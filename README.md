@@ -23,3 +23,8 @@ class DefaultLitAPI(LitAPI):
 server = LitServer(DefaultLitAPI())
 server.run(port=8888)
 ```
+
+Once the server starts it generates an example client you can use like this:
+```bash
+python client.py
+```
