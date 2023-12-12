@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, Request
 from mlserver.lit_api import LitAPI
+import shutil
 
 class LitServer:
     def __init__(self, lit_api: LitAPI):
@@ -24,8 +25,8 @@ class LitServer:
                 raise e
 
     def generate_client_file(self):
-        src_path = "./client.py"
-        dest_path = os.getcwd() + '/client.py'
+        src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
+        dest_path = os.path.join(os.getcwd(), 'client.py')
 
         # Copy the file to the destination directory
         try:
