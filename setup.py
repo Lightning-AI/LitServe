@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='mlserver',
+    name='lit-server',
     version='0.0.0',
     description='Lit server',
     author='',

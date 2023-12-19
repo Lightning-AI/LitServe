@@ -8,23 +8,28 @@ pip install mlserver
 
 ```python
 from lib import LitAPI, LitServer
-from fastapi import Request
 
-class DefaultLitAPI(LitAPI):
-    async def setup(self):
+class SimpleLitAPI(LitAPI):
+    def setup(self, devices):
         self.model = lambda x: x**2
 
-    async def predict(self, request: Request, data: dict):
-        x = float(data.get("input", 0.0))
-        result = self.model(x)
-        return {"result": result}
+    def predict(self, x):
+        return self.model(x)
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def encode_response(self, output):
+        return {"output": output}
 
 
-server = LitServer(DefaultLitAPI())
+api = SimpleLitAPI()
+server = LitServer(api, accelerator="cuda", devices=[0, 1])
 server.run(port=8888)
 ```
 
 Once the server starts it generates an example client you can use like this:
+
 ```bash
 python client.py
 ```
