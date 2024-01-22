@@ -4,11 +4,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='lit-server',
-    version='0.0.0',
+    version='0.0.1',
     description='Lit server',
-    author='',
-    author_email='',
-    url='',
-    install_requires=['fastapi'],
+    author='Lightning AI',
+    author_email='luca@lightning.ai',
+    url='https://github.com/Lightning-AI/lit-server',
+    install_requires=['fastapi>=0.100, <0.200'],
     packages=find_packages(),
 )

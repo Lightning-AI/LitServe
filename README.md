@@ -1,7 +1,7 @@
 # server
 
 ```bash
-pip install mlserver
+pip install git+https://github.com/Lightning-AI/lit-server.git
 ```
 
 ## example
@@ -13,11 +13,11 @@ class SimpleLitAPI(LitAPI):
     def setup(self, devices):
         self.model = lambda x: x**2
 
-    def predict(self, x):
-        return self.model(x)
-
     def decode_request(self, request):
         return request["input"]
+
+    def predict(self, x):
+        return self.model(x)
 
     def encode_response(self, output):
         return {"output": output}
