@@ -6,6 +6,8 @@ from lit_server import LitAPI, LitServer
 import torch
 import torch.nn as nn
 
+import pytest
+
 
 class Linear(nn.Module):
     def __init__(self):
@@ -36,6 +38,15 @@ class SimpleLitAPI(LitAPI):
 
 def test_torch():
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=5)
+
+    with TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 9.0}
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA to be available")
+def test_torch_gpu():
+    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=1, timeout=5)
 
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})

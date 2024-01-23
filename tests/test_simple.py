@@ -24,3 +24,27 @@ def test_simple():
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
+
+
+class SlowLitAPI(LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+
+    def decode_request(self, request: Request):
+        return request["input"]
+
+    def predict(self, x):
+        import time
+        time.sleep(1)
+        return self.model(x)
+
+    def encode_response(self, output) -> Response:
+        return {"output": output}
+
+
+def test_timeout():
+    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5)
+
+    with TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 504
