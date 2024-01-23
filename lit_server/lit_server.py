@@ -1,7 +1,8 @@
 import asyncio
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager
+from multiprocessing import Process, Manager, Queue, Pipe
+from queue import Empty
 import os
 import shutil
 import time
@@ -18,7 +19,7 @@ from lit_server import LitAPI
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 
-def inference_worker(lit_api, device, worker_id, request_buffer, response_buffer):
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
     lit_api.setup(device=device)
 
     while True:
@@ -27,18 +28,19 @@ def inference_worker(lit_api, device, worker_id, request_buffer, response_buffer
         #       to the buffer
         #       We could also expose the batching strategy at the LitAPI level
         try:
-            uid = next(iter(request_buffer.keys()))
-            x = request_buffer.pop(uid)
-        except (StopIteration, KeyError):
-            time.sleep(0.05)
+            uid = request_queue.get(timeout=1.0)
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+        except (Empty, ValueError):
             continue
 
-        x = lit_api.decode_request(x)
-
+        x = lit_api.decode_request(x_enc)
         y = lit_api.predict(x)
+        y_enc = lit_api.encode_response(y)
 
-        # response_buffer[uid] = y
-        response_buffer[uid] = lit_api.encode_response(y)
+        pipe_s.send(y_enc)
 
 
 def no_auth():
@@ -68,9 +70,9 @@ def cleanup(request_buffer, uid):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.request_queue = Queue()
     manager = Manager()
     app.request_buffer = manager.dict()
-    app.response_buffer = manager.dict()
 
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
     for worker_id, device in enumerate(app.devices * app.workers_per_device):
@@ -78,7 +80,7 @@ async def lifespan(app: FastAPI):
             device = device[0]
         process = Process(
             target=inference_worker,
-            args=(app.lit_api, device, worker_id, app.request_buffer, app.response_buffer),
+            args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer),
             daemon=True)
         process.start()
 
@@ -87,10 +89,18 @@ async def lifespan(app: FastAPI):
 
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
-    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1):
+    def __init__(
+        self,
+        lit_api: LitAPI,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=1,
+        timeout=30
+    ):
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
+        self.app.timeout = timeout
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -119,30 +129,34 @@ class LitServer:
         return [f"{accelerator}:{device}"]
 
     def setup_server(self):
-        # @self.app.post("/predict", dependencies=[Depends(setup_auth())])
-        @self.app.post("/predict")
+        @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
+            pipe_s, pipe_r = Pipe()
+
             if self.request_type == Request:
-                self.app.request_buffer[uid] = await request.json()
+                self.app.request_buffer[uid] = (await request.json(), pipe_s)
             else:
-                self.app.request_buffer[uid] = request
+                self.app.request_buffer[uid] = (request, pipe_s)
+
+            self.app.request_queue.put(uid)
+
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            output = None
+            if pipe_r.poll(self.app.timeout):
+                data = pipe_r.recv()
+            else:
+                raise HTTPException(status_code=504, detail="Request timed out")
 
-            while True:
-                await asyncio.sleep(0.05)
-                if uid in self.app.response_buffer:
-                    output = self.app.response_buffer.pop(uid)
-                    break
-
-            return output
+            return data
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
         dest_path = os.path.join(os.getcwd(), 'client.py')
+
+        if os.path.exists(dest_path):
+            return
 
         # Copy the file to the destination directory
         try:
@@ -151,8 +165,8 @@ class LitServer:
         except Exception as e:
             print(f"Error copying file: {e}")
 
-    def run(self, port=8000, timeout_keep_alive=30):
+    def run(self, port=8000, log_level="info", **kwargs):
         self.generate_client_file()
 
         import uvicorn
-        uvicorn.run(host="0.0.0.0", port=port, app=self.app, timeout_keep_alive=timeout_keep_alive, log_level="info")
+        uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)
