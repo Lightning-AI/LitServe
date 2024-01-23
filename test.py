@@ -27,10 +27,10 @@ class SimpleLitAPI(LitAPI):
 
     def decode_request(self, request: Request) -> Any:
         content = request["input"]
-        return torch.tensor(content, device=self.device)[None, None]
+        return torch.tensor([content], device=self.device)
 
     def predict(self, x: Any) -> Any:
-        return self.model(x)
+        return self.model(x[None, :])
 
     def encode_response(self, output: Any) -> Response:
         return {"output": float(output)}
@@ -53,15 +53,15 @@ class SimpleLitAPI2(LitAPI):
 
     def decode_request(self, request: PredictRequest) -> float:
         content = request.input
-        return torch.tensor(content, device=self.device)[None, None]
+        return torch.tensor([content], device=self.device)[None, None]
 
     def predict(self, x):
-        return self.model(x)
+        return self.model(x[None, :])
 
     def encode_response(self, output: float) -> PredictResponse:
         return PredictResponse(output=float(output))
 
 
 if __name__ == "__main__":
-    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=1, timeout=5)
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=5)
     server.run(port=8000)

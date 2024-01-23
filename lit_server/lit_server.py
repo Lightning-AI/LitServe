@@ -23,10 +23,9 @@ def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
     lit_api.setup(device=device)
 
     while True:
-        # TODO: we can easily implement batching here: just keep getting
-        #       items from the buffer, fill a batch, predict, assign outputs
-        #       to the buffer
-        #       We could also expose the batching strategy at the LitAPI level
+        # NOTE: to implement batching here: keep getting items from the queue,
+        #       fill a batch, predict, send outputs to the respective pipes
+        #       In the future we will expose this through the API.
         try:
             uid = request_queue.get(timeout=1.0)
             try:
