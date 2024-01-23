@@ -18,8 +18,8 @@ from lit_server import LitAPI
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 
-def inference_worker(lit_api, devices, worker_id, request_buffer, response_buffer):
-    lit_api.setup(devices=devices)
+def inference_worker(lit_api, device, worker_id, request_buffer, response_buffer):
+    lit_api.setup(device=device)
 
     while True:
         # TODO: we can easily implement batching here: just keep getting
@@ -33,9 +33,12 @@ def inference_worker(lit_api, devices, worker_id, request_buffer, response_buffe
             time.sleep(0.05)
             continue
 
+        x = lit_api.decode_request(x)
+
         y = lit_api.predict(x)
 
-        response_buffer[uid] = y
+        # response_buffer[uid] = y
+        response_buffer[uid] = lit_api.encode_response(y)
 
 
 def no_auth():
@@ -69,10 +72,13 @@ async def lifespan(app: FastAPI):
     app.request_buffer = manager.dict()
     app.response_buffer = manager.dict()
 
-    for worker_id, devices in enumerate(app.devices * app.workers_per_device):
+    # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
+    for worker_id, device in enumerate(app.devices * app.workers_per_device):
+        if len(device) == 1:
+            device = device[0]
         process = Process(
             target=inference_worker,
-            args=(app.lit_api, devices, worker_id, app.request_buffer, app.response_buffer),
+            args=(app.lit_api, device, worker_id, app.request_buffer, app.response_buffer),
             daemon=True)
         process.start()
 
@@ -113,14 +119,15 @@ class LitServer:
         return [f"{accelerator}:{device}"]
 
     def setup_server(self):
-        @self.app.post("/predict", dependencies=[Depends(setup_auth())])
+        # @self.app.post("/predict", dependencies=[Depends(setup_auth())])
+        @self.app.post("/predict")
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
             if self.request_type == Request:
-                self.app.request_buffer[uid] = self.app.lit_api.decode_request(await request.json())
+                self.app.request_buffer[uid] = await request.json()
             else:
-                self.app.request_buffer[uid] = self.app.lit_api.decode_request(request)
+                self.app.request_buffer[uid] = request
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
             output = None
@@ -131,7 +138,7 @@ class LitServer:
                     output = self.app.response_buffer.pop(uid)
                     break
 
-            return self.app.lit_api.encode_response(output)
+            return output
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")

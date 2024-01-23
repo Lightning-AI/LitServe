@@ -9,6 +9,6 @@ setup(
     author='Lightning AI',
     author_email='luca@lightning.ai',
     url='https://github.com/Lightning-AI/lit-server',
-    install_requires=['fastapi>=0.100, <0.200'],
+    install_requires=['fastapi>=0.100'],
     packages=find_packages(),
 )
