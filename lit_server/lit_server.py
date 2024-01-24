@@ -1,5 +1,5 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-
+import asyncio
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -40,7 +40,10 @@ def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
         y = lit_api.predict(x)
         y_enc = lit_api.encode_response(y)
 
-        pipe_s.send(y_enc)
+        try:
+            pipe_s.send(y_enc)
+        except BrokenPipeError:
+            pass
 
 
 def no_auth():
@@ -144,10 +147,15 @@ class LitServer:
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            if pipe_r.poll(self.app.timeout):
-                data = pipe_r.recv()
-            else:
-                raise HTTPException(status_code=504, detail="Request timed out")
+            async def get_from_pipe():
+                if pipe_r.poll(self.app.timeout):
+                    return pipe_r.recv()
+                return HTTPException(status_code=504, detail="Request timed out")
+
+            data = await asyncio.get_running_loop().create_task(get_from_pipe())
+
+            if type(data) == HTTPException:
+                raise data
 
             return data
 
