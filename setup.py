@@ -3,12 +3,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='mlserver',
-    version='0.0.0',
+    name='lit-server',
+    version='0.0.1',
     description='Lit server',
-    author='',
-    author_email='',
-    url='',
-    install_requires=['fastapi'],
+    author='Lightning AI',
+    author_email='luca@lightning.ai',
+    url='https://github.com/Lightning-AI/lit-server',
+    install_requires=['fastapi>=0.100'],
     packages=find_packages(),
 )
