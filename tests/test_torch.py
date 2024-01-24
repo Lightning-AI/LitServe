@@ -44,7 +44,7 @@ def test_torch():
         assert response.json() == {"output": 9.0}
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA to be available")
+@pytest.mark.skipif(torch.cuda.device_count() == 0, reason="requires CUDA to be available")
 def test_torch_gpu():
     server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=1, timeout=5)
 
