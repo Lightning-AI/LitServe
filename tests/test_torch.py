@@ -1,3 +1,5 @@
+# Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 

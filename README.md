@@ -2,7 +2,7 @@
 
 Lightweight inference server for AI/ML models based on FastAPI.
 
-Lit-server supports:
+lit-server supports:
 
 - serving models across multiple GPUs
 - full flexibility in the definition of request and response
@@ -209,3 +209,8 @@ LIT_SERVER_API_KEY=supersecretkey python main.py
 ```
 
 Clients are expected to auth with the same API key set in the `X-API-Key` HTTP header.
+
+## License
+
+lit-server is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
+See LICENSE file for details.
