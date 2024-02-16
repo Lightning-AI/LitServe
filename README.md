@@ -1,8 +1,8 @@
-# lit-serve
+# litserve
 
 Lightweight inference server for AI/ML models based on FastAPI.
 
-lit-server supports:
+litserve supports:
 
 - serving models across multiple GPUs
 - full flexibility in the definition of request and response
