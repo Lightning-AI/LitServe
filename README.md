@@ -1,4 +1,4 @@
-# lit-server
+# lit-serve
 
 Lightweight inference server for AI/ML models based on FastAPI.
 
