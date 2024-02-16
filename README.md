@@ -212,5 +212,5 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 ## License
 
-lit-server is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
+litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 See LICENSE file for details.
