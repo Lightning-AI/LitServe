@@ -13,7 +13,7 @@ import uuid
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
 
-from lit_server import LitAPI
+from litserve import LitAPI
 
 
 # if defined, it will require clients to auth with X-API-Key in the header

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from pydantic import BaseModel
 
-from lit_server import LitAPI, LitServer
+from litserve import LitAPI, LitServer
 
 
 class PredictRequest(BaseModel):

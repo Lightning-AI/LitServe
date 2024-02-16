@@ -8,7 +8,7 @@ import time
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
-from lit_server import LitAPI, LitServer
+from litserve import LitAPI, LitServer
 
 import requests
 import pytest

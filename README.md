@@ -18,7 +18,7 @@ and we'll probably add those directly as part of the library in the near future.
 ## Install
 
 ```bash
-pip install git+https://github.com/Lightning-AI/lit-server.git
+pip install git+https://github.com/Lightning-AI/litserve.git
 ```
 
 ## Use
@@ -26,7 +26,7 @@ pip install git+https://github.com/Lightning-AI/lit-server.git
 ### Creating a simple API server
 
 ```python
-from lib import LitAPI
+from litserve import LitAPI
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
@@ -57,7 +57,7 @@ class SimpleLitAPI(LitAPI):
 Now instantiate the API and start the server on an accelerator:
 
 ```python
-from lib import LitServer
+from litserve import LitServer
 
 api = SimpleLitAPI()
 
@@ -124,7 +124,7 @@ For example, running the API server on a 4-GPU machine, with a PyTorch model ser
 ```python
 from fastapi import Request, Response
 
-from lit_server import LitAPI, LitServer
+from litserve import LitAPI, LitServer
 
 import torch
 import torch.nn as nn

@@ -3,7 +3,7 @@
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
-from lit_server import LitAPI, LitServer
+from litserve import LitAPI, LitServer
 
 import torch
 import torch.nn as nn
