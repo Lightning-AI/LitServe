@@ -1,4 +1,8 @@
-coverage>=5.0
-pytest>=6.0
+coverage >=5.0
+pytest >=6.0
 pytest-cov
-mypy==1.8.0
+
+mypy ==1.8.0
+
+lightning >=2.0.0
+torch >=2.0.0
