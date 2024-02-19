@@ -65,7 +65,7 @@ jobs:
 
       - name: Tests
         run: |
-          coverage run --source pl_sandbox -m pytest src tests -v
+          coverage run --source litserve -m pytest src tests -v
 
       - name: Statistics
         if: success()
