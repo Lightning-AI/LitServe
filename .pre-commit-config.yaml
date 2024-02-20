@@ -66,8 +66,8 @@ repos:
           - pep8-naming
           - pydocstyle
 
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.277
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.2.0
     hooks:
       - id: ruff-format
         args: ["--preview"]
