@@ -1,0 +1,76 @@
+name: CI testing
+
+on:
+  push:
+    branches: [main, "release/*"]
+  pull_request:
+    branches: [main, "release/*"]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pytest:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        python-version: [3.9]
+        requires: ["oldest", "latest"]
+
+    timeout-minutes: 35
+    env:
+      TORCH_URL: "https://download.pytorch.org/whl/cpu/torch_stable.html"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set min. dependencies
+        if: matrix.requires == 'oldest'
+        run: |
+          for fpath in ('requirements.txt', '_requirements/test.txt'):
+              req = open(fpath).read().replace('>=', '==')
+              open(fpath, 'w').write(req)
+        shell: python
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.requires }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.requires }}-pip-
+
+      - name: Install package & dependencies
+        run: |
+          pip --version
+          pip install -e '.[test]' -U -q --find-links $TORCH_URL
+          pip list
+
+      - name: Tests
+        run: coverage run --source litserve -m pytest src tests -v
+
+      - name: Statistics
+        if: success()
+        run: |
+          coverage report
+          coverage xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          flags: unittests
+          env_vars: OS,PYTHON
+          name: codecov-umbrella
+          fail_ci_if_error: false
