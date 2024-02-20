@@ -18,7 +18,7 @@ and we'll probably add those directly as part of the library in the near future.
 ## Install
 
 ```bash
-pip install git+https://github.com/Lightning-AI/litserve.git
+pip install litserve
 ```
 
 ## Use
