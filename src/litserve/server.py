@@ -1,12 +1,12 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
 from queue import Empty
 import os
 import shutil
-import time
 from typing import Sequence
 import uuid
 
@@ -40,21 +40,18 @@ def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
         y = lit_api.predict(x)
         y_enc = lit_api.encode_response(y)
 
-        try:
+        with contextlib.suppress(BrokenPipeError):
             pipe_s.send(y_enc)
-        except BrokenPipeError:
-            pass
 
 
 def no_auth():
     pass
 
 
-def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name='X-API-Key'))):
+def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
     if x_api_key != LIT_SERVER_API_KEY:
         raise HTTPException(
-            status_code=401,
-            detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
+            status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
         )
 
 
@@ -65,10 +62,8 @@ def setup_auth():
 
 
 def cleanup(request_buffer, uid):
-    try:
+    with contextlib.suppress(KeyError):
         request_buffer.pop(uid)
-    except KeyError:
-        pass
 
 
 @asynccontextmanager
@@ -84,7 +79,8 @@ async def lifespan(app: FastAPI):
         process = Process(
             target=inference_worker,
             args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer),
-            daemon=True)
+            daemon=True,
+        )
         process.start()
 
     yield
@@ -92,14 +88,7 @@ async def lifespan(app: FastAPI):
 
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
-    def __init__(
-        self,
-        lit_api: LitAPI,
-        accelerator="cpu",
-        devices=1,
-        workers_per_device=1,
-        timeout=30
-    ):
+    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1, timeout=30):
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
@@ -161,7 +150,7 @@ class LitServer:
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
-        dest_path = os.path.join(os.getcwd(), 'client.py')
+        dest_path = os.path.join(os.getcwd(), "client.py")
 
         if os.path.exists(dest_path):
             return
@@ -177,4 +166,5 @@ class LitServer:
         self.generate_client_file()
 
         import uvicorn
+
         uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)

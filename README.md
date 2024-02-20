@@ -28,6 +28,7 @@ pip install git+https://github.com/Lightning-AI/litserve.git
 ```python
 from litserve import LitAPI
 
+
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
         """
@@ -88,11 +89,14 @@ with the advantage that the API will automatically validate the request.
 ```python
 from pydantic import BaseModel
 
+
 class PredictRequest(BaseModel):
     input: float
 
+
 class PredictResponse(BaseModel):
     output: float
+
 
 class SimpleLitAPI2(LitAPI):
     def setup(self, device):
@@ -113,7 +117,6 @@ if __name__ == "__main__":
     server = LitServer(api, accelerator="cpu")
     server.run(port=8888)
 ```
-
 
 ### Serving on GPU
 
@@ -173,7 +176,7 @@ The `devices` variable can also be an array specifying what device id to
 run the model on:
 
 ```python
-    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=[0, 3])
+server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=[0, 3])
 ```
 
 Last, you can run multiple copies of the same model from the same device,
@@ -181,7 +184,7 @@ if the model is small. The following will load two copies of the model on
 each of the 4 GPUs:
 
 ```python
-    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, workers_per_device=2)
+server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, workers_per_device=2)
 ```
 
 ### Timeouts and disconnections
@@ -194,14 +197,14 @@ response (Gateway Timeout) indicating that their request has timed out.
 For example, this is how you can configure the server with a timeout of 30 seconds per response.
 
 ```python
-    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
+server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
 ```
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
 
 ### Using API key authentication
 
-In order to secure the API behind an API key, just define the env var when 
+In order to secure the API behind an API key, just define the env var when
 starting the server
 
 ```bash

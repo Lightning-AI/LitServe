@@ -1,6 +1,5 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
-from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
 from pydantic import BaseModel
@@ -11,8 +10,10 @@ from litserve import LitAPI, LitServer
 class PredictRequest(BaseModel):
     input: float
 
+
 class PredictResponse(BaseModel):
     output: float
+
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):

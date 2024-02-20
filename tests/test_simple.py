@@ -47,6 +47,7 @@ def test_load():
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=25)
 
     from threading import Thread
+
     threads = []
 
     for _ in range(1):
@@ -59,7 +60,7 @@ def test_load():
         t.join()
         for el in outputs:
             assert el == {"output": 16.0}
-    
+
 
 class SlowLitAPI(LitAPI):
     def setup(self, device):
@@ -70,6 +71,7 @@ class SlowLitAPI(LitAPI):
 
     def predict(self, x):
         import time
+
         time.sleep(1)
         return self.model(x)
 
@@ -89,20 +91,23 @@ def get_free_port(port=1024, max_port=65535):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while port <= max_port:
         try:
-            sock.bind(('', port))
+            sock.bind(("", port))
             sock.close()
             return port
         except OSError:
             port += 1
-    raise IOError('no free ports')
+    raise OSError("no free ports")
+
 
 def start_server_slow(port):
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=10)
     server.run(port=port)
 
+
 def make_request(port, res_queue):
     response = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0})
     res_queue.put(response.json())
+
 
 @pytest.mark.xfail()  # fixme
 def test_concurrent_requests():
@@ -110,7 +115,7 @@ def test_concurrent_requests():
 
     port = get_free_port()
 
-    p = Process(target=start_server_slow, args=(port, ))
+    p = Process(target=start_server_slow, args=(port,))
     p.start()
 
     time.sleep(1)
@@ -120,7 +125,7 @@ def test_concurrent_requests():
 
     for el in req_procs:
         el.start()
-    
+
     for el in req_procs:
         el.join()
 
@@ -133,7 +138,7 @@ def test_concurrent_requests():
             count += 1
         except Empty:
             break
-        
+
         assert response == {"output": 16.0}
 
     assert count == n_requests

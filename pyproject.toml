@@ -1,0 +1,127 @@
+[metadata]
+license_file = "LICENSE"
+description-file = "README.md"
+
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+]
+
+
+[tool.check-manifest]
+ignore = [
+    "*.yml",
+    ".github",
+    ".github/*"
+]
+
+
+[tool.pytest.ini_options]
+norecursedirs = [
+    ".git",
+    ".github",
+    "dist",
+    "build",
+    "docs",
+]
+addopts = [
+    "--strict-markers",
+    "--doctest-modules",
+    "--color=yes",
+    "--disable-pytest-warnings",
+]
+filterwarnings = [
+    "error::FutureWarning",
+]
+xfail_strict = true
+junit_duration_report = "call"
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "pass",
+]
+
+[tool.codespell]
+#skip = '*.py'
+quiet-level = 3
+# comma separated list of words; waiting for:
+#  https://github.com/codespell-project/codespell/issues/2839#issuecomment-1731601603
+# also adding links until they ignored by its: nature
+#  https://github.com/codespell-project/codespell/issues/2243#issuecomment-1732019960
+#ignore-words-list = ""
+
+[tool.docformatter]
+recursive = true
+wrap-summaries = 120
+wrap-descriptions = 120
+blank = true
+
+
+#[tool.mypy]
+#files = [
+#    "src",
+#]
+#install_types = true
+#non_interactive = true
+#disallow_untyped_defs = true
+#ignore_missing_imports = true
+#show_error_codes = true
+#warn_redundant_casts = true
+#warn_unused_configs = true
+#warn_unused_ignores = true
+#allow_redefinition = true
+## disable this rule as the Trainer attributes are defined in the connectors, not in its __init__
+#disable_error_code = "attr-defined"
+## style choices
+#warn_no_return = false
+
+
+[tool.ruff]
+line-length = 120
+# Enable Pyflakes `E` and `F` codes by default.
+lint.select = [
+    "E", "W",  # see: https://pypi.org/project/pycodestyle
+    "F",  # see: https://pypi.org/project/pyflakes
+    "N",  # see: https://pypi.org/project/pep8-naming
+#    "D",  # see: https://pypi.org/project/pydocstyle
+]
+lint.extend-select = [
+    "C4",  # see: https://pypi.org/project/flake8-comprehensions
+    "PT",  # see: https://pypi.org/project/flake8-pytest-style
+    "RET",  # see: https://pypi.org/project/flake8-return
+    "SIM",  # see: https://pypi.org/project/flake8-simplify
+]
+lint.ignore = [
+    "E731",  # Do not assign a lambda expression, use a def
+]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".eggs",
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pypackages__",
+    "_build",
+    "build",
+    "dist",
+    "docs"
+]
+lint.ignore-init-module-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+"setup.py" = ["D100", "SIM115"]
+"__about__.py" = ["D100"]
+"__init__.py" = ["D100"]
+
+[tool.ruff.lint.pydocstyle]
+# Use Google-style docstrings.
+convention = "google"
+
+#[tool.ruff.pycodestyle]
+#ignore-overlong-task-comments = true
+
+[tool.ruff.lint.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
