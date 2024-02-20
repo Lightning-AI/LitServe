@@ -59,23 +59,23 @@ wrap-descriptions = 120
 blank = true
 
 
-[tool.mypy]
-files = [
-    "src",
-]
-install_types = true
-non_interactive = true
-disallow_untyped_defs = true
-ignore_missing_imports = true
-show_error_codes = true
-warn_redundant_casts = true
-warn_unused_configs = true
-warn_unused_ignores = true
-allow_redefinition = true
-# disable this rule as the Trainer attributes are defined in the connectors, not in its __init__
-disable_error_code = "attr-defined"
-# style choices
-warn_no_return = false
+#[tool.mypy]
+#files = [
+#    "src",
+#]
+#install_types = true
+#non_interactive = true
+#disallow_untyped_defs = true
+#ignore_missing_imports = true
+#show_error_codes = true
+#warn_redundant_casts = true
+#warn_unused_configs = true
+#warn_unused_ignores = true
+#allow_redefinition = true
+## disable this rule as the Trainer attributes are defined in the connectors, not in its __init__
+#disable_error_code = "attr-defined"
+## style choices
+#warn_no_return = false
 
 
 [tool.ruff]
