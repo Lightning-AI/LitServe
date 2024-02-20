@@ -1,5 +1,6 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -39,10 +40,8 @@ def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
         y = lit_api.predict(x)
         y_enc = lit_api.encode_response(y)
 
-        try:
+        with contextlib.suppress(BrokenPipeError):
             pipe_s.send(y_enc)
-        except BrokenPipeError:
-            pass
 
 
 def no_auth():
@@ -63,10 +62,8 @@ def setup_auth():
 
 
 def cleanup(request_buffer, uid):
-    try:
+    with contextlib.suppress(KeyError):
         request_buffer.pop(uid)
-    except KeyError:
-        pass
 
 
 @asynccontextmanager
