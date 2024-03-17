@@ -14,10 +14,18 @@ class LitAPI(ABC):
         """Convert the request payload to your model input."""
         pass
 
+    def batch(self, inputs):
+        """Convert a list of inputs to a batched input."""
+        raise NotImplementedError
+
     @abstractmethod
     def predict(self, x):
         """Run the model on the input and return the output."""
         pass
+
+    def unbatch(self, inputs):
+        """Convert a batched output to a list of outputs."""
+        raise NotImplementedError
 
     @abstractmethod
     def encode_response(self, output):
