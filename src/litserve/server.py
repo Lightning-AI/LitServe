@@ -73,10 +73,10 @@ def batched_loop(lit_api, device, worker_id, request_queue, request_buffer, max_
                 pipe_s.send(y_enc)
  
 
-def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, batching, max_batch_size):
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size):
     lit_api.setup(device=device)
 
-    if batching:
+    if max_batch_size > 1:
         batched_loop(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size)
     else:
         single_loop(lit_api, device, worker_id, request_queue, request_buffer)
@@ -116,8 +116,8 @@ async def lifespan(app: FastAPI):
             device = device[0]
         process = Process(
             target=inference_worker,
-            args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer, app.batching, app.max_batch_size),
-            daemon=True,
+            args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer, app.max_batch_size),
+            daemon=False,
         )
         process.start()
 
@@ -132,12 +132,11 @@ async def get_from_pipe(pipe, timeout):
 
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
-    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1, timeout=30, batching=False, max_batch_size=1):
+    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1, timeout=30, max_batch_size=1):
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
         self.app.timeout = timeout
-        self.app.batching = batching
         self.app.max_batch_size = max_batch_size
 
         initial_pool_size = 100
@@ -229,4 +228,4 @@ class LitServer:
 
         import uvicorn
 
-        uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)
+        uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, workers=1, **kwargs)

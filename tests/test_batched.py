@@ -48,6 +48,22 @@ class SimpleLitAPI(LitAPI):
         return {"output": float(output)}
 
 
+class SimpleLitAPI2(LitAPI):
+    def setup(self, device):
+        self.model = Linear().to(device)
+        self.device = device
+
+    def decode_request(self, request: Request):
+        content = request["input"]
+        return torch.tensor([content], device=self.device)
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output) -> Response:
+        return {"output": float(output)}
+
+
 def patched_inference_worker(*args, **kwargs):
     # TODO: delay the start of the loop, so requests have time to accumulate on the queue
     import time
@@ -61,7 +77,7 @@ async def test_batched(monkeypatch):
     monkeypatch.setattr(litserve.server, "inference_worker", patched_inference_worker)
 
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=5, batching=True, max_batch_size=10)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=5, max_batch_size=10)
 
     async with AsyncClient(server.app) as client:
         co1 = client.post("/predict", json={"input": 4.0})
@@ -74,3 +90,5 @@ async def test_batched(monkeypatch):
 
     assert response1.json() == {"output": 9.0}
     assert response2.json() == {"output": 9.0}
+
+    # TODO check that batch unbatch have been called

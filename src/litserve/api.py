@@ -3,6 +3,21 @@
 from abc import ABC, abstractmethod
 
 
+def no_batch_unbatch_message(obj):
+    return f"""
+        You set `max_batch_size > 1` but didn't implement batch() and unbatch().
+        Add these two methods to {obj.__class__.__name__}.
+
+        Example:
+
+        def batch(self, inputs):
+            return np.stack(inputs)
+
+        def unbatch(self, output):
+            return list(output)
+    """
+
+
 class LitAPI(ABC):
     @abstractmethod
     def setup(self, devices):
@@ -16,16 +31,28 @@ class LitAPI(ABC):
 
     def batch(self, inputs):
         """Convert a list of inputs to a batched input."""
-        raise NotImplementedError
+        # consider assigning an implementation when starting server
+        # to avoid the runtime cost of checking (should be negligible)
+        if hasattr(inputs[0], "__torch_function__"):
+            import torch
+            return torch.stack(inputs)
+        elif inputs[0].__class__.__name__ == "ndarray":
+            import numpy
+            return numpy.stack(inputs)
+        raise NotImplementedError(no_batch_unbatch_message(self))
 
     @abstractmethod
     def predict(self, x):
         """Run the model on the input and return the output."""
         pass
 
-    def unbatch(self, inputs):
+    def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
-        raise NotImplementedError
+        if hasattr(output, "__torch_function__"):
+            return list(output)
+        elif output.__class__.__name__ == "ndarray":
+            return list(output)
+        raise NotImplementedError(no_batch_unbatch_message(self))
 
     @abstractmethod
     def encode_response(self, output):
