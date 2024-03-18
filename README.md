@@ -5,6 +5,7 @@ Inference server for AI/ML models that is minimal and highly scalable.
 LitServe can:
 
 - Serve models across multiple GPUs
+- Supports all ML frameworks (PyTorch, Jax, Tensorflow, etc...)
 - Handles batching
 - Granular control for managing the request and response formats
 - Automatically validates schemas
