@@ -15,6 +15,7 @@ LitServe aims to be minimal and fully hackable by design. Despite its focus on m
 it his highly performant.
 
 Coming soon:
+
 - streaming (or submit a PR).
 
 ## Install
@@ -28,8 +29,10 @@ pip install litserve
 ### Create a demo API server
 
 First, define your API.
+
 ```python
 from litserve import LitAPI
+
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
@@ -71,7 +74,8 @@ server.run(port=8000)
 The server expects the client to send a `POST` to the `/predict` URL with a JSON payload.
 The way the payload is structured is up to the implementation of the `LitAPI` subclass.
 
-LitServe generates a client when the server starts. Test the server with this client:   
+LitServe generates a client when the server starts. Test the server with this client:
+
 ```bash
 python client.py
 ```
@@ -86,14 +90,18 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 
 Define the request and response as [Pydantic models](https://docs.pydantic.dev/latest/),
 to automatically validate the request.
+
 ```python
 from pydantic import BaseModel
+
 
 class PredictRequest(BaseModel):
     input: float
 
+
 class PredictResponse(BaseModel):
     output: float
+
 
 class SimpleLitAPI2(LitAPI):
     def setup(self, device):
@@ -107,6 +115,7 @@ class SimpleLitAPI2(LitAPI):
 
     def encode_response(self, output: float) -> PredictResponse:
         return PredictResponse(output=output)
+
 
 if __name__ == "__main__":
     api = SimpleLitAPI()
