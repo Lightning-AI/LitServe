@@ -1,19 +1,22 @@
-# litserve
+# LitServe
 
-Lightweight inference server for AI/ML models based on FastAPI.
+Inference server for AI/ML models that is minimal and highly scalable.
 
-litserve supports:
+LitServe can:
 
-- serving models across multiple GPUs
-- full flexibility in the definition of request and response
-- automatic schema validation
-- handling of timeouts and disconnections
-- API key authentication
+- Serve models across multiple GPUs
+- Handles batching
+- Granular control for managing the request and response formats
+- Automatically validates schemas
+- Handles timeouts and disconnects
+- Enables API key authentication
 
-While being fairly capable and fast, the server is extremely simple and hackable.
+LitServe aims to be minimal and fully hackable by design. Despite its focus on minimalism,
+it his highly performant.
 
-For example, adding batching and streaming logic should be relatively straightforward
-and we'll probably add those directly as part of the library in the near future.
+Coming soon:
+
+- streaming (or submit a PR).
 
 ## Install
 
@@ -23,7 +26,9 @@ pip install litserve
 
 ## Use
 
-### Creating a simple API server
+### Create a demo API server
+
+First, define your API.
 
 ```python
 from litserve import LitAPI
@@ -55,7 +60,7 @@ class SimpleLitAPI(LitAPI):
         return {"output": output}
 ```
 
-Now instantiate the API and start the server on an accelerator:
+Next, instantiate the API and start the server on a GPU:
 
 ```python
 from litserve import LitServer
@@ -69,7 +74,7 @@ server.run(port=8000)
 The server expects the client to send a `POST` to the `/predict` URL with a JSON payload.
 The way the payload is structured is up to the implementation of the `LitAPI` subclass.
 
-Once the server starts it generates an example client you can use like this:
+LitServe generates a client when the server starts. Test the server with this client:
 
 ```bash
 python client.py
@@ -81,10 +86,10 @@ that simply posts a sample request to the server:
 response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 ```
 
-### Pydantic models
+### Automatically validate requests
 
-You can also define request and response as [Pydantic models](https://docs.pydantic.dev/latest/),
-with the advantage that the API will automatically validate the request.
+Define the request and response as [Pydantic models](https://docs.pydantic.dev/latest/),
+to automatically validate the request.
 
 ```python
 from pydantic import BaseModel
@@ -118,7 +123,7 @@ if __name__ == "__main__":
     server.run(port=8888)
 ```
 
-### Serving on GPU
+### Serve on GPUs
 
 `LitServer` has the ability to coordinate serving from multiple GPUs.
 
@@ -202,7 +207,7 @@ server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
 
-### Using API key authentication
+### Use API key authentication
 
 In order to secure the API behind an API key, just define the env var when
 starting the server
