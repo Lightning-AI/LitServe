@@ -16,6 +16,7 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, R
 from fastapi.security import APIKeyHeader
 
 from litserve import LitAPI
+import logging
 
 
 # if defined, it will require clients to auth with X-API-Key in the header
@@ -39,26 +40,22 @@ def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, ba
         uids = [request_queue.get_nowait() for _ in range(max_batch_size)]
         return aggregate_batches_from_uid(uids, lit_api, request_buffer)
 
-    batches = []
+    uids = []
     start_time = time.time()
-    while len(batches) <= max_batch_size and time.time() - start_time < batch_timeout:
+    while len(uids) <= max_batch_size and (time.time() - start_time < batch_timeout):
         try:
             uid = request_queue.get_nowait()
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
-            x = lit_api.decode_request(x_enc)
-            batches.append((x, pipe_s))
+            uids.append(uid)
         except (Empty, ValueError):
             continue
-    return batches
+    return aggregate_batches_from_uid(uids, lit_api, request_buffer)
 
 
 def inference_worker(
     lit_api, device, worker_id, request_queue: Queue, request_buffer, max_batch_size, batch_timeout, cancel_event
 ):
     lit_api.setup(device=device)
+
     while True:
         if cancel_event.is_set():
             break
@@ -181,7 +178,7 @@ class LitServer:
         @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
-            print("new request", uid)
+            logging.info(f"new request: {uid}")
 
             pipe_s, pipe_r = Pipe()
 
@@ -190,7 +187,7 @@ class LitServer:
             else:
                 self.app.request_buffer[uid] = (request, pipe_s)
 
-            self.app.request_queue.put_nowait(uid)
+            self.app.request_queue.put(uid)
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
