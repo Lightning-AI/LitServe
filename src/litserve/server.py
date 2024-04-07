@@ -22,7 +22,6 @@ import logging
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
-
 def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
@@ -35,12 +34,12 @@ def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     return batches
 
 
-def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout):
+def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout, request_event: Event):
     uids = []
-    start_time = time.time()
-    while len(uids) <= max_batch_size and (time.time() - start_time < batch_timeout):
+    entered_at = time.time()
+    while batch_timeout - (time.time() - entered_at) and len(uids) <= max_batch_size:
         try:
-            uid = request_queue.get_nowait()
+            uid = request_queue.get(1.0)
             uids.append(uid)
         except (Empty, ValueError):
             continue
@@ -48,15 +47,13 @@ def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, ba
 
 
 def inference_worker(
-    lit_api, device, worker_id, request_queue: Queue, request_buffer, max_batch_size, batch_timeout, cancel_event
+    lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, request_event
 ):
     lit_api.setup(device=device)
-
     while True:
-        if cancel_event.is_set():
-            break
-
-        batches = aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+        batches = aggregate_batches(
+            lit_api, request_queue, request_buffer, max_batch_size, batch_timeout, request_event
+        )
         if not batches:
             continue
         x_batch, pipe_s_batch = zip(*batches)
@@ -95,8 +92,6 @@ async def lifespan(app: FastAPI):
     app.request_queue = Queue()
     manager = Manager()
     app.request_buffer = manager.dict()
-    app.cancel_event = Event()
-    signal.signal(signal.SIGINT, lambda x, y: app.cancel_event.set())
 
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
     for worker_id, device in enumerate(app.devices * app.workers_per_device):
@@ -112,7 +107,7 @@ async def lifespan(app: FastAPI):
                 app.request_buffer,
                 app.max_batch_size,
                 app.batch_timeout,
-                app.cancel_event,
+                app.request_event,
             ),
             daemon=True,
         )
@@ -133,12 +128,15 @@ class LitServer:
         max_batch_size=1,
         batch_timeout=1.0,
     ):
+        if batch_timeout > timeout:
+            raise ValueError(f"batch_timeout must be less than timeout")
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
         self.app.timeout = timeout
         self.app.max_batch_size = max_batch_size
         self.app.batch_timeout = batch_timeout
+        self.app.request_event = Event()
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -184,6 +182,7 @@ class LitServer:
                 self.app.request_buffer[uid] = (request, pipe_s)
 
             self.app.request_queue.put(uid)
+            self.app.request_event.set()
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
