@@ -9,7 +9,6 @@ import time
 import os
 import shutil
 from typing import Sequence
-import signal
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -21,6 +20,7 @@ import logging
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
+
 
 def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     batches = []
@@ -129,7 +129,7 @@ class LitServer:
         batch_timeout=1.0,
     ):
         if batch_timeout > timeout:
-            raise ValueError(f"batch_timeout must be less than timeout")
+            raise ValueError("batch_timeout must be less than timeout")
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
