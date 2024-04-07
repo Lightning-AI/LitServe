@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
 from queue import Empty
+import time
 import os
 import shutil
 from typing import Sequence
@@ -20,28 +21,35 @@ from litserve import LitAPI
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 
-def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size=1, batch_timeout=1.0):
     lit_api.setup(device=device)
-
     while True:
         # NOTE: to implement batching here: keep getting items from the queue,
         #       fill a batch, predict, send outputs to the respective pipes
         #       In the future we will expose this through the API.
-        try:
-            uid = request_queue.get(timeout=1.0)
+        batches = []
+        start_time = time.time()
+        while len(batches) <= max_batch_size and time.time() - start_time < batch_timeout:
             try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
+                uid = request_queue.get(timeout=batch_timeout)
+                try:
+                    x_enc, pipe_s = request_buffer.pop(uid)
+                except KeyError:
+                    continue
+                x = lit_api.decode_request(x_enc)
+                batches.append((x, pipe_s))
+            except (Empty, ValueError):
                 continue
-        except (Empty, ValueError):
+
+        if not batches:
             continue
+        x_batch, pipe_s_batch = zip(*batches)
+        y_batch = lit_api.predict(x_batch)
 
-        x = lit_api.decode_request(x_enc)
-        y = lit_api.predict(x)
-        y_enc = lit_api.encode_response(y)
-
-        with contextlib.suppress(BrokenPipeError):
-            pipe_s.send(y_enc)
+        for y, pipe_s  in zip(y_batch, pipe_s_batch):
+            y_enc = lit_api.encode_response(y)
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send(y_enc)
 
 
 def no_auth():
