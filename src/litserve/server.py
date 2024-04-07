@@ -22,6 +22,7 @@ import logging
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
+
 def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
