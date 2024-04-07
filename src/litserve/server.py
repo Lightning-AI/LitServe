@@ -3,12 +3,13 @@ import asyncio
 import contextlib
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager, Queue, Pipe
+from multiprocessing import Process, Manager, Queue, Pipe, Event
 from queue import Empty
 import time
 import os
 import shutil
 from typing import Sequence
+import signal
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -20,27 +21,46 @@ from litserve import LitAPI
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
+def aggregate_batches_from_uid(uids, lit_api, request_buffer):
+    batches = []
+    for uid in uids:
+        try:
+            x_enc, pipe_s = request_buffer.pop(uid)
+        except KeyError:
+            continue
+        x = lit_api.decode_request(x_enc)
+        batches.append((x, pipe_s))
+    return batches
 
-def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout):
+def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout):
+    if request_queue.qsize() >= max_batch_size:
+        uids = [request_queue.get_nowait() for _ in range(max_batch_size)]
+        return aggregate_batches_from_uid(uids, lit_api, request_buffer)
+
+    batches = []
+    start_time = time.time()
+    while len(batches) <= max_batch_size and time.time() - start_time < batch_timeout:
+        try:
+            uid = request_queue.get_nowait()
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+            x = lit_api.decode_request(x_enc)
+            batches.append((x, pipe_s))
+        except (Empty, ValueError):
+            continue
+    return batches
+
+def inference_worker(
+    lit_api, device, worker_id, request_queue: Queue, request_buffer, max_batch_size, batch_timeout, cancel_event
+):
     lit_api.setup(device=device)
     while True:
-        # NOTE: to implement batching here: keep getting items from the queue,
-        #       fill a batch, predict, send outputs to the respective pipes
-        #       In the future we will expose this through the API.
-        batches = []
-        start_time = time.time()
-        while len(batches) <= max_batch_size and time.time() - start_time < batch_timeout:
-            try:
-                uid = request_queue.get(timeout=batch_timeout)
-                try:
-                    x_enc, pipe_s = request_buffer.pop(uid)
-                except KeyError:
-                    continue
-                x = lit_api.decode_request(x_enc)
-                batches.append((x, pipe_s))
-            except (Empty, ValueError):
-                continue
+        if cancel_event.is_set():
+            break
 
+        batches = aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
         if not batches:
             continue
         x_batch, pipe_s_batch = zip(*batches)
@@ -79,6 +99,8 @@ async def lifespan(app: FastAPI):
     app.request_queue = Queue()
     manager = Manager()
     app.request_buffer = manager.dict()
+    app.cancel_event = Event()
+    signal.signal(signal.SIGINT, lambda x, y: app.cancel_event.set())
 
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
     for worker_id, device in enumerate(app.devices * app.workers_per_device):
@@ -94,6 +116,7 @@ async def lifespan(app: FastAPI):
                 app.request_buffer,
                 app.max_batch_size,
                 app.batch_timeout,
+                app.cancel_event,
             ),
             daemon=True,
         )
@@ -155,6 +178,7 @@ class LitServer:
         @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            print("new request", uid)
 
             pipe_s, pipe_r = Pipe()
 
@@ -163,7 +187,7 @@ class LitServer:
             else:
                 self.app.request_buffer[uid] = (request, pipe_s)
 
-            self.app.request_queue.put(uid)
+            self.app.request_queue.put_nowait(uid)
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
