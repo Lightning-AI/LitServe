@@ -189,16 +189,16 @@ class LitServer:
             else:
                 self.app.request_buffer[uid] = (request, pipe_s)
 
-            self.app.request_queue.put(uid)
+            self.app.request_queue.put_nowait(uid)
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            async def get_from_pipe():
+            def get_from_pipe():
                 if pipe_r.poll(self.app.timeout):
                     return pipe_r.recv()
                 return HTTPException(status_code=504, detail="Request timed out")
 
-            data = await asyncio.get_running_loop().create_task(get_from_pipe())
+            data = await asyncio.to_thread(get_from_pipe)
 
             if type(data) == HTTPException:
                 raise data
