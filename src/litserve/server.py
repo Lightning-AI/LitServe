@@ -36,10 +36,6 @@ def aggregate_batches_from_uid(uids, lit_api, request_buffer):
 
 
 def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout):
-    if request_queue.qsize() >= max_batch_size:
-        uids = [request_queue.get_nowait() for _ in range(max_batch_size)]
-        return aggregate_batches_from_uid(uids, lit_api, request_buffer)
-
     uids = []
     start_time = time.time()
     while len(uids) <= max_batch_size and (time.time() - start_time < batch_timeout):
