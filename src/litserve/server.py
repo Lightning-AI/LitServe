@@ -34,12 +34,12 @@ def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     return batches
 
 
-def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout, request_event: Event):
+def aggregate_batches(lit_api, request_queue:Queue, request_buffer, max_batch_size, batch_timeout):
     uids = []
     entered_at = time.time()
-    while batch_timeout - (time.time() - entered_at) and len(uids) <= max_batch_size:
+    while (batch_timeout - (time.time() - entered_at)>0) and len(uids) <= max_batch_size:
         try:
-            uid = request_queue.get(1.0)
+            uid = request_queue.get_nowait()
             uids.append(uid)
         except (Empty, ValueError):
             continue
@@ -47,12 +47,22 @@ def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, ba
 
 
 def inference_worker(
-    lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, request_event
+    lit_api,
+    device,
+    worker_id,
+    request_queue,
+    request_buffer,
+    max_batch_size,
+    batch_timeout,
 ):
     lit_api.setup(device=device)
     while True:
         batches = aggregate_batches(
-            lit_api, request_queue, request_buffer, max_batch_size, batch_timeout, request_event
+            lit_api,
+            request_queue,
+            request_buffer,
+            max_batch_size,
+            batch_timeout,
         )
         if not batches:
             continue
@@ -107,7 +117,6 @@ async def lifespan(app: FastAPI):
                 app.request_buffer,
                 app.max_batch_size,
                 app.batch_timeout,
-                app.request_event,
             ),
             daemon=True,
         )
@@ -136,7 +145,6 @@ class LitServer:
         self.app.timeout = timeout
         self.app.max_batch_size = max_batch_size
         self.app.batch_timeout = batch_timeout
-        self.app.request_event = Event()
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -182,7 +190,6 @@ class LitServer:
                 self.app.request_buffer[uid] = (request, pipe_s)
 
             self.app.request_queue.put(uid)
-            self.app.request_event.set()
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
