@@ -21,7 +21,7 @@ from litserve import LitAPI
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 
-def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size=1, batch_timeout=1.0):
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout):
     lit_api.setup(device=device)
     while True:
         # NOTE: to implement batching here: keep getting items from the queue,
@@ -86,7 +86,8 @@ async def lifespan(app: FastAPI):
             device = device[0]
         process = Process(
             target=inference_worker,
-            args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer),
+            args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer, app.max_batch_size, 
+                  app.batch_timeout),
             daemon=True,
         )
         process.start()
@@ -96,11 +97,13 @@ async def lifespan(app: FastAPI):
 
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
-    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1, timeout=30):
+    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1, timeout=30, max_batch_size=1, batch_timeout=1.0):
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
         self.app.timeout = timeout
+        self.app.max_batch_size = max_batch_size
+        self.app.batch_timeout = batch_timeout
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
