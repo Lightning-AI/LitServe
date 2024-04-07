@@ -1,6 +1,7 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
 from multiprocessing import Process, Queue
+from concurrent.futures import ThreadPoolExecutor
 from queue import Empty
 import socket
 import time
@@ -119,13 +120,10 @@ def test_concurrent_requests():
     time.sleep(1)
 
     res_queue = Queue()
-    req_procs = [Process(target=make_request, args=(port, res_queue), daemon=True) for _ in range(n_requests)]
-
-    for el in req_procs:
-        el.start()
-
-    for el in req_procs:
-        el.join()
+    futures = []
+    with ThreadPoolExecutor(max_workers=n_requests) as executor:
+        for _ in range(n_requests):
+            futures.append(executor.submit(make_request, port, res_queue))
 
     p.kill()
 
