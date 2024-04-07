@@ -100,7 +100,7 @@ def get_free_port(port=1024, max_port=65535):
 
 
 def start_server_slow(port):
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=2)
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
     server.run(port=port)
 
 
@@ -125,6 +125,7 @@ def test_concurrent_requests():
         for _ in range(n_requests):
             futures.append(executor.submit(make_request, port, res_queue))
 
+    time.sleep(0.01)
     p.kill()
 
     count = 0
