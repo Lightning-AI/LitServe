@@ -21,6 +21,7 @@ from litserve import LitAPI
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
+
 def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
@@ -31,6 +32,7 @@ def aggregate_batches_from_uid(uids, lit_api, request_buffer):
         x = lit_api.decode_request(x_enc)
         batches.append((x, pipe_s))
     return batches
+
 
 def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout):
     if request_queue.qsize() >= max_batch_size:
@@ -51,6 +53,7 @@ def aggregate_batches(lit_api, request_queue, request_buffer, max_batch_size, ba
         except (Empty, ValueError):
             continue
     return batches
+
 
 def inference_worker(
     lit_api, device, worker_id, request_queue: Queue, request_buffer, max_batch_size, batch_timeout, cancel_event
