@@ -139,7 +139,7 @@ class LitServer:
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")
-        if max_batch_size<=0:
+        if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
         self.app = FastAPI(lifespan=lifespan)
