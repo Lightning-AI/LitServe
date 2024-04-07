@@ -100,7 +100,7 @@ def get_free_port(port=1024, max_port=65535):
 
 
 def start_server_slow(port):
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=10)
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=2)
     server.run(port=port)
 
 
