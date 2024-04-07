@@ -109,7 +109,6 @@ def make_request(port, res_queue):
     res_queue.put(response.json())
 
 
-@pytest.mark.xfail()  # fixme
 def test_concurrent_requests():
     n_requests = 100
 
