@@ -16,7 +16,7 @@ import pytest
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
-        self.model = lambda x: x**2
+        self.model = lambda x_batch: [x**2 for x in x_batch]
 
     def decode_request(self, request: Request):
         return request["input"]
@@ -64,7 +64,7 @@ def test_load():
 
 class SlowLitAPI(LitAPI):
     def setup(self, device):
-        self.model = lambda x: x**2
+        self.model = lambda x_batch: [x**2 for x in x_batch]
 
     def decode_request(self, request: Request):
         return request["input"]

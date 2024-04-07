@@ -17,7 +17,7 @@ class PredictResponse(BaseModel):
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
-        self.model = lambda x: x**2
+        self.model = lambda x_batch: [x**2 for x in x_batch]
 
     def decode_request(self, request: PredictRequest) -> float:
         return request.input
