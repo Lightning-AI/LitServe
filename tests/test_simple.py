@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from litserve import LitAPI, LitServer
 
 import requests
-import pytest
 
 
 class SimpleLitAPI(LitAPI):
