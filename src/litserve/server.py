@@ -86,8 +86,15 @@ async def lifespan(app: FastAPI):
             device = device[0]
         process = Process(
             target=inference_worker,
-            args=(app.lit_api, device, worker_id, app.request_queue, app.request_buffer, app.max_batch_size, 
-                  app.batch_timeout),
+            args=(
+                app.lit_api,
+                device,
+                worker_id,
+                app.request_queue,
+                app.request_buffer,
+                app.max_batch_size,
+                app.batch_timeout,
+            ),
             daemon=True,
         )
         process.start()
@@ -97,7 +104,16 @@ async def lifespan(app: FastAPI):
 
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
-    def __init__(self, lit_api: LitAPI, accelerator="cpu", devices=1, workers_per_device=1, timeout=30, max_batch_size=1, batch_timeout=1.0):
+    def __init__(
+        self,
+        lit_api: LitAPI,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=1,
+        timeout=30,
+        max_batch_size=1,
+        batch_timeout=1.0,
+    ):
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
