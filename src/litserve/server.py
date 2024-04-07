@@ -46,7 +46,7 @@ def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, 
         x_batch, pipe_s_batch = zip(*batches)
         y_batch = lit_api.predict(x_batch)
 
-        for y, pipe_s  in zip(y_batch, pipe_s_batch):
+        for y, pipe_s in zip(y_batch, pipe_s_batch):
             y_enc = lit_api.encode_response(y)
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(y_enc)
