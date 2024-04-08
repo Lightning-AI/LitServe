@@ -11,7 +11,6 @@ import time
 from litserve import LitAPI, LitServer
 
 
-
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
         self.model = lambda x: x**2
@@ -68,7 +67,6 @@ class SlowLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-
         time.sleep(1)
         return self.model(x)
 
