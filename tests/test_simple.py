@@ -1,22 +1,14 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
-from multiprocessing import Process
-import asyncio
-from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
-from queue import Empty
 import socket
-import time
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
 
 
 from litserve import LitAPI, LitServer
 
-import requests
-import pytest
 
 
 class SimpleLitAPI(LitAPI):
@@ -75,7 +67,6 @@ class SlowLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-        import time
 
         time.sleep(1)
         return self.model(x)
@@ -107,7 +98,7 @@ def get_free_port(port=1024, max_port=65535):
 def test_concurrent_requests():
     n_requests = 100
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
-    with TestClient(server.app) as client, ThreadPoolExecutor(n_requests//4+1) as executor:
+    with TestClient(server.app) as client, ThreadPoolExecutor(n_requests // 4 + 1) as executor:
         responses = list(executor.map(lambda _: client.post("/predict", json={"input": 4.0}), range(n_requests)))
 
     count = 0
