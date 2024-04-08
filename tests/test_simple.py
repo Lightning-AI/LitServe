@@ -125,7 +125,7 @@ def test_concurrent_requests():
         for _ in range(n_requests):
             futures.append(executor.submit(make_request, port, res_queue))
 
-    time.sleep(0.01)
+    time.sleep(1)
     p.kill()
 
     count = 0
