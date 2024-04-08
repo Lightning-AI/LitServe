@@ -5,6 +5,7 @@ import socket
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
+import time
 
 
 from litserve import LitAPI, LitServer
