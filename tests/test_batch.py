@@ -90,11 +90,11 @@ def test_unbatched():
 
 
 def test_max_batch_size():
-    with pytest.raises(ValueError): # noqa: PT011
+    with pytest.raises(ValueError):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=0)
 
-    with pytest.raises(ValueError): # noqa: PT011
+    with pytest.raises(ValueError):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=-1)
 
-    with pytest.raises(ValueError): # noqa: PT011
+    with pytest.raises(ValueError):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
