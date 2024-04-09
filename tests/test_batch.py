@@ -38,7 +38,6 @@ class SimpleLitAPI(LitAPI):
         return torch.stack(inputs)
 
     def predict(self, x):
-        time.sleep(1)
         assert len(x) == 2
         return self.model(x)
 
