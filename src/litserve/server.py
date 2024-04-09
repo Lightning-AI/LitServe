@@ -1,6 +1,7 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 import asyncio
 import contextlib
+import multiprocessing
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -129,23 +130,43 @@ class LitServer:
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
-            pipe_s, pipe_r = Pipe()
+            read, write = multiprocessing.Pipe()
 
             if self.request_type == Request:
-                self.app.request_buffer[uid] = (await request.json(), pipe_s)
+                self.app.request_buffer[uid] = (await request.json(), write)
             else:
-                self.app.request_buffer[uid] = (request, pipe_s)
+                self.app.request_buffer[uid] = (request, write)
 
             self.app.request_queue.put(uid)
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            def get_from_pipe():
-                if pipe_r.poll(self.app.timeout):
-                    return pipe_r.recv()
+            # def get_from_pipe():
+            #     if pipe_r.poll(self.app.timeout):
+            #         return pipe_r.recv()
+            #     return HTTPException(status_code=504, detail="Request timed out")
+
+            async def event_wait(evt, timeout):
+                # suppress TimeoutError because we'll return False in case of timeout
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(evt.wait(), timeout)
+                return evt.is_set()
+
+            async def data_reader(read):
+                data_available = asyncio.Event()
+                asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+
+                while not read.poll():
+                    await event_wait(data_available, self.app.timeout)
+                    data_available.clear()
+                asyncio.get_event_loop().remove_reader(read.fileno())
+
+                if read.poll():
+                    return read.recv()
                 return HTTPException(status_code=504, detail="Request timed out")
 
-            data = await asyncio.to_thread(get_from_pipe)
+
+            data = await data_reader(read)
 
             if type(data) == HTTPException:
                 raise data
