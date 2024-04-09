@@ -167,7 +167,7 @@ class LitServer:
         workers_per_device=1,
         timeout=30,
         max_batch_size=1,
-        batch_timeout=1.0,
+        batch_timeout=0.0,
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")
