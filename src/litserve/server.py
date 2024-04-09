@@ -149,7 +149,7 @@ class LitServer:
                 data_available = asyncio.Event()
                 asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
 
-                while not read.poll():
+                if not read.poll():
                     await event_wait(data_available, self.app.timeout)
                     data_available.clear()
                 asyncio.get_event_loop().remove_reader(read.fileno())
