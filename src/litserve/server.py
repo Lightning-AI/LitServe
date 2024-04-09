@@ -34,7 +34,7 @@ def aggregate_batches_from_uid(uids, lit_api, request_buffer):
     return batches
 
 
-def aggregate_batches(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def collate_batches(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     uids = []
     entered_at = time.time()
     while (batch_timeout - (time.time() - entered_at) > 0) and len(uids) <= max_batch_size:
@@ -57,7 +57,7 @@ def inference_worker(
 ):
     lit_api.setup(device=device)
     while True:
-        batches = aggregate_batches(
+        batches = collate_batches(
             lit_api,
             request_queue,
             request_buffer,
