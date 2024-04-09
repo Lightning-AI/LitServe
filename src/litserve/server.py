@@ -3,7 +3,7 @@ import asyncio
 import contextlib
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager, Queue
+from multiprocessing import Process, Manager, Queue, Pipe
 from queue import Empty
 import os
 import shutil
