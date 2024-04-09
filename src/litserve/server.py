@@ -22,7 +22,7 @@ import logging
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 
-def aggregate_batches_from_uid(uids, lit_api, request_buffer):
+def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
         try:
@@ -43,7 +43,7 @@ def collate_batches(lit_api, request_queue: Queue, request_buffer, max_batch_siz
             uids.append(uid)
         except (Empty, ValueError):
             continue
-    return aggregate_batches_from_uid(uids, lit_api, request_buffer)
+    return get_batch_from_uid(uids, lit_api, request_buffer)
 
 
 def inference_worker(
