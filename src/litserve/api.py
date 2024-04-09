@@ -1,11 +1,10 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-import inspect
 from abc import ABC, abstractmethod
 
 
 def no_batch_unbatch_message(obj, data):
     return f"""
-        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports 
+        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
         PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
         Please implement these two methods in {obj.__class__.__name__}.
 
