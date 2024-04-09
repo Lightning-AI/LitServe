@@ -1,4 +1,5 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+import pytest
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
@@ -65,7 +66,7 @@ class SimpleLitAPI2(LitAPI):
 
 def test_batched():
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, max_batch_size=10, batch_timeout=1)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=10, batch_timeout=1)
 
     with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
         response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
@@ -79,7 +80,7 @@ def test_batched():
 
 def test_unbatched():
     api = SimpleLitAPI2()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, max_batch_size=1)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
 
     with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
         response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
@@ -87,3 +88,14 @@ def test_unbatched():
 
     assert response1.result().json() == {"output": 9.0}
     assert response2.result().json() == {"output": 11.0}
+
+
+def test_max_batch_size():
+    with pytest.raises(ValueError) as e:
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=0)
+
+    with pytest.raises(ValueError) as e:
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=-1)
+
+    with pytest.raises(ValueError) as e:
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)

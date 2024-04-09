@@ -61,7 +61,7 @@ def test_load():
 
 class SlowLitAPI(LitAPI):
     def setup(self, device):
-        self.model = lambda x_batch: [x**2 for x in x_batch]
+        self.model = lambda x: x**2
 
     def decode_request(self, request: Request):
         return request["input"]
@@ -75,7 +75,7 @@ class SlowLitAPI(LitAPI):
 
 
 def test_timeout():
-    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5, batch_timeout=0.1)
+    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5)
 
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
