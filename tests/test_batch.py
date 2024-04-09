@@ -1,4 +1,6 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+import time
+
 import pytest
 
 from fastapi import Request, Response
@@ -36,6 +38,7 @@ class SimpleLitAPI(LitAPI):
         return torch.stack(inputs)
 
     def predict(self, x):
+        time.sleep(1)
         assert len(x) == 2
         return self.model(x)
 
@@ -66,11 +69,16 @@ class SimpleLitAPI2(LitAPI):
 
 def test_batched():
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=20, batch_timeout=4)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
+    t0 = time.time()
     with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
         response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
         response2 = executor.submit(client.post, "/predict", json={"input": 5.0})
+
+    t1 = time.time()
+    x = t1 - t0
+    assert x < 2
 
     assert response1.result().json() == {"output": 9.0}
     assert response2.result().json() == {"output": 11.0}
