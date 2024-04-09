@@ -80,7 +80,7 @@ class SlowLitAPI(LitAPI):
 
 
 def test_timeout():
-    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5)
+    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5, batch_timeout=0.1)
 
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
