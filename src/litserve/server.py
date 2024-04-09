@@ -83,19 +83,23 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
 
 
 def inference_worker(
-        lit_api,
-        device,
-        worker_id,
-        request_queue,
-        request_buffer,
-        max_batch_size,
-        batch_timeout,
+    lit_api,
+    device,
+    worker_id,
+    request_queue,
+    request_buffer,
+    max_batch_size,
+    batch_timeout,
 ):
     lit_api.setup(device=device)
     if max_batch_size > 1:
         run_batch_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
-        run_single_loop(lit_api, request_queue, request_buffer,)
+        run_single_loop(
+            lit_api,
+            request_queue,
+            request_buffer,
+        )
 
 
 def no_auth():
@@ -151,14 +155,14 @@ async def lifespan(app: FastAPI):
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
     def __init__(
-            self,
-            lit_api: LitAPI,
-            accelerator="cpu",
-            devices=1,
-            workers_per_device=1,
-            timeout=30,
-            max_batch_size=1,
-            batch_timeout=1.0,
+        self,
+        lit_api: LitAPI,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=1,
+        timeout=30,
+        max_batch_size=1,
+        batch_timeout=1.0,
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")

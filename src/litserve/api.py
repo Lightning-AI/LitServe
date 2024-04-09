@@ -35,9 +35,11 @@ class LitAPI(ABC):
         # to avoid the runtime cost of checking (should be negligible)
         if hasattr(inputs[0], "__torch_function__"):
             import torch
+
             return torch.stack(inputs)
         elif inputs[0].__class__.__name__ == "ndarray":
             import numpy
+
             return numpy.stack(inputs)
         raise NotImplementedError(no_batch_unbatch_message(self))
 
@@ -48,9 +50,7 @@ class LitAPI(ABC):
 
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
-        if hasattr(output, "__torch_function__"):
-            return list(output)
-        elif output.__class__.__name__ == "ndarray":
+        if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
             return list(output)
         raise NotImplementedError(no_batch_unbatch_message(self))
 
