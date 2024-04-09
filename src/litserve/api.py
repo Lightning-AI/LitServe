@@ -1,12 +1,13 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-
+import inspect
 from abc import ABC, abstractmethod
 
 
-def no_batch_unbatch_message(obj):
+def no_batch_unbatch_message(obj, data):
     return f"""
-        You set `max_batch_size > 1` but didn't implement batch() and unbatch().
-        Add these two methods to {obj.__class__.__name__}.
+        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports 
+        PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
+        Please implement these two methods in {obj.__class__.__name__}.
 
         Example:
 
@@ -41,7 +42,7 @@ class LitAPI(ABC):
             import numpy
 
             return numpy.stack(inputs)
-        raise NotImplementedError(no_batch_unbatch_message(self))
+        raise NotImplementedError(no_batch_unbatch_message(self, inputs))
 
     @abstractmethod
     def predict(self, x):
@@ -52,7 +53,7 @@ class LitAPI(ABC):
         """Convert a batched output to a list of outputs."""
         if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
             return list(output)
-        raise NotImplementedError(no_batch_unbatch_message(self))
+        raise NotImplementedError(no_batch_unbatch_message(self, output))
 
     @abstractmethod
     def encode_response(self, output):

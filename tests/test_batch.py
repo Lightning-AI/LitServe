@@ -65,7 +65,7 @@ class SimpleLitAPI2(LitAPI):
 
 def test_batched():
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=10, batch_timeout=1)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=20, batch_timeout=4)
 
     with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
         response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
