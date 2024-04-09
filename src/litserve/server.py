@@ -1,7 +1,6 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 import asyncio
 import contextlib
-import multiprocessing
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -15,7 +14,6 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, R
 from fastapi.security import APIKeyHeader
 
 from litserve import LitAPI
-
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -130,7 +128,7 @@ class LitServer:
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
-            read, write = multiprocessing.Pipe()
+            read, write = Pipe()
 
             if self.request_type == Request:
                 self.app.request_buffer[uid] = (await request.json(), write)
@@ -140,11 +138,6 @@ class LitServer:
             self.app.request_queue.put(uid)
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
-
-            # def get_from_pipe():
-            #     if pipe_r.poll(self.app.timeout):
-            #         return pipe_r.recv()
-            #     return HTTPException(status_code=504, detail="Request timed out")
 
             async def event_wait(evt, timeout):
                 # suppress TimeoutError because we'll return False in case of timeout
@@ -164,7 +157,6 @@ class LitServer:
                 if read.poll():
                     return read.recv()
                 return HTTPException(status_code=504, detail="Request timed out")
-
 
             data = await data_reader(read)
 
