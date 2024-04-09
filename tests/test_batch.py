@@ -36,6 +36,7 @@ class SimpleLitAPI(LitAPI):
         return torch.stack(inputs)
 
     def predict(self, x):
+        assert len(x) == 2
         return self.model(x)
 
     def unbatch(self, output):
