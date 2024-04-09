@@ -37,7 +37,7 @@ class LitAPI(ABC):
             import torch
 
             return torch.stack(inputs)
-        elif inputs[0].__class__.__name__ == "ndarray":
+        elif inputs[0].__class__.__name__ == "ndarray":  # noqa: RET505
             import numpy
 
             return numpy.stack(inputs)
