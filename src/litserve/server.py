@@ -4,7 +4,7 @@ import contextlib
 import multiprocessing
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager, Queue, Pipe
+from multiprocessing import Process, Manager, Queue
 from queue import Empty
 import os
 import shutil
@@ -164,7 +164,6 @@ class LitServer:
                 if read.poll():
                     return read.recv()
                 return HTTPException(status_code=504, detail="Request timed out")
-
 
             data = await data_reader(read)
 
