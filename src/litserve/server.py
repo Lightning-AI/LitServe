@@ -67,11 +67,15 @@ def run_batch_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size
 
 def run_single_loop(lit_api, request_queue: Queue, request_buffer, ):
     while True:
-        uid = request_queue.get_nowait()
         try:
-            x_enc, pipe_s = request_buffer.pop(uid)
-        except KeyError:
+            uid = request_queue.get(timeout=0.01)
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+        except (Empty, ValueError):
             continue
+
         x = lit_api.decode_request(x_enc)
         y = lit_api.predict(x)
         y_enc = lit_api.encode_response(y)
