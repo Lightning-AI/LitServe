@@ -65,7 +65,7 @@ def run_batch_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size
                 pipe_s.send(y_enc)
 
 
-def run_single_loop(lit_api, request_queue: Queue, request_buffer, ):
+def run_single_loop(lit_api, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=0.01)
