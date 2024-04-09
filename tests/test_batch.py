@@ -30,15 +30,18 @@ class SimpleLitAPI(LitAPI):
         content = request["input"]
         return torch.tensor([content], device=self.device)
 
+    def batch(self, inputs):
+        assert len(inputs) == 2
+        return torch.stack(inputs)
+
     def predict(self, x):
-        x = torch.stack(x)
-        assert x.shape == (2, 1), f"{x.shape}"
-        output = self.model(x)
-        output = list(output)
-        return output
+        return self.model(x)
+
+    def unbatch(self, output):
+        assert output.shape[0] == 2
+        return list(output)
 
     def encode_response(self, output) -> Response:
-        assert len(output) == 1
         return {"output": float(output)}
 
 
@@ -76,7 +79,7 @@ def test_batched():
 
 def test_unbatched():
     api = SimpleLitAPI2()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, max_batch_size=1, batch_timeout=0)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, max_batch_size=1)
 
     with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
         response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
