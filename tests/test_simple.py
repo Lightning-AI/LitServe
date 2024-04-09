@@ -1,7 +1,6 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
 from concurrent.futures import ThreadPoolExecutor
-import socket
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
@@ -80,18 +79,6 @@ def test_timeout():
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 504
-
-
-def get_free_port(port=1024, max_port=65535):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    while port <= max_port:
-        try:
-            sock.bind(("", port))
-            sock.close()
-            return port
-        except OSError:
-            port += 1
-    raise OSError("no free ports")
 
 
 def test_concurrent_requests():
