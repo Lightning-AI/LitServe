@@ -37,7 +37,7 @@ def collate_requests(lit_api, request_queue: Queue, request_buffer, max_batch_si
     entered_at = time.time()
     while (batch_timeout - (time.time() - entered_at) > 0) and len(uids) <= max_batch_size:
         try:
-            uid = request_queue.get_nowait()
+            uid = request_queue.get(timeout=0.001)
             uids.append(uid)
         except (Empty, ValueError):
             continue
@@ -72,7 +72,7 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
 def run_single_loop(lit_api, request_queue: Queue, request_buffer):
     while True:
         try:
-            uid = request_queue.get(timeout=0.01)
+            uid = request_queue.get(timeout=1.0)
             try:
                 x_enc, pipe_s = request_buffer.pop(uid)
             except KeyError:
