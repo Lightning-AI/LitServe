@@ -44,7 +44,7 @@ def collate_requests(lit_api, request_queue: Queue, request_buffer, max_batch_si
     return get_batch_from_uid(uids, lit_api, request_buffer)
 
 
-def run_batch_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     while True:
         batches = collate_requests(
             lit_api,
@@ -55,11 +55,16 @@ def run_batch_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size
         )
         if not batches:
             continue
-        x_batch, pipe_s_batch = zip(*batches)
-        y_batch = lit_api.predict(x_batch)
 
-        for y, pipe_s in zip(y_batch, pipe_s_batch):
+        inputs, pipes = zip(*batches)
+
+        x = lit_api.batch(inputs)
+        y = lit_api.predict(x)
+        outputs = lit_api.unbatch(y)
+
+        for y, pipe_s in zip(outputs, pipes):
             y_enc = lit_api.encode_response(y)
+
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(y_enc)
 
@@ -93,7 +98,7 @@ def inference_worker(
 ):
     lit_api.setup(device=device)
     if max_batch_size > 1:
-        run_batch_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+        run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
         run_single_loop(lit_api, request_queue, request_buffer,)
 
