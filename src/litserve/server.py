@@ -17,7 +17,6 @@ from fastapi.security import APIKeyHeader
 from litserve import LitAPI
 import logging
 
-
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
@@ -34,7 +33,7 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
     return batches
 
 
-def collate_batches(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def collate_requests(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     uids = []
     entered_at = time.time()
     while (batch_timeout - (time.time() - entered_at) > 0) and len(uids) <= max_batch_size:
@@ -46,18 +45,9 @@ def collate_batches(lit_api, request_queue: Queue, request_buffer, max_batch_siz
     return get_batch_from_uid(uids, lit_api, request_buffer)
 
 
-def inference_worker(
-    lit_api,
-    device,
-    worker_id,
-    request_queue,
-    request_buffer,
-    max_batch_size,
-    batch_timeout,
-):
-    lit_api.setup(device=device)
+def run_batch_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     while True:
-        batches = collate_batches(
+        batches = collate_requests(
             lit_api,
             request_queue,
             request_buffer,
@@ -73,6 +63,36 @@ def inference_worker(
             y_enc = lit_api.encode_response(y)
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(y_enc)
+
+
+def run_single_loop(lit_api, request_queue: Queue, request_buffer, ):
+    while True:
+        uid = request_queue.get_nowait()
+        try:
+            x_enc, pipe_s = request_buffer.pop(uid)
+        except KeyError:
+            continue
+        x = lit_api.decode_request(x_enc)
+        y = lit_api.predict(x)
+        y_enc = lit_api.encode_response(y)
+        with contextlib.suppress(BrokenPipeError):
+            pipe_s.send(y_enc)
+
+
+def inference_worker(
+        lit_api,
+        device,
+        worker_id,
+        request_queue,
+        request_buffer,
+        max_batch_size,
+        batch_timeout,
+):
+    lit_api.setup(device=device)
+    if max_batch_size > 1:
+        run_batch_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+    else:
+        run_single_loop(lit_api, request_queue, request_buffer,)
 
 
 def no_auth():
@@ -128,14 +148,14 @@ async def lifespan(app: FastAPI):
 class LitServer:
     # TODO: add support for accelerator="auto", devices="auto"
     def __init__(
-        self,
-        lit_api: LitAPI,
-        accelerator="cpu",
-        devices=1,
-        workers_per_device=1,
-        timeout=30,
-        max_batch_size=1,
-        batch_timeout=1.0,
+            self,
+            lit_api: LitAPI,
+            accelerator="cpu",
+            devices=1,
+            workers_per_device=1,
+            timeout=30,
+            max_batch_size=1,
+            batch_timeout=1.0,
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")
@@ -148,6 +168,9 @@ class LitServer:
         self.app.timeout = timeout
         self.app.max_batch_size = max_batch_size
         self.app.batch_timeout = batch_timeout
+        initial_pool_size = 100
+        self.max_pool_size = 1000
+        self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -170,6 +193,18 @@ class LitServer:
 
         self.setup_server()
 
+    def new_pipe(self):
+        try:
+            pipe_s, pipe_r = self.pipe_pool.pop()
+        except IndexError:
+            pipe_s, pipe_r = Pipe()
+        return pipe_s, pipe_r
+
+    def dispose_pipe(self, pipe_s, pipe_r):
+        if len(self.pipe_pool) > self.max_pool_size:
+            return
+        self.pipe_pool.append(pipe_s, pipe_r)
+
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
             return [f"{accelerator}:{el}" for el in device]
@@ -185,7 +220,7 @@ class LitServer:
             uid = uuid.uuid4()
             logging.info(f"new request: {uid}")
 
-            pipe_s, pipe_r = Pipe()
+            pipe_s, pipe_r = self.new_pipe()
 
             if self.request_type == Request:
                 self.app.request_buffer[uid] = (await request.json(), pipe_s)
@@ -193,7 +228,6 @@ class LitServer:
                 self.app.request_buffer[uid] = (request, pipe_s)
 
             self.app.request_queue.put_nowait(uid)
-
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
             def get_from_pipe():
