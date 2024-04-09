@@ -19,7 +19,6 @@ from litserve import LitAPI
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 
-
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
     lit_api.setup(device=device)
 
@@ -145,6 +144,7 @@ class LitServer:
                 with contextlib.suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(evt.wait(), timeout)
                 return evt.is_set()
+
             def get_from_pipe():
                 if read.poll(self.app.timeout):
                     return read.recv()
