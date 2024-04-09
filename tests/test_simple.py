@@ -1,17 +1,14 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
 
-from multiprocessing import Process, Queue
-from queue import Empty
+from concurrent.futures import ThreadPoolExecutor
 import socket
-import time
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
+import time
+
 
 from litserve import LitAPI, LitServer
-
-import requests
-import pytest
 
 
 class SimpleLitAPI(LitAPI):
@@ -70,8 +67,6 @@ class SlowLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-        import time
-
         time.sleep(1)
         return self.model(x)
 
@@ -99,46 +94,14 @@ def get_free_port(port=1024, max_port=65535):
     raise OSError("no free ports")
 
 
-def start_server_slow(port):
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=10)
-    server.run(port=port)
-
-
-def make_request(port, res_queue):
-    response = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0})
-    res_queue.put(response.json())
-
-
-@pytest.mark.xfail()  # fixme
 def test_concurrent_requests():
     n_requests = 100
-
-    port = get_free_port()
-
-    p = Process(target=start_server_slow, args=(port,))
-    p.start()
-
-    time.sleep(1)
-
-    res_queue = Queue()
-    req_procs = [Process(target=make_request, args=(port, res_queue), daemon=True) for _ in range(n_requests)]
-
-    for el in req_procs:
-        el.start()
-
-    for el in req_procs:
-        el.join()
-
-    p.kill()
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
+    with TestClient(server.app) as client, ThreadPoolExecutor(n_requests // 4 + 1) as executor:
+        responses = list(executor.map(lambda _: client.post("/predict", json={"input": 4.0}), range(n_requests)))
 
     count = 0
-    while True:
-        try:
-            response = res_queue.get_nowait()
-            count += 1
-        except Empty:
-            break
-
-        assert response == {"output": 16.0}
-
+    for response in responses:
+        assert response.json() == {"output": 16.0}
+        count += 1
     assert count == n_requests

@@ -12,9 +12,8 @@ import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
-
+import sys
 from litserve import LitAPI
-
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -129,23 +128,45 @@ class LitServer:
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
-            pipe_s, pipe_r = Pipe()
+            read, write = Pipe()
 
             if self.request_type == Request:
-                self.app.request_buffer[uid] = (await request.json(), pipe_s)
+                self.app.request_buffer[uid] = (await request.json(), write)
             else:
-                self.app.request_buffer[uid] = (request, pipe_s)
+                self.app.request_buffer[uid] = (request, write)
 
             self.app.request_queue.put(uid)
 
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            async def get_from_pipe():
-                if pipe_r.poll(self.app.timeout):
-                    return pipe_r.recv()
+            async def event_wait(evt, timeout):
+                # suppress TimeoutError because we'll return False in case of timeout
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(evt.wait(), timeout)
+                return evt.is_set()
+
+            def get_from_pipe():
+                if read.poll(self.app.timeout):
+                    return read.recv()
                 return HTTPException(status_code=504, detail="Request timed out")
 
-            data = await asyncio.get_running_loop().create_task(get_from_pipe())
+            async def data_reader():
+                data_available = asyncio.Event()
+                asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+
+                if not read.poll():
+                    await event_wait(data_available, self.app.timeout)
+                    data_available.clear()
+                asyncio.get_event_loop().remove_reader(read.fileno())
+
+                if read.poll():
+                    return read.recv()
+                return HTTPException(status_code=504, detail="Request timed out")
+
+            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+                data = await asyncio.to_thread(get_from_pipe)
+            else:
+                data = await data_reader()
 
             if type(data) == HTTPException:
                 raise data
