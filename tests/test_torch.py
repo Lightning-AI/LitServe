@@ -39,7 +39,7 @@ class SimpleLitAPI(LitAPI):
 
 
 def test_torch():
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=5, batch_timeout=1)
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=5)
 
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
@@ -48,7 +48,7 @@ def test_torch():
 
 @pytest.mark.skipif(torch.cuda.device_count() == 0, reason="requires CUDA to be available")
 def test_torch_gpu():
-    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=1, timeout=5, batch_timeout=2)
+    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=1, timeout=5)
 
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
