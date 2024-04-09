@@ -104,7 +104,7 @@ class PredictResponse(BaseModel):
     output: float
 
 
-class SimpleLitAPI2(LitAPI):
+class SimpleLitAPI(LitAPI):
     def setup(self, device):
         self.model = lambda x: x**2
 
