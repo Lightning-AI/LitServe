@@ -32,7 +32,6 @@ class SimpleLitAPI(LitAPI):
         return torch.tensor([content], device=self.device)
 
     def predict(self, x):
-        x = torch.stack(x, dim=0)
         return self.model(x[None, :])
 
     def encode_response(self, output) -> Response:
