@@ -61,6 +61,7 @@ class SimpleLitAPI2(LitAPI):
     def encode_response(self, output) -> Response:
         return {"output": float(output)}
 
+
 def test_batched():
     api = SimpleLitAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=2, max_batch_size=10, batch_timeout=1)
