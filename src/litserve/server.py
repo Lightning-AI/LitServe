@@ -18,8 +18,6 @@ from litserve import LitAPI
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
-if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer):
@@ -147,8 +145,12 @@ class LitServer:
                 with contextlib.suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(evt.wait(), timeout)
                 return evt.is_set()
+            def get_from_pipe():
+                if read.poll(self.app.timeout):
+                    return read.recv()
+                return HTTPException(status_code=504, detail="Request timed out")
 
-            async def data_reader(read):
+            async def data_reader():
                 data_available = asyncio.Event()
                 asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
 
@@ -161,7 +163,10 @@ class LitServer:
                     return read.recv()
                 return HTTPException(status_code=504, detail="Request timed out")
 
-            data = await data_reader(read)
+            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+                data = await asyncio.to_thread(get_from_pipe)
+            else:
+                data = await data_reader()
 
             if type(data) == HTTPException:
                 raise data
