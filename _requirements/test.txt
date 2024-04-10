@@ -1,7 +1,8 @@
+pytest-asyncio >=0.23.6
+asgi-lifespan >=2.1.0
 coverage >=5.0
 pytest >=6.0
 pytest-cov
-
 mypy ==1.9.0
 
 requests
