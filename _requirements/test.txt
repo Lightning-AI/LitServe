@@ -1,4 +1,4 @@
-coverage >=5.0
+coverage[toml] >=5.0
 pytest >=8.0
 pytest-cov
 mypy ==1.9.0
