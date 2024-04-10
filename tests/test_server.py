@@ -1,7 +1,10 @@
-from multiprocessing import Pipe
+from multiprocessing import Pipe, Manager
 from unittest.mock import patch, MagicMock
-from litserve.server import inference_worker
+from litserve.server import inference_worker, run_single_loop
 from litserve.server import LitServer
+
+
+import pytest
 
 
 def test_new_pipe(lit_server):
@@ -49,3 +52,39 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
 
     inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0)
     mock_single_loop.assert_called_once()
+
+
+@pytest.fixture()
+def loop_args():
+    from multiprocessing import Manager, Queue, Pipe
+
+    requests_queue = Queue()
+    request_buffer = Manager().dict()
+    requests_queue.put(1)
+    requests_queue.put(2)
+    read, write = Pipe()
+    request_buffer[1] = {"input": 4.0}, write
+    request_buffer[2] = {"input": 5.0}, write
+
+    lit_api_mock = MagicMock()
+    lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
+    lit_api_mock.batch = MagicMock()
+    lit_api_mock.unbatch = MagicMock(side_effect=Exception("exit loop"))
+
+    return lit_api_mock, requests_queue, request_buffer
+
+
+class FakePipe:
+    def send(self, item):
+        raise StopIteration("exit loop")
+
+
+def test_single_loop(simple_litapi, loop_args):
+    lit_api_mock, requests_queue, request_buffer = loop_args
+    lit_api_mock.unbatch.side_effect = None
+    request_buffer = Manager().dict()
+    request_buffer[1] = {"input": 4.0}, FakePipe()
+    request_buffer[2] = {"input": 5.0}, FakePipe()
+
+    with pytest.raises(StopIteration, match="exit loop"):
+        run_single_loop(lit_api_mock, requests_queue, request_buffer)
