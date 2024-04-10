@@ -20,8 +20,13 @@ class SimpleLitAPI(LitAPI):
 
 
 @pytest.fixture()
-def lit_server():
-    return LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=10)
+def simple_litapi():
+    return SimpleLitAPI()
+
+
+@pytest.fixture()
+def lit_server(simple_litapi):
+    return LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
 
 
 @pytest.fixture()
