@@ -78,8 +78,6 @@ def test_batched():
     assert response1.result().json() == {"output": 9.0}
     assert response2.result().json() == {"output": 11.0}
 
-    # TODO check that batch unbatch have been called
-
 
 def test_unbatched():
     api = SimpleLitAPI2()
