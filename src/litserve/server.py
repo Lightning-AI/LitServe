@@ -35,7 +35,7 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
 def collate_requests(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     uids = []
     entered_at = time.time()
-    while (batch_timeout - (time.time() - entered_at) > 0) and len(uids) <= max_batch_size:
+    while (batch_timeout - (time.time() - entered_at) > 0) and len(uids) < max_batch_size:
         try:
             uid = request_queue.get(timeout=0.001)
             uids.append(uid)
