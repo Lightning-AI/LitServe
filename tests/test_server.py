@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 from litserve.server import inference_worker, run_single_loop
 from litserve.server import LitServer
 
-
 import pytest
 
 
@@ -68,9 +67,6 @@ def loop_args():
 
     lit_api_mock = MagicMock()
     lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
-    lit_api_mock.batch = MagicMock()
-    lit_api_mock.unbatch = MagicMock(side_effect=Exception("exit loop"))
-
     return lit_api_mock, requests_queue, request_buffer
 
 
