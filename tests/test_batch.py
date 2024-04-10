@@ -83,7 +83,7 @@ def test_batched():
 
 def test_unbatched():
     api = SimpleLitAPI2()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=30, max_batch_size=1)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
 
     with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
         response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
