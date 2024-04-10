@@ -106,6 +106,7 @@ def test_max_batch_size():
 
 def test_batched_loop():
     from multiprocessing import Manager, Queue, Pipe
+
     requests_queue = Queue()
     request_buffer = Manager().dict()
     requests_queue.put(1)
