@@ -74,11 +74,10 @@ async def test_batched():
     api = SimpleLitAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
-    async with LifespanManager(server.app) as manager:
-        async with AsyncClient(app=manager.app, base_url="http://test") as ac:
-            response1 = ac.post("/predict", json={"input": 4.0})
-            response2 = ac.post("/predict", json={"input": 5.0})
-            response1, response2 = await asyncio.gather(response1, response2)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response1 = ac.post("/predict", json={"input": 4.0})
+        response2 = ac.post("/predict", json={"input": 5.0})
+        response1, response2 = await asyncio.gather(response1, response2)
 
     assert response1.json() == {"output": 9.0}
     assert response2.json() == {"output": 11.0}
@@ -89,11 +88,10 @@ async def test_unbatched():
     api = SimpleLitAPI2()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
 
-    async with LifespanManager(server.app) as manager:
-        async with AsyncClient(app=manager.app, base_url="http://test") as ac:
-            response1 = ac.post("/predict", json={"input": 4.0})
-            response2 = ac.post("/predict", json={"input": 5.0})
-            response1, response2 = await asyncio.gather(response1, response2)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response1 = ac.post("/predict", json={"input": 4.0})
+        response2 = ac.post("/predict", json={"input": 5.0})
+        response1, response2 = await asyncio.gather(response1, response2)
 
     assert response1.json() == {"output": 9.0}
     assert response2.json() == {"output": 11.0}
