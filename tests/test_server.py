@@ -1,4 +1,5 @@
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+from litserve.server import inference_worker
 from litserve.server import LitServer
 
 
@@ -31,3 +32,13 @@ def test_device_identifiers(mock_lifespan, simple_litapi):
     # [["cuda:1"], ["cuda:2"]]
     assert server.app.devices[0][0] == "cuda:1"
     assert server.app.devices[1][0] == "cuda:2"
+
+
+@patch("litserve.server.run_batched_loop")
+@patch("litserve.server.run_single_loop")
+def test_inference_worker(mock_single_loop, mock_batched_loop):
+    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0)
+    mock_batched_loop.assert_called_once()
+
+    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0)
+    mock_single_loop.assert_called_once()
