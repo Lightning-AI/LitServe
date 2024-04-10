@@ -270,6 +270,7 @@ class LitServer:
             else:
                 data = await data_reader()
 
+            self.dispose_pipe(read, write)
             if type(data) == HTTPException:
                 raise data
 
