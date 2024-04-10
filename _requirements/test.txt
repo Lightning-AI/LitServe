@@ -1,4 +1,4 @@
-pytest-asyncio >=0.23.6
+pytest-asyncio
 asgi-lifespan >=2.1.0
 coverage >=5.0
 pytest >=6.0
