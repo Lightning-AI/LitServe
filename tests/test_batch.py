@@ -116,6 +116,7 @@ def test_batched_loop():
     request_buffer[2] = {"input": 5.0}, write
 
     lit_api_mock = MagicMock()
+    lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
     lit_api_mock.batch = MagicMock()
     lit_api_mock.unbatch = MagicMock(side_effect=Exception("exit loop"))
 
@@ -123,4 +124,5 @@ def test_batched_loop():
         run_batched_loop(lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
 
     lit_api_mock.batch.assert_called_once()
+    lit_api_mock.batch.assert_called_once_with((4.0, 5.0))
     lit_api_mock.unbatch.assert_called_once()
