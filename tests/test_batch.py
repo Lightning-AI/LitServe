@@ -118,11 +118,8 @@ def test_batched_loop():
     lit_api_mock.batch = MagicMock()
     lit_api_mock.unbatch = MagicMock(side_effect=Exception("exit loop"))
 
-    try:
+    with pytest.raises(Exception, match="exit loop"):
         run_batched_loop(lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
-
-    except Exception as e:
-        assert e.args[0] == "exit loop"
 
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.unbatch.assert_called_once()
