@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
-        self.model = lambda x: x ** 2
+        self.model = lambda x: x**2
 
     def decode_request(self, request: Request):
         return request["input"]
