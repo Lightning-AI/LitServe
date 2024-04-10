@@ -1,5 +1,6 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
-import time
+from unittest.mock import MagicMock
+from litserve.server import run_batched_loop
 
 import pytest
 
@@ -101,3 +102,27 @@ def test_max_batch_size():
 
     with pytest.raises(ValueError, match="must be"):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+
+
+def test_batched_loop():
+    from multiprocessing import Manager, Queue, Pipe
+    requests_queue = Queue()
+    request_buffer = Manager().dict()
+    requests_queue.put(1)
+    requests_queue.put(2)
+    read, write = Pipe()
+    request_buffer[1] = {"input": 4.0}, write
+    request_buffer[2] = {"input": 5.0}, write
+
+    lit_api_mock = MagicMock()
+    lit_api_mock.batch = MagicMock()
+    lit_api_mock.unbatch = MagicMock(side_effect=Exception("exit loop"))
+
+    try:
+        run_batched_loop(lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
+
+    except Exception as e:
+        assert e.args[0] == "exit loop"
+
+    lit_api_mock.batch.assert_called_once()
+    lit_api_mock.unbatch.assert_called_once()
