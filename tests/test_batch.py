@@ -1,9 +1,14 @@
 # Copyright Lightning AI. Licensed under the Apache License 2.0, see LICENSE file.
+import asyncio
+from unittest.mock import MagicMock
+from asgi_lifespan import LifespanManager
+
+from litserve.server import run_batched_loop
+
 import pytest
 
 from fastapi import Request, Response
-from fastapi.testclient import TestClient
-from concurrent.futures import ThreadPoolExecutor
+from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
 
@@ -36,6 +41,7 @@ class SimpleLitAPI(LitAPI):
         return torch.stack(inputs)
 
     def predict(self, x):
+        assert len(x) == 2
         return self.model(x)
 
     def unbatch(self, output):
@@ -63,30 +69,32 @@ class SimpleLitAPI2(LitAPI):
         return {"output": float(output)}
 
 
-def test_batched():
+@pytest.mark.asyncio()
+async def test_batched():
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=20, batch_timeout=4)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
-    with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
-        response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
-        response2 = executor.submit(client.post, "/predict", json={"input": 5.0})
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response1 = ac.post("/predict", json={"input": 4.0})
+        response2 = ac.post("/predict", json={"input": 5.0})
+        response1, response2 = await asyncio.gather(response1, response2)
 
-    assert response1.result().json() == {"output": 9.0}
-    assert response2.result().json() == {"output": 11.0}
-
-    # TODO check that batch unbatch have been called
+    assert response1.json() == {"output": 9.0}
+    assert response2.json() == {"output": 11.0}
 
 
-def test_unbatched():
+@pytest.mark.asyncio()
+async def test_unbatched():
     api = SimpleLitAPI2()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
 
-    with ThreadPoolExecutor(2) as executor, TestClient(server.app) as client:
-        response1 = executor.submit(client.post, "/predict", json={"input": 4.0})
-        response2 = executor.submit(client.post, "/predict", json={"input": 5.0})
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response1 = ac.post("/predict", json={"input": 4.0})
+        response2 = ac.post("/predict", json={"input": 5.0})
+        response1, response2 = await asyncio.gather(response1, response2)
 
-    assert response1.result().json() == {"output": 9.0}
-    assert response2.result().json() == {"output": 11.0}
+    assert response1.json() == {"output": 9.0}
+    assert response2.json() == {"output": 11.0}
 
 
 def test_max_batch_size():
@@ -98,3 +106,27 @@ def test_max_batch_size():
 
     with pytest.raises(ValueError, match="must be"):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+
+
+def test_batched_loop():
+    from multiprocessing import Manager, Queue, Pipe
+
+    requests_queue = Queue()
+    request_buffer = Manager().dict()
+    requests_queue.put(1)
+    requests_queue.put(2)
+    read, write = Pipe()
+    request_buffer[1] = {"input": 4.0}, write
+    request_buffer[2] = {"input": 5.0}, write
+
+    lit_api_mock = MagicMock()
+    lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
+    lit_api_mock.batch = MagicMock()
+    lit_api_mock.unbatch = MagicMock(side_effect=Exception("exit loop"))
+
+    with pytest.raises(Exception, match="exit loop"):
+        run_batched_loop(lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
+
+    lit_api_mock.batch.assert_called_once()
+    lit_api_mock.batch.assert_called_once_with((4.0, 5.0))
+    lit_api_mock.unbatch.assert_called_once()
