@@ -213,7 +213,7 @@ class LitServer:
         return pipe_s, pipe_r
 
     def dispose_pipe(self, pipe_s, pipe_r):
-        if len(self.pipe_pool) > self.max_pool_size:
+        if len(self.pipe_pool) >= self.max_pool_size:
             return
         self.pipe_pool.append((pipe_s, pipe_r))
 

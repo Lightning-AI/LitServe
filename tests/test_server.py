@@ -1,3 +1,4 @@
+from multiprocessing import Pipe
 from unittest.mock import patch, MagicMock
 from litserve.server import inference_worker
 from litserve.server import LitServer
@@ -12,12 +13,18 @@ def test_new_pipe(lit_server):
     assert len(lit_server.new_pipe()) == 2
 
 
+def test_dispose_pipe(lit_server):
+    for i in range(lit_server.max_pool_size + 10):
+        lit_server.dispose_pipe(*Pipe())
+    assert len(lit_server.pipe_pool) == lit_server.max_pool_size
+
+
 def test_index(sync_testclient):
     assert sync_testclient.get("/").text == "litserve running"
 
 
 @patch("litserve.server.lifespan")
-def test_device_identifiers(mock_lifespan, simple_litapi):
+def test_device_identifiers(lifespan_mock, simple_litapi):
     server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
     assert server.device_identifiers("cpu", 1) == ["cpu:1"]
     assert server.device_identifiers("cpu", [1, 2]) == ["cpu:1", "cpu:2"]
