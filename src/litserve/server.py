@@ -215,7 +215,7 @@ class LitServer:
     def dispose_pipe(self, pipe_s, pipe_r):
         if len(self.pipe_pool) > self.max_pool_size:
             return
-        self.pipe_pool.append(pipe_s, pipe_r)
+        self.pipe_pool.append((pipe_s, pipe_r))
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
