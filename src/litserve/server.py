@@ -291,7 +291,6 @@ class LitServer:
             print(f"Error copying file: {e}")
 
     def run(self, port=8000, log_level="info", **kwargs):
-        self.generate_client_file()
 
         import uvicorn
 
