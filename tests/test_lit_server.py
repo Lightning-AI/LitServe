@@ -109,7 +109,7 @@ def test_generate_client_file(capsys, lit_server):
 
 
 def test_run():
-    # Run the server.py script in the background
+    # Run the simple_server.py script in the background
     subprocess.Popen(
         ["python", "tests/simple_server.py"],
         stdout=subprocess.DEVNULL,
