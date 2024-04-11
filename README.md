@@ -78,11 +78,12 @@ class SimpleLitAPI(ls.LitAPI):
         # Convert the model output to a response payload.
         return {"output": output}
 
-# STEP 2: START THE SERVER
-api = SimpleLitAPI()
-server = ls.LitServer(api, accelerator="gpu")
-server.run(port=8000)
 
+# STEP 2: START THE SERVER
+if __name__ == "__main__":
+    api = SimpleLitAPI()
+    server = ls.LitServer(api, accelerator="gpu")
+    server.run(port=8000)
 ```
 
 Now run the server via the command-line
