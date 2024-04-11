@@ -17,7 +17,7 @@ def test_new_pipe(lit_server):
         lit_server.new_pipe()
 
     assert len(lit_server.pipe_pool) == 0, "pipe_pool was completely used and need to be empty"
-    assert len(lit_server.new_pipe()) == 2, "Need to create new pipes if the pool is empty"
+    assert len(lit_server.new_pipe()) == 2, "Need to return new Pipe if the pipe_pool was empty"
 
 
 def test_dispose_pipe(lit_server):
