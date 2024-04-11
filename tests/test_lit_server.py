@@ -119,7 +119,7 @@ def test_stream(simple_stream_api):
         "http://0.0.0.0:8000/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
     )
 
-    # Check if request was successful
+    output = "prompt=Hello World generated_output=LitServe is streaming output".split()
     assert response.status_code == 200
-    for chunk in response.iter_content(chunk_size=1024):
-        print(chunk.decode("utf-8"))
+    for chunk, o in zip(response.iter_content(chunk_size=1024), output):
+        assert chunk.decode("utf-8") == o
