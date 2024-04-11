@@ -31,7 +31,7 @@ Install LitServe via pip:
 
 ```bash
 pip install litserve
-```    
+```
 
 <details>
   <summary>Advanced install options</summary>
@@ -49,9 +49,9 @@ pip install -e '.[all]'
 
 
 # Get started
-LitServe is an inference server for AI/ML models that is minimal and highly scalable.   
+LitServe is an inference server for AI/ML models that is minimal and highly scalable.
 
-It has 2 simple, minimal APIs - LitAPI and LitServer.    
+It has 2 simple, minimal APIs - LitAPI and LitServer.
 
 ## Implement a server
 Here's a hello world example:
@@ -85,7 +85,7 @@ server.run(port=8000)
 
 ```
 
-Now run the server via the command-line   
+Now run the server via the command-line
 
 ```bash
 python server.py
@@ -98,9 +98,9 @@ LitServe automatically generates a client when it starts. Use this client to tes
 python client.py
 ```
 
-Or ping the server yourself directly   
+Or ping the server yourself directly
 ```python
-import requests   
+import requests
 response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 ```
 
@@ -108,7 +108,7 @@ The server expects the client to send a `POST` to the `/predict` URL with a JSON
 The way the payload is structured is up to the implementation of the `LitAPI` subclass.
 
 # Features
-LitServe supports multiple advanced state-of-the-art features. 
+LitServe supports multiple advanced state-of-the-art features.
 
 | Feature  | description  |
 |---|---|
@@ -124,11 +124,11 @@ LitServe supports multiple advanced state-of-the-art features.
 
 > [!NOTE]
 > Our goal is not to jump on every hype train, but instead support features that scale
-under the most demanding enterprise deployments.   
+under the most demanding enterprise deployments.
 
 ## Feature details
 
-Explore each feature in detail:   
+Explore each feature in detail:
 
 <details>
   <summary>Automatic schema validation</summary>
@@ -243,7 +243,7 @@ each of the 4 GPUs:
 ```python
 server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, workers_per_device=2)
 ```
-    
+
 </details>
 
 <details>
