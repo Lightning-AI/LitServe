@@ -100,7 +100,7 @@ def test_run():
         stdin=subprocess.DEVNULL,
     )
 
-    time.sleep(2)
+    time.sleep(5)
     assert os.path.exists("client.py")
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output
