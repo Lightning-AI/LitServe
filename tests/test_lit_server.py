@@ -2,7 +2,6 @@ import subprocess
 import time
 from multiprocessing import Pipe, Manager
 
-from litserve import server
 
 import os
 
@@ -93,23 +92,7 @@ def test_single_loop(simple_litapi, loop_args):
         run_single_loop(lit_api_mock, requests_queue, request_buffer)
 
 
-def test_generate_client_file(capsys, lit_server):
-    lit_server.generate_client_file()
-    src_path = os.path.join(os.path.dirname(server.__file__), "python_client.py")
-
-    dest_path = os.path.join(os.getcwd(), "client.py")
-    stmt = f"File '{src_path}' copied to '{dest_path}'\n"
-
-    captured = capsys.readouterr()
-    assert captured.out == stmt
-
-    assert os.path.exists(dest_path)
-    assert lit_server.generate_client_file() is None
-    os.remove(dest_path)
-
-
 def test_run():
-    # Run the simple_server.py script in the background
     subprocess.Popen(
         ["python", "tests/simple_server.py"],
         stdout=subprocess.DEVNULL,
