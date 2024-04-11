@@ -1,4 +1,7 @@
 from multiprocessing import Pipe, Manager
+from litserve import server
+
+import os
 from unittest.mock import patch, MagicMock
 from litserve.server import inference_worker, run_single_loop
 from litserve.server import LitServer
@@ -84,3 +87,18 @@ def test_single_loop(simple_litapi, loop_args):
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_single_loop(lit_api_mock, requests_queue, request_buffer)
+
+
+def test_generate_client_file(capsys, tmp_path, lit_server):
+    lit_server.generate_client_file()
+    src_path = os.path.join(os.path.dirname(server.__file__), "python_client.py")
+
+    dest_path = os.path.join(os.getcwd(), "client.py")
+    stmt = f"File '{src_path}' copied to '{dest_path}'\n"
+
+    captured = capsys.readouterr()
+    assert captured.out == stmt
+
+    assert os.path.exists(dest_path)
+    assert lit_server.generate_client_file() is None
+    os.remove(dest_path)
