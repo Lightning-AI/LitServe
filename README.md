@@ -291,7 +291,7 @@ See LICENSE file for details.
 
 # Run Tests
 
-You can run tests using `pytest` to verify that all the tests pass after making any changes.
+You can run tests locally using `pytest` to verify that all the tests pass after making any changes.
 
 First, you need to install the test dependencies:
 
