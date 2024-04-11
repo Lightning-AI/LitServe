@@ -1,4 +1,8 @@
+import subprocess
+import time
 from multiprocessing import Pipe, Manager
+from threading import Thread
+
 from litserve import server
 
 import os
@@ -103,3 +107,12 @@ def test_generate_client_file(capsys, lit_server):
     assert os.path.exists(dest_path)
     assert lit_server.generate_client_file() is None
     os.remove(dest_path)
+
+
+def test_run(lit_server):
+    t = Thread(target=lit_server.run, daemon=True)
+    t.start()
+    time.sleep(2)
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output
+    os.remove("client.py")
