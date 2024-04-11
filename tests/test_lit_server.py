@@ -113,6 +113,7 @@ def test_run(lit_server):
     t = Thread(target=lit_server.run, daemon=True)
     t.start()
     time.sleep(2)
+    assert os.path.exists("client.py")
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output
     os.remove("client.py")
