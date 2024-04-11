@@ -1,4 +1,10 @@
+import subprocess
+import time
 from multiprocessing import Pipe, Manager
+
+
+import os
+
 from unittest.mock import patch, MagicMock
 from litserve.server import inference_worker, run_single_loop
 from litserve.server import LitServer
@@ -84,3 +90,18 @@ def test_single_loop(simple_litapi, loop_args):
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_single_loop(lit_api_mock, requests_queue, request_buffer)
+
+
+def test_run():
+    subprocess.Popen(
+        ["python", "tests/simple_server.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+
+    time.sleep(5)
+    assert os.path.exists("client.py")
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output
+    os.remove("client.py")
