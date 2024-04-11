@@ -287,3 +287,20 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 See LICENSE file for details.
+
+
+# Run Tests
+
+You can run tests using `pytest` to verify that all the tests pass after making any changes.
+
+First, you need to install the test dependencies:
+
+```shell
+pip install -r _requirements/test.txt
+```
+
+Then, run pytest in your terminal as follows:
+
+```shell
+pytest tests
+```
