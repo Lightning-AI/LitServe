@@ -1,7 +1,9 @@
 import subprocess
+from threading import Thread
+
+import requests
 import time
 from multiprocessing import Pipe, Manager
-
 
 import os
 
@@ -52,10 +54,10 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
 @patch("litserve.server.run_batched_loop")
 @patch("litserve.server.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0)
+    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0, streaming=False)
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0)
+    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0, streaming=False)
     mock_single_loop.assert_called_once()
 
 
@@ -105,3 +107,19 @@ def test_run():
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output
     os.remove("client.py")
+
+
+def test_stream(simple_stream_api):
+    server = LitServer(simple_stream_api, accelerator="cpu", streaming=True)
+    t = Thread(target=server.run, args=(), daemon=True)
+    t.start()
+    time.sleep(2)
+
+    response = requests.post(
+        "http://0.0.0.0:8000/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
+    )
+
+    # Check if request was successful
+    assert response.status_code == 200
+    for chunk in response.iter_content(chunk_size=1024):
+        print(chunk.decode("utf-8"))

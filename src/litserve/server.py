@@ -14,6 +14,9 @@ import uuid
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
 import sys
+
+from starlette.responses import StreamingResponse
+
 from litserve import LitAPI
 
 # if defined, it will require clients to auth with X-API-Key in the header
@@ -87,16 +90,33 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
             pipe_s.send(y_enc)
 
 
+def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
+    while True:
+        try:
+            uid = request_queue.get(timeout=1.0)
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+        except (Empty, ValueError):
+            continue
+
+        x = lit_api.decode_request(x_enc)
+        for y in lit_api.predict(x):
+            y_enc = lit_api.encode_response(y)
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send(y_enc)
+
+        pipe_s.send(StopIteration())
+
+
 def inference_worker(
-    lit_api,
-    device,
-    worker_id,
-    request_queue,
-    request_buffer,
-    max_batch_size,
-    batch_timeout,
+    lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, streaming
 ):
     lit_api.setup(device=device)
+    if streaming:
+        run_streaming_loop(lit_api, request_queue, request_buffer)
+        return
     if max_batch_size > 1:
         run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
@@ -149,6 +169,7 @@ async def lifespan(app: FastAPI):
                 app.request_buffer,
                 app.max_batch_size,
                 app.batch_timeout,
+                app.streaming,
             ),
             daemon=True,
         )
@@ -168,6 +189,7 @@ class LitServer:
         timeout=30,
         max_batch_size=1,
         batch_timeout=0.0,
+        streaming=False,
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")
@@ -182,6 +204,7 @@ class LitServer:
         self.app.batch_timeout = batch_timeout
         initial_pool_size = 100
         self.max_pool_size = 1000
+        self.app.streaming = streaming
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
@@ -275,6 +298,43 @@ class LitServer:
                 raise data
 
             return data
+
+        @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
+        async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+            uid = uuid.uuid4()
+
+            read, write = self.new_pipe()
+
+            if self.request_type == Request:
+                self.app.request_buffer[uid] = (await request.json(), write)
+            else:
+                self.app.request_buffer[uid] = (request, write)
+
+            self.app.request_queue.put(uid)
+            background_tasks.add_task(cleanup, self.app.request_buffer, uid)
+
+            async def event_wait(evt, timeout):
+                # suppress TimeoutError because we'll return False in case of timeout
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(evt.wait(), timeout)
+                return evt.is_set()
+
+            async def data_streamer():
+                data_available = asyncio.Event()
+                while True:
+                    asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+                    if not read.poll():
+                        await event_wait(data_available, self.app.timeout)
+                        data_available.clear()
+                    asyncio.get_event_loop().remove_reader(read.fileno())
+
+                    if read.poll():
+                        data = read.recv()
+                        if isinstance(data, StopIteration):
+                            return
+                        yield data
+
+            return StreamingResponse(data_streamer())
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")

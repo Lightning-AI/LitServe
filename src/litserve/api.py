@@ -45,7 +45,7 @@ class LitAPI(ABC):
 
     @abstractmethod
     def predict(self, x):
-        """Run the model on the input and return the output."""
+        """Run the model on the input and return or stream the output."""
         pass
 
     def unbatch(self, output):

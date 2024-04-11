@@ -19,9 +19,29 @@ class SimpleLitAPI(LitAPI):
         return {"output": output}
 
 
+class SimpleStreamAPI(LitAPI):
+    def setup(self, device):
+        self.sentence = "LitServe is streaming output"
+
+    def decode_request(self, request: Request) -> float:
+        return request["prompt"]
+
+    def predict(self, x):
+        output = f"prompt={x} generated_output={self.sentence}".split()
+        yield from output
+
+    def encode_response(self, output: str) -> str:
+        return output.lower() + " "
+
+
 @pytest.fixture()
 def simple_litapi():
     return SimpleLitAPI()
+
+
+@pytest.fixture()
+def simple_stream_api():
+    return SimpleStreamAPI()
 
 
 @pytest.fixture()
