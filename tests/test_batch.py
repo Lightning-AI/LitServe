@@ -41,7 +41,7 @@ class SimpleLitAPI(LitAPI):
         return torch.stack(inputs)
 
     def predict(self, x):
-        assert len(x) == 2
+        assert len(x) == 2, "Expected two concurrent inputs to be batched"
         return self.model(x)
 
     def unbatch(self, output):

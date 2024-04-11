@@ -2,7 +2,6 @@ import subprocess
 import time
 from multiprocessing import Pipe, Manager
 
-
 import os
 
 from unittest.mock import patch, MagicMock
@@ -17,14 +16,14 @@ def test_new_pipe(lit_server):
     for _ in range(pool_size):
         lit_server.new_pipe()
 
-    assert len(lit_server.pipe_pool) == 0
-    assert len(lit_server.new_pipe()) == 2
+    assert len(lit_server.pipe_pool) == 0, "pipe_pool was completely used and need to be empty"
+    assert len(lit_server.new_pipe()) == 2, "Need to create new pipes if the pool is empty"
 
 
 def test_dispose_pipe(lit_server):
     for i in range(lit_server.max_pool_size + 10):
         lit_server.dispose_pipe(*Pipe())
-    assert len(lit_server.pipe_pool) == lit_server.max_pool_size
+    assert len(lit_server.pipe_pool) == lit_server.max_pool_size, "pipe_pool size must be less than max_pool_size"
 
 
 def test_index(sync_testclient):
@@ -83,13 +82,18 @@ class FakePipe:
 
 def test_single_loop(simple_litapi, loop_args):
     lit_api_mock, requests_queue, request_buffer = loop_args
-    lit_api_mock.unbatch.side_effect = None
+    lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
+    lit_api_mock.predict = MagicMock(side_effect=lambda x: x**2)
+    lit_api_mock.encode_response = MagicMock()
     request_buffer = Manager().dict()
     request_buffer[1] = {"input": 4.0}, FakePipe()
     request_buffer[2] = {"input": 5.0}, FakePipe()
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_single_loop(lit_api_mock, requests_queue, request_buffer)
+    lit_api_mock.decode_request.assert_called_with({"input": 4.0})
+    lit_api_mock.predict.assert_called_with(4.0)
+    lit_api_mock.encode_response.assert_called_with(16.0)
 
 
 def test_run():
@@ -101,7 +105,7 @@ def test_run():
     )
 
     time.sleep(5)
-    assert os.path.exists("client.py")
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
-    assert '{"output":16.0}' in output
+    assert '{"output":16.0}' in output, "tests/simple_server.py didn't return expected output"
     os.remove("client.py")
