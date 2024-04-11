@@ -122,4 +122,4 @@ def test_stream(simple_stream_api):
     output = "prompt=Hello World generated_output=LitServe is streaming output".split()
     assert response.status_code == 200
     for chunk, o in zip(response.iter_content(chunk_size=1024), output):
-        assert chunk.decode("utf-8") == o
+        assert chunk.decode("utf-8") == o.lower()

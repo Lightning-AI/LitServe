@@ -31,7 +31,7 @@ class SimpleStreamAPI(LitAPI):
         yield from output
 
     def encode_response(self, output: str) -> str:
-        return output.lower() + " "
+        return output.lower()
 
 
 @pytest.fixture()
