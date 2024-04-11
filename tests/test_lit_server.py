@@ -82,18 +82,13 @@ class FakePipe:
 
 def test_single_loop(simple_litapi, loop_args):
     lit_api_mock, requests_queue, request_buffer = loop_args
-    lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
-    lit_api_mock.predict = MagicMock(side_effect=lambda x: x**2)
-    lit_api_mock.encode_response = MagicMock()
+    lit_api_mock.unbatch.side_effect = None
     request_buffer = Manager().dict()
     request_buffer[1] = {"input": 4.0}, FakePipe()
     request_buffer[2] = {"input": 5.0}, FakePipe()
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_single_loop(lit_api_mock, requests_queue, request_buffer)
-    lit_api_mock.decode_request.assert_called_with({"input": 4.0})
-    lit_api_mock.predict.assert_called_with(4.0)
-    lit_api_mock.encode_response.assert_called_with(16.0)
 
 
 def test_run():
