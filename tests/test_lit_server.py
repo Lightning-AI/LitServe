@@ -93,7 +93,7 @@ def test_single_loop(simple_litapi, loop_args):
 
 
 def test_run():
-    subprocess.Popen(
+    process = subprocess.Popen(
         ["python", "tests/simple_server.py"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -105,3 +105,4 @@ def test_run():
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output
     os.remove("client.py")
+    process.kill()
