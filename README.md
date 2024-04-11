@@ -49,7 +49,9 @@ pip install -e '.[all]'
 
 
 # Get started
-LitServe consists of 2 very simple, minimal but powerful APIs - the LitAPI and the LitServer. 
+LitServe is an inference server for AI/ML models that is minimal and highly scalable.   
+
+It has 2 simple, minimal APIs - LitAPI and LitServer.    
 
 ## Implement a server
 Here's a hello world example:
