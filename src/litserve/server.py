@@ -27,7 +27,7 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, R
 from fastapi.security import APIKeyHeader
 import sys
 
-from starlette.responses import StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 
