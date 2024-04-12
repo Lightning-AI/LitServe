@@ -121,17 +121,16 @@ def test_run():
     assert '{"output":16.0}' in output
     os.remove("client.py")
     process.kill()
-    time.sleep(5)
 
 
 def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, accelerator="cpu", stream=True)
-    t = Thread(target=server.run, args=(), daemon=True)
+    t = Thread(target=server.run, kwargs={"port": 8888}, daemon=True)
     t.start()
     time.sleep(2)
 
     response = requests.post(
-        "http://0.0.0.0:8000/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
+        "http://0.0.0.0:8888/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
     )
     assert response.status_code == 200, f"Check if {simple_stream_api} is running on port 8000"
 
