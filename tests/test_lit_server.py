@@ -132,8 +132,8 @@ def test_stream(simple_stream_api):
     response = requests.post(
         "http://0.0.0.0:8000/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
     )
+    assert response.status_code == 200, f"Check if {simple_stream_api} is running on port 8000"
 
-    output = "prompt=Hello World generated_output=LitServe is streaming output".split()
-    assert response.status_code == 200
-    for chunk, o in zip(response.iter_content(chunk_size=1024), output):
-        assert chunk.decode("utf-8") == o.lower()
+    expected_output = "prompt=Hello World generated_output=LitServe is streaming output".lower().split()
+    for chunk, out in zip(response.iter_content(chunk_size=1024), expected_output):
+        assert chunk.decode("utf-8") == out, "Server must yield the expected output"
