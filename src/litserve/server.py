@@ -122,11 +122,9 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
         pipe_s.send(StopIteration())
 
 
-def inference_worker(
-    lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, streaming
-):
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
-    if streaming:
+    if stream:
         run_streaming_loop(lit_api, request_queue, request_buffer)
         return
     if max_batch_size > 1:
@@ -181,7 +179,7 @@ async def lifespan(app: FastAPI):
                 app.request_buffer,
                 app.max_batch_size,
                 app.batch_timeout,
-                app.streaming,
+                app.stream,
             ),
             daemon=True,
         )
@@ -201,7 +199,7 @@ class LitServer:
         timeout=30,
         max_batch_size=1,
         batch_timeout=0.0,
-        streaming=False,
+        stream=False,
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")
@@ -216,7 +214,7 @@ class LitServer:
         self.app.batch_timeout = batch_timeout
         initial_pool_size = 100
         self.max_pool_size = 1000
-        self.app.streaming = streaming
+        self.app.stream = stream
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)

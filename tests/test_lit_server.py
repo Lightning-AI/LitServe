@@ -67,10 +67,10 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
 @patch("litserve.server.run_batched_loop")
 @patch("litserve.server.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0, streaming=False)
+    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0, stream=False)
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0, streaming=False)
+    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0, stream=False)
     mock_single_loop.assert_called_once()
 
 
@@ -124,7 +124,7 @@ def test_run():
 
 
 def test_stream(simple_stream_api):
-    server = LitServer(simple_stream_api, accelerator="cpu", streaming=True)
+    server = LitServer(simple_stream_api, accelerator="cpu", stream=True)
     t = Thread(target=server.run, args=(), daemon=True)
     t.start()
     time.sleep(2)
