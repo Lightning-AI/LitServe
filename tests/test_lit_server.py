@@ -16,8 +16,8 @@ def test_new_pipe(lit_server):
     for _ in range(pool_size):
         lit_server.new_pipe()
 
-    assert len(lit_server.pipe_pool) == 0, "pipe_pool was completely used and need to be empty"
-    assert len(lit_server.new_pipe()) == 2, "Need to return new Pipe if the pipe_pool was empty"
+    assert len(lit_server.pipe_pool) == 0, "lit_server.new_pipe() was used till max_pool_size which exhausts the pool"
+    assert len(lit_server.new_pipe()) == 2, "lit_server.new_pipe() always must return a tuple of read and write pipes"
 
 
 def test_dispose_pipe(lit_server):
