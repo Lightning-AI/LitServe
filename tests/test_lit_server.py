@@ -120,7 +120,7 @@ def test_run():
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output
     os.remove("client.py")
-    process.kill()
+    process.terminate()
 
 
 def test_stream(simple_stream_api):
