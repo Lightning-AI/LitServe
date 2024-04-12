@@ -1,3 +1,16 @@
+# Copyright The Lightning AI team.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import subprocess
 from threading import Thread
 
@@ -95,7 +108,7 @@ def test_single_loop(simple_litapi, loop_args):
 
 
 def test_run():
-    subprocess.Popen(
+    process = subprocess.Popen(
         ["python", "tests/simple_server.py"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -107,6 +120,7 @@ def test_run():
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output
     os.remove("client.py")
+    process.kill()
 
 
 def test_stream(simple_stream_api):
