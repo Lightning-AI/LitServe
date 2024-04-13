@@ -329,6 +329,15 @@ class LitServer:
                     await asyncio.wait_for(evt.wait(), timeout)
                 return evt.is_set()
 
+            async def stream_from_pipe():
+                while True:
+                    if read.poll(self.app.timeout):
+                        data = read.recv()
+                        if isinstance(data, StopIteration):
+                            return
+                        yield data
+                    asyncio.sleep(0.01)
+
             async def data_streamer():
                 data_available = asyncio.Event()
                 while True:
@@ -343,6 +352,9 @@ class LitServer:
                         if isinstance(data, StopIteration):
                             return
                         yield data
+
+            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+                return StreamingResponse(stream_from_pipe())
 
             return StreamingResponse(data_streamer())
 
