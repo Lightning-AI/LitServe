@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import subprocess
-from threading import Thread
 
-import requests
 import time
 from multiprocessing import Pipe, Manager
+from asgi_lifespan import LifespanManager
 
 import os
+from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
 from litserve.server import inference_worker, run_single_loop
@@ -123,17 +123,11 @@ def test_run():
     process.kill()
 
 
-def test_stream(simple_stream_api):
+@pytest.mark.asyncio()
+async def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, accelerator="cpu", stream=True)
-    t = Thread(target=server.run, kwargs={"port": 8000}, daemon=True)
-    t.start()
-    time.sleep(5)
+    expected_output = "prompt=Hello World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
-    response = requests.post(
-        "http://0.0.0.0:8000/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
-    )
-    assert response.status_code == 200, f"Check if {simple_stream_api} is running on port 8000"
-
-    expected_output = "prompt=Hello World generated_output=LitServe is streaming output".lower().split()
-    for chunk, out in zip(response.iter_content(chunk_size=1024), expected_output):
-        assert chunk.decode("utf-8") == out, "Server must yield the expected output"
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response = await ac.post("/stream-predict", json={"prompt": "Hello World"}, timeout=10)
+        assert response.text == expected_output
