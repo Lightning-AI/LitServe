@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Generator
 
 from litserve.server import LitServer
 import pytest
@@ -34,18 +35,19 @@ class SimpleLitAPI(LitAPI):
 
 
 class SimpleStreamAPI(LitAPI):
-    def setup(self, device):
+    def setup(self, device) -> None:
         self.sentence = "LitServe is streaming output"
 
     def decode_request(self, request: Request) -> float:
         return request["prompt"]
 
-    def predict(self, x):
+    def predict(self, x) -> Generator:
         output = f"prompt={x} generated_output={self.sentence}".split()
         yield from output
 
-    def encode_response(self, output: str) -> str:
-        return output.lower()
+    def encode_response(self, output: Generator) -> Generator:
+        for out in output:
+            yield out.lower()
 
 
 @pytest.fixture()

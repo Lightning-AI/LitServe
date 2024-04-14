@@ -57,7 +57,7 @@ class LitAPI(ABC):
 
     @abstractmethod
     def predict(self, x):
-        """Run the model on the input and return or stream the output."""
+        """Run the model on the input and return or yield the output."""
         pass
 
     def unbatch(self, output):
@@ -68,5 +68,9 @@ class LitAPI(ABC):
 
     @abstractmethod
     def encode_response(self, output):
-        """Convert the model output to a response payload."""
+        """Convert the model output to a response payload.
+
+        To enable streaming, it should yield the output.
+
+        """
         pass
