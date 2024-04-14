@@ -127,7 +127,7 @@ def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, accelerator="cpu", stream=True)
     t = Thread(target=server.run, kwargs={"port": 8888}, daemon=True)
     t.start()
-    time.sleep(2)
+    time.sleep(5)
 
     response = requests.post(
         "http://0.0.0.0:8888/stream-predict", json={"prompt": "Hello World"}, stream=True, timeout=5
