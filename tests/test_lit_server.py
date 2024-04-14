@@ -130,4 +130,5 @@ async def test_stream(simple_stream_api):
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         response = await ac.post("/stream-predict", json={"prompt": "Hello World"}, timeout=10)
-        assert response.text == expected_output, "Server returns input prompt and generated output which didn't match"
+        assert response.status_code == 200, "Check if server is running and the request format is valid."
+        assert response.text == expected_output, "Server returns input prompt and generated output which didn't match."
