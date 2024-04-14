@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import contextlib
+import logging
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -147,6 +148,7 @@ async def lifespan(app: FastAPI):
     manager = Manager()
     app.request_buffer = manager.dict()
 
+    process_list = []
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
     for worker_id, device in enumerate(app.devices * app.workers_per_device):
         if len(device) == 1:
@@ -165,8 +167,13 @@ async def lifespan(app: FastAPI):
             daemon=True,
         )
         process.start()
+        process_list.append((process, worker_id))
 
     yield
+
+    for process, worker_id in process_list:
+        logging.info(f"terminating worker worker_id={worker_id}")
+        process.terminate()
 
 
 class LitServer:
