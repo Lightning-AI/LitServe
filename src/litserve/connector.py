@@ -7,13 +7,14 @@ import torch
 class _Connector:
     def __init__(self, accelerator: Optional[str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
-
-        if accelerator == "auto":
+        if accelerator == "cpu":
+            self._accelerator = "cpu"
+        elif accelerator == "auto":
             self._accelerator = self._choose_auto_accelerator()
         elif accelerator in ["cuda", "gpu"]:
             self._accelerator = self._choose_gpu_accelerator_backend()
         else:
-            self._accelerator = "cpu"
+            raise ValueError(f"Accelerator {accelerator} is not supported")
 
     @property
     def accelerator(self):
