@@ -214,6 +214,15 @@ class LitServer:
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
+        if stream and max_batch_size > 1:
+            raise ValueError("streaming is not supported with automatic batching at this time.")
+
+        if stream and not all([
+            inspect.isgeneratorfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response),
+        ]):
+            raise ValueError("lit_api.predict and lit_api.encode_response must be generators in streaming mode.")
+
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device

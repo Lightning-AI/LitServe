@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import subprocess
 
 import time
@@ -140,7 +141,7 @@ class FakeStreamPipe:
     def send(self, item):
         if isinstance(item, StopIteration):
             raise StopIteration("exit loop")
-        assert item == f"{self.i}"
+        assert item == f"{self.i}", "LitAPI generates number from 0 to 9 which is sent via Pipe"
         self.i += 1
 
 
@@ -150,6 +151,7 @@ def test_streaming_loop(loop_args):
             yield {"output": f"{i}"}
 
     def fake_encode(output):
+        assert inspect.isgenerator(output), "predict function must be a generator in streaming mode"
         for out in output:
             yield out["output"]
 
