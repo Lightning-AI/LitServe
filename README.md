@@ -12,15 +12,15 @@
 ---
 
 
-<p align="center">   
+<p align="center">
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>    
+</a>
 
 </p>
 
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/litserve)   
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/litserve)
 ![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg) [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE) [![Discord](https://img.shields.io/discord/1077906959069626439?style=plastic)](https://discord.gg/VptPCZkGNa)
 
 
@@ -35,20 +35,20 @@
 
 &nbsp;
 
-# Deploy AI models Lightning fast ⚡   
-LitServe is a framework for deploying AI models at scale. It is designed do be simple yet powerfully scalable.    LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.   
+# Deploy AI models Lightning fast ⚡
+LitServe is a framework for deploying AI models at scale. It is designed do be simple yet powerfully scalable.    LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.
 
-Run the hello world demo here:    
-    
+Run the hello world demo here:
+
 <div align="center">
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
 </a>
-</div>    
+</div>
 
 &nbsp;
 
-Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.        
+Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
 <div align="center">
     <img src="https://github.com/Lightning-AI/litserve/assets/3640001/4a4a5028-1e64-46f3-b0db-ef5b3f636655" height="160px">
@@ -67,7 +67,7 @@ pip install litserve
   <summary>Advanced install options</summary>
 &nbsp;
 
-Install the main branch:   
+Install the main branch:
 
 ```bash
 pip install https://github.com/Lightning-AI/litserve/main.zip
@@ -91,11 +91,11 @@ LitServe is an inference server for AI/ML models that is minimal and highly scal
 It has 2 simple, minimal APIs - LitAPI and LitServer.
 
 ## Implement a server
-Here's a hello world example:    
+Here's a hello world example:
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>    
+</a>
 
 ```python
 # server.py
