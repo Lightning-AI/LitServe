@@ -151,11 +151,35 @@ class SimpleLitAPI(LitAPI):
         return {"output": float(output)}
 
 
-def test_auto_accelerator():
-    server = LitServer(SimpleLitAPI(), devices=1, timeout=10)
-    if torch.cuda.is_available():
-        assert server._connector.accelerator == "cuda"
-    elif torch.backends.mps.is_available():
-        assert server._connector.accelerator == "mps"
-    else:
-        assert server._connector.accelerator == "cpu"
+@pytest.mark.parametrize(
+    ("input_accelerator", "expected_accelerator"),
+    [
+        ("cpu", "cpu"),
+        pytest.param(
+            "cuda",
+            "cuda",
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
+        ),
+        pytest.param(
+            None, "cuda", marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
+        ),
+        pytest.param(
+            "auto",
+            "cuda",
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
+        ),
+        pytest.param(
+            "auto",
+            "mps",
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
+        ),
+        pytest.param(
+            None,
+            "mps",
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
+        ),
+    ],
+)
+def test_auto_accelerator(input_accelerator, expected_accelerator):
+    server = LitServer(SimpleLitAPI(), devices=1, timeout=10, accelerator=input_accelerator)
+    assert server._connector.accelerator == expected_accelerator

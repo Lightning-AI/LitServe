@@ -216,6 +216,7 @@ class LitServer:
         if self.response_type == encode_response_signature.empty:
             self.response_type = Response
 
+        accelerator = self._connector.accelerator
         if accelerator == "cpu":
             self.app.devices = [accelerator]
         elif accelerator in ["cuda", "gpu"]:
