@@ -37,3 +37,6 @@ def test_connector(input_accelerator, expected_accelerator):
     assert (
         connector.accelerator == expected_accelerator
     ), f"accelerator was supposed to be {expected_accelerator} but was {connector.accelerator}"
+
+    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'cuda', or 'gpu'"):
+        _Connector(accelerator="SUPER_CHIP")
