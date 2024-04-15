@@ -38,21 +38,17 @@
 # Deploy AI models Lightning fast ⚡
 LitServe is a framework for deploying AI models at scale. It is designed do be simple yet powerfully scalable.    LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.
 
-Run the hello world demo here:
-
-<div align="center">
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>
-</div>
-
-&nbsp;
-
 Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
 <div align="center">
     <img src="https://github.com/Lightning-AI/litserve/assets/3640001/4a4a5028-1e64-46f3-b0db-ef5b3f636655" height="160px">
 </div>
+
+Run the hello world demo here:    
+
+<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
+</a>
 
 &nbsp;
 
