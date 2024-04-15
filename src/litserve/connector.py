@@ -9,9 +9,12 @@ class _Connector:
         accelerator = self._sanitize_accelerator(accelerator)
         if accelerator == "cpu":
             self._accelerator = "cpu"
+        elif accelerator == "cuda":
+            self._accelerator = "cuda"
+
         elif accelerator == "auto":
             self._accelerator = self._choose_auto_accelerator()
-        elif accelerator in ["cuda", "gpu"]:
+        elif accelerator == "gpu":
             self._accelerator = self._choose_gpu_accelerator_backend()
 
     @property
