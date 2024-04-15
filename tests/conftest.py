@@ -38,7 +38,7 @@ class SimpleStreamAPI(LitAPI):
     def setup(self, device) -> None:
         self.sentence = "LitServe is streaming output"
 
-    def decode_request(self, request: Request) -> float:
+    def decode_request(self, request: Request) -> str:
         return request["prompt"]
 
     def predict(self, x) -> Generator:

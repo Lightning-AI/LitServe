@@ -344,7 +344,7 @@ class LitServer:
                         if isinstance(data, StopIteration):
                             return
                         yield data
-                    asyncio.sleep(0.01)
+                    await asyncio.sleep(0.0001)
 
             async def data_streamer():
                 data_available = asyncio.Event()

@@ -21,7 +21,7 @@ import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
-from litserve.server import inference_worker, run_single_loop
+from litserve.server import inference_worker, run_single_loop, run_streaming_loop
 from litserve.server import LitServer
 
 import pytest
@@ -125,10 +125,45 @@ def test_run():
 
 @pytest.mark.asyncio()
 async def test_stream(simple_stream_api):
-    server = LitServer(simple_stream_api, accelerator="cpu", stream=True)
+    server = LitServer(simple_stream_api, stream=True)
     expected_output = "prompt=Hello World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         response = await ac.post("/stream-predict", json={"prompt": "Hello World"}, timeout=10)
         assert response.status_code == 200, "Check if server is running and the request format is valid."
         assert response.text == expected_output, "Server returns input prompt and generated output which didn't match."
+
+
+class FakeStreamPipe:
+    i = 0
+
+    def send(self, item):
+        if isinstance(item, StopIteration):
+            raise StopIteration("exit loop")
+        assert item == f"{self.i}"
+        self.i += 1
+
+
+def test_streaming_loop(loop_args):
+    def fake_predict(inputs: str):
+        for i in range(10):
+            yield {"output": f"{i}"}
+
+    def fake_encode(output):
+        for out in output:
+            yield out["output"]
+
+    fake_stream_api = MagicMock()
+    fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
+    fake_stream_api.predict = MagicMock(side_effect=fake_predict)
+    fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
+
+    _, requests_queue, request_buffer = loop_args
+    request_buffer = Manager().dict()
+    request_buffer[1] = {"prompt": "Hello"}, FakeStreamPipe()
+
+    with pytest.raises(StopIteration, match="exit loop"):
+        run_streaming_loop(fake_stream_api, requests_queue, request_buffer)
+
+    fake_stream_api.predict.assert_called_once_with("Hello")
+    fake_stream_api.encode_response.assert_called_once()
