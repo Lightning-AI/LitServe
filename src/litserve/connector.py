@@ -1,11 +1,11 @@
-from typing import Union, Optional
+import sys
+from typing import Optional
 import platform
 import torch
 
 
 class _Connector:
-    def __init__(self, accelerator: Optional[str] = "auto", device: Optional[Union[str, torch.device]] = "auto"):
-        # TODO: Enable device='auto'
+    def __init__(self, accelerator: Optional[str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
 
         if accelerator == "auto":
@@ -14,8 +14,6 @@ class _Connector:
             self._accelerator = self._choose_gpu_accelerator_backend()
         else:
             self._accelerator = "cpu"
-
-        self._device = self._resolve_device(device)
 
     @property
     def accelerator(self):
@@ -34,10 +32,12 @@ class _Connector:
         return accelerator
 
     def _choose_auto_accelerator(self):
-        try:
-            return self._choose_gpu_accelerator_backend()
-        except RuntimeError:
-            return "cpu"
+        if "torch" in sys.modules:
+            try:
+                return self._choose_gpu_accelerator_backend()
+            except RuntimeError:
+                print("No GPU accelerator found, will default to cpu")
+        return "cpu"
 
     @staticmethod
     def _choose_gpu_accelerator_backend():

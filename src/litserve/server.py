@@ -28,6 +28,7 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, R
 from fastapi.security import APIKeyHeader
 import sys
 from litserve import LitAPI
+from litserve.connector import _Connector
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -181,7 +182,7 @@ class LitServer:
     def __init__(
         self,
         lit_api: LitAPI,
-        accelerator="cpu",
+        accelerator="auto",
         devices=1,
         workers_per_device=1,
         timeout=30,
@@ -202,6 +203,7 @@ class LitServer:
         initial_pool_size = 100
         self.max_pool_size = 1000
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
+        self._connector = _Connector(accelerator=accelerator)
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)

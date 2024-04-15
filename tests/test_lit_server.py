@@ -14,8 +14,11 @@
 import subprocess
 import time
 from multiprocessing import Pipe, Manager
+from litserve import LitAPI
+from fastapi import Request, Response
 
-
+import torch
+import torch.nn as nn
 import os
 
 from unittest.mock import patch, MagicMock
@@ -119,3 +122,40 @@ def test_run():
     assert '{"output":16.0}' in output
     os.remove("client.py")
     process.kill()
+
+
+class Linear(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(1, 1)
+        self.linear.weight.data.fill_(2.0)
+        self.linear.bias.data.fill_(1.0)
+
+    def forward(self, x):
+        return self.linear(x)
+
+
+class SimpleLitAPI(LitAPI):
+    def setup(self, device):
+        self.model = Linear().to(device)
+        self.device = device
+
+    def decode_request(self, request: Request):
+        content = request["input"]
+        return torch.tensor([content], device=self.device)
+
+    def predict(self, x):
+        return self.model(x[None, :])
+
+    def encode_response(self, output) -> Response:
+        return {"output": float(output)}
+
+
+def test_auto_accelerator():
+    server = LitServer(SimpleLitAPI(), devices=1, timeout=10)
+    if torch.cuda.is_available():
+        assert server._connector.accelerator == "cuda"
+    elif torch.backends.mps.is_available():
+        assert server._connector.accelerator == "mps"
+    else:
+        assert server._connector.accelerator == "cpu"
