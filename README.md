@@ -44,7 +44,7 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
     <img src="https://github.com/Lightning-AI/litserve/assets/3640001/4a4a5028-1e64-46f3-b0db-ef5b3f636655" height="160px">
 </div>
 
-Run the hello world demo here:    
+Run the hello world demo here:
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
