@@ -13,8 +13,6 @@ class _Connector:
             self._accelerator = self._choose_auto_accelerator()
         elif accelerator in ["cuda", "gpu"]:
             self._accelerator = self._choose_gpu_accelerator_backend()
-        else:
-            raise ValueError(f"Accelerator {accelerator} is not supported")
 
     @property
     def accelerator(self):
