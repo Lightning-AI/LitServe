@@ -141,7 +141,7 @@ class FakeStreamPipe:
     def send(self, item):
         if isinstance(item, StopIteration):
             raise StopIteration("exit loop")
-        assert item == f"{self.i}", "LitAPI generates number from 0 to 9 which is sent via Pipe"
+        assert item == f"{self.i}", "This streaming loop generates number from 0 to 9 which is sent via Pipe"
         self.i += 1
 
 
@@ -169,3 +169,10 @@ def test_streaming_loop(loop_args):
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
+
+
+def test_litapi_with_stream(simple_litapi, simple_stream_api):
+    with pytest.raises(
+        ValueError, match="Both lit_api.predict and lit_api.encode_response must be generators in streaming mode."
+    ):
+        LitServer(simple_litapi, stream=True)

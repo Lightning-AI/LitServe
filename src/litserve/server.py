@@ -221,7 +221,7 @@ class LitServer:
             inspect.isgeneratorfunction(lit_api.predict),
             inspect.isgeneratorfunction(lit_api.encode_response),
         ]):
-            raise ValueError("lit_api.predict and lit_api.encode_response must be generators in streaming mode.")
+            raise ValueError("Both lit_api.predict and lit_api.encode_response must be generators in streaming mode.")
 
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
