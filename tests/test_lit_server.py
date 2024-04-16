@@ -11,14 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
+import inspect
+import pickle
 import subprocess
 import time
 from multiprocessing import Pipe, Manager
-
+from asgi_lifespan import LifespanManager
 import os
+from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
-from litserve.server import inference_worker, run_single_loop
+from litserve.server import inference_worker, run_single_loop, run_streaming_loop
 from litserve.server import LitServer
 
 import pytest
@@ -64,10 +68,10 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
 @patch("litserve.server.run_batched_loop")
 @patch("litserve.server.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0)
+    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0, stream=False)
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0)
+    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0, stream=False)
     mock_single_loop.assert_called_once()
 
 
@@ -118,3 +122,64 @@ def test_run():
     assert '{"output":16.0}' in output, "tests/simple_server.py didn't return expected output"
     os.remove("client.py")
     process.kill()
+
+
+@pytest.mark.asyncio()
+async def test_stream(simple_stream_api):
+    server = LitServer(simple_stream_api, stream=True, timeout=10)
+    expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
+    expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
+
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1, resp2 = await asyncio.gather(resp1, resp2)
+        assert resp1.status_code == 200, "Check if server is running and the request format is valid."
+        assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
+        assert resp2.status_code == 200, "Check if server is running and the request format is valid."
+        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
+
+
+class FakeStreamPipe:
+    i = 0
+
+    def send(self, item):
+        if item == pickle.dumps(StopIteration()):
+            raise StopIteration("exit loop")
+        assert item == f"{self.i}", "This streaming loop generates number from 0 to 9 which is sent via Pipe"
+        self.i += 1
+
+
+def test_streaming_loop(loop_args):
+    def fake_predict(inputs: str):
+        for i in range(10):
+            yield {"output": f"{i}"}
+
+    def fake_encode(output):
+        assert inspect.isgenerator(output), "predict function must be a generator when `stream=True`"
+        for out in output:
+            yield out["output"]
+
+    fake_stream_api = MagicMock()
+    fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
+    fake_stream_api.predict = MagicMock(side_effect=fake_predict)
+    fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
+
+    _, requests_queue, request_buffer = loop_args
+    request_buffer = Manager().dict()
+    request_buffer[1] = {"prompt": "Hello"}, FakeStreamPipe()
+
+    with pytest.raises(StopIteration, match="exit loop"):
+        run_streaming_loop(fake_stream_api, requests_queue, request_buffer)
+
+    fake_stream_api.predict.assert_called_once_with("Hello")
+    fake_stream_api.encode_response.assert_called_once()
+
+
+def test_litapi_with_stream(simple_litapi):
+    with pytest.raises(
+        ValueError,
+        match="""When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield""",
+    ):
+        LitServer(simple_litapi, stream=True)
