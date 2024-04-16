@@ -347,6 +347,8 @@ class LitServer:
                 return evt.is_set()
 
             async def stream_from_pipe():
+                # this is a workaround for Windows since asyncio loop.add_reader is not supported.
+                # https://docs.python.org/3/library/asyncio-platforms.html
                 while True:
                     if read.poll(self.app.timeout):
                         data = read.recv()
