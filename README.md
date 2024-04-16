@@ -5,7 +5,7 @@
 
 # LitServe
 
-**Deploy AI models at scale**
+**Deploy AI models at scale - High-throughput serving engine for AI models**
 
 ✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Multi-GPU &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
 
@@ -36,8 +36,17 @@
 &nbsp;
 
 # Deploy AI models Lightning fast ⚡
-LitServe is a framework for deploying AI models at scale. It is designed do be simple yet powerfully scalable.    LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.
+LitServe is a high-throughput serving engine for deploying AI models at scale. LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.
 
+Why we wrote LitServe:    
+
+1. Work with any model: LLMs, vision, time-series, etc...
+3. We wanted a zero abstraction, minimal, hackable code-base without bloat.     
+5. Built for enterprise scale (not demos, etc...).
+6. Easy enough for researchers, scalable and hackable for engineers.    
+2. Work on any hardware (GPU/TPU) automatically.    
+5. Let you focus on model performance, not the serving boilerplate.    
+    
 Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
 <div align="center">
