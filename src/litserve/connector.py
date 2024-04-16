@@ -14,7 +14,6 @@
 import sys
 from typing import Optional
 import platform
-import torch
 
 
 class _Connector:
@@ -56,6 +55,8 @@ class _Connector:
 
     @staticmethod
     def _choose_gpu_accelerator_backend():
+        import torch
+
         if torch.cuda.is_available():
             return "cuda"
         if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
