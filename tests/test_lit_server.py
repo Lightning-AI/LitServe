@@ -179,9 +179,7 @@ def test_streaming_loop(loop_args):
 def test_litapi_with_stream(simple_litapi):
     with pytest.raises(
         ValueError,
-        match=(
-            "When `stream=True` both `lit_api.predict` and"
-            " `lit_api.encode_response` must generate values using `yield`"
-        ),
+        match="""When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield""",
     ):
         LitServer(simple_litapi, stream=True)

@@ -224,7 +224,23 @@ class LitServer:
             inspect.isgeneratorfunction(lit_api.predict),
             inspect.isgeneratorfunction(lit_api.encode_response),
         ]):
-            raise ValueError("Both lit_api.predict and lit_api.encode_response must be generators in streaming mode.")
+            raise ValueError(
+                """When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )
 
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
