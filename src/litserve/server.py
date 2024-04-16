@@ -36,7 +36,7 @@ from litserve import LitAPI
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
-STOP_ITERATION = pickle.dumps(StopIteration())
+STOP_ITERATION_PKL = pickle.dumps(StopIteration())
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -124,7 +124,7 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(y_enc)
 
-        pipe_s.send(STOP_ITERATION)
+        pipe_s.send(STOP_ITERATION_PKL)
 
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
@@ -368,12 +368,15 @@ class LitServer:
             async def stream_from_pipe():
                 # this is a workaround for Windows since asyncio loop.add_reader is not supported.
                 # https://docs.python.org/3/library/asyncio-platforms.html
+                entered_at = time.time()
                 while True:
                     if read.poll(self.app.timeout):
                         data = read.recv()
-                        if isinstance(data, StopIteration()):
+                        if data == STOP_ITERATION_PKL:
                             return
                         yield data
+                    if (time.time() - entered_at) > self.app.timeout:
+                        return
                     await asyncio.sleep(0.0001)
 
             async def data_streamer():
@@ -387,7 +390,7 @@ class LitServer:
                         asyncio.get_event_loop().remove_reader(read.fileno())
                     if read.poll():
                         data = read.recv()
-                        if data == STOP_ITERATION:
+                        if data == STOP_ITERATION_PKL:
                             return
                         yield data
 
