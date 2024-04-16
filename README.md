@@ -334,6 +334,8 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 <details>
   <summary>Stream model response</summary>
 
+&nbsp;
+
 `LitServer` can stream model outputs for LLMs or any model of your choice.
 
 For example, running the API server for a LLM with streaming:
