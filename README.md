@@ -5,7 +5,7 @@
 
 # LitServe
 
-**Deploy AI models at scale - High-throughput serving engine for AI models**
+**High-throughput serving engine for AI models**
 
 ✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Multi-GPU &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
 
