@@ -329,13 +329,61 @@ LIT_SERVER_API_KEY=supersecretkey python main.py
 Clients are expected to auth with the same API key set in the `X-API-Key` HTTP header.
 
 </details>
+
+
+<details>
+  <summary>Stream model response</summary>
+
+`LitServer` can stream model outputs for LLMs or any model of your choice.
+
+For example, running the API server for a LLM with streaming:
+
+```python
+from typing import Generator
+
+from litserve.api import LitAPI
+
+from litserve import LitServer
+from pydantic import BaseModel
+
+
+class PromptRequest(BaseModel):
+    prompt: str
+
+
+class SimpleStreamAPI(LitAPI):
+    def setup(self, device) -> None:
+        self.model = ...
+        self.tokenizer = ...
+        self.NUM_MAX_TOKENS = ...
+
+    def decode_request(self, request: PromptRequest) -> str:
+        return request.prompt
+
+    def predict(self, x) -> Generator:
+        for i in range(self.NUM_MAX_TOKENS):
+            x = self.model(x)
+            yield x
+
+    def encode_response(self, output: Generator) -> Generator:
+        for out in output:
+            yield self.tokenizer.decode(out)
+
+
+if __name__ == "__main__":
+    api = SimpleStreamAPI()
+    server = LitServer(api, stream=True, timeout=10)
+    server.run(port=8888)
+```
+
 &nbsp;
+
+</details>
 
 ## License
 
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 See LICENSE file for details.
-
 
 # Run Tests
 
