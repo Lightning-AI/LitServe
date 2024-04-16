@@ -14,6 +14,7 @@
 import asyncio
 import contextlib
 import logging
+import pickle
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -27,11 +28,16 @@ import uuid
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
 import sys
+
+from fastapi.responses import StreamingResponse
+
 from litserve import LitAPI
 from litserve.connector import _Connector
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
+
+STOP_ITERATION_PKL = pickle.dumps(StopIteration())
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -101,16 +107,32 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
             pipe_s.send(y_enc)
 
 
-def inference_worker(
-    lit_api,
-    device,
-    worker_id,
-    request_queue,
-    request_buffer,
-    max_batch_size,
-    batch_timeout,
-):
+def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
+    while True:
+        try:
+            uid = request_queue.get(timeout=1.0)
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+        except (Empty, ValueError):
+            continue
+
+        x = lit_api.decode_request(x_enc)
+        y_gen = lit_api.predict(x)
+        y_enc_gen = lit_api.encode_response(y_gen)
+        for y_enc in y_enc_gen:
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send(y_enc)
+
+        pipe_s.send(STOP_ITERATION_PKL)
+
+
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
+    if stream:
+        run_streaming_loop(lit_api, request_queue, request_buffer)
+        return
     if max_batch_size > 1:
         run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
@@ -164,6 +186,7 @@ async def lifespan(app: FastAPI):
                 app.request_buffer,
                 app.max_batch_size,
                 app.batch_timeout,
+                app.stream,
             ),
             daemon=True,
         )
@@ -188,11 +211,37 @@ class LitServer:
         timeout=30,
         max_batch_size=1,
         batch_timeout=0.0,
+        stream=False,
     ):
         if batch_timeout > timeout:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
+
+        if stream and max_batch_size > 1:
+            raise ValueError("streaming is not supported with automatic batching at this time.")
+
+        if stream and not all([
+            inspect.isgeneratorfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response),
+        ]):
+            raise ValueError(
+                """When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )
 
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
@@ -202,6 +251,7 @@ class LitServer:
         self.app.batch_timeout = batch_timeout
         initial_pool_size = 100
         self.max_pool_size = 1000
+        self.app.stream = stream
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator)
 
@@ -219,7 +269,7 @@ class LitServer:
         accelerator = self._connector.accelerator
         if accelerator == "cpu":
             self.app.devices = [accelerator]
-        elif accelerator in ["cuda", "gpu"]:
+        elif accelerator in ["cuda", "mps"]:
             device_list = devices
             if isinstance(devices, int):
                 device_list = range(devices)
@@ -297,6 +347,60 @@ class LitServer:
                 raise data
 
             return data
+
+        @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
+        async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+            uid = uuid.uuid4()
+
+            read, write = self.new_pipe()
+
+            if self.request_type == Request:
+                self.app.request_buffer[uid] = (await request.json(), write)
+            else:
+                self.app.request_buffer[uid] = (request, write)
+
+            self.app.request_queue.put(uid)
+            background_tasks.add_task(cleanup, self.app.request_buffer, uid)
+
+            async def event_wait(evt, timeout):
+                # suppress TimeoutError because we'll return False in case of timeout
+                with contextlib.suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(evt.wait(), timeout)
+                return evt.is_set()
+
+            async def stream_from_pipe():
+                # this is a workaround for Windows since asyncio loop.add_reader is not supported.
+                # https://docs.python.org/3/library/asyncio-platforms.html
+                entered_at = time.time()
+                while True:
+                    if read.poll(self.app.timeout):
+                        data = read.recv()
+                        if data == STOP_ITERATION_PKL:
+                            return
+                        yield data
+                    if (time.time() - entered_at) > self.app.timeout:
+                        return
+                    await asyncio.sleep(0.0001)
+
+            async def data_streamer():
+                data_available = asyncio.Event()
+                while True:
+                    asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+                    if not read.poll():
+                        if await event_wait(data_available, self.app.timeout) is False:  # stream timed out
+                            return
+                        data_available.clear()
+                        asyncio.get_event_loop().remove_reader(read.fileno())
+                    if read.poll():
+                        data = read.recv()
+                        if data == STOP_ITERATION_PKL:
+                            return
+                        yield data
+
+            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+                return StreamingResponse(stream_from_pipe())
+
+            return StreamingResponse(data_streamer())
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
