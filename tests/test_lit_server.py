@@ -171,7 +171,7 @@ def test_streaming_loop(loop_args):
     fake_stream_api.encode_response.assert_called_once()
 
 
-def test_litapi_with_stream(simple_litapi, simple_stream_api):
+def test_litapi_with_stream(simple_litapi):
     with pytest.raises(
         ValueError, match="Both lit_api.predict and lit_api.encode_response must be generators in streaming mode."
     ):
