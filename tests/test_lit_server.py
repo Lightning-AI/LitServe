@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import pickle
 import subprocess
 
 import time
 from multiprocessing import Pipe, Manager
 from asgi_lifespan import LifespanManager
-
 import os
 from httpx import AsyncClient
 
@@ -126,7 +126,7 @@ def test_run():
 
 @pytest.mark.asyncio()
 async def test_stream(simple_stream_api):
-    server = LitServer(simple_stream_api, stream=True)
+    server = LitServer(simple_stream_api, stream=True, timeout=10)
     expected_output = "prompt=Hello World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
@@ -139,7 +139,7 @@ class FakeStreamPipe:
     i = 0
 
     def send(self, item):
-        if isinstance(item, StopIteration):
+        if item == pickle.dumps(StopIteration()):
             raise StopIteration("exit loop")
         assert item == f"{self.i}", "This streaming loop generates number from 0 to 9 which is sent via Pipe"
         self.i += 1

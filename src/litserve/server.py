@@ -14,6 +14,7 @@
 import asyncio
 import contextlib
 import logging
+import pickle
 from contextlib import asynccontextmanager
 import inspect
 from multiprocessing import Process, Manager, Queue, Pipe
@@ -34,6 +35,8 @@ from litserve import LitAPI
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
+
+STOP_ITERATION = pickle.dumps(StopIteration())
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -121,7 +124,7 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(y_enc)
 
-        pipe_s.send(StopIteration())
+        pipe_s.send(STOP_ITERATION)
 
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
@@ -352,7 +355,7 @@ class LitServer:
                 while True:
                     if read.poll(self.app.timeout):
                         data = read.recv()
-                        if isinstance(data, StopIteration):
+                        if isinstance(data, StopIteration()):
                             return
                         yield data
                     await asyncio.sleep(0.0001)
@@ -362,13 +365,13 @@ class LitServer:
                 while True:
                     asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
                     if not read.poll():
-                        await event_wait(data_available, self.app.timeout)
+                        if await event_wait(data_available, self.app.timeout) is False:  # stream timed out
+                            return
                         data_available.clear()
-                    asyncio.get_event_loop().remove_reader(read.fileno())
-
+                        asyncio.get_event_loop().remove_reader(read.fileno())
                     if read.poll():
                         data = read.recv()
-                        if isinstance(data, StopIteration):
+                        if data == STOP_ITERATION:
                             return
                         yield data
 

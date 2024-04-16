@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
 from typing import Generator
 
 from litserve.server import LitServer
@@ -46,7 +47,9 @@ class SimpleStreamAPI(LitAPI):
         yield from output
 
     def encode_response(self, output: Generator) -> Generator:
+        delay = 0.01  # delay for testing timeouts
         for out in output:
+            time.sleep(delay)
             yield out.lower()
 
 
