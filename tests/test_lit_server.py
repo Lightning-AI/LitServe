@@ -14,7 +14,6 @@
 import inspect
 import pickle
 import subprocess
-
 import time
 from multiprocessing import Pipe, Manager
 from asgi_lifespan import LifespanManager
@@ -33,14 +32,14 @@ def test_new_pipe(lit_server):
     for _ in range(pool_size):
         lit_server.new_pipe()
 
-    assert len(lit_server.pipe_pool) == 0
-    assert len(lit_server.new_pipe()) == 2
+    assert len(lit_server.pipe_pool) == 0, "All available pipes from the pipe_pool were used up, which makes it empty"
+    assert len(lit_server.new_pipe()) == 2, "lit_server.new_pipe() always must return a tuple of read and write pipes"
 
 
 def test_dispose_pipe(lit_server):
     for i in range(lit_server.max_pool_size + 10):
         lit_server.dispose_pipe(*Pipe())
-    assert len(lit_server.pipe_pool) == lit_server.max_pool_size
+    assert len(lit_server.pipe_pool) == lit_server.max_pool_size, "pipe_pool size must be less than max_pool_size"
 
 
 def test_index(sync_testclient):
@@ -117,9 +116,9 @@ def test_run():
     )
 
     time.sleep(5)
-    assert os.path.exists("client.py")
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
-    assert '{"output":16.0}' in output
+    assert '{"output":16.0}' in output, "tests/simple_server.py didn't return expected output"
     os.remove("client.py")
     process.kill()
 
@@ -173,6 +172,10 @@ def test_streaming_loop(loop_args):
 
 def test_litapi_with_stream(simple_litapi):
     with pytest.raises(
-        ValueError, match="When `stream=True` both `lit_api.predict` and `lit_api.encode_response` must generate values using `yield`"
+        ValueError,
+        match=(
+            "When `stream=True` both `lit_api.predict` and"
+            " `lit_api.encode_response` must generate values using `yield`"
+        ),
     ):
         LitServer(simple_litapi, stream=True)
