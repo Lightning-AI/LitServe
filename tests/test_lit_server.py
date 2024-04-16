@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import inspect
 import pickle
 import subprocess
@@ -126,12 +127,17 @@ def test_run():
 @pytest.mark.asyncio()
 async def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, stream=True, timeout=10)
-    expected_output = "prompt=Hello World generated_output=LitServe is streaming output".lower().replace(" ", "")
+    expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
+    expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        response = await ac.post("/stream-predict", json={"prompt": "Hello World"}, timeout=10)
-        assert response.status_code == 200, "Check if server is running and the request format is valid."
-        assert response.text == expected_output, "Server returns input prompt and generated output which didn't match."
+        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1, resp2 = await asyncio.gather(resp1, resp2)
+        assert resp1.status_code == 200, "Check if server is running and the request format is valid."
+        assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
+        assert resp2.status_code == 200, "Check if server is running and the request format is valid."
+        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
 
 
 class FakeStreamPipe:
@@ -150,7 +156,7 @@ def test_streaming_loop(loop_args):
             yield {"output": f"{i}"}
 
     def fake_encode(output):
-        assert inspect.isgenerator(output), "predict function must be a generator in streaming mode"
+        assert inspect.isgenerator(output), "predict function must be a generator when `stream=True`"
         for out in output:
             yield out["output"]
 
