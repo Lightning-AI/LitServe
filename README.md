@@ -336,7 +336,7 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 &nbsp;
 
-LitServer can stream the outputs for LLMs or any model of your choice.
+`LitServer` can stream the outputs for LLMs or any model of your choice.
 
 To enable streaming, you need to implement `LitAPI.predict` and `LitAPI.encode_response` as a generator (a Python
 function which yields output) and set `LitServer(..., stream=True)`.
