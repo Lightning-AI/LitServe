@@ -18,7 +18,7 @@ import multiprocessing
 import pickle
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager, Queue, Pipe
+from multiprocessing import Manager, Queue, Pipe
 from queue import Empty
 import time
 import os
@@ -34,9 +34,6 @@ from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-
-if multiprocessing.get_start_method() == "fork":
-    multiprocessing.set_start_method("spawn")
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -180,7 +177,9 @@ async def lifespan(app: FastAPI):
     for worker_id, device in enumerate(app.devices * app.workers_per_device):
         if len(device) == 1:
             device = device[0]
-        process = Process(
+
+        ctx = multiprocessing.get_context("spawn")
+        process = ctx.Process(
             target=inference_worker,
             args=(
                 app.lit_api,
