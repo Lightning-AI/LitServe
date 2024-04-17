@@ -14,7 +14,8 @@
 import sys
 from typing import Optional
 import platform
-
+import subprocess
+from functools import lru_cache
 
 class _Connector:
     def __init__(self, accelerator: Optional[str] = "auto"):
@@ -56,9 +57,22 @@ class _Connector:
     @staticmethod
     def _choose_gpu_accelerator_backend():
         import torch
-
-        if torch.cuda.is_available():
+        if check_cuda_with_nvidia_smi():
             return "cuda"
         if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
             return "mps"
         raise RuntimeError("No supported gpu backend found!")
+
+
+@lru_cache(maxsize=1)
+def check_cuda_with_nvidia_smi():
+    """Checks if CUDA is installed using the `nvidia-smi` command-line tool."""
+
+    try:
+        output = subprocess.check_output(["nvidia-smi", "-L"])
+        if b"GPU" in output:
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError:
+        return False

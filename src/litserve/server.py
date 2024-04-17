@@ -14,11 +14,10 @@
 import asyncio
 import contextlib
 import logging
-import multiprocessing
 import pickle
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Manager, Queue, Pipe
+from multiprocessing import Process, Manager, Queue, Pipe
 from queue import Empty
 import time
 import os
@@ -178,8 +177,7 @@ async def lifespan(app: FastAPI):
         if len(device) == 1:
             device = device[0]
 
-        ctx = multiprocessing.get_context("spawn")
-        process = ctx.Process(
+        process = Process(
             target=inference_worker,
             args=(
                 app.lit_api,
