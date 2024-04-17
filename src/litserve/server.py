@@ -14,6 +14,7 @@
 import asyncio
 import contextlib
 import logging
+import multiprocessing
 import pickle
 from contextlib import asynccontextmanager
 import inspect
@@ -33,6 +34,8 @@ from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 from litserve.connector import _Connector
+
+multiprocessing.set_start_method("spawn")
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
