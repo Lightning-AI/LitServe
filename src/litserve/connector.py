@@ -71,10 +71,6 @@ def check_cuda_with_nvidia_smi():
     """Checks if CUDA is installed using the `nvidia-smi` command-line tool."""
 
     try:
-        output = subprocess.check_output(["nvidia-smi", "-L"])
-        if b"GPU" in output:
-            return True
-        else:
-            return False
-    except subprocess.CalledProcessError:
+        return b"GPU" in subprocess.check_output(["nvidia-smi", "-L"])
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return False
