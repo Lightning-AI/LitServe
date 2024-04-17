@@ -35,7 +35,8 @@ from fastapi.responses import StreamingResponse
 from litserve import LitAPI
 from litserve.connector import _Connector
 
-multiprocessing.set_start_method("spawn")
+if multiprocessing.get_start_method() == "fork":
+    multiprocessing.set_start_method("spawn")
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
