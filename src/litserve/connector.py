@@ -17,6 +17,7 @@ import platform
 import subprocess
 from functools import lru_cache
 
+
 class _Connector:
     def __init__(self, accelerator: Optional[str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
@@ -57,6 +58,7 @@ class _Connector:
     @staticmethod
     def _choose_gpu_accelerator_backend():
         import torch
+
         if check_cuda_with_nvidia_smi():
             return "cuda"
         if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
