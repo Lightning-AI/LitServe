@@ -36,12 +36,11 @@ from litserve import LitAPI
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
-STOP_ITERATION_PKL = pickle.dumps(StopIteration())
-
 
 class LitAPIStatus:
     OK = "OK"
     ERROR = "ERROR"
+    FINISH_STREAMING = "FINISH_STREAMING"
 
 
 def load_and_raise(response):
@@ -49,7 +48,7 @@ def load_and_raise(response):
         exception = pickle.loads(response)
         raise exception
     except pickle.PickleError:
-        logging.error(f"Expected response to be a pickled exception but was: {response}")
+        logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -100,7 +99,7 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
                 with contextlib.suppress(BrokenPipeError):
                     pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
-            logging.error(e)
+            logging.exception(e)
             err_pkl = pickle.dumps(e)
 
             for pipe_s in pipes:
@@ -140,14 +139,17 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
         except (Empty, ValueError):
             continue
 
-        x = lit_api.decode_request(x_enc)
-        y_gen = lit_api.predict(x)
-        y_enc_gen = lit_api.encode_response(y_gen)
-        for y_enc in y_enc_gen:
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(y_enc)
-
-        pipe_s.send(STOP_ITERATION_PKL)
+        try:
+            x = lit_api.decode_request(x_enc)
+            y_gen = lit_api.predict(x)
+            y_enc_gen = lit_api.encode_response(y_gen)
+            for y_enc in y_enc_gen:
+                with contextlib.suppress(BrokenPipeError):
+                    pipe_s.send((y_enc, LitAPIStatus.OK))
+            pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+        except Exception as e:
+            logging.exception(e)
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
@@ -394,10 +396,17 @@ class LitServer:
                 entered_at = time.time()
                 while True:
                     if read.poll(self.app.timeout):
-                        data = read.recv()
-                        if data == STOP_ITERATION_PKL:
+                        response, status = read.recv()
+                        if status == LitAPIStatus.FINISH_STREAMING:
                             return
-                        yield data
+                        elif status == LitAPIStatus.ERROR:
+                            logging.error(
+                                "Error occurred during streaming data from inference server. Please check:\n"
+                                "- Ensure your LitAPI batch and unbatch implementation is correct."
+                                "- Check the exception traceback to debug."
+                            )
+                            return
+                        yield response
                     if (time.time() - entered_at) > self.app.timeout:
                         return
                     await asyncio.sleep(0.0001)
@@ -412,10 +421,18 @@ class LitServer:
                         data_available.clear()
                         asyncio.get_event_loop().remove_reader(read.fileno())
                     if read.poll():
-                        data = read.recv()
-                        if data == STOP_ITERATION_PKL:
+                        response, status = read.recv()
+                        if status == LitAPIStatus.FINISH_STREAMING:
                             return
-                        yield data
+                        if status == LitAPIStatus.ERROR:
+                            logging.error(
+                                "Error occurred during streaming data from inference server. Please check:\n"
+                                "- Ensure your LitAPI batch and unbatch implementation is correct."
+                                "- Check the exception traceback to debug."
+                            )
+
+                            return
+                        yield response
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 return StreamingResponse(stream_from_pipe())

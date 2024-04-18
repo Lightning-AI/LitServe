@@ -143,7 +143,7 @@ def test_batched_loop():
     lit_api_mock.unbatch = MagicMock(side_effect=lambda x: x)
     lit_api_mock.encode_response = MagicMock(side_effect=lambda x: {"output": x})
 
-    with patch("pickle.dumps", side_effect=Exception("exit loop")), pytest.raises(Exception, match="exit loop"):
+    with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
         run_batched_loop(lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
 
     lit_api_mock.batch.assert_called_once()
