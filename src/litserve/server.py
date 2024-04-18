@@ -45,8 +45,8 @@ class LitAPIStatus:
 
 def load_and_raise(response):
     try:
-        exception = pickle.loads(response)
-        raise exception
+        pickle.loads(response)
+        raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
         logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
 
