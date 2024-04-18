@@ -39,6 +39,19 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 STOP_ITERATION_PKL = pickle.dumps(StopIteration())
 
 
+class LitAPIStatus:
+    OK = "OK"
+    ERROR = "ERROR"
+
+
+def load_and_raise(response):
+    try:
+        exception = pickle.loads(response)
+        raise exception
+    except pickle.PickleError:
+        logging.error(f"Expected response to be a pickled exception but was: {response}")
+
+
 def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
@@ -77,18 +90,24 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
 
         inputs, pipes = zip(*batches)
 
-        x = lit_api.batch(inputs)
-        y = lit_api.predict(x)
-        outputs = lit_api.unbatch(y)
+        try:
+            x = lit_api.batch(inputs)
+            y = lit_api.predict(x)
+            outputs = lit_api.unbatch(y)
+            for y, pipe_s in zip(outputs, pipes):
+                y_enc = lit_api.encode_response(y)
 
-        for y, pipe_s in zip(outputs, pipes):
-            y_enc = lit_api.encode_response(y)
+                with contextlib.suppress(BrokenPipeError):
+                    pipe_s.send((y_enc, LitAPIStatus.OK))
+        except Exception as e:
+            logging.error(e)
+            err_pkl = pickle.dumps(e)
 
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(y_enc)
+            for pipe_s in pipes:
+                pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
-def run_single_loop(lit_api, request_queue: Queue, request_buffer):
+def run_single_loop(lit_api, request_queue: Queue, request_buffer: list[Pipe]):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
@@ -98,12 +117,16 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
                 continue
         except (Empty, ValueError):
             continue
+        try:
+            x = lit_api.decode_request(x_enc)
+            y = lit_api.predict(x)
+            y_enc = lit_api.encode_response(y)
 
-        x = lit_api.decode_request(x_enc)
-        y = lit_api.predict(x)
-        y_enc = lit_api.encode_response(y)
-        with contextlib.suppress(BrokenPipeError):
-            pipe_s.send(y_enc)
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send((y_enc, LitAPIStatus.OK))
+        except Exception as e:
+            logging.exception(e)
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
@@ -319,7 +342,7 @@ class LitServer:
             def get_from_pipe():
                 if read.poll(self.app.timeout):
                     return read.recv()
-                return HTTPException(status_code=504, detail="Request timed out")
+                raise HTTPException(status_code=504, detail="Request timed out")
 
             async def data_reader():
                 data_available = asyncio.Event()
@@ -332,18 +355,18 @@ class LitServer:
 
                 if read.poll():
                     return read.recv()
-                return HTTPException(status_code=504, detail="Request timed out")
+                raise HTTPException(status_code=504, detail="Request timed out")
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await asyncio.to_thread(get_from_pipe)
             else:
                 data = await data_reader()
-
             self.dispose_pipe(read, write)
-            if type(data) == HTTPException:
-                raise data
 
-            return data
+            response, status = data
+            if status == LitAPIStatus.ERROR:
+                load_and_raise(response)
+            return response
 
         @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
