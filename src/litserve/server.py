@@ -107,7 +107,7 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
                 pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
-def run_single_loop(lit_api, request_queue: Queue, request_buffer: list[Pipe]):
+def run_single_loop(lit_api, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
