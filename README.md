@@ -515,7 +515,7 @@ import requests
 import json
 
 url = "http://127.0.0.1:8000/stream-predict"
-prompt = "Write a Python code to sort a linkedlist in reverse order. Please be short."
+prompt = "Write a Python code to sort a linkedlist in reverse order."
 resp = requests.post(
     url,
     json={
