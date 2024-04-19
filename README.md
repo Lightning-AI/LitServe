@@ -336,12 +336,12 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 &nbsp;
 
-`LitServer` can stream longer outputs, such as LLM-generated text.
+`LitServer` can stream longer responses, such as LLM generated text.
 
 To enable streaming, you need to implement `LitAPI.predict` and `LitAPI.encode_response` as a generator (a Python
-function which yields output) and set `LitServer(..., stream=True)`.
+function that yields output) and set `LitServer(..., stream=True)`.
 
-For example, running the API server for an LLM with streaming:
+For example, streaming long responses generated over time:
 
 ```python
 from typing import Generator
@@ -359,7 +359,7 @@ class Request(BaseModel):
 
 class SimpleStreamAPI(LitAPI):
     def setup(self, device) -> None:
-        self.num_outputs = 10
+        self.num_outputs = 100
 
     def decode_request(self, request: Request) -> str:
         return request.number
