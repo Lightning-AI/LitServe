@@ -337,7 +337,7 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 Learn and use the following examples to quickly get started to serve the model of your choice.
 
 <details>
-    <summary>**Serve Llama 3**</summary>
+    <summary><b>Serve Llama 3</b></summary>
 
 &nbsp;
 
