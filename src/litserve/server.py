@@ -401,9 +401,8 @@ class LitServer:
                             return
                         elif status == LitAPIStatus.ERROR:
                             logging.error(
-                                "Error occurred while streaming outputs from the inference worker. Please check the following traceback:\n"
-                                "- Ensure your LitAPI batch and unbatch implementation is correct."
-                                "- Check the exception traceback to debug."
+                                "Error occurred while streaming outputs from the inference worker. "
+                                "Please check the above traceback."
                             )
                             return
                         yield response
@@ -426,11 +425,9 @@ class LitServer:
                             return
                         if status == LitAPIStatus.ERROR:
                             logging.error(
-                                "Error occurred during streaming data from inference server. Please check:\n"
-                                "- Ensure your LitAPI batch and unbatch implementation is correct."
-                                "- Check the exception traceback to debug."
+                                "Error occurred while streaming outputs from the inference worker. "
+                                "Please check the above traceback."
                             )
-
                             return
                         yield response
 
