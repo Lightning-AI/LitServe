@@ -227,6 +227,7 @@ class LitServer:
         if stream and not all([
             inspect.isgeneratorfunction(lit_api.predict),
             inspect.isgeneratorfunction(lit_api.encode_response),
+            inspect.isgeneratorfunction(lit_api.unbatch),
         ]):
             raise ValueError(
                 """When `stream=True` both `lit_api.predict` and
@@ -243,6 +244,11 @@ class LitServer:
                     for output in outputs:
                         encoded_output = ...
                         yield encoded_output
+
+                def unbatch(self, outputs):
+                    for output in outputs:
+                        unbatched_output = ...
+                        yield unbatched_output
              """
             )
 
