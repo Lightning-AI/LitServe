@@ -137,7 +137,7 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer, max_batch_
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
     if stream:
-        run_streaming_loop(lit_api, request_queue, request_buffer)
+        run_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
         return
     if max_batch_size > 1:
         run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
@@ -223,9 +223,6 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
-
-        if stream and max_batch_size > 1:
-            raise ValueError("streaming is not supported with automatic batching at this time.")
 
         if stream and not all([
             inspect.isgeneratorfunction(lit_api.predict),
