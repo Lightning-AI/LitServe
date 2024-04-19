@@ -339,13 +339,16 @@ Learn and use these examples to quickly get started for serving the model of you
 <details>
     <summary>Serve Llama 3</summary>
 
-You can serve Llama 3 and stream chat response to client.
+&nbsp;
+
+You can serve Llama 3 and stream chat response to client. This example is based on LitGPT which can be installed
+from [here](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#install-litgpt).
 
 ```python
 from typing import Generator, List
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, Literal
+from typing import Any, Optional
 from litgpt.utils import check_valid_checkpoint_dir
 
 import lightning as L
@@ -379,7 +382,7 @@ class LlamaAPI(LitAPI):
         self.precision = precision
 
     def setup(self, device: str) -> None:
-        # Setup the model so it can be called in `predict`.
+        # Set up the model, so it can be called in `predict`.
         config = Config.from_file(self.checkpoint_dir / "model_config.yaml")
         device = torch.device(device)
         torch.set_float32_matmul_precision("high")
