@@ -336,7 +336,7 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 &nbsp;
 
-`LitServer` can stream the outputs for LLMs or any model of your choice.
+`LitServer` can stream longer outputs, such as LLM-generated text.
 
 To enable streaming, you need to implement `LitAPI.predict` and `LitAPI.encode_response` as a generator (a Python
 function which yields output) and set `LitServer(..., stream=True)`.
@@ -347,37 +347,35 @@ For example, running the API server for an LLM with streaming:
 from typing import Generator
 
 from litserve.api import LitAPI
+import json
 
 from litserve import LitServer
 from pydantic import BaseModel
 
 
-class PromptRequest(BaseModel):
-    prompt: str
+class Request(BaseModel):
+    number: int
 
 
 class SimpleStreamAPI(LitAPI):
     def setup(self, device) -> None:
-        self.model = ...
-        self.tokenizer = ...
-        self.NUM_MAX_TOKENS = ...
+        self.num_outputs = 10
 
-    def decode_request(self, request: PromptRequest) -> str:
-        return request.prompt
+    def decode_request(self, request: Request) -> str:
+        return request.number
 
     def predict(self, x) -> Generator:
-        for i in range(self.NUM_MAX_TOKENS):
-            x = self.model(x)
-            yield x
+        for i in range(self.num_outputs):
+            yield x**i
 
     def encode_response(self, output: Generator) -> Generator:
         for out in output:
-            yield self.tokenizer.decode(out)
+            yield json.dumps({"output": out})
 
 
 if __name__ == "__main__":
     api = SimpleStreamAPI()
-    server = LitServer(api, stream=True, timeout=10)
+    server = LitServer(api, stream=True, timeout=30)
     server.run(port=8888)
 ```
 
