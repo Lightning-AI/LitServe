@@ -56,7 +56,7 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
 &nbsp;
 
 # Examples    
-Here are more advanced examples that show different models deployed with LitServe:   
+Explore various examples that show different models deployed with LitServe:   
 
 | Example  | description  | Difficulty | Run |
 |---|---|---|---|
