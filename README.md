@@ -154,6 +154,8 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 The server expects the client to send a `POST` to the `/predict` URL with a JSON payload.
 The way the payload is structured is up to the implementation of the `LitAPI` subclass.    
 
+&nbsp;
+
 # Examples    
 Here are more advanced examples that show different models deployed with LitServe:   
 
@@ -161,7 +163,7 @@ Here are more advanced examples that show different models deployed with LitServ
 |---|---|---|
 | [Hugging face BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model)  | Deploy model for tasks like text generation and more  | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 
-
+&nbsp;
 
 # Features
 LitServe supports multiple advanced state-of-the-art features.
