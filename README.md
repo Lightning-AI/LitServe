@@ -89,6 +89,7 @@ pip install -e '.[all]'
 
 </details>
 
+&nbsp;
 
 # Get started
 LitServe is an inference server for AI/ML models that is minimal and highly scalable.
