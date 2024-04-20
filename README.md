@@ -53,11 +53,15 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
     <img src="https://github.com/Lightning-AI/litserve/assets/3640001/4a4a5028-1e64-46f3-b0db-ef5b3f636655" height="160px">
 </div>
 
-Run the hello world demo here:
+&nbsp;
 
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>
+# Examples    
+Here are more advanced examples that show different models deployed with LitServe:   
+
+| Example  | description  | Difficulty | Run |
+|---|---|---|---|
+| [Hello world](#implement-a-server)  | Hello world model  | Toy | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a> |
+| [Hugging face BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model)  | Deploy model for tasks like text generation and more  | Basic | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 
 &nbsp;
 
@@ -154,15 +158,6 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 
 The server expects the client to send a `POST` to the `/predict` URL with a JSON payload.
 The way the payload is structured is up to the implementation of the `LitAPI` subclass.    
-
-&nbsp;
-
-# Examples    
-Here are more advanced examples that show different models deployed with LitServe:   
-
-| Example  | description  | Run |
-|---|---|---|
-| [Hugging face BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model)  | Deploy model for tasks like text generation and more  | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 
 &nbsp;
 
