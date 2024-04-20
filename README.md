@@ -55,8 +55,8 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
 
 &nbsp;
 
-# Examples    
-Explore various examples that show different models deployed with LitServe:   
+# Examples
+Explore various examples that show different models deployed with LitServe:
 
 | Example  | description  | Difficulty | Run |
 |---|---|---|---|
@@ -157,7 +157,7 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 ```
 
 The server expects the client to send a `POST` to the `/predict` URL with a JSON payload.
-The way the payload is structured is up to the implementation of the `LitAPI` subclass.    
+The way the payload is structured is up to the implementation of the `LitAPI` subclass.
 
 &nbsp;
 
@@ -339,19 +339,19 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 &nbsp;
 
 # Contribute
-LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.   
+LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
 ##  Run Tests
 
 Use `pytest` to run tests locally.
 
-First, install test dependencies:    
-    
+First, install test dependencies:
+
 ```shell
 pip install -r _requirements/test.txt
 ```
 
-Run the tests 
+Run the tests
 ```shell
 pytest tests
 ```
@@ -362,4 +362,3 @@ pytest tests
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 See LICENSE file for details.
 Then, run pytest in your terminal as follows:
-
