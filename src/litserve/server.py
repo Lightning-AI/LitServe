@@ -37,7 +37,19 @@ from litserve.connector import _Connector
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
-STOP_ITERATION_PKL = pickle.dumps(StopIteration())
+
+class LitAPIStatus:
+    OK = "OK"
+    ERROR = "ERROR"
+    FINISH_STREAMING = "FINISH_STREAMING"
+
+
+def load_and_raise(response):
+    try:
+        pickle.loads(response)
+        raise HTTPException(500, "Internal Server Error")
+    except pickle.PickleError:
+        logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -78,15 +90,21 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
 
         inputs, pipes = zip(*batches)
 
-        x = lit_api.batch(inputs)
-        y = lit_api.predict(x)
-        outputs = lit_api.unbatch(y)
+        try:
+            x = lit_api.batch(inputs)
+            y = lit_api.predict(x)
+            outputs = lit_api.unbatch(y)
+            for y, pipe_s in zip(outputs, pipes):
+                y_enc = lit_api.encode_response(y)
 
-        for y, pipe_s in zip(outputs, pipes):
-            y_enc = lit_api.encode_response(y)
+                with contextlib.suppress(BrokenPipeError):
+                    pipe_s.send((y_enc, LitAPIStatus.OK))
+        except Exception as e:
+            logging.exception(e)
+            err_pkl = pickle.dumps(e)
 
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(y_enc)
+            for pipe_s in pipes:
+                pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
 def run_single_loop(lit_api, request_queue: Queue, request_buffer):
@@ -99,12 +117,16 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
                 continue
         except (Empty, ValueError):
             continue
+        try:
+            x = lit_api.decode_request(x_enc)
+            y = lit_api.predict(x)
+            y_enc = lit_api.encode_response(y)
 
-        x = lit_api.decode_request(x_enc)
-        y = lit_api.predict(x)
-        y_enc = lit_api.encode_response(y)
-        with contextlib.suppress(BrokenPipeError):
-            pipe_s.send(y_enc)
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send((y_enc, LitAPIStatus.OK))
+        except Exception as e:
+            logging.exception(e)
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
@@ -118,14 +140,17 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
         except (Empty, ValueError):
             continue
 
-        x = lit_api.decode_request(x_enc)
-        y_gen = lit_api.predict(x)
-        y_enc_gen = lit_api.encode_response(y_gen)
-        for y_enc in y_enc_gen:
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(y_enc)
-
-        pipe_s.send(STOP_ITERATION_PKL)
+        try:
+            x = lit_api.decode_request(x_enc)
+            y_gen = lit_api.predict(x)
+            y_enc_gen = lit_api.encode_response(y_gen)
+            for y_enc in y_enc_gen:
+                with contextlib.suppress(BrokenPipeError):
+                    pipe_s.send((y_enc, LitAPIStatus.OK))
+            pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+        except Exception as e:
+            logging.exception(e)
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
@@ -323,7 +348,7 @@ class LitServer:
             def get_from_pipe():
                 if read.poll(self.app.timeout):
                     return read.recv()
-                return HTTPException(status_code=504, detail="Request timed out")
+                raise HTTPException(status_code=504, detail="Request timed out")
 
             async def data_reader():
                 data_available = asyncio.Event()
@@ -336,18 +361,18 @@ class LitServer:
 
                 if read.poll():
                     return read.recv()
-                return HTTPException(status_code=504, detail="Request timed out")
+                raise HTTPException(status_code=504, detail="Request timed out")
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await asyncio.to_thread(get_from_pipe)
             else:
                 data = await data_reader()
-
             self.dispose_pipe(read, write)
-            if type(data) == HTTPException:
-                raise data
 
-            return data
+            response, status = data
+            if status == LitAPIStatus.ERROR:
+                load_and_raise(response)
+            return response
 
         @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
@@ -375,10 +400,16 @@ class LitServer:
                 entered_at = time.time()
                 while True:
                     if read.poll(self.app.timeout):
-                        data = read.recv()
-                        if data == STOP_ITERATION_PKL:
+                        response, status = read.recv()
+                        if status == LitAPIStatus.FINISH_STREAMING:
                             return
-                        yield data
+                        elif status == LitAPIStatus.ERROR:
+                            logging.error(
+                                "Error occurred while streaming outputs from the inference worker. "
+                                "Please check the above traceback."
+                            )
+                            return
+                        yield response
                     if (time.time() - entered_at) > self.app.timeout:
                         return
                     await asyncio.sleep(0.0001)
@@ -393,10 +424,16 @@ class LitServer:
                         data_available.clear()
                         asyncio.get_event_loop().remove_reader(read.fileno())
                     if read.poll():
-                        data = read.recv()
-                        if data == STOP_ITERATION_PKL:
+                        response, status = read.recv()
+                        if status == LitAPIStatus.FINISH_STREAMING:
                             return
-                        yield data
+                        if status == LitAPIStatus.ERROR:
+                            logging.error(
+                                "Error occurred while streaming outputs from the inference worker. "
+                                "Please check the above traceback."
+                            )
+                            return
+                        yield response
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 return StreamingResponse(stream_from_pipe())

@@ -26,8 +26,8 @@
 
 <p align="center">
   <a href="https://lightning.ai/">Lightning AI</a> •
-  <a href="#install-litserve">Install</a> •
   <a href="#get-started">Get started</a> •
+  <a href="#examples">Examples</a> •
   <a href="#features">Features</a>
 </p>
 
@@ -53,11 +53,18 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
     <img src="https://github.com/Lightning-AI/litserve/assets/3640001/4a4a5028-1e64-46f3-b0db-ef5b3f636655" height="160px">
 </div>
 
-Run the hello world demo here:
+&nbsp;
 
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>
+# Examples
+Explore various examples that show different models deployed with LitServe:
+
+| Example  | description | Run |
+|---|---|---|
+| [Hello world](#implement-a-server)  | Hello world model | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a> |
+| [ANY Hugging face model](https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly)  | Deploy any Hugging Face model | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a> |
+| [Hugging face BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model)  | Deploy model for tasks like text generation and more | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+| [Open AI CLIP](https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve)  | Deploy Open AI CLIP (computer vision model) for tasks like image understanding | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+| [Open AI Whisper](https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model)  | Deploy Open AI Whisper (Audio model) for tasks like speech to text | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 
 &nbsp;
 
@@ -75,7 +82,7 @@ pip install litserve
 Install the main branch:
 
 ```bash
-pip install https://github.com/Lightning-AI/litserve/main.zip
+pip install git+https://github.com/Lightning-AI/litserve.git@main
 ```
 &nbsp;
 
@@ -89,6 +96,7 @@ pip install -e '.[all]'
 
 </details>
 
+&nbsp;
 
 # Get started
 LitServe is an inference server for AI/ML models that is minimal and highly scalable.
@@ -153,6 +161,8 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 
 The server expects the client to send a `POST` to the `/predict` URL with a JSON payload.
 The way the payload is structured is up to the implementation of the `LitAPI` subclass.
+
+&nbsp;
 
 # Features
 LitServe supports multiple advanced state-of-the-art features.
@@ -331,24 +341,27 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 </details>
 &nbsp;
 
-## License
+# Contribute
+LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
-litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
-See LICENSE file for details.
+##  Run Tests
 
+Use `pytest` to run tests locally.
 
-# Run Tests
-
-You can run tests locally using `pytest` to verify that all the tests pass after making any changes.
-
-First, you need to install the test dependencies:
+First, install test dependencies:
 
 ```shell
 pip install -r _requirements/test.txt
 ```
 
-Then, run pytest in your terminal as follows:
-
+Run the tests
 ```shell
 pytest tests
 ```
+
+
+# License
+
+litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
+See LICENSE file for details.
+Then, run pytest in your terminal as follows:

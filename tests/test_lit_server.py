@@ -13,7 +13,6 @@
 # limitations under the License.
 import asyncio
 import inspect
-import pickle
 import subprocess
 import time
 from multiprocessing import Pipe, Manager
@@ -146,18 +145,23 @@ async def test_stream(simple_stream_api):
 
 
 class FakeStreamPipe:
-    i = 0
+    def __init__(self, num_streamed_outputs):
+        self.num_streamed_outputs = num_streamed_outputs
+        self.count = 0
 
-    def send(self, item):
-        if item == pickle.dumps(StopIteration()):
+    def send(self, args):
+        response, status = args
+        if self.count >= self.num_streamed_outputs:
             raise StopIteration("exit loop")
-        assert item == f"{self.i}", "This streaming loop generates number from 0 to 9 which is sent via Pipe"
-        self.i += 1
+        assert response == f"{self.count}", "This streaming loop generates number from 0 to 9 which is sent via Pipe"
+        self.count += 1
 
 
 def test_streaming_loop(loop_args):
+    num_streamed_outputs = 10
+
     def fake_predict(inputs: str):
-        for i in range(10):
+        for i in range(num_streamed_outputs):
             yield {"output": f"{i}"}
 
     def fake_encode(output):
@@ -172,7 +176,7 @@ def test_streaming_loop(loop_args):
 
     _, requests_queue, request_buffer = loop_args
     request_buffer = Manager().dict()
-    request_buffer[1] = {"prompt": "Hello"}, FakeStreamPipe()
+    request_buffer[1] = {"prompt": "Hello"}, FakeStreamPipe(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_streaming_loop(fake_stream_api, requests_queue, request_buffer)
