@@ -81,7 +81,7 @@ pip install litserve
 Install the main branch:
 
 ```bash
-pip install https://github.com/Lightning-AI/litserve/main.zip
+pip install git+https://github.com/Lightning-AI/litserve.git@main    
 ```
 &nbsp;
 
