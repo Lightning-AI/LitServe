@@ -128,7 +128,31 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
             pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
-def run_streaming_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
+    while True:
+        try:
+            uid = request_queue.get(timeout=1.0)
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+        except (Empty, ValueError):
+            continue
+
+        try:
+            x = lit_api.decode_request(x_enc)
+            y_gen = lit_api.predict(x)
+            y_enc_gen = lit_api.encode_response(y_gen)
+            for y_enc in y_enc_gen:
+                with contextlib.suppress(BrokenPipeError):
+                    pipe_s.send((y_enc, LitAPIStatus.OK))
+            pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+        except Exception as e:
+            logging.exception(e)
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+
+
+def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     while True:
         batches = collate_requests(
             lit_api,
@@ -166,8 +190,12 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer, max_batch_
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
     if stream:
-        run_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+        if max_batch_size > 1:
+            run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+        else:
+            run_streaming_loop(lit_api, request_queue, request_buffer)
         return
+
     if max_batch_size > 1:
         run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
@@ -256,11 +284,37 @@ class LitServer:
         if stream and not all([
             inspect.isgeneratorfunction(lit_api.predict),
             inspect.isgeneratorfunction(lit_api.encode_response),
-            inspect.isgeneratorfunction(lit_api.unbatch),
         ]):
             raise ValueError(
                 """When `stream=True` both `lit_api.predict` and
              `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )
+
+        if (
+            stream
+            and max_batch_size > 1
+            and not all([
+                inspect.isgeneratorfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response),
+                inspect.isgeneratorfunction(lit_api.unbatch),
+            ])
+        ):
+            raise ValueError(
+                """When `stream=True`, `lit_api.predict`, `lit_api.encode_response` and `lit_api.unbatch`
+                 must generate values using `yield`.
 
              Example:
 
