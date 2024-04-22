@@ -48,11 +48,9 @@ class _Connector:
         return accelerator
 
     def _choose_auto_accelerator(self):
-        if "torch" in sys.modules:
-            try:
-                return self._choose_gpu_accelerator_backend()
-            except RuntimeError:
-                print("No GPU accelerator found, will default to cpu")
+        gpu_backend = self._choose_gpu_accelerator_backend()
+        if "torch" in sys.modules and gpu_backend:
+            return gpu_backend
         return "cpu"
 
     @staticmethod
@@ -63,7 +61,7 @@ class _Connector:
             return "cuda"
         if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
             return "mps"
-        raise RuntimeError("No supported gpu backend found!")
+        return None
 
 
 @lru_cache(maxsize=1)
