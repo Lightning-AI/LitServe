@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import patch
 
 from litserve.connector import _Connector, check_cuda_with_nvidia_smi
 import pytest
@@ -67,15 +66,3 @@ def test__sanitize_accelerator():
     assert _Connector._sanitize_accelerator("CPU") == "cpu"
     with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'cuda', or 'gpu'"):
         _Connector._sanitize_accelerator("SUPER_CHIP")
-
-
-def test_mocked_connector():
-    # 1. cuda available
-    with patch("litserve.connector.check_cuda_with_nvidia_smi", return_value=True):
-        connector = _Connector(accelerator="auto")
-        assert connector.accelerator == "cuda"
-
-    # 2. mps available
-    with patch("litserve.connector._Connector._choose_gpu_accelerator_backend", return_value="mps"):
-        connector = _Connector(accelerator="auto")
-        assert connector.accelerator == "mps"

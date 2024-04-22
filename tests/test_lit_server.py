@@ -26,6 +26,8 @@ import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
+
+from litserve.connector import _Connector
 from litserve.server import inference_worker, run_single_loop, run_streaming_loop
 from litserve.server import LitServer
 
@@ -253,3 +255,15 @@ class SimpleLitAPI(LitAPI):
 def test_auto_accelerator(input_accelerator, expected_accelerator):
     server = LitServer(SimpleLitAPI(), devices=1, timeout=10, accelerator=input_accelerator)
     assert server._connector.accelerator == expected_accelerator
+
+
+def test_mocked_accelerator():
+    # 1. cuda available
+    with patch("litserve.connector.check_cuda_with_nvidia_smi", return_value=True):
+        connector = _Connector(accelerator="auto")
+        assert connector.accelerator == "cuda"
+
+    # 2. mps available
+    with patch("litserve.connector._Connector._choose_gpu_accelerator_backend", return_value="mps"):
+        server = LitServer(SimpleLitAPI(), devices=1, timeout=10, accelerator="auto")
+        assert server._connector.accelerator == "mps"
