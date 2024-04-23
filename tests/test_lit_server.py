@@ -17,10 +17,17 @@ import subprocess
 import time
 from multiprocessing import Pipe, Manager
 from asgi_lifespan import LifespanManager
+from litserve import LitAPI
+from fastapi import Request, Response
+
+import torch
+import torch.nn as nn
 import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
+
+from litserve.connector import _Connector
 from litserve.server import (
     inference_worker,
     run_single_loop,
@@ -245,3 +252,76 @@ def test_litapi_with_stream(simple_litapi):
              `lit_api.encode_response` must generate values using `yield.""",
     ):
         LitServer(simple_litapi, stream=True)
+
+
+class Linear(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = nn.Linear(1, 1)
+        self.linear.weight.data.fill_(2.0)
+        self.linear.bias.data.fill_(1.0)
+
+    def forward(self, x):
+        return self.linear(x)
+
+
+class SimpleLitAPI(LitAPI):
+    def setup(self, device):
+        self.model = Linear().to(device)
+        self.device = device
+
+    def decode_request(self, request: Request):
+        content = request["input"]
+        return torch.tensor([content], device=self.device)
+
+    def predict(self, x):
+        return self.model(x[None, :])
+
+    def encode_response(self, output) -> Response:
+        return {"output": float(output)}
+
+
+@pytest.mark.parametrize(
+    ("input_accelerator", "expected_accelerator"),
+    [
+        ("cpu", "cpu"),
+        pytest.param(
+            "cuda",
+            "cuda",
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
+        ),
+        pytest.param(
+            None, "cuda", marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
+        ),
+        pytest.param(
+            "auto",
+            "cuda",
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
+        ),
+        pytest.param(
+            "auto",
+            "mps",
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
+        ),
+        pytest.param(
+            None,
+            "mps",
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
+        ),
+    ],
+)
+def test_auto_accelerator(input_accelerator, expected_accelerator):
+    server = LitServer(SimpleLitAPI(), devices=1, timeout=10, accelerator=input_accelerator)
+    assert server._connector.accelerator == expected_accelerator
+
+
+def test_mocked_accelerator():
+    # 1. cuda available
+    with patch("litserve.connector.check_cuda_with_nvidia_smi", return_value=True):
+        connector = _Connector(accelerator="auto")
+        assert connector.accelerator == "cuda"
+
+    # 2. mps available
+    with patch("litserve.connector._Connector._choose_gpu_accelerator_backend", return_value="mps"):
+        server = LitServer(SimpleLitAPI(), devices=1, timeout=10, accelerator="auto")
+        assert server._connector.accelerator == "mps"
