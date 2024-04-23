@@ -165,7 +165,7 @@ async def test_batched_stream_server(simple_batched_stream_api):
         assert resp1.status_code == 200, "Check if server is running and the request format is valid."
         assert resp2.status_code == 200, "Check if server is running and the request format is valid."
         assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
-        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
+        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match"
 
 
 class FakeStreamPipe:
