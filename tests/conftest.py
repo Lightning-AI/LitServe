@@ -61,7 +61,6 @@ class SimpleBatchedStreamAPI(LitAPI):
         return request["prompt"]
 
     def batch(self, inputs):
-        assert len(inputs) == 2, "Expected exactly two inputs"
         return inputs
 
     def predict(self, x) -> Generator:
