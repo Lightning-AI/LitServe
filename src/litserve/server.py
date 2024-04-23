@@ -266,7 +266,7 @@ async def lifespan(app: FastAPI):
 
 
 class LitServer:
-    # TODO: add support for accelerator="auto", devices="auto"
+    # TODO: add support for devices="auto"
     def __init__(
         self,
         lit_api: LitAPI,
