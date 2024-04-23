@@ -32,6 +32,8 @@ def no_batch_unbatch_message(obj, data):
 
 
 class LitAPI(ABC):
+    _stream: bool = False
+
     @abstractmethod
     def setup(self, devices):
         """Setup the model so it can be called in `predict`."""
@@ -64,7 +66,11 @@ class LitAPI(ABC):
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
         if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
-            return list(output)
+            if self._stream:
+                yield from list(output)
+            else:
+                return list(output)
+
         raise NotImplementedError(no_batch_unbatch_message(self, output))
 
     @abstractmethod
@@ -76,9 +82,17 @@ class LitAPI(ABC):
         """
         pass
 
-    def sanitize(self, stream: bool, max_batch_size: int):
+    @property
+    def stream(self):
+        return self._stream
+
+    @stream.setter
+    def stream(self, value):
+        self._stream = value
+
+    def sanitize(self, max_batch_size: int):
         if (
-            stream
+            self.stream
             and max_batch_size > 1
             and not all([
                 inspect.isgeneratorfunction(self.predict),
@@ -109,7 +123,7 @@ class LitAPI(ABC):
              """
             )
 
-        if stream and not all([
+        if self.stream and not all([
             inspect.isgeneratorfunction(self.predict),
             inspect.isgeneratorfunction(self.encode_response),
         ]):

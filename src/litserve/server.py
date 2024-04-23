@@ -283,7 +283,8 @@ class LitServer:
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
-        lit_api.sanitize(stream, max_batch_size)
+        lit_api.stream = stream
+        lit_api.sanitize(max_batch_size)
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
