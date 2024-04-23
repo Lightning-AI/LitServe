@@ -283,60 +283,7 @@ class LitServer:
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
-        if stream and not all([
-            inspect.isgeneratorfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response),
-        ]):
-            raise ValueError(
-                """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-             """
-            )
-
-        if (
-            stream
-            and max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response),
-                inspect.isgeneratorfunction(lit_api.unbatch),
-            ])
-        ):
-            raise ValueError(
-                """When `stream=True`, `lit_api.predict`, `lit_api.encode_response` and `lit_api.unbatch`
-                 must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-
-                def unbatch(self, outputs):
-                    for output in outputs:
-                        unbatched_output = ...
-                        yield unbatched_output
-             """
-            )
-
+        lit_api.sanitize(stream, max_batch_size)
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device

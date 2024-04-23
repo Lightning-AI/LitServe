@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 from abc import ABC, abstractmethod
 
 
@@ -74,3 +75,58 @@ class LitAPI(ABC):
 
         """
         pass
+
+    def sanitize(self, stream: bool, max_batch_size: int):
+        if (
+            stream
+            and max_batch_size > 1
+            and not all([
+                inspect.isgeneratorfunction(self.predict),
+                inspect.isgeneratorfunction(self.encode_response),
+                inspect.isgeneratorfunction(self.unbatch),
+            ])
+        ):
+            raise ValueError(
+                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
+                `lit_api.unbatch` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+
+                def unbatch(self, outputs):
+                    for output in outputs:
+                        unbatched_output = ...
+                        yield unbatched_output
+             """
+            )
+
+        if stream and not all([
+            inspect.isgeneratorfunction(self.predict),
+            inspect.isgeneratorfunction(self.encode_response),
+        ]):
+            raise ValueError(
+                """When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )
