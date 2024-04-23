@@ -15,7 +15,7 @@ import inspect
 from abc import ABC, abstractmethod
 
 
-def no_batch_unbatch_message(obj, data):
+def no_batch_unbatch_message_no_stream(obj, data):
     return f"""
         You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
         PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
@@ -28,6 +28,23 @@ def no_batch_unbatch_message(obj, data):
 
         def unbatch(self, output):
             return list(output)
+    """
+
+
+def no_batch_unbatch_message_stream(obj, data):
+    return f"""
+        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
+        PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
+        Please implement these two methods in {obj.__class__.__name__}.
+
+        Example:
+
+        def batch(self, inputs):
+            return np.stack(inputs)
+
+        def unbatch(self, output):
+            for out in output:
+                yield list(out)
     """
 
 
@@ -56,7 +73,7 @@ class LitAPI(ABC):
             import numpy
 
             return numpy.stack(inputs)
-        raise NotImplementedError(no_batch_unbatch_message(self, inputs))
+        raise NotImplementedError(no_batch_unbatch_message_no_stream(self, inputs))
 
     @abstractmethod
     def predict(self, x):
@@ -71,7 +88,11 @@ class LitAPI(ABC):
             else:
                 return list(output)
 
-        raise NotImplementedError(no_batch_unbatch_message(self, output))
+        if self.stream:
+            message = no_batch_unbatch_message_stream(self, output)
+        else:
+            message = no_batch_unbatch_message_no_stream(self, output)
+        raise NotImplementedError(message)
 
     @abstractmethod
     def encode_response(self, output):
