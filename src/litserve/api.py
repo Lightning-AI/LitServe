@@ -73,7 +73,12 @@ class LitAPI(ABC):
             import numpy
 
             return numpy.stack(inputs)
-        raise NotImplementedError(no_batch_unbatch_message_no_stream(self, inputs))
+
+        if self.stream:
+            message = no_batch_unbatch_message_stream(self, inputs)
+        else:
+            message = no_batch_unbatch_message_no_stream(self, inputs)
+        raise NotImplementedError(message)
 
     @abstractmethod
     def predict(self, x):
