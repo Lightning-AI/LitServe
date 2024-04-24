@@ -5,7 +5,7 @@
 
 # LitServe
 
-**High-throughput serving engine for AI models** with a minimal interface
+**High-throughput serving engine for AI models**    
 
 ✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Auto-GPU, multi-GPU &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
 
