@@ -11,10 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 from abc import ABC, abstractmethod
 
 
-def no_batch_unbatch_message(obj, data):
+def no_batch_unbatch_message_no_stream(obj, data):
     return f"""
         You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
         PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
@@ -30,7 +31,26 @@ def no_batch_unbatch_message(obj, data):
     """
 
 
+def no_batch_unbatch_message_stream(obj, data):
+    return f"""
+        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
+        PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
+        Please implement these two methods in {obj.__class__.__name__}.
+
+        Example:
+
+        def batch(self, inputs):
+            return np.stack(inputs)
+
+        def unbatch(self, output):
+            for out in output:
+                yield list(out)
+    """
+
+
 class LitAPI(ABC):
+    _stream: bool = False
+
     @abstractmethod
     def setup(self, devices):
         """Setup the model so it can be called in `predict`."""
@@ -53,7 +73,12 @@ class LitAPI(ABC):
             import numpy
 
             return numpy.stack(inputs)
-        raise NotImplementedError(no_batch_unbatch_message(self, inputs))
+
+        if self.stream:
+            message = no_batch_unbatch_message_stream(self, inputs)
+        else:
+            message = no_batch_unbatch_message_no_stream(self, inputs)
+        raise NotImplementedError(message)
 
     @abstractmethod
     def predict(self, x):
@@ -63,8 +88,16 @@ class LitAPI(ABC):
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
         if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
-            return list(output)
-        raise NotImplementedError(no_batch_unbatch_message(self, output))
+            if self._stream:
+                yield from list(output)
+            else:
+                return list(output)
+
+        if self.stream:
+            message = no_batch_unbatch_message_stream(self, output)
+        else:
+            message = no_batch_unbatch_message_no_stream(self, output)
+        raise NotImplementedError(message)
 
     @abstractmethod
     def encode_response(self, output):
@@ -74,3 +107,66 @@ class LitAPI(ABC):
 
         """
         pass
+
+    @property
+    def stream(self):
+        return self._stream
+
+    @stream.setter
+    def stream(self, value):
+        self._stream = value
+
+    def sanitize(self, max_batch_size: int):
+        if (
+            self.stream
+            and max_batch_size > 1
+            and not all([
+                inspect.isgeneratorfunction(self.predict),
+                inspect.isgeneratorfunction(self.encode_response),
+                inspect.isgeneratorfunction(self.unbatch),
+            ])
+        ):
+            raise ValueError(
+                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
+                `lit_api.unbatch` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+
+                def unbatch(self, outputs):
+                    for output in outputs:
+                        unbatched_output = ...
+                        yield unbatched_output
+             """
+            )
+
+        if self.stream and not all([
+            inspect.isgeneratorfunction(self.predict),
+            inspect.isgeneratorfunction(self.encode_response),
+        ]):
+            raise ValueError(
+                """When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )
