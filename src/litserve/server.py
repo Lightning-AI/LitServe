@@ -36,7 +36,7 @@ from litserve.connector import _Connector
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-LONG_TIMEOUT = 10
+LONG_TIMEOUT = 100
 
 
 class LitAPIStatus:
