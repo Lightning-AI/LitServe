@@ -153,11 +153,50 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
             pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
+def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+    while True:
+        batches = collate_requests(
+            lit_api,
+            request_queue,
+            request_buffer,
+            max_batch_size,
+            batch_timeout,
+        )
+        if not batches:
+            continue
+
+        inputs, pipes = zip(*batches)
+
+        try:
+            x = lit_api.batch(inputs)
+            y_iter = lit_api.predict(x)
+            unbatched_iter = lit_api.unbatch(y_iter)
+            y_enc_iter = lit_api.encode_response(unbatched_iter)
+
+            # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
+            for y_batch in y_enc_iter:
+                for y_enc, pipe_s in zip(y_batch, pipes):
+                    with contextlib.suppress(BrokenPipeError):
+                        pipe_s.send((y_enc, LitAPIStatus.OK))
+
+            for pipe_s in pipes:
+                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+        except Exception as e:
+            logging.exception(e)
+            err = pickle.dumps(e)
+            for pipe_s in pipes:
+                pipe_s.send((err, LitAPIStatus.ERROR))
+
+
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
     if stream:
-        run_streaming_loop(lit_api, request_queue, request_buffer)
+        if max_batch_size > 1:
+            run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+        else:
+            run_streaming_loop(lit_api, request_queue, request_buffer)
         return
+
     if max_batch_size > 1:
         run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
@@ -227,7 +266,7 @@ async def lifespan(app: FastAPI):
 
 
 class LitServer:
-    # TODO: add support for accelerator="auto", devices="auto"
+    # TODO: add support for devices="auto"
     def __init__(
         self,
         lit_api: LitAPI,
@@ -244,31 +283,8 @@ class LitServer:
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
-        if stream and max_batch_size > 1:
-            raise ValueError("streaming is not supported with automatic batching at this time.")
-
-        if stream and not all([
-            inspect.isgeneratorfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response),
-        ]):
-            raise ValueError(
-                """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-             """
-            )
-
+        lit_api.stream = stream
+        lit_api.sanitize(max_batch_size)
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device

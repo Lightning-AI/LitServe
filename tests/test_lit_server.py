@@ -28,7 +28,13 @@ from httpx import AsyncClient
 from unittest.mock import patch, MagicMock
 
 from litserve.connector import _Connector
-from litserve.server import inference_worker, run_single_loop, run_streaming_loop
+from litserve.server import (
+    inference_worker,
+    run_single_loop,
+    run_streaming_loop,
+    LitAPIStatus,
+    run_batched_streaming_loop,
+)
 from litserve.server import LitServer
 
 import pytest
@@ -146,6 +152,22 @@ async def test_stream(simple_stream_api):
         assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
 
 
+@pytest.mark.asyncio()
+async def test_batched_stream_server(simple_batched_stream_api):
+    server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
+    expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
+    expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
+
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1, resp2 = await asyncio.gather(resp1, resp2)
+        assert resp1.status_code == 200, "Check if server is running and the request format is valid."
+        assert resp2.status_code == 200, "Check if server is running and the request format is valid."
+        assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
+        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
+
+
 class FakeStreamPipe:
     def __init__(self, num_streamed_outputs):
         self.num_streamed_outputs = num_streamed_outputs
@@ -184,6 +206,58 @@ def test_streaming_loop(loop_args):
         run_streaming_loop(fake_stream_api, requests_queue, request_buffer)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
+    fake_stream_api.encode_response.assert_called_once()
+
+
+class FakeBatchedStreamPipe:
+    def __init__(self, num_streamed_outputs):
+        self.num_streamed_outputs = num_streamed_outputs
+        self.count = 0
+
+    def send(self, args):
+        response, status = args
+        if status == LitAPIStatus.FINISH_STREAMING:
+            raise StopIteration("interrupt iteration")
+        if status == LitAPIStatus.ERROR and b"interrupt iteration" in response:
+            assert self.count == self.num_streamed_outputs, (
+                f"Loop count must have incremented for " f"{self.num_streamed_outputs} times."
+            )
+            raise StopIteration("finish streaming")
+
+        assert (
+            response == f"{self.count}"
+        ), f"streaming loop generates number from 0 to 9 which is sent via Pipe. {args}"
+        self.count += 1
+
+
+def test_batched_streaming_loop(loop_args):
+    num_streamed_outputs = 10
+
+    def fake_predict(inputs: list):
+        n = len(inputs)
+        for i in range(num_streamed_outputs):
+            yield [{"output": f"{i}"}] * n
+
+    def fake_encode(output_iter):
+        assert inspect.isgenerator(output_iter), "predict function must be a generator when `stream=True`"
+        for outputs in output_iter:
+            yield [output["output"] for output in outputs]
+
+    fake_stream_api = MagicMock()
+    fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
+    fake_stream_api.batch = MagicMock(side_effect=lambda inputs: inputs)
+    fake_stream_api.predict = MagicMock(side_effect=fake_predict)
+    fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
+    fake_stream_api.unbatch = MagicMock(side_effect=lambda inputs: inputs)
+
+    _, requests_queue, request_buffer = loop_args
+    request_buffer = Manager().dict()
+    request_buffer[1] = {"prompt": "Hello"}, FakeBatchedStreamPipe(num_streamed_outputs)
+    request_buffer[2] = {"prompt": "World"}, FakeBatchedStreamPipe(num_streamed_outputs)
+
+    with pytest.raises(StopIteration, match="finish streaming"):
+        run_batched_streaming_loop(fake_stream_api, requests_queue, request_buffer, max_batch_size=2, batch_timeout=2)
+    fake_stream_api.predict.assert_called_once_with(("Hello", "World"))
     fake_stream_api.encode_response.assert_called_once()
 
 

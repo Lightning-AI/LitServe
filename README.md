@@ -180,7 +180,7 @@ LitServe supports multiple advanced state-of-the-art features.
 | Automatic schema validation | ✅ |
 | Handle timeouts | ✅ |
 | Handle disconnects | ✅ |
-| Streaming | in progress... |
+| Streaming | ✅ |
 
 > [!NOTE]
 > Our goal is not to jump on every hype train, but instead support features that scale
