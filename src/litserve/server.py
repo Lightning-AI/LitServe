@@ -102,9 +102,9 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
         except Exception as e:
             logging.exception(e)
             err_pkl = pickle.dumps(e)
-
-            for pipe_s in pipes:
-                pipe_s.send((err_pkl, LitAPIStatus.ERROR))
+            with contextlib.suppress(BrokenPipeError):
+                for pipe_s in pipes:
+                    pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
 def run_single_loop(lit_api, request_queue: Queue, request_buffer):
@@ -126,7 +126,8 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
                 pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
             logging.exception(e)
-            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
@@ -150,7 +151,8 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
             pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
             logging.exception(e)
-            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
