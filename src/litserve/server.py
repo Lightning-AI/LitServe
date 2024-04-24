@@ -148,7 +148,8 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
             for y_enc in y_enc_gen:
                 with contextlib.suppress(BrokenPipeError):
                     pipe_s.send((y_enc, LitAPIStatus.OK))
-            pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
             logging.exception(e)
             with contextlib.suppress(BrokenPipeError):
