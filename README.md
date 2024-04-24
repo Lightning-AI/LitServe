@@ -137,7 +137,7 @@ class SimpleLitAPI(ls.LitAPI):
 # STEP 2: START THE SERVER
 if __name__ == "__main__":
     api = SimpleLitAPI()
-    server = ls.LitServer(api, accelerator="gpu")
+    server = ls.LitServer(api, accelerator="auto")
     server.run(port=8000)
 ```
 
@@ -226,7 +226,7 @@ class SimpleLitAPI(LitAPI):
 
 if __name__ == "__main__":
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu")
+    server = LitServer(api, accelerator="auto")
     server.run(port=8888)
 ```
 
@@ -288,6 +288,13 @@ if __name__ == "__main__":
     server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4)
     server.run(port=8000)
 ```
+
+The `accelerator` variable can be set to `"auto"`, and LitServe will select the appropriate GPU or CPU, whichever is available.
+
+```python
+server = LitServer(SimpleLitAPI(), accelerator="auto")
+```
+
 
 The `devices` variable can also be an array specifying what device id to
 run the model on:
