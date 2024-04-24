@@ -7,7 +7,8 @@
 
 **High-throughput serving engine for AI models**
 
-✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Auto-GPU, multi-GPU &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
+✅ Batching &nbsp; &nbsp; ✅ Streaming &nbsp; &nbsp; ✅ Auto-GPU, multi-GPU &nbsp; &nbsp; ✅ PyTorch/JAX/TF &nbsp; &nbsp; ✅
+Full control &nbsp; &nbsp; ✅ Auth
 
 ---
 
@@ -36,7 +37,9 @@
 &nbsp;
 
 # Deploy AI models Lightning fast ⚡
-LitServe is a high-throughput serving engine for deploying AI models at scale. LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.
+
+LitServe is a high-throughput serving engine for deploying AI models at scale. LitServe generates an API endpoint for a
+model, handles batching, streaming, autoscaling across CPU/GPUs and more.
 
 Why we wrote LitServe:
 
@@ -47,7 +50,8 @@ Why we wrote LitServe:
 2. Work on any hardware (GPU/TPU) automatically.
 5. Let you focus on model performance, not the serving boilerplate.
 
-Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
+Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every
+framework like PyTorch, JAX, Tensorflow and more.
 
 <div align="center">
     <img src="https://github.com/Lightning-AI/litserve/assets/3640001/4a4a5028-1e64-46f3-b0db-ef5b3f636655" height="160px">
@@ -56,20 +60,22 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
 &nbsp;
 
 # Examples
+
 Explore various examples that show different models deployed with LitServe:
 
-| Example  | description | Run |
-|---|---|---|
-| [Hello world](#implement-a-server)  | Hello world model | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a> |
-| [ANY Hugging face model](https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly)  | **(Text)** Deploy any Hugging Face model | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a> |
-| [Hugging face BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model)  | **(Text)** Deploy model for tasks like text generation and more | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
-| [Open AI CLIP](https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve)  | **(Multimodal)** Deploy Open AI CLIP for tasks like image understanding | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
-| [Open AI Whisper](https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model)  | **(Audio)** Deploy Open AI Whisper for tasks like speech to text | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
-| [Stable diffusion 2](https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2)  | **(Vision)** Deploy Stable diffusion 2 for tasks like image generation | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+| Example                                                                                                     | description                                                             | Run                                                                                                                                                                                                                                 |
+|-------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [Hello world](#implement-a-server)                                                                          | Hello world model                                                       | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>                        |
+| [ANY Hugging face model](https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly) | **(Text)** Deploy any Hugging Face model                                | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>     |
+| [Hugging face BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model)       | **(Text)** Deploy model for tasks like text generation and more         | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+| [Open AI CLIP](https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve)                 | **(Multimodal)** Deploy Open AI CLIP for tasks like image understanding | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+| [Open AI Whisper](https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model)                 | **(Audio)** Deploy Open AI Whisper for tasks like speech to text        | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+| [Stable diffusion 2](https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2) | **(Vision)** Deploy Stable diffusion 2 for tasks like image generation  | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 
 &nbsp;
 
 # Install LitServe
+
 Install LitServe via pip:
 
 ```bash
@@ -85,6 +91,7 @@ Install the main branch:
 ```bash
 pip install git+https://github.com/Lightning-AI/litserve.git@main
 ```
+
 &nbsp;
 
 Install from source:
@@ -100,11 +107,13 @@ pip install -e '.[all]'
 &nbsp;
 
 # Get started
+
 LitServe is an inference server for AI/ML models that is minimal and highly scalable.
 
 It has 2 simple, minimal APIs - LitAPI and LitServer.
 
 ## Implement a server
+
 Here's a hello world example:
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
@@ -115,11 +124,12 @@ Here's a hello world example:
 # server.py
 import litserve as ls
 
+
 # STEP 1: DEFINE YOUR MODEL API
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
         # Setup the model so it can be called in `predict`.
-        self.model = lambda x: x**2
+        self.model = lambda x: x ** 2
 
     def decode_request(self, request):
         # Convert the request payload to your model input.
@@ -148,6 +158,7 @@ python server.py
 ```
 
 ## Use the server
+
 LitServe automatically generates a client when it starts. Use this client to test the server:
 
 ```bash
@@ -155,8 +166,10 @@ python client.py
 ```
 
 Or ping the server yourself directly
+
 ```python
 import requests
+
 response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 ```
 
@@ -166,25 +179,26 @@ The way the payload is structured is up to the implementation of the `LitAPI` su
 &nbsp;
 
 # Features
+
 LitServe supports multiple advanced state-of-the-art features.
 
-| Feature  | description  |
-|---|---|
-| Accelerators  | CPU, GPU, Multi-GPU  |
-| Auto-GPU  | Detects and auto-runs on all GPUs on a machine  |
-| Model types  | LLMs, Vision, Time series, any model type...  |
-| ML frameworks  | PyTorch, Jax, Tensorflow, numpy, etc...  |
-| Batching | ✅ |
-| API authentication | ✅ |
-| Full request/response control | ✅ |
-| Automatic schema validation | ✅ |
-| Handle timeouts | ✅ |
-| Handle disconnects | ✅ |
-| Streaming | ✅ |
+| Feature                       | description                                    |
+|-------------------------------|------------------------------------------------|
+| Accelerators                  | CPU, GPU, Multi-GPU                            |
+| Auto-GPU                      | Detects and auto-runs on all GPUs on a machine |
+| Model types                   | LLMs, Vision, Time series, any model type...   |
+| ML frameworks                 | PyTorch, Jax, Tensorflow, numpy, etc...        |
+| Batching                      | ✅                                              |
+| API authentication            | ✅                                              |
+| Full request/response control | ✅                                              |
+| Automatic schema validation   | ✅                                              |
+| Handle timeouts               | ✅                                              |
+| Handle disconnects            | ✅                                              |
+| Streaming                     | ✅                                              |
 
 > [!NOTE]
 > Our goal is not to jump on every hype train, but instead support features that scale
-under the most demanding enterprise deployments.
+> under the most demanding enterprise deployments.
 
 ## Feature details
 
@@ -212,7 +226,7 @@ class PredictResponse(BaseModel):
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
-        self.model = lambda x: x**2
+        self.model = lambda x: x ** 2
 
     def decode_request(self, request: PredictRequest) -> float:
         return request.input
@@ -347,26 +361,58 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 <details>
   <summary>Dynamic batching</summary>
 
-FastServe can combine individual requests together to improve throughput. To enable batching, you need to implement
-`LitAPI.batch`, `LitAPI.unbatch` method which converts a list of inputs to batched input and vice-versa. You will also
-need to implement `LitAPI.predict` in such a way that it can handle batched input and finally set a `max_batch_size`
-argument in `LitServe(..., max_batch_size=4)` to a value>1.
+FastServe can combine individual requests together to improve throughput. To enable batching, you need to set
+`max_batch_size` argument and implement `LitAPI.batch`, `LitAPI.unbatch` method which converts a list of inputs to
+batched input and vice-versa.
+With dynamic batching the `LitAPI.predict` method must handle batched inputs.
+
+```python
+import numpy as np
+from litserve import Request
+from litserve import LitServer
+from litserve import LitAPI
+
+
+class SimpleStreamAPI(LitAPI):
+    def setup(self, device) -> None:
+        self.model = lambda x: x ** 2
+
+    def decode_request(self, request: Request) -> float:
+        return request["input"]
+
+    def batch(self, inputs):
+        return np.stack(inputs)
+
+    def predict(self, x):
+        return self.model(x)
+
+    def unbatch(self, output):
+        return list(output)
+
+    def encode_response(self, output):
+        return {"output": output}
+
+
+if __name__ == "__main__":
+    api = SimpleStreamAPI()
+    server = LitServer(api, max_batch_size=4, batch_timeout=2)
+    server.run(port=8000)
+```
 
 You can control the wait time to aggregate requests into a batch with `batch_timeout` argument. In the following
-example, server will wait for 2 seconds to combine 4 requests together.
+example, server will wait for 2 seconds to combine 4 requests together:
 
 ```python
 server = LitServer(SimpleLitAPI(), max_batch_size=4, batch_timeout=2)
 ```
 
-
-
 </details>
 
 # Contribute
+
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
-##  Run Tests
+## Run Tests
 
 Use `pytest` to run tests locally.
 
@@ -377,10 +423,10 @@ pip install -r _requirements/test.txt
 ```
 
 Run the tests
+
 ```shell
 pytest tests
 ```
-
 
 # License
 
