@@ -343,6 +343,26 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 </details>
 &nbsp;
 
+
+<details>
+  <summary>Dynamic batching</summary>
+
+FastServe can combine individual requests together to improve throughput. To enable batching, you need to implement
+`LitAPI.batch`, `LitAPI.unbatch` method which converts a list of inputs to batched input and vice-versa. You will also
+need to implement `LitAPI.predict` in such a way that it can handle batched input and finally set a `max_batch_size`
+argument in `LitServe(..., max_batch_size=4)` to a value>1.
+
+You can control the wait time to aggregate requests into a batch with `batch_timeout` argument. In the following
+example, server will wait for 2 seconds to combine 4 requests together.
+
+```python
+server = LitServer(SimpleLitAPI(), max_batch_size=4, batch_timeout=2)
+```
+
+
+
+</details>
+
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
