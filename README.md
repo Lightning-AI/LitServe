@@ -387,11 +387,7 @@ if __name__ == "__main__":
 &nbsp;
 
 You can control the wait time to aggregate requests into a batch with the `batch_timeout` argument.
-In the following example, the server will wait for 2 seconds to combine 4 requests together:
-
-```python
-server = LitServer(SimpleLitAPI(), max_batch_size=4, batch_timeout=2)
-```
+In the above example, the server will wait for 2 seconds to combine 4 requests together.
 </details>
 &nbsp;
 
