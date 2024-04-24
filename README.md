@@ -5,7 +5,7 @@
 
 # LitServe
 
-**High-throughput serving engine for AI models**    
+**High-throughput serving engine for AI models**
 
 ✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Auto-GPU, multi-GPU &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
 
@@ -171,7 +171,7 @@ LitServe supports multiple advanced state-of-the-art features.
 | Feature  | description  |
 |---|---|
 | Accelerators  | CPU, GPU, Multi-GPU  |
-| Auto-GPU  | Detects and auto-runs on all GPUs on a machine  |    
+| Auto-GPU  | Detects and auto-runs on all GPUs on a machine  |
 | Model types  | LLMs, Vision, Time series, any model type...  |
 | ML frameworks  | PyTorch, Jax, Tensorflow, numpy, etc...  |
 | Batching | ✅ |
@@ -358,27 +358,22 @@ For example, streaming long responses generated over time:
 ```python
 from typing import Generator
 
-from litserve.api import LitAPI
 import json
-
+from litserve import Request
 from litserve import LitServer
-from pydantic import BaseModel
-
-
-class Request(BaseModel):
-    number: int
+from litserve import LitAPI
 
 
 class SimpleStreamAPI(LitAPI):
     def setup(self, device) -> None:
-        self.num_outputs = 100
+        self.model = lambda x, y: x**y
 
-    def decode_request(self, request: Request) -> str:
-        return request.number
+    def decode_request(self, request: Request) -> float:
+        return request["input"]
 
     def predict(self, x) -> Generator:
-        for i in range(self.num_outputs):
-            yield x**i
+        for i in range(10):
+            yield self.model(x, i)
 
     def encode_response(self, output: Generator) -> Generator:
         for out in output:
@@ -387,8 +382,8 @@ class SimpleStreamAPI(LitAPI):
 
 if __name__ == "__main__":
     api = SimpleStreamAPI()
-    server = LitServer(api, stream=True, timeout=30)
-    server.run(port=8888)
+    server = LitServer(api, stream=True)
+    server.run(port=8000)
 ```
 
 &nbsp;
