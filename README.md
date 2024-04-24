@@ -366,7 +366,7 @@ from litserve import LitAPI
 
 class SimpleStreamAPI(LitAPI):
     def setup(self, device) -> None:
-        self.model = lambda x, y: x**y
+        self.model = lambda x, y: x*y
 
     def decode_request(self, request: Request) -> float:
         return request["input"]
