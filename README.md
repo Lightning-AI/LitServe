@@ -355,8 +355,6 @@ LIT_SERVER_API_KEY=supersecretkey python main.py
 Clients are expected to auth with the same API key set in the `X-API-Key` HTTP header.
 
 </details>
-&nbsp;
-
 
 <details>
   <summary>Dynamic batching</summary>
@@ -405,8 +403,8 @@ example, server will wait for 2 seconds to combine 4 requests together:
 ```python
 server = LitServer(SimpleLitAPI(), max_batch_size=4, batch_timeout=2)
 ```
-
 </details>
+&nbsp;
 
 # Contribute
 
