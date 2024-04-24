@@ -19,6 +19,12 @@ jobs:
         os: [ubuntu-latest, macOS-latest, windows-latest]
         python-version: [3.9]
         requires: ["oldest", "latest"]
+        include:
+          - os: macos-latest
+            python-version: "3.10"
+        exclude:
+          - os: macos-latest
+            python-version: "3.9"
 
     timeout-minutes: 35
     env:
