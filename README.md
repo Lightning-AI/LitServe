@@ -358,6 +358,7 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 <details>
   <summary>Dynamic batching</summary>
+&nbsp;
 
 FastServe can combine individual requests together to improve throughput. To enable batching, you need to set
 `max_batch_size` argument and implement `LitAPI.batch`, `LitAPI.unbatch` method which converts a list of inputs to
@@ -396,6 +397,7 @@ if __name__ == "__main__":
     server = LitServer(api, max_batch_size=4, batch_timeout=2)
     server.run(port=8000)
 ```
+&nbsp;
 
 You can control the wait time to aggregate requests into a batch with `batch_timeout` argument. In the following
 example, server will wait for 2 seconds to combine 4 requests together:
