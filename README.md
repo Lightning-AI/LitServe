@@ -381,13 +381,13 @@ class SimpleStreamAPI(LitAPI):
 
 if __name__ == "__main__":
     api = SimpleStreamAPI()
-    server = LitServer(api, max_batch_size=4, batch_timeout=2)
+    server = LitServer(api, max_batch_size=4, batch_timeout=0.05)
     server.run(port=8000)
 ```
 &nbsp;
 
 You can control the wait time to aggregate requests into a batch with the `batch_timeout` argument.
-In the above example, the server will wait for 2 seconds to combine 4 requests together.
+In the above example, the server will wait for 0.05 seconds to combine 4 requests together.
 </details>
 &nbsp;
 
