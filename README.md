@@ -354,23 +354,21 @@ method must handle batched inputs.
 
 ```python
 import numpy as np
-from litserve import Request
-from litserve import LitServer
-from litserve import LitAPI
+import litserve as ls
 
-
-class SimpleStreamAPI(LitAPI):
+class SimpleStreamAPI(ls.LitAPI):
     def setup(self, device) -> None:
         self.model = lambda x: x ** 2
 
-    def decode_request(self, request: Request) -> float:
+    def decode_request(self, request):
         return request["input"]
 
     def batch(self, inputs):
         return np.stack(inputs)
 
     def predict(self, x):
-        return self.model(x)
+        result = self.model(x)
+        return result
 
     def unbatch(self, output):
         return list(output)
@@ -378,11 +376,11 @@ class SimpleStreamAPI(LitAPI):
     def encode_response(self, output):
         return {"output": output}
 
-
 if __name__ == "__main__":
     api = SimpleStreamAPI()
-    server = LitServer(api, max_batch_size=4, batch_timeout=0.05)
+    server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.05)
     server.run(port=8000)
+
 ```
 &nbsp;
 
