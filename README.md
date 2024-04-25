@@ -236,7 +236,7 @@ if __name__ == "__main__":
     <summary>Automatic accelerator</summary>
 &nbsp;
 
-LitServe can automatically select the appropriate GPU or CPU, whichever is available.
+LitServe can automatically select the appropriate GPU or CPU, whichever is available on the user's machine.
 
 ```python
 # Automatically selects the available accelerator
@@ -247,7 +247,7 @@ server = LitServer(SimpleLitAPI())
 `LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
 `"mps"` if you wish to manually control the device placement.
 
-The following examples show how to set the accelerator manually:
+The following example shows how to set the accelerator manually:
 
 ```python
 # Run on CUDA-supported GPUs
