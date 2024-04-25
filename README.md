@@ -348,7 +348,7 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 
 &nbsp;
 
-`LitServer` can stream longer responses, such as LLM generated text.
+`LitServer` can stream outputs from the model in real-time, such as returning text one word at a time from a language model.
 
 To enable streaming, you need to implement `LitAPI.predict` and `LitAPI.encode_response` as a generator (a Python
 function that yields output) and set `LitServer(..., stream=True)`.
