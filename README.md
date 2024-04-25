@@ -233,6 +233,36 @@ if __name__ == "__main__":
 </details>
 
 <details>
+    <summary>Automatic accelerator</summary>
+&nbsp;
+
+LitServe can automatically select the appropriate GPU or CPU, whichever is available.
+
+```python
+# Automatically selects the available accelerator
+
+server = LitServer(SimpleLitAPI())
+```
+
+`LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
+`"mps"` if you wish to manually control the device placement.
+
+
+
+
+The following examples show how to set the accelerator manually:
+
+```python
+# Run on CUDA-supported GPUs
+server = LitServer(SimpleLitAPI(), accelerator="cuda")
+
+# Run on Apple's Metal-powered GPUs
+server = LitServer(SimpleLitAPI(), accelerator="mps")
+```
+
+</details>
+
+<details>
   <summary>Serve on GPUs</summary>
 
 &nbsp;
@@ -288,13 +318,6 @@ if __name__ == "__main__":
     server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4)
     server.run(port=8000)
 ```
-
-The `accelerator` variable can be set to `"auto"`, and LitServe will select the appropriate GPU or CPU, whichever is available.
-
-```python
-server = LitServer(SimpleLitAPI(), accelerator="auto")
-```
-
 
 The `devices` variable can also be an array specifying what device id to
 run the model on:
