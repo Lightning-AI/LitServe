@@ -363,7 +363,7 @@ class SimpleStreamAPI(ls.LitAPI):
     def setup(self, device) -> None:
         self.model = lambda x, y: x * y
 
-    def decode_request(self, request: ls.Request) -> float:
+    def decode_request(self, request):
         return request["input"]
 
     def predict(self, x):
