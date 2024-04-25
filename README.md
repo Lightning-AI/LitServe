@@ -356,33 +356,28 @@ as a generator (a Python function that yields output).
 For example, streaming long responses generated over time:
 
 ```python
-from typing import Generator
-
 import json
-from litserve import Request
-from litserve import LitServer
-from litserve import LitAPI
+import litserve as ls
 
-
-class SimpleStreamAPI(LitAPI):
+class SimpleStreamAPI(ls.LitAPI):
     def setup(self, device) -> None:
-        self.model = lambda x, y: x*y
+        self.model = lambda x, y: x * y
 
-    def decode_request(self, request: Request) -> float:
+    def decode_request(self, request: ls.Request) -> float:
         return request["input"]
 
-    def predict(self, x) -> Generator:
+    def predict(self, x):
         for i in range(10):
             yield self.model(x, i)
 
-    def encode_response(self, output: Generator) -> Generator:
+    def encode_response(self, output):
         for out in output:
             yield json.dumps({"output": out})
 
 
 if __name__ == "__main__":
     api = SimpleStreamAPI()
-    server = LitServer(api, stream=True)
+    server = ls.LitServer(api, stream=True)
     server.run(port=8000)
 ```
 
