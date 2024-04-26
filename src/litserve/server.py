@@ -291,7 +291,7 @@ class LitServer:
         batch_timeout: float = 0.0,
         stream: bool = False,
     ):
-        if batch_timeout > timeout:
+        if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
