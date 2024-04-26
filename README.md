@@ -346,9 +346,9 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
   <summary>Dynamic batching</summary>
 &nbsp;
 
-LitServe can combine individual requests into a batch to enhance throughput.
-To enable batching, you need to set the `max_batch_size` argument and implement `LitAPI.predict` to handle batched inputs.
-
+LitServe can combine individual requests into a batch to improve throughput.
+To enable batching, you need to set the `max_batch_size` argument to match the batch size that your model can handle
+and implement `LitAPI.predict` to process batched inputs.
 
 
 ```python
