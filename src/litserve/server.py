@@ -353,6 +353,10 @@ class LitServer:
                 return await asyncio.wait_for(call_next(request), timeout=self.app.timeout)
 
             except asyncio.TimeoutError:
+                logging.error(
+                    f"The server couldn't process the request within the specified {timeout} seconds timeout. "
+                    "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+                )
                 return JSONResponse("Request timed out", 504)
 
         @self.app.get("/", dependencies=[Depends(setup_auth())])
