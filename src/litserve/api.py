@@ -48,6 +48,14 @@ def no_batch_unbatch_message_stream(obj, data):
     """
 
 
+def _unbatch_stream(output):
+    yield from list(output)
+
+
+def _unbatch_no_stream(output):
+    return list(output)
+
+
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: callable = None
@@ -86,12 +94,6 @@ class LitAPI(ABC):
         """Run the model on the input and return or yield the output."""
         pass
 
-    def _unbatch_stream(self, output):
-        yield from list(output)
-
-    def _unbatch_no_stream(self, output):
-        return list(output)
-
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
         if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
@@ -122,9 +124,9 @@ class LitAPI(ABC):
 
     def sanitize(self, max_batch_size: int):
         if self.stream:
-            self._default_unbatch = self._unbatch_stream
+            self._default_unbatch = _unbatch_stream
         else:
-            self._default_unbatch = self._unbatch_no_stream
+            self._default_unbatch = _unbatch_no_stream
 
         if (
             self.stream
