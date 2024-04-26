@@ -48,8 +48,9 @@ def no_batch_unbatch_message_stream(obj, data):
     """
 
 
-def _unbatch_stream(output):
-    yield from list(output)
+def _unbatch_stream(output_stream):
+    for output in output_stream:
+        yield from list(output)
 
 
 def _unbatch_no_stream(output):
@@ -127,14 +128,14 @@ class LitAPI(ABC):
             self._default_unbatch = _unbatch_stream
         else:
             self._default_unbatch = _unbatch_no_stream
-
+        is_overridden = self.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             self.stream
             and max_batch_size > 1
             and not all([
                 inspect.isgeneratorfunction(self.predict),
                 inspect.isgeneratorfunction(self.encode_response),
-                inspect.isgeneratorfunction(self.unbatch),
+                (is_overridden or inspect.isgeneratorfunction(self.unbatch)),
             ])
         ):
             raise ValueError(
