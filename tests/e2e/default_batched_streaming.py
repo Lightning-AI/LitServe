@@ -11,16 +11,13 @@ class SimpleStreamAPI(ls.LitAPI):
     def decode_request(self, request):
         return np.asarray(request["input"])
 
-    def batch(self, inputs):
-        return np.stack(inputs)
-
     def predict(self, x):
         for i in range(10):
             yield self.model(x, i)
 
-    def encode_response(self, output):
-        for out in output:
-            yield json.dumps({"output": out})
+    def encode_response(self, output_stream):
+        for outputs in output_stream:
+            yield [json.dumps({"output": output}) for output in outputs]
 
 
 if __name__ == "__main__":

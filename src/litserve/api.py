@@ -48,15 +48,6 @@ def no_batch_unbatch_message_stream(obj, data):
     """
 
 
-def _unbatch_stream(output_stream):
-    for output in output_stream:
-        yield from list(output)
-
-
-def _unbatch_no_stream(output):
-    return list(output)
-
-
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: callable = None
@@ -95,16 +86,23 @@ class LitAPI(ABC):
         """Run the model on the input and return or yield the output."""
         pass
 
+    def _unbatch_no_stream(self, output):
+        if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
+            return list(output)
+        message = no_batch_unbatch_message_no_stream(self, output)
+        raise NotImplementedError(message)
+
+    def _unbatch_stream(self, output_stream):
+        for output in output_stream:
+            if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
+                yield list(output)
+            else:
+                message = no_batch_unbatch_message_no_stream(self, output)
+                raise NotImplementedError(message)
+
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
-        if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
-            return self._default_unbatch(output)
-
-        if self.stream:
-            message = no_batch_unbatch_message_stream(self, output)
-        else:
-            message = no_batch_unbatch_message_no_stream(self, output)
-        raise NotImplementedError(message)
+        return self._default_unbatch(output)
 
     @abstractmethod
     def encode_response(self, output):
@@ -125,9 +123,9 @@ class LitAPI(ABC):
 
     def sanitize(self, max_batch_size: int):
         if self.stream:
-            self._default_unbatch = _unbatch_stream
+            self._default_unbatch = self._unbatch_stream
         else:
-            self._default_unbatch = _unbatch_no_stream
+            self._default_unbatch = self._unbatch_no_stream
         is_overridden = self.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             self.stream
