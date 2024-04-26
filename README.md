@@ -381,7 +381,7 @@ In the above example, the server will wait for 0.05 seconds to combine 4 request
 &nbsp;
 
 LitServe automatically stacks NumPy arrays and PyTorch tensors along the batch dimension before calling the
-`LitAPI.predict` method, and unbinds the output afterward. You can customize this behavior by overriding the
+`LitAPI.predict` method, and splits the output across requests afterward. You can customize this behavior by overriding the
 `LitAPI.batch` and `LitAPI.unbatch` methods to handle different data types.
 
 ```python
