@@ -50,6 +50,7 @@ def no_batch_unbatch_message_stream(obj, data):
 
 class LitAPI(ABC):
     _stream: bool = False
+    _default_unbatch: callable = None
 
     @abstractmethod
     def setup(self, devices):
@@ -85,19 +86,23 @@ class LitAPI(ABC):
         """Run the model on the input and return or yield the output."""
         pass
 
+    def _unbatch_no_stream(self, output):
+        if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
+            return list(output)
+        message = no_batch_unbatch_message_no_stream(self, output)
+        raise NotImplementedError(message)
+
+    def _unbatch_stream(self, output_stream):
+        for output in output_stream:
+            if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
+                yield list(output)
+            else:
+                message = no_batch_unbatch_message_no_stream(self, output)
+                raise NotImplementedError(message)
+
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
-        if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
-            if self._stream:
-                yield from list(output)
-            else:
-                return list(output)
-
-        if self.stream:
-            message = no_batch_unbatch_message_stream(self, output)
-        else:
-            message = no_batch_unbatch_message_no_stream(self, output)
-        raise NotImplementedError(message)
+        return self._default_unbatch(output)
 
     @abstractmethod
     def encode_response(self, output):
@@ -117,13 +122,18 @@ class LitAPI(ABC):
         self._stream = value
 
     def sanitize(self, max_batch_size: int):
+        if self.stream:
+            self._default_unbatch = self._unbatch_stream
+        else:
+            self._default_unbatch = self._unbatch_no_stream
+        original = self.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             self.stream
             and max_batch_size > 1
             and not all([
                 inspect.isgeneratorfunction(self.predict),
                 inspect.isgeneratorfunction(self.encode_response),
-                inspect.isgeneratorfunction(self.unbatch),
+                (original or inspect.isgeneratorfunction(self.unbatch)),
             ])
         ):
             raise ValueError(
