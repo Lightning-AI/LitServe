@@ -24,7 +24,7 @@ from queue import Empty
 import time
 import os
 import shutil
-from typing import Sequence, Optional
+from typing import Sequence, Optional, Union
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -286,7 +286,7 @@ class LitServer:
         accelerator: Optional[str] = "auto",
         devices: int = 1,
         workers_per_device: int = 1,
-        timeout: Optional[int] = 30,
+        timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
         stream: bool = False,
@@ -354,8 +354,9 @@ class LitServer:
         async def timeout_middleware(request: Request, call_next):
             timeout = self.app.timeout
             try:
-                if timeout in [-1, None]:
+                if timeout is False or timeout == -1:
                     return await call_next(request)
+
                 return await asyncio.wait_for(call_next(request), timeout=self.app.timeout)
 
             except asyncio.TimeoutError:
