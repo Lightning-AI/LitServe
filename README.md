@@ -347,9 +347,8 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 &nbsp;
 
 LitServe can combine individual requests into a batch to enhance throughput.
-To enable batching, you need to set the `max_batch_size` argument and implement the `LitAPI.batch` and `LitAPI.unbatch`
-methods, which convert a list of inputs to batched input and vice versa. With dynamic batching, the `LitAPI.predict`
-method must handle batched inputs.
+To enable batching, you need to set the `max_batch_size` argument and implement `LitAPI.predict` to handle batched inputs.
+
 
 
 ```python
@@ -361,17 +360,11 @@ class SimpleStreamAPI(ls.LitAPI):
         self.model = lambda x: x ** 2
 
     def decode_request(self, request):
-        return request["input"]
-
-    def batch(self, inputs):
-        return np.stack(inputs)
+        return np.asarray(request["input"])
 
     def predict(self, x):
         result = self.model(x)
         return result
-
-    def unbatch(self, output):
-        return list(output)
 
     def encode_response(self, output):
         return {"output": output}
@@ -381,10 +374,30 @@ if __name__ == "__main__":
     server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.05)
     server.run(port=8000)
 ```
-&nbsp;
 
 You can control the wait time to aggregate requests into a batch with the `batch_timeout` argument.
 In the above example, the server will wait for 0.05 seconds to combine 4 requests together.
+
+&nbsp;
+
+LitServe automatically stacks NumPy arrays and PyTorch tensors along the batch dimension before calling the
+`LitAPI.predict` method, and unbinds the output afterward. You can customize this behavior by overriding the
+`LitAPI.batch` and `LitAPI.unbatch` methods to handle different data types.
+
+```python
+class SimpleStreamAPI(ls.LitAPI):
+    ...
+
+    def batch(self, inputs):
+        return np.stack(inputs)
+
+    def unbatch(self, output):
+        return list(output)
+
+    ...
+```
+
+
 </details>
 &nbsp;
 
