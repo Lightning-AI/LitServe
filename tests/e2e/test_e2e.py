@@ -2,10 +2,15 @@ import os
 import subprocess
 import time
 
+import pytest
 
-def test_default_batching():
+scripts = ["tests/e2e/default_batching.py", "tests/e2e/batched_streaming.py"]
+
+
+@pytest.mark.parametrize("script", scripts)
+def test_e2e(script):
     process = subprocess.Popen(
-        ["python", "tests/e2e/default_batching.py"],
+        ["python", script],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         stdin=subprocess.DEVNULL,
