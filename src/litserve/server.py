@@ -14,6 +14,8 @@
 import asyncio
 import contextlib
 import logging
+from fastapi.responses import JSONResponse
+
 import pickle
 from contextlib import asynccontextmanager
 import inspect
@@ -289,6 +291,8 @@ class LitServer:
         batch_timeout=0.0,
         stream=False,
     ):
+        if batch_timeout > timeout:
+            raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
@@ -346,6 +350,14 @@ class LitServer:
         return [f"{accelerator}:{device}"]
 
     def setup_server(self):
+        @self.app.middleware("http")
+        async def timeout_middleware(request: Request, call_next):
+            try:
+                return await asyncio.wait_for(call_next(request), timeout=self.app.timeout)
+
+            except asyncio.TimeoutError:
+                return JSONResponse("Request timed out", 504)
+
         @self.app.get("/", dependencies=[Depends(setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
