@@ -17,7 +17,6 @@ from fastapi import Request, Response
 from fastapi.testclient import TestClient
 import time
 
-
 from litserve import LitAPI, LitServer
 
 
@@ -89,7 +88,13 @@ def test_timeout():
 
     with TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
-        assert response.status_code == 504
+        assert response.status_code == 504, "Server takes longer than specified timeout and request should timeout"
+
+    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
+
+    with TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
 
 def test_concurrent_requests():
