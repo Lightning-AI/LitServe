@@ -90,11 +90,14 @@ def test_timeout():
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 504, "Server takes longer than specified timeout and request should timeout"
 
-    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
+    server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
+    server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
 
-    with TestClient(server.app) as client:
-        response = client.post("/predict", json={"input": 4.0})
-        assert response.status_code == 200, "Expected slow server to respond since timeout was disabled"
+    with TestClient(server1.app) as client1, TestClient(server2.app) as client2:
+        response1 = client1.post("/predict", json={"input": 4.0})
+        assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
+        response2 = client2.post("/predict", json={"input": 4.0})
+        assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
 
 def test_concurrent_requests():
