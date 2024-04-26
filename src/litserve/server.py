@@ -55,13 +55,6 @@ def load_and_raise(response):
         logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
 
 
-async def event_wait(evt, timeout):
-    # suppress TimeoutError because we'll return False in case of timeout
-    with contextlib.suppress(asyncio.TimeoutError):
-        await asyncio.wait_for(evt.wait(), timeout)
-    return evt.is_set()
-
-
 def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
