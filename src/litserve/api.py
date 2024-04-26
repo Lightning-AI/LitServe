@@ -126,14 +126,14 @@ class LitAPI(ABC):
             self._default_unbatch = self._unbatch_stream
         else:
             self._default_unbatch = self._unbatch_no_stream
-        is_overridden = self.unbatch.__code__ is LitAPI.unbatch.__code__
+        original = self.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             self.stream
             and max_batch_size > 1
             and not all([
                 inspect.isgeneratorfunction(self.predict),
                 inspect.isgeneratorfunction(self.encode_response),
-                (is_overridden or inspect.isgeneratorfunction(self.unbatch)),
+                (original or inspect.isgeneratorfunction(self.unbatch)),
             ])
         ):
             raise ValueError(
