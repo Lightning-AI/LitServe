@@ -241,7 +241,11 @@ LitServe can automatically select the appropriate GPU or CPU, whichever is avail
 ```python
 # Automatically selects the available accelerator
 
-server = LitServer(SimpleLitAPI())
+api = SimpleLitAPI()
+
+# these two are equivalent
+server = LitServer(api)
+server = LitServer(api, accelerator='auto')
 ```
 
 `LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
