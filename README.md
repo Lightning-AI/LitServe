@@ -341,7 +341,50 @@ LIT_SERVER_API_KEY=supersecretkey python main.py
 Clients are expected to auth with the same API key set in the `X-API-Key` HTTP header.
 
 </details>
+
+
+<details>
+  <summary>Stream long responses</summary>
+
 &nbsp;
+
+LitServe can stream outputs from the model in real-time, such as returning text one word at a time from a language model.
+
+To enable streaming, you need to set `LitServer(..., stream=True)` and  implement `LitAPI.predict` and `LitAPI.encode_response`
+as a generator (a Python function that yields output).
+
+For example, streaming long responses generated over time:
+
+```python
+import json
+import litserve as ls
+
+class SimpleStreamAPI(ls.LitAPI):
+    def setup(self, device) -> None:
+        self.model = lambda x, y: x * y
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        for i in range(10):
+            yield self.model(x, i)
+
+    def encode_response(self, output):
+        for out in output:
+            yield json.dumps({"output": out})
+
+
+if __name__ == "__main__":
+    api = SimpleStreamAPI()
+    server = ls.LitServer(api, stream=True)
+    server.run(port=8000)
+```
+
+&nbsp;
+
+</details>
+
 
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
@@ -366,4 +409,3 @@ pytest tests
 
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 See LICENSE file for details.
-Then, run pytest in your terminal as follows:
