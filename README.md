@@ -137,7 +137,7 @@ class SimpleLitAPI(ls.LitAPI):
 # STEP 2: START THE SERVER
 if __name__ == "__main__":
     api = SimpleLitAPI()
-    server = ls.LitServer(api, accelerator="gpu")
+    server = ls.LitServer(api, accelerator="auto")
     server.run(port=8000)
 ```
 
@@ -226,8 +226,39 @@ class SimpleLitAPI(LitAPI):
 
 if __name__ == "__main__":
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu")
+    server = LitServer(api, accelerator="auto")
     server.run(port=8888)
+```
+
+</details>
+
+<details>
+    <summary>Automatic accelerator</summary>
+&nbsp;
+
+LitServe can automatically select the appropriate GPU or CPU, whichever is available on the user's machine.
+
+```python
+# Automatically selects the available accelerator
+
+api = SimpleLitAPI()
+
+# these two are equivalent
+server = LitServer(api)
+server = LitServer(api, accelerator='auto')
+```
+
+`LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
+`"mps"` if you wish to manually control the device placement.
+
+The following example shows how to set the accelerator manually:
+
+```python
+# Run on CUDA-supported GPUs
+server = LitServer(SimpleLitAPI(), accelerator="cuda")
+
+# Run on Apple's Metal-powered GPUs
+server = LitServer(SimpleLitAPI(), accelerator="mps")
 ```
 
 </details>
@@ -399,7 +430,50 @@ class SimpleStreamAPI(ls.LitAPI):
 
 
 </details>
+
+
+<details>
+  <summary>Stream long responses</summary>
+
 &nbsp;
+
+LitServe can stream outputs from the model in real-time, such as returning text one word at a time from a language model.
+
+To enable streaming, you need to set `LitServer(..., stream=True)` and  implement `LitAPI.predict` and `LitAPI.encode_response`
+as a generator (a Python function that yields output).
+
+For example, streaming long responses generated over time:
+
+```python
+import json
+import litserve as ls
+
+class SimpleStreamAPI(ls.LitAPI):
+    def setup(self, device) -> None:
+        self.model = lambda x, y: x * y
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        for i in range(10):
+            yield self.model(x, i)
+
+    def encode_response(self, output):
+        for out in output:
+            yield json.dumps({"output": out})
+
+
+if __name__ == "__main__":
+    api = SimpleStreamAPI()
+    server = ls.LitServer(api, stream=True)
+    server.run(port=8000)
+```
+
+&nbsp;
+
+</details>
+
 
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
@@ -424,4 +498,3 @@ pytest tests
 
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
 See LICENSE file for details.
-Then, run pytest in your terminal as follows:
