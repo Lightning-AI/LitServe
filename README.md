@@ -137,7 +137,7 @@ class SimpleLitAPI(ls.LitAPI):
 # STEP 2: START THE SERVER
 if __name__ == "__main__":
     api = SimpleLitAPI()
-    server = ls.LitServer(api, accelerator="gpu")
+    server = ls.LitServer(api, accelerator="auto")
     server.run(port=8000)
 ```
 
@@ -226,8 +226,39 @@ class SimpleLitAPI(LitAPI):
 
 if __name__ == "__main__":
     api = SimpleLitAPI()
-    server = LitServer(api, accelerator="cpu")
+    server = LitServer(api, accelerator="auto")
     server.run(port=8888)
+```
+
+</details>
+
+<details>
+    <summary>Automatic accelerator</summary>
+&nbsp;
+
+LitServe can automatically select the appropriate GPU or CPU, whichever is available on the user's machine.
+
+```python
+# Automatically selects the available accelerator
+
+api = SimpleLitAPI()
+
+# these two are equivalent
+server = LitServer(api)
+server = LitServer(api, accelerator='auto')
+```
+
+`LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
+`"mps"` if you wish to manually control the device placement.
+
+The following example shows how to set the accelerator manually:
+
+```python
+# Run on CUDA-supported GPUs
+server = LitServer(SimpleLitAPI(), accelerator="cuda")
+
+# Run on Apple's Metal-powered GPUs
+server = LitServer(SimpleLitAPI(), accelerator="mps")
 ```
 
 </details>
