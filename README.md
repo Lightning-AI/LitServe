@@ -359,7 +359,7 @@ This is useful to avoid requests queuing up beyond the ability of the server to 
 To disable the timeout for long-running tasks, set `timeout=False` or `timeout=-1`:
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=False)
+server = LitServer(SimpleLitAPI(), timeout=False)
 ```
 
 </details>
