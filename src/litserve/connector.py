@@ -19,9 +19,7 @@ from functools import lru_cache
 
 
 class _Connector:
-    def __init__(self,
-                 accelerator: str = "auto",
-                 devices: Union[List[int], int, str] = "auto"):
+    def __init__(self, accelerator: str = "auto", devices: Union[List[int], int, str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
         if accelerator == "cpu":
             self._accelerator = "cpu"
