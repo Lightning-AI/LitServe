@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
-from typing import Optional
+from typing import List, Optional, Union
 import platform
 import subprocess
 from functools import lru_cache
 
 
 class _Connector:
-    def __init__(self, accelerator: Optional[str] = "auto"):
+    def __init__(self,
+                 accelerator: str = "auto",
+                 devices: Union[List[int], int, str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
         if accelerator == "cpu":
             self._accelerator = "cpu"
@@ -31,9 +33,18 @@ class _Connector:
         elif accelerator == "gpu":
             self._accelerator = self._choose_gpu_accelerator_backend()
 
+        if devices == "auto":
+            self._devices = self._auto_device_count(self._accelerator)
+        else:
+            self._devices = devices
+
     @property
     def accelerator(self):
         return self._accelerator
+
+    @property
+    def devices(self):
+        return self._devices
 
     @staticmethod
     def _sanitize_accelerator(accelerator: Optional[str]):
@@ -53,11 +64,19 @@ class _Connector:
             return gpu_backend
         return "cpu"
 
+    def _auto_device_count(self, accelerator) -> int:
+        if accelerator == "cpu":
+            return 1
+        elif accelerator == "cuda":
+            return check_cuda_with_nvidia_smi()
+        elif accelerator == "mps":
+            return 1
+
     @staticmethod
     def _choose_gpu_accelerator_backend():
         import torch
 
-        if check_cuda_with_nvidia_smi():
+        if check_cuda_with_nvidia_smi() > 0:
             return "cuda"
         if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
             return "mps"
@@ -69,6 +88,7 @@ def check_cuda_with_nvidia_smi():
     """Checks if CUDA is installed using the `nvidia-smi` command-line tool."""
 
     try:
-        return b"GPU" in subprocess.check_output(["nvidia-smi", "-L"])
+        lines = subprocess.check_output(["nvidia-smi", "-L"]).decode("utf-8").strip().split("\n")
+        return len([el for el in lines if el.startswith("GPU")])
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+        return 0

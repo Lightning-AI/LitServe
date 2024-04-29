@@ -245,7 +245,7 @@ api = SimpleLitAPI()
 
 # these two are equivalent
 server = LitServer(api)
-server = LitServer(api, accelerator='auto')
+server = LitServer(api, accelerator="auto", devices="auto")
 ```
 
 `LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
