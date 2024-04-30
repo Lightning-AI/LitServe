@@ -81,5 +81,5 @@ def test_connector(input_accelerator, expected_accelerator, expected_devices):
 def test__sanitize_accelerator():
     assert _Connector._sanitize_accelerator(None) == "auto"
     assert _Connector._sanitize_accelerator("CPU") == "cpu"
-    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'cuda', or 'gpu'"):
+    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'"):
         _Connector._sanitize_accelerator("SUPER_CHIP")
