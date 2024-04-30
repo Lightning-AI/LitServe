@@ -329,6 +329,13 @@ server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
 
+
+To disable the timeout for long-running tasks, set `timeout=False` or `timeout=-1`:
+
+```python
+server = LitServer(SimpleLitAPI(), timeout=False)
+```
+
 </details>
 
 <details>
