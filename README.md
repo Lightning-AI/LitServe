@@ -266,7 +266,7 @@ class Linear(nn.Module):
     def forward(self, x):
         return self.linear(x)
 
-class SimpleLitAPI(ls.LitAPI):
+class SimplePyTorchAPI(ls.LitAPI):
     def setup(self, device):
         # move the model to the correct device
         # keep track of the device for moving data accordingly
@@ -290,7 +290,7 @@ class SimpleLitAPI(ls.LitAPI):
 if __name__ == "__main__":
     # accelerator="auto" (or "cuda"), devices="auto" (or 4) will lead to 4 workers serving
     # the model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
-    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", devices="auto")
+    server = ls.LitServer(SimplePyTorchAPI(), accelerator="auto", devices="auto")
     server.run(port=8000)
 ```
 
@@ -298,7 +298,9 @@ The `devices` argument can also be an array specifying what device id to
 run the model on:
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=[0, 3])
+import litserve as ls
+
+server = LitServer(ls.examples.SimplePyTorchAPI(), accelerator="cuda", devices=[0, 3])
 ```
 
 Last, you can run multiple copies of the same model from the same device,
@@ -306,7 +308,9 @@ if the model is small. The following will load two copies of the model on
 each of the 4 GPUs:
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, workers_per_device=2)
+import litserve as ls
+
+server = LitServer(ls.examples.SimplePyTorchAPI(), accelerator="cuda", devices=4, workers_per_device=2)
 ```
 
 </details>
