@@ -63,12 +63,9 @@ class _Connector:
         return "cpu"
 
     def _auto_device_count(self, accelerator) -> int:
-        if accelerator == "cpu":
-            return 1
-        elif accelerator == "cuda":
+        if accelerator == "cuda":
             return check_cuda_with_nvidia_smi()
-        elif accelerator == "mps":
-            return 1
+        return 1
 
     @staticmethod
     def _choose_gpu_accelerator_backend():
