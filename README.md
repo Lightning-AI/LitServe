@@ -198,9 +198,10 @@ LitServe automatically detects GPUs on a machine and uses them when available:
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleLitAPI
 
 # Automatically selects the available accelerator
-api = ls.examples.SimpleLitAPI() # defined by you with ls.LitAPI
+api = SimpleLitAPI() # defined by you with ls.LitAPI
 
 # when running on GPUs these are equivalent. It's best to let Lightning decide by not specifying it!
 server = ls.LitServer(api)
@@ -215,12 +216,13 @@ The following example shows how to set the accelerator manually:
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleLitAPI
 
 # Run on CUDA-supported GPUs
-server = ls.LitServer(ls.examples.SimpleLitAPI(), accelerator="cuda")
+server = ls.LitServer(SimpleLitAPI(), accelerator="cuda")
 
 # Run on Apple's Metal-powered GPUs
-server = ls.LitServer(ls.examples.SimpleLitAPI(), accelerator="mps")
+server = ls.LitServer(SimpleLitAPI(), accelerator="mps")
 ```
 
 </details>
@@ -239,9 +241,10 @@ The `devices` argument can also be explicitly set to the desired number of devic
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleLitAPI
 
 # Automatically selects the available accelerators
-api = ls.examples.SimpleLitAPI() # defined by you with ls.LitAPI
+api = SimpleLitAPI() # defined by you with ls.LitAPI
 
 # when running on a 4-GPUs machine these are equivalent.
 # It's best to let Lightning decide by not specifying accelerator and devices!
@@ -299,8 +302,9 @@ run the model on:
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleTorchAPI
 
-server = LitServer(ls.examples.SimpleTorchAPI(), accelerator="cuda", devices=[0, 3])
+server = ls.LitServer(SimpleTorchAPI(), accelerator="cuda", devices=[0, 3])
 ```
 
 Last, you can run multiple copies of the same model from the same device,
