@@ -506,7 +506,6 @@ if __name__ == "__main__":
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
-</details>
 
 <details>
   <summary>Run tests</summary>
