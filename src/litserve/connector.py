@@ -79,14 +79,10 @@ class _Connector:
 
 
 @lru_cache(maxsize=1)
-def check_cuda_with_nvidia_smi():
+def check_cuda_with_nvidia_smi() -> int:
     """Checks if CUDA is installed using the `nvidia-smi` command-line tool."""
-    command = ["nvidia-smi", "--list-gpus"]
     try:
-        result = subprocess.run(command, capture_output=True, text=True)
-        if result.returncode == 0:
-            output_lines = result.stdout.strip().split("\n")
-            return sum(1 for line in output_lines if line.startswith("GPU"))
-        return 0
+        lines = subprocess.check_output(["nvidia-smi", "-L"]).decode("utf-8").strip().split("\n")
+        return len([el for el in lines if el.startswith("GPU")])
     except (subprocess.CalledProcessError, FileNotFoundError):
         return 0
