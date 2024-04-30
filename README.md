@@ -194,13 +194,13 @@ Explore each feature in detail:
     <summary>Use accelerators automatically (GPUs, CPU, mps)</summary>
 &nbsp;
 
-LitServe automatically detects GPUs on a machine and uses them when available:    
+LitServe automatically detects GPUs on a machine and uses them when available:
 
 ```python
 import litserve as ls
 
 # Automatically selects the available accelerator
-api = SimpleLitAPI() # defined by you with ls.LitAPI
+api = ls.examples.SimpleLitAPI() # defined by you with ls.LitAPI
 
 # when running on GPUs these are equivalent. it's best to let Lightning decide by not specifying it!
 server = ls.LitServer(api)
@@ -217,10 +217,10 @@ The following example shows how to set the accelerator manually:
 import litserve as ls
 
 # Run on CUDA-supported GPUs
-server = ls.LitServer(SimpleLitAPI(), accelerator="cuda")
+server = ls.LitServer(ls.examples.SimpleLitAPI(), accelerator="cuda")
 
 # Run on Apple's Metal-powered GPUs
-server = ls.LitServer(SimpleLitAPI(), accelerator="mps")
+server = ls.LitServer(ls.examples.SimpleLitAPI(), accelerator="mps")
 ```
 
 </details>
