@@ -194,7 +194,7 @@ Explore each feature in detail:
     <summary>Use accelerators automatically (GPUs, CPU, mps)</summary>
 &nbsp;
 
-LitServe automatically detects GPUs on a machine and uses them when available:    
+LitServe automatically detects GPUs on a machine and uses them when available:
 
 ```python
 import litserve as ls
@@ -248,7 +248,7 @@ server = ls.LitServer(api)
 server = ls.LitServer(api, accelerator="cuda", devices=4)
 server = ls.LitServer(api, accelerator="auto", devices="auto")
 ```
-  
+
 For example, running the API server on a 4-GPU machine, with a PyTorch model served by each GPU:
 
 ```python
