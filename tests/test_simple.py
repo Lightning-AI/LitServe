@@ -90,7 +90,8 @@ class SlowLitAPI(LitAPI):
 
 @pytest.mark.asyncio()
 async def test_timeout():
-    server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5)
+    api = SlowLitAPI()  # takes 1 second for each prediction
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=0.9)  # windows CI need more time to process queue
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         response1 = ac.post("/predict", json={"input": 4.0})
