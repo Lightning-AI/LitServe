@@ -241,7 +241,7 @@ The `devices` argument can also be explicitly set to the desired number of devic
 import litserve as ls
 
 # Automatically selects the available accelerators
-api = SimpleLitAPI() # defined by you with ls.LitAPI
+api = ls.examples.SimpleLitAPI() # defined by you with ls.LitAPI
 
 # when running on a 4-GPUs machine these are equivalent.
 # It's best to let Lightning decide by not specifying accelerator and devices!
