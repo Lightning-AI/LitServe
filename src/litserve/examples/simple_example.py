@@ -1,5 +1,4 @@
 import litserve as ls
-import numpy as np
 
 
 class SimpleLitAPI(ls.LitAPI):
@@ -25,6 +24,8 @@ class SimpleBatchedAPI(ls.LitAPI):
         self.model = lambda x: x**2
 
     def decode_request(self, request):
+        import numpy as np
+
         return np.asarray(request["input"])
 
     def predict(self, x):
