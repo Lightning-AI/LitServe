@@ -51,6 +51,12 @@ def test_check_cuda_with_nvidia_smi():
             marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
         ),
         pytest.param(
+            "mps",
+            "mps",
+            1,
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
+        ),
+        pytest.param(
             None,
             "mps",
             1,
@@ -68,7 +74,7 @@ def test_connector(input_accelerator, expected_accelerator, expected_devices):
         connector.devices == expected_devices
     ), f"devices was supposed to be {expected_devices} but was {connector.devices}"
 
-    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'cuda', or 'gpu'"):
+    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'"):
         _Connector(accelerator="SUPER_CHIP")
 
 
