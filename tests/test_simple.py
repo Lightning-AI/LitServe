@@ -98,6 +98,7 @@ async def test_timeout():
         response1, response2 = await asyncio.gather(response1, response2)
         # first request blocks the second request in queue
         # request only times out if it is in queue
+        assert response1.status_code == 200, "First request should complete since it's popped from the request queue."
         assert response2.status_code == 504, "Server takes longer than specified timeout and request should timeout"
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)

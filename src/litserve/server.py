@@ -37,6 +37,8 @@ from litserve.connector import _Connector
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
+
+# timeout when we need to poll or wait indefinitely for a result in a loop.
 LONG_TIMEOUT = 100
 
 
