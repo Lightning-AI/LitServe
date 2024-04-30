@@ -309,8 +309,9 @@ each of the 4 GPUs:
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleTorchAPI
 
-server = LitServer(ls.examples.SimpleTorchAPI(), accelerator="cuda", devices=4, workers_per_device=2)
+server = ls.LitServer(SimpleTorchAPI(), accelerator="cuda", devices=4, workers_per_device=2)
 ```
 
 </details>
@@ -328,7 +329,10 @@ response (Gateway Timeout) indicating that their request has timed out.
 For example, this is how you can configure the server with a timeout of 30 seconds per response.
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
+import litserve as ls
+from litserve.examples import SimpleLitAPI
+
+server = ls.LitServer(SimpleLitAPI(), timeout=30)
 ```
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
@@ -337,7 +341,10 @@ This is useful to avoid requests queuing up beyond the ability of the server to 
 To disable the timeout for long-running tasks, set `timeout=False` or `timeout=-1`:
 
 ```python
-server = LitServer(SimpleLitAPI(), timeout=False)
+import litserve as ls
+from litserve.examples import SimpleLitAPI
+
+server = ls.LitServer(SimpleLitAPI(), timeout=False)
 ```
 
 </details>
@@ -402,9 +409,10 @@ LitServe automatically stacks NumPy arrays and PyTorch tensors along the batch d
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleBatchedAPI
 import numpy as np
 
-class CustomBatchedAPI(ls.examples.SimpleBatchedAPI):
+class CustomBatchedAPI(SimpleBatchedAPI):
     def batch(self, inputs):
         return np.stack(inputs)
 
