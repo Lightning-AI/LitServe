@@ -367,7 +367,7 @@ and implement `LitAPI.predict` to process batched inputs.
 import numpy as np
 import litserve as ls
 
-class SimpleStreamAPI(ls.LitAPI):
+class SimpleBatchedAPI(ls.LitAPI):
     def setup(self, device) -> None:
         self.model = lambda x: x ** 2
 
@@ -382,7 +382,7 @@ class SimpleStreamAPI(ls.LitAPI):
         return {"output": output}
 
 if __name__ == "__main__":
-    api = SimpleStreamAPI()
+    api = SimpleBatchedAPI()
     server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.05)
     server.run(port=8000)
 ```
@@ -397,16 +397,20 @@ LitServe automatically stacks NumPy arrays and PyTorch tensors along the batch d
 `LitAPI.batch` and `LitAPI.unbatch` methods to handle different data types.
 
 ```python
-class SimpleStreamAPI(ls.LitAPI):
-    ...
+import litserve as ls
+import  numpy as np
 
+class CustomBatchedAPI(ls.examples.SimpleBatchedAPI):
     def batch(self, inputs):
         return np.stack(inputs)
 
     def unbatch(self, output):
         return list(output)
 
-    ...
+if __name__ == "__main__":
+    api = CustomBatchedAPI()
+    server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.05)
+    server.run(port=8000)
 ```
 
 

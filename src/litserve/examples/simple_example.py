@@ -1,4 +1,5 @@
 import litserve as ls
+import numpy as np
 
 
 class SimpleLitAPI(ls.LitAPI):
@@ -16,4 +17,18 @@ class SimpleLitAPI(ls.LitAPI):
 
     def encode_response(self, output):
         # Convert the model output to a response payload.
+        return {"output": output}
+
+
+class SimpleBatchedAPI(ls.LitAPI):
+    def setup(self, device) -> None:
+        self.model = lambda x: x**2
+
+    def decode_request(self, request):
+        return np.asarray(request["input"])
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output):
         return {"output": output}
