@@ -291,12 +291,11 @@ async def lifespan(app: FastAPI):
 
 
 class LitServer:
-    # TODO: add support for devices="auto"
     def __init__(
         self,
         lit_api: LitAPI,
-        accelerator: Optional[str] = "auto",
-        devices: int = 1,
+        accelerator: str = "auto",
+        devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
@@ -320,7 +319,7 @@ class LitServer:
         self.max_pool_size = 1000
         self.app.stream = stream
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
-        self._connector = _Connector(accelerator=accelerator)
+        self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -334,6 +333,7 @@ class LitServer:
             self.response_type = Response
 
         accelerator = self._connector.accelerator
+        devices = self._connector.devices
         if accelerator == "cpu":
             self.app.devices = [accelerator]
         elif accelerator in ["cuda", "mps"]:
