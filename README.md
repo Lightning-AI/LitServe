@@ -233,23 +233,24 @@ server = ls.LitServer(SimpleLitAPI(), accelerator="mps")
 `LitServer` has the ability to coordinate serving from multiple GPUs.
 
 `LitServer` accepts a `devices` argument which defaults to `"auto"`. On multi-GPU machines, LitServe
-run a copy of the model on each accelerator device detected on the machine.
+will run a copy of the model on each device detected on the machine.
 
 The `devices` argument can also be explicitly set to the desired number of devices to use on the machine.
 
 ```python
 import litserve as ls
 
-# Automatically selects the available accelerator
+# Automatically selects the available accelerators
 api = SimpleLitAPI() # defined by you with ls.LitAPI
 
-# when running on a 4-GPUs machine these are equivalent. It's best to let Lightning decide by not specifying it!
+# when running on a 4-GPUs machine these are equivalent.
+# It's best to let Lightning decide by not specifying accelerator and devices!
 server = ls.LitServer(api)
 server = ls.LitServer(api, accelerator="cuda", devices=4)
 server = ls.LitServer(api, accelerator="auto", devices="auto")
 ```
 
-For example, running the API server on a 4-GPU machine, with a PyTorch model served by each GPU:
+For example, running the API server on a 4-GPU machine, with a PyTorch model served on each GPU:
 
 ```python
 import torch, torch.nn as nn
