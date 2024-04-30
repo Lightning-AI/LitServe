@@ -11,11 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 import time
+
+from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
 
@@ -83,12 +88,17 @@ class SlowLitAPI(LitAPI):
         return {"output": output}
 
 
-def test_timeout():
+@pytest.mark.asyncio()
+async def test_timeout():
     server = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=0.5)
 
-    with TestClient(server.app) as client:
-        response = client.post("/predict", json={"input": 4.0})
-        assert response.status_code == 504, "Server takes longer than specified timeout and request should timeout"
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response1 = ac.post("/predict", json={"input": 4.0})
+        response2 = ac.post("/predict", json={"input": 5.0})
+        response1, response2 = await asyncio.gather(response1, response2)
+        # first request blocks the second request in queue
+        # request only times out if it is in queue
+        assert response2.status_code == 504, "Server takes longer than specified timeout and request should timeout"
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)

@@ -14,8 +14,7 @@
 import asyncio
 import contextlib
 import logging
-from fastapi.responses import JSONResponse
-
+from typing import Coroutine
 import pickle
 from contextlib import asynccontextmanager
 import inspect
@@ -42,6 +41,7 @@ LONG_TIMEOUT = 100
 
 
 class LitAPIStatus:
+    STARTED = "STARTED"
     OK = "OK"
     ERROR = "ERROR"
     FINISH_STREAMING = "FINISH_STREAMING"
@@ -53,6 +53,24 @@ def load_and_raise(response):
         raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
         logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
+
+
+async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
+    if timeout == -1 or timeout is False:
+        return await coro
+
+    task = asyncio.create_task(coro)
+    shield = asyncio.shield(task)
+    try:
+        return await asyncio.wait_for(shield, timeout)
+    except asyncio.TimeoutError:
+        if uid in request_buffer:
+            logging.error(
+                f"The server couldn't process the request within the specified {timeout} seconds timeout. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            raise HTTPException(504, "Request timed out")
+        return await task
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -343,22 +361,6 @@ class LitServer:
         return [f"{accelerator}:{device}"]
 
     def setup_server(self):
-        @self.app.middleware("http")
-        async def timeout_middleware(request: Request, call_next):
-            timeout = self.app.timeout
-            try:
-                if timeout is False or timeout == -1:
-                    return await call_next(request)
-
-                return await asyncio.wait_for(call_next(request), timeout=self.app.timeout)
-
-            except asyncio.TimeoutError:
-                logging.error(
-                    f"The server couldn't process the request within the specified {timeout} seconds timeout. "
-                    "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-                )
-                return JSONResponse("Request timed out", 504)
-
         @self.app.get("/", dependencies=[Depends(setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
@@ -393,9 +395,11 @@ class LitServer:
                 return read.recv()
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await asyncio.to_thread(get_from_pipe)
+                data = await wait_for_queue_timeout(
+                    asyncio.to_thread(get_from_pipe), self.app.timeout, uid, self.app.request_buffer
+                )
             else:
-                data = await data_reader()
+                data = await wait_for_queue_timeout(data_reader(), self.app.timeout, uid, self.app.request_buffer)
             self.dispose_pipe(read, write)
 
             response, status = data
