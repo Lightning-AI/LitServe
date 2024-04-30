@@ -65,7 +65,7 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
     except asyncio.TimeoutError:
         if uid in request_buffer:
             logging.error(
-                f"The server couldn't process the request within the specified {timeout} seconds timeout. "
+                f"Request was waiting in the queue for too long ({timeout} seconds) and has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
             raise HTTPException(504, "Request timed out")
