@@ -90,5 +90,5 @@ def check_cuda_with_nvidia_smi():
         else:
             print("Error:", result.stderr)
             return 0
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return 0
