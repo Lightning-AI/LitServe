@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 import sys
 from typing import List, Optional, Union
 import platform
@@ -80,9 +81,18 @@ class _Connector:
 
 @lru_cache(maxsize=1)
 def check_cuda_with_nvidia_smi() -> int:
-    """Checks if CUDA is installed using the `nvidia-smi` command-line tool."""
+    """Checks if CUDA is installed using the `nvidia-smi` command-line tool. Returns count of visible devices."""
     try:
-        lines = subprocess.check_output(["nvidia-smi", "-L"]).decode("utf-8").strip().split("\n")
-        return len([el for el in lines if el.startswith("GPU")])
+        nvidia_smi_output = subprocess.check_output(["nvidia-smi", "-L"]).decode("utf-8").strip()
+        devices = [el for el in nvidia_smi_output.split("\n") if el.startswith("GPU")]
+        devices = [el.split(":")[0].split()[1] for el in devices]
+        visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES")
+        if visible_devices:
+            # we need check the intersection of devices and visible devices, since
+            # using CUDA_VISIBLE_DEVICES=0,25 on a 4-GPU machine will yield
+            # torch.cuda.device_count() == 1
+            visible_devices = [el for el in visible_devices.split(",")]
+            devices = [el for el in devices if el in visible_devices]
+        return len(devices)
     except (subprocess.CalledProcessError, FileNotFoundError):
         return 0
