@@ -200,7 +200,7 @@ LitServe automatically detects GPUs on a machine and uses them when available:
 import litserve as ls
 
 # Automatically selects the available accelerator
-api = SimpleLitAPI() // defined by you with ls.LitAPI
+api = SimpleLitAPI() # defined by you with ls.LitAPI
 
 # when running on GPUs these are equivalent. it's best to let Lightning decide by not specifying it!
 server = ls.LitServer(api)
