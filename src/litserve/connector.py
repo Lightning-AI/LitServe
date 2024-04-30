@@ -85,10 +85,8 @@ def check_cuda_with_nvidia_smi():
     try:
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
-            gpu_count = len(result.stdout.splitlines())
-            return gpu_count
-        else:
-            print("Error:", result.stderr)
-            return 0
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            return len(result.stdout.splitlines())
+        print("Error:", result.stderr)
+        return 0
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return 0
