@@ -170,7 +170,7 @@ LitServe supports multiple advanced state-of-the-art features.
 
 | Feature  | description  |
 |---|---|
-| Accelerators  | CPU, GPU, Multi-GPU  |
+| Accelerators  | CPU, GPU, Multi-GPU, mps  |
 | Auto-GPU  | Detects and auto-runs on all GPUs on a machine  |
 | Model types  | LLMs, Vision, Time series, any model type...  |
 | ML frameworks  | PyTorch, Jax, Tensorflow, numpy, etc...  |
@@ -191,61 +191,21 @@ under the most demanding enterprise deployments.
 Explore each feature in detail:
 
 <details>
-  <summary>Automatic schema validation</summary>
-
+    <summary>Use accelerators automatically (GPUs, CPU, mps)</summary>
 &nbsp;
 
-Define the request and response as [Pydantic models](https://docs.pydantic.dev/latest/),
-to automatically validate the request.
+LitServe automatically detects GPUs on a machine and uses them when available:    
 
 ```python
-from pydantic import BaseModel
+import litserve as ls
 
-
-class PredictRequest(BaseModel):
-    input: float
-
-
-class PredictResponse(BaseModel):
-    output: float
-
-
-class SimpleLitAPI(LitAPI):
-    def setup(self, device):
-        self.model = lambda x: x**2
-
-    def decode_request(self, request: PredictRequest) -> float:
-        return request.input
-
-    def predict(self, x):
-        return self.model(x)
-
-    def encode_response(self, output: float) -> PredictResponse:
-        return PredictResponse(output=output)
-
-
-if __name__ == "__main__":
-    api = SimpleLitAPI()
-    server = LitServer(api, accelerator="auto")
-    server.run(port=8888)
-```
-
-</details>
-
-<details>
-    <summary>Automatic accelerator</summary>
-&nbsp;
-
-LitServe can automatically select the appropriate GPU or CPU, whichever is available on the user's machine.
-
-```python
 # Automatically selects the available accelerator
+api = SimpleLitAPI() # defined by you with ls.LitAPI
 
-api = SimpleLitAPI()
-
-# these two are equivalent
-server = LitServer(api)
-server = LitServer(api, accelerator="auto", devices="auto")
+# when running on GPUs these are equivalent. It's best to let Lightning decide by not specifying it!
+server = ls.LitServer(api)
+server = ls.LitServer(api, accelerator="cuda")
+server = ls.LitServer(api, accelerator="auto")
 ```
 
 `LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
@@ -254,32 +214,46 @@ server = LitServer(api, accelerator="auto", devices="auto")
 The following example shows how to set the accelerator manually:
 
 ```python
+import litserve as ls
+
 # Run on CUDA-supported GPUs
-server = LitServer(SimpleLitAPI(), accelerator="cuda")
+server = ls.LitServer(SimpleLitAPI(), accelerator="cuda")
 
 # Run on Apple's Metal-powered GPUs
-server = LitServer(SimpleLitAPI(), accelerator="mps")
+server = ls.LitServer(SimpleLitAPI(), accelerator="mps")
 ```
 
 </details>
 
 <details>
-  <summary>Serve on GPUs</summary>
+  <summary>Serve on multi-GPUs</summary>
 
 &nbsp;
 
 `LitServer` has the ability to coordinate serving from multiple GPUs.
 
+`LitServer` accepts a `devices` argument which defaults to `"auto"`. On multi-GPU machines, LitServe
+run a copy of the model on each accelerator device detected on the machine.
+
+The `devices` argument can also be explicitly set to the desired number of devices to use on the machine.
+
+```python
+import litserve as ls
+
+# Automatically selects the available accelerator
+api = SimpleLitAPI() # defined by you with ls.LitAPI
+
+# when running on a 4-GPUs machine these are equivalent. It's best to let Lightning decide by not specifying it!
+server = ls.LitServer(api)
+server = ls.LitServer(api, accelerator="cuda", devices=4)
+server = ls.LitServer(api, accelerator="auto", devices="auto")
+```
+  
 For example, running the API server on a 4-GPU machine, with a PyTorch model served by each GPU:
 
 ```python
-from fastapi import Request, Response
-
-from litserve import LitAPI, LitServer
-
-import torch
-import torch.nn as nn
-
+import torch, torch.nn as nn
+import litserve as ls
 
 class Linear(nn.Module):
     def __init__(self):
@@ -291,15 +265,14 @@ class Linear(nn.Module):
     def forward(self, x):
         return self.linear(x)
 
-
-class SimpleLitAPI(LitAPI):
+class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
         # move the model to the correct device
         # keep track of the device for moving data accordingly
         self.model = Linear().to(device)
         self.device = device
 
-    def decode_request(self, request: Request):
+    def decode_request(self, request):
         # get the input and create a 1D tensor on the correct device
         content = request["input"]
         return torch.tensor([content], device=self.device)
@@ -308,19 +281,19 @@ class SimpleLitAPI(LitAPI):
         # the model expects a batch dimension, so create it
         return self.model(x[None, :])
 
-    def encode_response(self, output) -> Response:
+    def encode_response(self, output):
         # float will take the output value directly onto CPU memory
         return {"output": float(output)}
 
 
 if __name__ == "__main__":
-    # accelerator="cuda", devices=4 will lead to 4 workers serving the
-    # model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
-    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4)
+    # accelerator="auto" (or "cuda"), devices="auto" (or 4) will lead to 4 workers serving
+    # the model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
+    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", devices="auto")
     server.run(port=8000)
 ```
 
-The `devices` variable can also be an array specifying what device id to
+The `devices` argument can also be an array specifying what device id to
 run the model on:
 
 ```python
@@ -474,11 +447,57 @@ if __name__ == "__main__":
 
 </details>
 
+<details>
+  <summary>Automatic schema validation</summary>
+
+&nbsp;
+
+Define the request and response as [Pydantic models](https://docs.pydantic.dev/latest/),
+to automatically validate the request.
+
+```python
+from pydantic import BaseModel
+import litserve as ls
+
+
+class PredictRequest(BaseModel):
+    input: float
+
+
+class PredictResponse(BaseModel):
+    output: float
+
+
+class SimpleLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+
+    def decode_request(self, request: PredictRequest) -> float:
+        return request.input
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output: float) -> PredictResponse:
+        return PredictResponse(output=output)
+
+
+if __name__ == "__main__":
+    api = SimpleLitAPI()
+    server = ls.LitServer(api, accelerator="auto")
+    server.run(port=8888)
+```
+
+</details>
+
 
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
-##  Run Tests
+</details>
+
+<details>
+  <summary>Run tests</summary>
 
 Use `pytest` to run tests locally.
 
@@ -493,6 +512,7 @@ Run the tests
 pytest tests
 ```
 
+</details>
 
 # License
 
