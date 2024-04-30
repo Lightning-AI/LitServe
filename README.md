@@ -194,7 +194,7 @@ Explore each feature in detail:
     <summary>Use accelerators automatically (GPUs, CPU, mps)</summary>
 &nbsp;
 
-LitServe automatically detects GPUs on a machine and uses them when available:    
+LitServe automatically detects GPUs on a machine and uses them when available:
 
 ```python
 import litserve as ls
@@ -311,6 +311,13 @@ server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
 ```
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
+
+
+To disable the timeout for long-running tasks, set `timeout=False` or `timeout=-1`:
+
+```python
+server = LitServer(SimpleLitAPI(), timeout=False)
+```
 
 </details>
 
