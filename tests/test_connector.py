@@ -19,7 +19,7 @@ import torch
 
 @pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
 def test_check_cuda_with_nvidia_smi():
-    assert check_cuda_with_nvidia_smi() is True
+    assert check_cuda_with_nvidia_smi() == torch.cuda.device_count()
 
 
 @pytest.mark.parametrize(
