@@ -36,7 +36,7 @@ def test_check_cuda_with_nvidia_smi():
             None,
             "cuda",
             torch.cuda.device_count(),
-            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
         ),
         pytest.param(
             "auto",
