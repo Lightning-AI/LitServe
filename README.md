@@ -202,10 +202,10 @@ import litserve as ls
 # Automatically selects the available accelerator
 api = ls.examples.SimpleLitAPI() # defined by you with ls.LitAPI
 
-# when running on GPUs these are equivalent. it's best to let Lightning decide by not specifying it!
+# when running on GPUs these are equivalent. It's best to let Lightning decide by not specifying it!
 server = ls.LitServer(api)
-server = ls.LitServer(api, accelerator='cuda')
-server = ls.LitServer(api, accelerator='auto')
+server = ls.LitServer(api, accelerator="cuda")
+server = ls.LitServer(api, accelerator="auto")
 ```
 
 `LitServer` accepts an `accelerator` argument which defaults to `"auto"`. It can also be explicitly set to `"cpu"`, `"cuda"`, or
@@ -232,10 +232,27 @@ server = ls.LitServer(ls.examples.SimpleLitAPI(), accelerator="mps")
 
 `LitServer` has the ability to coordinate serving from multiple GPUs.
 
-For example, running the API server on a 4-GPU machine, with a PyTorch model served by each GPU:
+`LitServer` accepts a `devices` argument which defaults to `"auto"`. On multi-GPU machines, LitServe
+will run a copy of the model on each device detected on the machine.
+
+The `devices` argument can also be explicitly set to the desired number of devices to use on the machine.
 
 ```python
-from fastapi import Request, Response
+import litserve as ls
+
+# Automatically selects the available accelerators
+api = SimpleLitAPI() # defined by you with ls.LitAPI
+
+# when running on a 4-GPUs machine these are equivalent.
+# It's best to let Lightning decide by not specifying accelerator and devices!
+server = ls.LitServer(api)
+server = ls.LitServer(api, accelerator="cuda", devices=4)
+server = ls.LitServer(api, accelerator="auto", devices="auto")
+```
+
+For example, running the API server on a 4-GPU machine, with a PyTorch model served on each GPU:
+
+```python
 import torch, torch.nn as nn
 import litserve as ls
 
@@ -256,7 +273,7 @@ class SimpleLitAPI(ls.LitAPI):
         self.model = Linear().to(device)
         self.device = device
 
-    def decode_request(self, request: Request):
+    def decode_request(self, request):
         # get the input and create a 1D tensor on the correct device
         content = request["input"]
         return torch.tensor([content], device=self.device)
@@ -265,19 +282,19 @@ class SimpleLitAPI(ls.LitAPI):
         # the model expects a batch dimension, so create it
         return self.model(x[None, :])
 
-    def encode_response(self, output) -> Response:
+    def encode_response(self, output):
         # float will take the output value directly onto CPU memory
         return {"output": float(output)}
 
 
 if __name__ == "__main__":
-    # accelerator="auto" (or "cuda"), devices=4 will lead to 4 workers serving the
-    # model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
-    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", devices=4)
+    # accelerator="auto" (or "cuda"), devices="auto" (or 4) will lead to 4 workers serving
+    # the model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
+    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", devices="auto")
     server.run(port=8000)
 ```
 
-The `devices` variable can also be an array specifying what device id to
+The `devices` argument can also be an array specifying what device id to
 run the model on:
 
 ```python
@@ -311,6 +328,13 @@ server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
 ```
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
+
+
+To disable the timeout for long-running tasks, set `timeout=False` or `timeout=-1`:
+
+```python
+server = LitServer(SimpleLitAPI(), timeout=False)
+```
 
 </details>
 

@@ -19,43 +19,54 @@ import torch
 
 @pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
 def test_check_cuda_with_nvidia_smi():
-    assert check_cuda_with_nvidia_smi() is True
+    assert check_cuda_with_nvidia_smi() == torch.cuda.device_count()
 
 
 @pytest.mark.parametrize(
-    ("input_accelerator", "expected_accelerator"),
+    ("input_accelerator", "expected_accelerator", "expected_devices"),
     [
-        ("cpu", "cpu"),
+        ("cpu", "cpu", 1),
         pytest.param(
             "cuda",
             "cuda",
+            torch.cuda.device_count(),
             marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
         ),
         pytest.param(
-            None, "cuda", marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
+            None,
+            "cuda",
+            torch.cuda.device_count(),
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
         ),
         pytest.param(
             "auto",
             "cuda",
+            torch.cuda.device_count(),
             marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
         ),
         pytest.param(
             "auto",
             "mps",
+            1,
             marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
         ),
         pytest.param(
             None,
             "mps",
+            1,
             marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
         ),
     ],
 )
-def test_connector(input_accelerator, expected_accelerator):
+def test_connector(input_accelerator, expected_accelerator, expected_devices):
     connector = _Connector(accelerator=input_accelerator)
     assert (
         connector.accelerator == expected_accelerator
     ), f"accelerator was supposed to be {expected_accelerator} but was {connector.accelerator}"
+
+    assert (
+        connector.devices == expected_devices
+    ), f"devices was supposed to be {expected_devices} but was {connector.devices}"
 
     with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'cuda', or 'gpu'"):
         _Connector(accelerator="SUPER_CHIP")

@@ -14,6 +14,7 @@
 import asyncio
 import contextlib
 import logging
+from typing import Coroutine
 import pickle
 from contextlib import asynccontextmanager
 import inspect
@@ -22,7 +23,7 @@ from queue import Empty
 import time
 import os
 import shutil
-from typing import Sequence
+from typing import Sequence, Optional, Union
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -37,6 +38,9 @@ from litserve.connector import _Connector
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
+# timeout when we need to poll or wait indefinitely for a result in a loop.
+LONG_TIMEOUT = 100
+
 
 class LitAPIStatus:
     OK = "OK"
@@ -50,6 +54,24 @@ def load_and_raise(response):
         raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
         logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
+
+
+async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
+    if timeout == -1 or timeout is False:
+        return await coro
+
+    task = asyncio.create_task(coro)
+    shield = asyncio.shield(task)
+    try:
+        return await asyncio.wait_for(shield, timeout)
+    except asyncio.TimeoutError:
+        if uid in request_buffer:
+            logging.error(
+                f"Request was waiting in the queue for too long ({timeout} seconds) and has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            raise HTTPException(504, "Request timed out")
+        return await task
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -269,19 +291,18 @@ async def lifespan(app: FastAPI):
 
 
 class LitServer:
-    # TODO: add support for devices="auto"
     def __init__(
         self,
         lit_api: LitAPI,
-        accelerator="auto",
-        devices=1,
-        workers_per_device=1,
-        timeout=30,
-        max_batch_size=1,
-        batch_timeout=0.0,
-        stream=False,
+        accelerator: str = "auto",
+        devices: Union[str, int] = "auto",
+        workers_per_device: int = 1,
+        timeout: Union[float, bool] = 30,
+        max_batch_size: int = 1,
+        batch_timeout: float = 0.0,
+        stream: bool = False,
     ):
-        if batch_timeout > timeout:
+        if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
@@ -291,14 +312,14 @@ class LitServer:
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
         self.app.workers_per_device = workers_per_device
-        self.app.timeout = timeout
         self.app.max_batch_size = max_batch_size
+        self.app.timeout = timeout
         self.app.batch_timeout = batch_timeout
         initial_pool_size = 100
         self.max_pool_size = 1000
         self.app.stream = stream
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
-        self._connector = _Connector(accelerator=accelerator)
+        self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -312,6 +333,7 @@ class LitServer:
             self.response_type = Response
 
         accelerator = self._connector.accelerator
+        devices = self._connector.devices
         if accelerator == "cpu":
             self.app.devices = [accelerator]
         elif accelerator in ["cuda", "mps"]:
@@ -358,34 +380,27 @@ class LitServer:
             self.app.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            async def event_wait(evt, timeout):
-                # suppress TimeoutError because we'll return False in case of timeout
-                with contextlib.suppress(asyncio.TimeoutError):
-                    await asyncio.wait_for(evt.wait(), timeout)
-                return evt.is_set()
-
             def get_from_pipe():
-                if read.poll(self.app.timeout):
-                    return read.recv()
-                raise HTTPException(status_code=504, detail="Request timed out")
+                while True:
+                    if read.poll(LONG_TIMEOUT):
+                        return read.recv()
 
             async def data_reader():
                 data_available = asyncio.Event()
                 asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
 
                 if not read.poll():
-                    await event_wait(data_available, self.app.timeout)
-                    data_available.clear()
+                    await data_available.wait()
+                data_available.clear()
                 asyncio.get_event_loop().remove_reader(read.fileno())
-
-                if read.poll():
-                    return read.recv()
-                raise HTTPException(status_code=504, detail="Request timed out")
+                return read.recv()
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await asyncio.to_thread(get_from_pipe)
+                data = await wait_for_queue_timeout(
+                    asyncio.to_thread(get_from_pipe), self.app.timeout, uid, self.app.request_buffer
+                )
             else:
-                data = await data_reader()
+                data = await wait_for_queue_timeout(data_reader(), self.app.timeout, uid, self.app.request_buffer)
             self.dispose_pipe(read, write)
 
             response, status = data
@@ -407,18 +422,11 @@ class LitServer:
             self.app.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            async def event_wait(evt, timeout):
-                # suppress TimeoutError because we'll return False in case of timeout
-                with contextlib.suppress(asyncio.TimeoutError):
-                    await asyncio.wait_for(evt.wait(), timeout)
-                return evt.is_set()
-
             async def stream_from_pipe():
                 # this is a workaround for Windows since asyncio loop.add_reader is not supported.
                 # https://docs.python.org/3/library/asyncio-platforms.html
-                entered_at = time.time()
                 while True:
-                    if read.poll(self.app.timeout):
+                    if read.poll(LONG_TIMEOUT):
                         response, status = read.recv()
                         if status == LitAPIStatus.FINISH_STREAMING:
                             return
@@ -429,8 +437,7 @@ class LitServer:
                             )
                             return
                         yield response
-                    if (time.time() - entered_at) > self.app.timeout:
-                        return
+
                     await asyncio.sleep(0.0001)
 
             async def data_streamer():
@@ -438,8 +445,7 @@ class LitServer:
                 while True:
                     asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
                     if not read.poll():
-                        if await event_wait(data_available, self.app.timeout) is False:  # stream timed out
-                            return
+                        await data_available.wait()
                         data_available.clear()
                         asyncio.get_event_loop().remove_reader(read.fileno())
                     if read.poll():
