@@ -194,7 +194,7 @@ Explore each feature in detail:
     <summary>Use accelerators automatically (GPUs, CPU, mps)</summary>
 &nbsp;
 
-LitServe automatically detects GPUs on a machine and uses them when available:    
+LitServe automatically detects GPUs on a machine and uses them when available:
 
 ```python
 import litserve as ls
