@@ -41,7 +41,6 @@ LONG_TIMEOUT = 100
 
 
 class LitAPIStatus:
-    STARTED = "STARTED"
     OK = "OK"
     ERROR = "ERROR"
     FINISH_STREAMING = "FINISH_STREAMING"
