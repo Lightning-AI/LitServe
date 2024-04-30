@@ -35,7 +35,7 @@ class SimpleBatchedAPI(ls.LitAPI):
         return {"output": output}
 
 
-class SimplePyTorchAPI(ls.LitAPI):
+class SimpleTorchAPI(ls.LitAPI):
     def setup(self, device):
         # move the model to the correct device
         # keep track of the device for moving data accordingly

@@ -7,7 +7,7 @@ import litserve as ls
 
 @pytest.mark.asyncio()
 async def test_simple_pytorch_api():
-    api = ls.examples.SimplePyTorchAPI()
+    api = ls.examples.SimpleTorchAPI()
     server = ls.LitServer(api)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         response = await ac.post("/predict", json={"input": 4.0})

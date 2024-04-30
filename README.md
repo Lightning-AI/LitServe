@@ -266,7 +266,7 @@ class Linear(nn.Module):
     def forward(self, x):
         return self.linear(x)
 
-class SimplePyTorchAPI(ls.LitAPI):
+class SimpleTorchAPI(ls.LitAPI):
     def setup(self, device):
         # move the model to the correct device
         # keep track of the device for moving data accordingly
@@ -290,7 +290,7 @@ class SimplePyTorchAPI(ls.LitAPI):
 if __name__ == "__main__":
     # accelerator="auto" (or "cuda"), devices="auto" (or 4) will lead to 4 workers serving
     # the model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
-    server = ls.LitServer(SimplePyTorchAPI(), accelerator="auto", devices="auto")
+    server = ls.LitServer(SimpleTorchAPI(), accelerator="auto", devices="auto")
     server.run(port=8000)
 ```
 
@@ -300,7 +300,7 @@ run the model on:
 ```python
 import litserve as ls
 
-server = LitServer(ls.examples.SimplePyTorchAPI(), accelerator="cuda", devices=[0, 3])
+server = LitServer(ls.examples.SimpleTorchAPI(), accelerator="cuda", devices=[0, 3])
 ```
 
 Last, you can run multiple copies of the same model from the same device,
@@ -310,7 +310,7 @@ each of the 4 GPUs:
 ```python
 import litserve as ls
 
-server = LitServer(ls.examples.SimplePyTorchAPI(), accelerator="cuda", devices=4, workers_per_device=2)
+server = LitServer(ls.examples.SimpleTorchAPI(), accelerator="cuda", devices=4, workers_per_device=2)
 ```
 
 </details>
@@ -402,7 +402,7 @@ LitServe automatically stacks NumPy arrays and PyTorch tensors along the batch d
 
 ```python
 import litserve as ls
-import  numpy as np
+import numpy as np
 
 class CustomBatchedAPI(ls.examples.SimpleBatchedAPI):
     def batch(self, inputs):
