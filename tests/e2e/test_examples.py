@@ -17,7 +17,7 @@ async def test_simple_pytorch_api():
 @pytest.mark.asyncio()
 async def test_simple_batched_api():
     api = ls.examples.SimpleBatchedAPI()
-    server = ls.LitServer(api)
+    server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.1)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         response = await ac.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
