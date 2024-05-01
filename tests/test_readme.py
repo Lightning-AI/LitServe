@@ -40,7 +40,7 @@ def test_readme(tmp_path):
     d = tmp_path / "readme_codes"
     d.mkdir()
     code_blocks = get_code_blocks("README.md")
-    assert len(code_blocks) > 0
+    assert len(code_blocks) > 0, "No code block found in README.md"
 
     for i, code in enumerate(code_blocks):
         file = d / f"{i}.py"
