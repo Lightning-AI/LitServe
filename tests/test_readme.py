@@ -61,6 +61,6 @@ def test_readme(tmp_path):
             ), "Client examples should fail with a ConnectionError because there is no server running."
 
         else:
-            assert process.returncode == 0, (
-                f"Code exited with {process.returncode}.\n Please check the code for correctness:\n" f"```\n{code}\n```"
-            )
+            assert (
+                process.returncode == 0
+            ), f"Code exited with {process.returncode}.\n Please check the code for correctness:\n```\n{code}\n```"
