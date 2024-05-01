@@ -1,7 +1,7 @@
 coverage[toml] >=5.0
 pytest >=8.0
 pytest-cov
-mypy ==1.9.0
+mypy ==1.10.0
 pytest-asyncio
 asgi-lifespan
 
