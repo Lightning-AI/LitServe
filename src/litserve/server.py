@@ -23,7 +23,7 @@ from queue import Empty
 import time
 import os
 import shutil
-from typing import Sequence, Optional, Union
+from typing import Sequence, Optional, Union, List
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -40,6 +40,10 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 # timeout when we need to poll or wait indefinitely for a result in a loop.
 LONG_TIMEOUT = 100
+
+
+class LitSpec:
+    ...
 
 
 class LitAPIStatus:
@@ -301,6 +305,7 @@ class LitServer:
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
         stream: bool = False,
+        specs: Optional[Union[List[LitSpec], LitSpec]] = None
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -320,6 +325,9 @@ class LitServer:
         self.app.stream = stream
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator, devices=devices)
+
+        specs = specs if specs is not None else []
+        self._specs = specs if isinstance(specs, Sequence) else [specs]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -464,6 +472,12 @@ class LitServer:
                 return StreamingResponse(stream_from_pipe())
 
             return StreamingResponse(data_streamer())
+        
+        for spec in self._specs:
+            spec.setup(self)
+            # TODO check that path is not clashing
+            for path, endpoint, methods in spec.endpoints:
+                self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
