@@ -1,7 +1,8 @@
 import time
-from typing import Literal, Optional, List, Dict, Any, Union
+from typing import Literal, Optional, List, Dict, Union
 import uuid
-
+from fastapi import BackgroundTasks
+from .base import LitSpec
 from pydantic import BaseModel, Field
 
 
@@ -49,24 +50,24 @@ class ChatCompletionResponse(BaseModel):
     usage: UsageInfo
 
 
-class OpenAISpec:
+class OpenAISpec(LitSpec):
     def __init__(self):
-        self._endpoints = [
-            (chat_completion, "/v1/chat/completions", ["POST"])
-        ]
+        self._endpoints = [(self.chat_completion, "/v1/chat/completions", ["POST"])]
 
-        self._add_endpoint(chat_completion, "/v1/chat/completions", ["POST"])
-
-    def _add_endpoint(path, endpoint, methods):
-        self._endpoints.append((path, endpoint, methods))
-
-    @property
-    def endpoints():
-        return self._endpoints.copy()
-
-    async def chat_completion(request: ChatCompletionRequest, background_tasks: BackgroundTasks) -> ChatCompletionResponse:
-        # TODO here
-        return ChatCompletionResponse()
+        self._add_endpoint(self.chat_completion, "/v1/chat/completions", ["POST"])
 
     def setup(self, server):
         self._server = server
+
+    def _add_endpoint(self, path, endpoint, methods):
+        self._endpoints.append((path, endpoint, methods))
+
+    @property
+    def endpoints(self):
+        return self._endpoints.copy()
+
+    async def chat_completion(
+        self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
+    ) -> ChatCompletionResponse:
+        # TODO here
+        return ChatCompletionResponse()
