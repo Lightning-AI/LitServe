@@ -52,19 +52,10 @@ class ChatCompletionResponse(BaseModel):
 
 class OpenAISpec(LitSpec):
     def __init__(self):
-        self._endpoints = [(self.chat_completion, "/v1/chat/completions", ["POST"])]
-
         self._add_endpoint(self.chat_completion, "/v1/chat/completions", ["POST"])
 
     def setup(self, server):
         self._server = server
-
-    def _add_endpoint(self, path, endpoint, methods):
-        self._endpoints.append((path, endpoint, methods))
-
-    @property
-    def endpoints(self):
-        return self._endpoints.copy()
 
     async def chat_completion(
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
