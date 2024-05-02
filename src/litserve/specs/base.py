@@ -4,7 +4,8 @@ class LitSpec:
     def setup(self, obj):
         raise NotImplementedError()
 
-    def _add_endpoint(self, path, endpoint, methods):
+    def add_endpoint(self, path, endpoint, methods):
+        """Register an endpoint in the spec."""
         self._endpoints.append((path, endpoint, methods))
 
     @property
