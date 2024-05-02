@@ -26,6 +26,8 @@ class _Connector:
             self._accelerator = "cpu"
         elif accelerator == "cuda":
             self._accelerator = "cuda"
+        elif accelerator == "mps":
+            self._accelerator = "mps"
 
         elif accelerator == "auto":
             self._accelerator = self._choose_auto_accelerator()
@@ -50,8 +52,8 @@ class _Connector:
         if isinstance(accelerator, str):
             accelerator = accelerator.lower()
 
-        if accelerator not in ["auto", "cpu", "cuda", "gpu", None]:
-            raise ValueError("accelerator must be one of 'auto', 'cpu', 'cuda', or 'gpu'")
+        if accelerator not in ["auto", "cpu", "mps", "cuda", "gpu", None]:
+            raise ValueError("accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'")
 
         if accelerator is None:
             return "auto"
