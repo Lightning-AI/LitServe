@@ -34,16 +34,13 @@ from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 from litserve.connector import _Connector
+from litserve.specs.base import LitSpec
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 # timeout when we need to poll or wait indefinitely for a result in a loop.
 LONG_TIMEOUT = 100
-
-
-class LitSpec:
-    ...
 
 
 class LitAPIStatus:
@@ -305,7 +302,7 @@ class LitServer:
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
         stream: bool = False,
-        specs: Optional[Union[List[LitSpec], LitSpec]] = None
+        specs: Optional[Union[List[LitSpec], LitSpec]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -472,11 +469,12 @@ class LitServer:
                 return StreamingResponse(stream_from_pipe())
 
             return StreamingResponse(data_streamer())
-        
+
         for spec in self._specs:
+            spec: LitSpec
             spec.setup(self)
             # TODO check that path is not clashing
-            for path, endpoint, methods in spec.endpoints:
+            for endpoint, path, methods in spec.endpoints:
                 self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])
 
     def generate_client_file(self):
