@@ -29,12 +29,18 @@ class LitSpec:
         return self._endpoints.copy()
 
     def decode_request(self, request):
-        if self.decode_request_hook:
-            return self.decode_request_hook(request)
-        return self._lit_api.decode_request(request)
+        # TODO: LitAPI.decode_request is abstractmethod and users will be forced to implement that.
+        if self.decode_request_hook and not callable(self.decode_request_hook):
+            raise ValueError(
+                "decode_request_hook was defined but is not callable. It must be a callable "
+                "function/method to replace LitAPI.decode_request."
+            )
+        return self.decode_request_hook(request) if self.decode_request_hook else self._lit_api.decode_request(request)
 
     def encode_response(self, output):
-        if self.encode_response_hook:
-            return self.encode_response_hook(output)
-
-        return self._lit_api.encode_response(output)
+        if self.encode_response_hook and not callable(self.encode_response_hook):
+            raise ValueError(
+                "encode_response_hook was defined but is not callable. It must be a callable "
+                "function/method to replace LitAPI.encode_response."
+            )
+        return self.encode_response_hook(output) if self.encode_response_hook else self._lit_api.encode_response(output)
