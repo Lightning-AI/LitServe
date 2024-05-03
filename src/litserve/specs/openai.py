@@ -1,9 +1,15 @@
 import time
+import typing
 from typing import Literal, Optional, List, Dict, Union
 import uuid
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException
 from .base import LitSpec
 from pydantic import BaseModel, Field
+
+from ..server import wait_for_queue_timeout
+
+if typing.TYPE_CHECKING:
+    from litserve import LitServer
 
 
 def shortuuid():
@@ -51,15 +57,77 @@ class ChatCompletionResponse(BaseModel):
 
 
 class OpenAISpec(LitSpec):
-    def __init__(self):
+    def __init__(
+        self,
+    ):
         # register the endpoint
-        self.add_endpoint(self.chat_completion, "/v1/chat/completions", ["POST"])
+        self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
 
-    def setup(self, server):
+    def setup(self, server: "LitServer"):
         self._server = server
+        self._lit_api = server.app.lit_api
+
+    def decode_request_fn(self, request):
+        return request
+
+    def encode_response_fn(self, output):
+        return output
 
     async def chat_completion(
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
     ) -> ChatCompletionResponse:
         # TODO here
-        return ChatCompletionResponse()
+        if request.stream:
+            raise HTTPException(status_code=400, detail="Streaming not currently supported")
+
+        if request.stop is not None:
+            raise HTTPException(status_code=400, detail="Parameter stop not currently supported")
+
+        if request.frequency_penalty:
+            raise HTTPException(status_code=400, detail="Parameter frequency_penalty not currently supported")
+
+        if request.presence_penalty:
+            raise HTTPException(status_code=400, detail="Parameter presence_penalty not currently supported")
+
+        if request.max_tokens is not None:
+            raise HTTPException(status_code=400, detail="Parameter max_tokens not currently supported")
+
+        if request.top_p != 1.0:
+            raise HTTPException(status_code=400, detail="Parameter top_p not currently supported")
+
+        uids = [uuid.uuid4() for _ in range(request.n)]
+        pipes = []
+        for uid in uids:
+            read, write = self._server.new_pipe()
+
+            self._server.app.request_buffer[uid] = (request, write)
+            self._server.app.request_queue.put(uid)
+
+            # TODO: Enable background cleanup here
+            # background_tasks.add_task(cleanup, self._server.app.request_buffer, uid)
+            pipes.append(read)
+
+        responses = []
+        for uid, read in zip(uids, pipes):
+            data = await wait_for_queue_timeout(
+                self._server.data_reader(read), self._server.app.timeout, uid, self._server.app.request_buffer
+            )
+            responses.append(data)
+
+        choices = []
+
+        usage = UsageInfo()
+        for i, response in enumerate(responses):
+            choices.append(
+                ChatCompletionResponseChoice(
+                    index=i,
+                    message=ChatMessage(role="assistant", content=response["text"]),
+                    finish_reason=response.get("finish_reason", "stop"),
+                )
+            )
+            task_usage = UsageInfo.parse_obj(response["usage"]) if "usage" in response else UsageInfo()
+            for usage_key, usage_value in task_usage.dict().items():
+                setattr(usage, usage_key, getattr(usage, usage_key) + usage_value)
+
+        model = request.model or "litserve"
+        return ChatCompletionResponse(model=model, choices=choices, usage=usage)
