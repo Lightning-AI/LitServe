@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from litserve.__about__ import *  # noqa: F401, F403
-from litserve.api import LitAPI
-from litserve.server import LitServer, Request, Response
-from litserve import examples
+import litserve as ls
 
-__all__ = ["LitAPI", "LitServer", "Request", "Response", "examples"]
+if __name__ == "__main__":
+    api = ls.examples.SimpleLitAPI()
+    server = ls.LitServer(api)
+    server.run(port=8000)

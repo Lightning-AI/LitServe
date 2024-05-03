@@ -17,6 +17,21 @@ import subprocess
 import time
 
 
+def test_e2e_default_api():
+    process = subprocess.Popen(
+        ["python", "tests/e2e/default_api.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+
+    time.sleep(5)
+    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
+    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+    assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
+    process.kill()
+
+
 def test_e2e_default_batching():
     process = subprocess.Popen(
         ["python", "tests/e2e/default_batching.py"],

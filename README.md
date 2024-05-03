@@ -198,6 +198,7 @@ LitServe automatically detects GPUs on a machine and uses them when available:
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleLitAPI
 
 # Automatically selects the available accelerator
 api = SimpleLitAPI() # defined by you with ls.LitAPI
@@ -215,6 +216,7 @@ The following example shows how to set the accelerator manually:
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleLitAPI
 
 # Run on CUDA-supported GPUs
 server = ls.LitServer(SimpleLitAPI(), accelerator="cuda")
@@ -239,6 +241,7 @@ The `devices` argument can also be explicitly set to the desired number of devic
 
 ```python
 import litserve as ls
+from litserve.examples import SimpleLitAPI
 
 # Automatically selects the available accelerators
 api = SimpleLitAPI() # defined by you with ls.LitAPI
@@ -266,7 +269,7 @@ class Linear(nn.Module):
     def forward(self, x):
         return self.linear(x)
 
-class SimpleLitAPI(ls.LitAPI):
+class SimpleTorchAPI(ls.LitAPI):
     def setup(self, device):
         # move the model to the correct device
         # keep track of the device for moving data accordingly
@@ -290,7 +293,7 @@ class SimpleLitAPI(ls.LitAPI):
 if __name__ == "__main__":
     # accelerator="auto" (or "cuda"), devices="auto" (or 4) will lead to 4 workers serving
     # the model from "cuda:0", "cuda:1", "cuda:2", "cuda:3" respectively
-    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", devices="auto")
+    server = ls.LitServer(SimpleTorchAPI(), accelerator="auto", devices="auto")
     server.run(port=8000)
 ```
 
@@ -298,7 +301,10 @@ The `devices` argument can also be an array specifying what device id to
 run the model on:
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=[0, 3])
+import litserve as ls
+from litserve.examples import SimpleTorchAPI
+
+server = ls.LitServer(SimpleTorchAPI(), accelerator="cuda", devices=[0, 3])
 ```
 
 Last, you can run multiple copies of the same model from the same device,
@@ -306,7 +312,10 @@ if the model is small. The following will load two copies of the model on
 each of the 4 GPUs:
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, workers_per_device=2)
+import litserve as ls
+from litserve.examples import SimpleTorchAPI
+
+server = ls.LitServer(SimpleTorchAPI(), accelerator="cuda", devices=4, workers_per_device=2)
 ```
 
 </details>
@@ -324,7 +333,10 @@ response (Gateway Timeout) indicating that their request has timed out.
 For example, this is how you can configure the server with a timeout of 30 seconds per response.
 
 ```python
-server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=4, timeout=30)
+import litserve as ls
+from litserve.examples import SimpleLitAPI
+
+server = ls.LitServer(SimpleLitAPI(), timeout=30)
 ```
 
 This is useful to avoid requests queuing up beyond the ability of the server to respond.
@@ -333,7 +345,10 @@ This is useful to avoid requests queuing up beyond the ability of the server to 
 To disable the timeout for long-running tasks, set `timeout=False` or `timeout=-1`:
 
 ```python
-server = LitServer(SimpleLitAPI(), timeout=False)
+import litserve as ls
+from litserve.examples import SimpleLitAPI
+
+server = ls.LitServer(SimpleLitAPI(), timeout=False)
 ```
 
 </details>
@@ -367,7 +382,7 @@ and implement `LitAPI.predict` to process batched inputs.
 import numpy as np
 import litserve as ls
 
-class SimpleStreamAPI(ls.LitAPI):
+class SimpleBatchedAPI(ls.LitAPI):
     def setup(self, device) -> None:
         self.model = lambda x: x ** 2
 
@@ -382,7 +397,7 @@ class SimpleStreamAPI(ls.LitAPI):
         return {"output": output}
 
 if __name__ == "__main__":
-    api = SimpleStreamAPI()
+    api = SimpleBatchedAPI()
     server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.05)
     server.run(port=8000)
 ```
@@ -397,16 +412,21 @@ LitServe automatically stacks NumPy arrays and PyTorch tensors along the batch d
 `LitAPI.batch` and `LitAPI.unbatch` methods to handle different data types.
 
 ```python
-class SimpleStreamAPI(ls.LitAPI):
-    ...
+import litserve as ls
+from litserve.examples import SimpleBatchedAPI
+import numpy as np
 
+class CustomBatchedAPI(SimpleBatchedAPI):
     def batch(self, inputs):
         return np.stack(inputs)
 
     def unbatch(self, output):
         return list(output)
 
-    ...
+if __name__ == "__main__":
+    api = CustomBatchedAPI()
+    server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.05)
+    server.run(port=8000)
 ```
 
 
@@ -493,7 +513,7 @@ class SimpleLitAPI(ls.LitAPI):
 if __name__ == "__main__":
     api = SimpleLitAPI()
     server = ls.LitServer(api, accelerator="auto")
-    server.run(port=8888)
+    server.run(port=8000)
 ```
 
 </details>
@@ -502,7 +522,6 @@ if __name__ == "__main__":
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
-</details>
 
 <details>
   <summary>Run tests</summary>
