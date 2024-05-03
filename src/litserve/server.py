@@ -324,6 +324,9 @@ class LitServer:
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
+        # TODO: A better way to replace litapi with specs. This results in Pickle error
+        # if specs:
+        #     self.app.lit_api = specs
         specs = specs if specs is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
 
