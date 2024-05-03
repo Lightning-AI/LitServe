@@ -15,7 +15,9 @@
 
 import subprocess
 from typing import List
+import sys
 import re
+import pytest
 
 uvicorn_msg = "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"
 
@@ -36,6 +38,7 @@ def get_code_blocks(file: str) -> List[str]:
         return extract_code_blocks(lines)
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="Windows CI is slow and this test is just a sanity check.")
 def test_readme(tmp_path):
     d = tmp_path / "readme_codes"
     d.mkdir()
