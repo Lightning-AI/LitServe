@@ -18,7 +18,8 @@ from typing import Coroutine
 import pickle
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager, Queue, Pipe
+import multiprocessing as mp
+from multiprocessing import Manager, Queue, Pipe
 from queue import Empty
 import time
 import os
@@ -133,6 +134,7 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
+            logging.debug(f"Received request uid={uid}")
             try:
                 x_enc, pipe_s = request_buffer.pop(uid)
             except KeyError:
@@ -256,9 +258,9 @@ def cleanup(request_buffer, uid):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.request_queue = Queue()
     manager = Manager()
     app.request_buffer = manager.dict()
+    app.request_queue = manager.Queue()
 
     process_list = []
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
@@ -266,7 +268,8 @@ async def lifespan(app: FastAPI):
         if len(device) == 1:
             device = device[0]
 
-        process = Process(
+        ctx = mp.get_context("spawn")
+        process = ctx.Process(
             target=inference_worker,
             args=(
                 app.lit_api,
