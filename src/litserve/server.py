@@ -219,6 +219,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
+    # litapi = litspec(litapi)
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
@@ -379,6 +380,21 @@ class LitServer:
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
+    def get_from_pipe(self, read):
+        while True:
+            if read.poll(LONG_TIMEOUT):
+                return read.recv()
+
+    async def data_reader(self, read):
+        data_available = asyncio.Event()
+        asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+
+        if not read.poll():
+            await data_available.wait()
+        data_available.clear()
+        asyncio.get_event_loop().remove_reader(read.fileno())
+        return read.recv()
+
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(setup_auth())])
         async def index(request: Request) -> Response:
@@ -403,27 +419,14 @@ class LitServer:
             self.app.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.app.request_buffer, uid)
 
-            def get_from_pipe():
-                while True:
-                    if read.poll(LONG_TIMEOUT):
-                        return read.recv()
-
-            async def data_reader():
-                data_available = asyncio.Event()
-                asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
-
-                if not read.poll():
-                    await data_available.wait()
-                data_available.clear()
-                asyncio.get_event_loop().remove_reader(read.fileno())
-                return read.recv()
-
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await wait_for_queue_timeout(
-                    asyncio.to_thread(get_from_pipe), self.app.timeout, uid, self.app.request_buffer
+                    asyncio.to_thread(self.get_from_pipe, read), self.app.timeout, uid, self.app.request_buffer
                 )
             else:
-                data = await wait_for_queue_timeout(data_reader(), self.app.timeout, uid, self.app.request_buffer)
+                data = await wait_for_queue_timeout(
+                    self.data_reader(read), self.app.timeout, uid, self.app.request_buffer
+                )
             self.dispose_pipe(read, write)
 
             response, status = data
@@ -492,7 +495,7 @@ class LitServer:
             spec: LitSpec
             spec.setup(self)
             # TODO check that path is not clashing
-            for endpoint, path, methods in spec.endpoints:
+            for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])
 
     def generate_client_file(self):
