@@ -28,4 +28,3 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
             )
             raise HTTPException(504, "Request timed out")
         return await task
-

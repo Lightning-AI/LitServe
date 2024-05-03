@@ -14,7 +14,6 @@
 import asyncio
 import contextlib
 import logging
-from typing import Coroutine
 import pickle
 from contextlib import asynccontextmanager
 import inspect
@@ -24,7 +23,7 @@ from queue import Empty
 import time
 import os
 import shutil
-from typing import Sequence, Optional, Union, List
+from typing import Sequence, Optional, Union
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -194,7 +193,9 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                 pipe_s.send((err, LitAPIStatus.ERROR))
 
 
-def inference_worker(lit_api, spec, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
+def inference_worker(
+    lit_api, spec, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream
+):
     lit_api.setup(device=device)
     # litapi = litspec(litapi)
     if stream:
