@@ -12,6 +12,7 @@ class LitSpec:
     We have to call `predict` from LitAPI
 
     """
+
     def __init__(self):
         self._endpoints = []
 

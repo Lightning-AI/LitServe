@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from ..utils import wait_for_queue_timeout, LitAPIStatus
 
 if typing.TYPE_CHECKING:
-    from litserve import LitServer
+    pass
 
 
 def shortuuid():
