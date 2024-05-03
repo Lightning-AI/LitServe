@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks, HTTPException
 from .base import LitSpec
 from pydantic import BaseModel, Field
 
-from ..server import wait_for_queue_timeout
+from ..server import wait_for_queue_timeout, LitAPIStatus
 
 if typing.TYPE_CHECKING:
     from litserve import LitServer
@@ -67,10 +67,10 @@ class OpenAISpec(LitSpec):
         self._server = server
         self._lit_api = server.app.lit_api
 
-    def decode_request_fn(self, request):
-        return request
+    def decode_request_hook(self, request: ChatCompletionRequest):
+        return request.messages
 
-    def encode_response_fn(self, output):
+    def encode_response_hook(self, output) -> ChatCompletionResponse:
         return output
 
     async def chat_completion(
@@ -117,7 +117,11 @@ class OpenAISpec(LitSpec):
         choices = []
 
         usage = UsageInfo()
-        for i, response in enumerate(responses):
+        for i, data in enumerate(responses):
+            response, status = data
+            if status != LitAPIStatus.OK:
+                break
+
             choices.append(
                 ChatCompletionResponseChoice(
                     index=i,
