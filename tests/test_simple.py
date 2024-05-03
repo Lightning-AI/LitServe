@@ -94,6 +94,7 @@ async def test_timeout():
     server = LitServer(api, accelerator="cpu", devices=1, timeout=0.9)  # windows CI need more time to process queue
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        await asyncio.sleep(1)  # Give time to start inference workers
         response1 = ac.post("/predict", json={"input": 4.0})
         response2 = ac.post("/predict", json={"input": 5.0})
         response1, response2 = await asyncio.gather(response1, response2)
