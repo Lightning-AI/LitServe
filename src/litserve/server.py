@@ -400,7 +400,7 @@ class LitServer:
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
-        @self.app.post("/predict", dependencies=[Depends(setup_auth())])
+        # @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
@@ -434,7 +434,7 @@ class LitServer:
                 load_and_raise(response)
             return response
 
-        @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
+        # @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
 
@@ -490,6 +490,13 @@ class LitServer:
                 return StreamingResponse(stream_from_pipe())
 
             return StreamingResponse(data_streamer())
+
+        if not self._specs:
+            stream = self.app.lit_api.stream
+            endpoint = "/stream-predict" if stream else "/predict"
+            self.app.add_api_route(
+                endpoint, stream_predict if stream else predict, dependencies=[Depends(setup_auth())]
+            )
 
         for spec in self._specs:
             spec: LitSpec
