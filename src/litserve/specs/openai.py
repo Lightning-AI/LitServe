@@ -6,7 +6,8 @@ from fastapi import BackgroundTasks, HTTPException
 from .base import LitSpec
 from pydantic import BaseModel, Field
 
-from ..server import wait_for_queue_timeout, LitAPIStatus
+# from ..server import wait_for_queue_timeout, LitAPIStatus
+from ..utils import wait_for_queue_timeout, LitAPIStatus
 
 if typing.TYPE_CHECKING:
     from litserve import LitServer
@@ -60,23 +61,19 @@ class OpenAISpec(LitSpec):
     def __init__(
         self,
     ):
+        super().__init__()
         # register the endpoint
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
 
-    def setup(self, server: "LitServer"):
-        self._server = server
-        self._lit_api = server.app.lit_api
+    # def decode_request(self, request: ChatCompletionRequest):
+    #     return request
 
-    def decode_request_hook(self, request: ChatCompletionRequest):
-        return request.messages
-
-    def encode_response_hook(self, output) -> ChatCompletionResponse:
-        return output
+    # def encode_response(self, output) -> ChatCompletionResponse:
+    #     return output
 
     async def chat_completion(
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
     ) -> ChatCompletionResponse:
-        # TODO here
         if request.stream:
             raise HTTPException(status_code=400, detail="Streaming not currently supported")
 
@@ -100,11 +97,12 @@ class OpenAISpec(LitSpec):
         for uid in uids:
             read, write = self._server.new_pipe()
 
-            self._server.app.request_buffer[uid] = (request, write)
+            request_el = request.copy()
+            request_el.n = 1
+            self._server.app.request_buffer[uid] = (request_el, write)
             self._server.app.request_queue.put(uid)
 
-            # TODO: Enable background cleanup here
-            # background_tasks.add_task(cleanup, self._server.app.request_buffer, uid)
+            background_tasks.add_task(self._server.cleanup_request, self._server.app.request_buffer, uid)
             pipes.append(read)
 
         responses = []

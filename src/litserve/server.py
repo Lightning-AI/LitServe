@@ -36,6 +36,7 @@ from fastapi.responses import StreamingResponse
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs.base import LitSpec
+from litserve.utils import wait_for_queue_timeout, LitAPIStatus
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -44,36 +45,12 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 LONG_TIMEOUT = 100
 
 
-class LitAPIStatus:
-    OK = "OK"
-    ERROR = "ERROR"
-    FINISH_STREAMING = "FINISH_STREAMING"
-
-
 def load_and_raise(response):
     try:
         pickle.loads(response)
         raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
         logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
-
-
-async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
-    if timeout == -1 or timeout is False:
-        return await coro
-
-    task = asyncio.create_task(coro)
-    shield = asyncio.shield(task)
-    try:
-        return await asyncio.wait_for(shield, timeout)
-    except asyncio.TimeoutError:
-        if uid in request_buffer:
-            logging.error(
-                f"Request was waiting in the queue for too long ({timeout} seconds) and has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            raise HTTPException(504, "Request timed out")
-        return await task
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
@@ -217,7 +194,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                 pipe_s.send((err, LitAPIStatus.ERROR))
 
 
-def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
+def inference_worker(lit_api, spec, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
     # litapi = litspec(litapi)
     if stream:
@@ -285,6 +262,7 @@ async def lifespan(app: FastAPI):
             target=inference_worker,
             args=(
                 app.lit_api,
+                app.spec,
                 device,
                 worker_id,
                 app.request_queue,
@@ -316,7 +294,7 @@ class LitServer:
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
         stream: bool = False,
-        specs: Optional[Union[List[LitSpec], LitSpec]] = None,
+        spec: Optional[LitSpec] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -331,6 +309,7 @@ class LitServer:
         self.app.max_batch_size = max_batch_size
         self.app.timeout = timeout
         self.app.batch_timeout = batch_timeout
+        self.app.spec = spec
         initial_pool_size = 100
         self.max_pool_size = 1000
         self.app.stream = stream
@@ -340,7 +319,7 @@ class LitServer:
         # TODO: A better way to replace litapi with specs. This results in Pickle error
         # if specs:
         #     self.app.lit_api = specs
-        specs = specs if specs is not None else []
+        specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
@@ -398,6 +377,10 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
+    def cleanup_request(self, request_buffer, uid):
+        with contextlib.suppress(KeyError):
+            request_buffer.pop(uid)
+
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(setup_auth())])
         async def index(request: Request) -> Response:
@@ -419,7 +402,7 @@ class LitServer:
                 self.app.request_buffer[uid] = (request, write)
 
             self.app.request_queue.put(uid)
-            background_tasks.add_task(cleanup, self.app.request_buffer, uid)
+            background_tasks.add_task(self.cleanup_request, self.app.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await wait_for_queue_timeout(
@@ -494,7 +477,9 @@ class LitServer:
 
         if not self._specs:
             stream = self.app.lit_api.stream
-            endpoint = "/stream-predict" if stream else "/predict"
+            # In the future we might want to differentiate endpoints for streaming vs non-streaming
+            # For now we allow either one or the other
+            endpoint = "/predict"
             self.app.add_api_route(
                 endpoint, stream_predict if stream else predict, dependencies=[Depends(setup_auth())]
             )
