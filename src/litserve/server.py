@@ -262,6 +262,14 @@ async def lifespan(app: FastAPI):
     app.request_buffer = manager.dict()
     app.request_queue = manager.Queue()
 
+    try:
+        pickle.dumps(app.lit_api)
+    except pickle.PickleError:
+        raise ValueError(
+            "lit_api is not pickleable. Please ensure all heavy-weight operations, like model "
+            "creation, are defined in LitAPI's setup method."
+        )
+
     process_list = []
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
     for worker_id, device in enumerate(app.devices * app.workers_per_device):
