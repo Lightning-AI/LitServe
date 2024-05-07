@@ -100,10 +100,10 @@ pip install -e '.[all]'
 &nbsp;
 
 # Get started
-LitServe has a minimal API that allows enterprise-scale, with full control.   
+LitServe has a minimal API that allows enterprise-scale, with full control.
 
-1. Implement the LitAPI class which describes the inference process for the model(s).    
-2. Enable the specific optimizations (such as batching or streaming) in the LitServer.   
+1. Implement the LitAPI class which describes the inference process for the model(s).
+2. Enable the specific optimizations (such as batching or streaming) in the LitServer.
 
 ## Implement a server
 Here's a hello world example:
@@ -177,7 +177,7 @@ LitServe supports multiple advanced state-of-the-art features.
 | ML frameworks  | PyTorch, Jax, Tensorflow, numpy, etc...  |
 | Batching | ✅ |
 | API authentication | ✅ |
-| Multiple models in a single API | ✅ |    
+| Multiple models in a single API | ✅ |
 | Full request/response control | ✅ |
 | Automatic schema validation | ✅ |
 | Handle timeouts | ✅ |
