@@ -257,7 +257,7 @@ def test_batched_streaming_loop(loop_args):
 
     with pytest.raises(StopIteration, match="finish streaming"):
         run_batched_streaming_loop(fake_stream_api, requests_queue, request_buffer, max_batch_size=2, batch_timeout=2)
-    fake_stream_api.predict.assert_called_once_with(("Hello", "World"))
+    fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
 
 
