@@ -81,8 +81,7 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
             x_enc, pipe_s = request_buffer.pop(uid)
         except KeyError:
             continue
-        x = lit_api.decode_request(x_enc)
-        batches.append((x, pipe_s))
+        batches.append((x_enc, pipe_s))
     return batches
 
 
@@ -113,7 +112,8 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
         inputs, pipes = zip(*batches)
 
         try:
-            x = lit_api.batch(inputs)
+            x = [lit_api.decode_request(input) for input in inputs]
+            x = lit_api.batch(x)
             y = lit_api.predict(x)
             outputs = lit_api.unbatch(y)
             for y, pipe_s in zip(outputs, pipes):
@@ -193,7 +193,8 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
         inputs, pipes = zip(*batches)
 
         try:
-            x = lit_api.batch(inputs)
+            x = [lit_api.decode_request(input) for input in inputs]
+            x = lit_api.batch(x)
             y_iter = lit_api.predict(x)
             unbatched_iter = lit_api.unbatch(y_iter)
             y_enc_iter = lit_api.encode_response(unbatched_iter)
