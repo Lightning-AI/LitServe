@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
+import psutil
 from typing import Generator
 
 from litserve.server import LitServer
@@ -105,3 +106,13 @@ def lit_server(simple_litapi):
 def sync_testclient(lit_server):
     with TestClient(lit_server.app) as client:
         yield client
+
+
+@pytest.fixture()
+def killall():
+    def _run(process):
+        parent = psutil.Process(process.pid)
+        for child in parent.children(recursive=True):
+            child.kill()
+        process.kill()
+    return _run

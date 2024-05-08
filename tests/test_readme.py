@@ -61,8 +61,7 @@ def test_readme(tmp_path):
         elif "requests.post" in code:
             assert (
                 "requests.exceptions.ConnectionError" in errs
-            ), "Client examples should fail with a ConnectionError because there is no server running."
-
+            ), f"Client examples should fail with a ConnectionError because there is no server running. \n {code}"
         else:
             assert (
                 process.returncode == 0

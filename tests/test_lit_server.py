@@ -26,6 +26,7 @@ import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
+import pytest
 
 from litserve.connector import _Connector
 from litserve.server import (
@@ -36,8 +37,6 @@ from litserve.server import (
     run_batched_streaming_loop,
 )
 from litserve.server import LitServer
-
-import pytest
 
 
 def test_new_pipe(lit_server):
@@ -120,7 +119,7 @@ def test_single_loop(simple_litapi, loop_args):
         run_single_loop(lit_api_mock, requests_queue, request_buffer)
 
 
-def test_run():
+def test_run(killall):
     process = subprocess.Popen(
         ["python", "tests/simple_server.py"],
         stdout=subprocess.DEVNULL,
@@ -133,7 +132,7 @@ def test_run():
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output, "tests/simple_server.py didn't return expected output"
     os.remove("client.py")
-    process.kill()
+    killall(process)
 
 
 @pytest.mark.asyncio()
@@ -143,8 +142,8 @@ async def test_stream(simple_stream_api):
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
-        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
         resp1, resp2 = await asyncio.gather(resp1, resp2)
         assert resp1.status_code == 200, "Check if server is running and the request format is valid."
         assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
@@ -159,8 +158,8 @@ async def test_batched_stream_server(simple_batched_stream_api):
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
-        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
         resp1, resp2 = await asyncio.gather(resp1, resp2)
         assert resp1.status_code == 200, "Check if server is running and the request format is valid."
         assert resp2.status_code == 200, "Check if server is running and the request format is valid."

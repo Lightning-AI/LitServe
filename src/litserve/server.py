@@ -194,7 +194,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
 
 
 def inference_worker(
-    lit_api, spec, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream
+    lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream
 ):
     lit_api.setup(device=device)
     # litapi = litspec(litapi)
@@ -263,7 +263,7 @@ async def lifespan(app: FastAPI):
             target=inference_worker,
             args=(
                 app.lit_api,
-                app.spec,
+                # app.spec,
                 device,
                 worker_id,
                 app.request_queue,
@@ -481,8 +481,11 @@ class LitServer:
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
             endpoint = "/predict"
+            methods = ["POST"]
+            with open("foo.txt", "w") as f:
+                f.write(f"STREAM {stream}")
             self.app.add_api_route(
-                endpoint, stream_predict if stream else predict, dependencies=[Depends(setup_auth())]
+                endpoint, stream_predict if stream else predict, methods=methods, dependencies=[Depends(setup_auth())]
             )
 
         for spec in self._specs:
