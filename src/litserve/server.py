@@ -482,8 +482,6 @@ class LitServer:
             # For now we allow either one or the other
             endpoint = "/predict"
             methods = ["POST"]
-            with open("foo.txt", "w") as f:
-                f.write(f"STREAM {stream}")
             self.app.add_api_route(
                 endpoint, stream_predict if stream else predict, methods=methods, dependencies=[Depends(setup_auth())]
             )
