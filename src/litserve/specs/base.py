@@ -35,7 +35,7 @@ class LitSpec:
         return self._lit_api.decode_request(*args, **kwargs)
 
     def predict(self, *args, **kwargs):
-        return self._lit_api.predict(*x, **kwargs)
+        return self._lit_api.predict(*args, **kwargs)
 
     def encode_response(self, *args, **kwargs):
         return self._lit_api.encode_response(*args, **kwargs)

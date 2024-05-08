@@ -115,4 +115,5 @@ def killall():
         for child in parent.children(recursive=True):
             child.kill()
         process.kill()
+
     return _run
