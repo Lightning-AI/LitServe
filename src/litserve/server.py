@@ -190,9 +190,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                 pipe_s.send((err, LitAPIStatus.ERROR))
 
 
-def inference_worker(
-    lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream
-):
+def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
     # litapi = litspec(litapi)
     if stream:
