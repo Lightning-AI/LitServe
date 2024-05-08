@@ -266,7 +266,7 @@ async def lifespan(app: FastAPI):
         pickle.dumps(app.lit_api)
     except pickle.PickleError:
         raise ValueError(
-            "lit_api is not pickleable. Please ensure all heavy-weight operations, like model "
+            "The LitAPI instance provided to LitServer cannot be moved to a worker because it cannot be pickled. Please ensure all heavy-weight operations, like model "
             "creation, are defined in LitAPI's setup method."
         )
 
