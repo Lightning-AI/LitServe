@@ -147,5 +147,5 @@ def test_batched_loop():
         run_batched_loop(lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
 
     lit_api_mock.batch.assert_called_once()
-    lit_api_mock.batch.assert_called_once_with((4.0, 5.0))
+    lit_api_mock.batch.assert_called_once_with([4.0, 5.0])
     lit_api_mock.unbatch.assert_called_once()
