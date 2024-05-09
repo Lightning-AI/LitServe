@@ -5,6 +5,7 @@ mypy ==1.9.0
 pytest-asyncio
 asgi-lifespan
 python-multipart
+psutil
 
 requests
 lightning >2.0.0
