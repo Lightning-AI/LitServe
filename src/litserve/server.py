@@ -386,7 +386,12 @@ class LitServer:
             read, write = self.new_pipe()
 
             if self.request_type == Request:
-                self.app.request_buffer[uid] = (await request.json(), write)
+                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
+                    "Content-Type"
+                ].startswith("multipart/form-data"):
+                    self.app.request_buffer[uid] = (await request.form(), write)
+                else:
+                    self.app.request_buffer[uid] = (await request.json(), write)
             else:
                 self.app.request_buffer[uid] = (request, write)
 
