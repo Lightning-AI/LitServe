@@ -65,12 +65,6 @@ class OpenAISpec(LitSpec):
         # register the endpoint
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
 
-    # def decode_request(self, request: ChatCompletionRequest):
-    #     return request
-
-    # def encode_response(self, output) -> ChatCompletionResponse:
-    #     return output
-
     async def chat_completion(
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
     ) -> ChatCompletionResponse:
