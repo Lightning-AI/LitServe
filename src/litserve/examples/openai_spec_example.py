@@ -17,6 +17,6 @@ class SimpleLitAPI(ls.LitAPI):
 
 
 if __name__ == "__main__":
-    specs = OpenAISpec()
-    server = ls.LitServer(SimpleLitAPI(), specs=specs)
+    spec = OpenAISpec()
+    server = ls.LitServer(SimpleLitAPI(), spec=spec)
     server.run(port=8000)
