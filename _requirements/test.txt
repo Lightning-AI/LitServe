@@ -4,6 +4,7 @@ pytest-cov
 mypy ==1.9.0
 pytest-asyncio
 asgi-lifespan
+python-multipart
 
 requests
 lightning >2.0.0

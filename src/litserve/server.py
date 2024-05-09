@@ -17,7 +17,8 @@ import logging
 import pickle
 from contextlib import asynccontextmanager
 import inspect
-from multiprocessing import Process, Manager, Queue, Pipe
+import multiprocessing as mp
+from multiprocessing import Manager, Queue, Pipe
 from queue import Empty
 import time
 import os
@@ -58,8 +59,7 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
             x_enc, pipe_s = request_buffer.pop(uid)
         except KeyError:
             continue
-        x = lit_api.decode_request(x_enc)
-        batches.append((x, pipe_s))
+        batches.append((x_enc, pipe_s))
     return batches
 
 
@@ -90,7 +90,8 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
         inputs, pipes = zip(*batches)
 
         try:
-            x = lit_api.batch(inputs)
+            x = [lit_api.decode_request(input) for input in inputs]
+            x = lit_api.batch(x)
             y = lit_api.predict(x)
             outputs = lit_api.unbatch(y)
             for y, pipe_s in zip(outputs, pipes):
@@ -110,6 +111,7 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
+            logging.debug(f"Received request uid={uid}")
             try:
                 x_enc, pipe_s = request_buffer.pop(uid)
             except KeyError:
@@ -170,7 +172,8 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
         inputs, pipes = zip(*batches)
 
         try:
-            x = lit_api.batch(inputs)
+            x = [lit_api.decode_request(input) for input in inputs]
+            x = lit_api.batch(x)
             y_iter = lit_api.predict(x)
             unbatched_iter = lit_api.unbatch(y_iter)
             y_enc_iter = lit_api.encode_response(unbatched_iter)
@@ -234,9 +237,18 @@ def cleanup(request_buffer, uid):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.request_queue = Queue()
     manager = Manager()
     app.request_buffer = manager.dict()
+    app.request_queue = manager.Queue()
+
+    try:
+        pickle.dumps(app.lit_api)
+    except pickle.PickleError:
+        raise ValueError(
+            "The LitAPI instance provided to LitServer cannot be moved to a worker because"
+            "it cannot be pickled. Please ensure all heavy-weight operations, like model "
+            "creation, are defined in LitAPI's setup method."
+        )
 
     process_list = []
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
@@ -244,7 +256,8 @@ async def lifespan(app: FastAPI):
         if len(device) == 1:
             device = device[0]
 
-        process = Process(
+        ctx = mp.get_context("spawn")
+        process = ctx.Process(
             target=inference_worker,
             args=(
                 app.lit_api,
@@ -378,7 +391,12 @@ class LitServer:
             read, write = self.new_pipe()
 
             if self.request_type == Request:
-                self.app.request_buffer[uid] = (await request.json(), write)
+                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
+                    "Content-Type"
+                ].startswith("multipart/form-data"):
+                    self.app.request_buffer[uid] = (await request.form(), write)
+                else:
+                    self.app.request_buffer[uid] = (await request.json(), write)
             else:
                 self.app.request_buffer[uid] = (request, write)
 

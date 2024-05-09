@@ -7,7 +7,7 @@
 
 **High-throughput serving engine for AI models**
 
-✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Auto-GPU, multi-GPU &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
+✅ Batching &nbsp; &nbsp;  ✅ Streaming &nbsp; &nbsp;  ✅ Auto-GPU, multi-GPU &nbsp; &nbsp; ✅ Multi-modal &nbsp; &nbsp;  ✅ PyTorch/JAX/TF &nbsp; &nbsp;  ✅ Full control &nbsp; &nbsp;  ✅ Auth
 
 ---
 
@@ -100,9 +100,10 @@ pip install -e '.[all]'
 &nbsp;
 
 # Get started
-LitServe is an inference server for AI/ML models that is minimal and highly scalable.
+LitServe has a minimal API that allows enterprise-scale, with full control.
 
-It has 2 simple, minimal APIs - LitAPI and LitServer.
+1. Implement the LitAPI class which describes the inference process for the model(s).
+2. Enable the specific optimizations (such as batching or streaming) in the LitServer.
 
 ## Implement a server
 Here's a hello world example:
@@ -176,6 +177,7 @@ LitServe supports multiple advanced state-of-the-art features.
 | ML frameworks  | PyTorch, Jax, Tensorflow, numpy, etc...  |
 | Batching | ✅ |
 | API authentication | ✅ |
+| Multiple models in a single API | ✅ |
 | Full request/response control | ✅ |
 | Automatic schema validation | ✅ |
 | Handle timeouts | ✅ |
