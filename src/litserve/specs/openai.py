@@ -6,7 +6,6 @@ from fastapi import BackgroundTasks, HTTPException
 from .base import LitSpec
 from pydantic import BaseModel, Field
 
-# from ..server import wait_for_queue_timeout, LitAPIStatus
 from ..utils import wait_for_queue_timeout, LitAPIStatus
 
 if typing.TYPE_CHECKING:
