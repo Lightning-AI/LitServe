@@ -1,7 +1,7 @@
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
-from litserve.examples import SimpleLitAPI
+from litserve.examples.openai_spec_example import OpenAILitAPI
 from litserve.specs.openai import OpenAISpec
 import litserve as ls
 
@@ -9,7 +9,7 @@ import litserve as ls
 @pytest.mark.asyncio()
 async def test_openai_spec():
     spec = OpenAISpec()
-    server = ls.LitServer(SimpleLitAPI(), spec=spec)
+    server = ls.LitServer(OpenAILitAPI(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         data = {
             "model": "",

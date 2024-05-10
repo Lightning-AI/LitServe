@@ -2,7 +2,7 @@ import litserve as ls
 from litserve.specs.openai import OpenAISpec
 
 
-class SimpleLitAPI(ls.LitAPI):
+class OpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = ...
 
@@ -18,5 +18,5 @@ class SimpleLitAPI(ls.LitAPI):
 
 if __name__ == "__main__":
     spec = OpenAISpec()
-    server = ls.LitServer(SimpleLitAPI(), spec=spec)
+    server = ls.LitServer(OpenAILitAPI(), spec=spec)
     server.run(port=8000)
