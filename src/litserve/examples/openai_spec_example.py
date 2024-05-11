@@ -42,6 +42,5 @@ class OpenAILitAPI(ls.LitAPI):
 
 
 if __name__ == "__main__":
-    spec = OpenAISpec()
     server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpecWithHooks())
     server.run(port=8000)

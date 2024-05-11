@@ -547,9 +547,29 @@ class OpenAILitAPI(ls.LitAPI):
         return {"text": output}
 
 if __name__ == "__main__":
-    api = OpenAILitAPI()
-    spec = OpenAISpec()
-    server = ls.LitServer(api, spec=spec)
+    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec())
+    server.run(port=8000)
+```
+
+
+By default, LitServe will use LitAPI's implementation of `LitAPI.decode_request` and `LitAPI.encode_response`.
+You can also customize this behaviour and let your `spec` handle it by implementing `decode_request` and
+`encode_response` for spec as follows:
+
+```python
+import litserve as ls
+from litserve.examples.openai_spec_example import OpenAILitAPI
+from litserve.specs.openai import OpenAISpec
+
+class OpenAISpecWithHooks(OpenAISpec):
+    def decode_request(self, request):
+        return request.messages
+
+    def encode_response(self, output):
+        return {"text": "encode_response called from Spec"}
+
+if __name__ == "__main__":
+    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpecWithHooks())
     server.run(port=8000)
 ```
 
