@@ -479,7 +479,7 @@ class LitServer:
             return StreamingResponse(data_streamer())
 
         if not self._specs:
-            stream = self.app.lit_api.stream
+            stream = self.lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
             endpoint = "/predict"
@@ -490,7 +490,8 @@ class LitServer:
 
         for spec in self._specs:
             spec: LitSpec
-            # TODO: We need to call setup in after spawning inference workers
+            # Objects of Server class are referenced (not copied)
+            logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app
             spec.setup(server_copy)
