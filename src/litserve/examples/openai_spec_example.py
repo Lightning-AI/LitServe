@@ -15,14 +15,6 @@ import litserve as ls
 from litserve.specs.openai import OpenAISpec
 
 
-class OpenAIBasicAPI(ls.LitAPI):
-    def setup(self, device):
-        self.model = ...
-
-    def predict(self, x):
-        return "This is a generated output"
-
-
 class OpenAISpecWithHooks(OpenAISpec):
     def decode_request(self, request):
         return request
@@ -47,5 +39,5 @@ class OpenAILitAPI(ls.LitAPI):
 
 if __name__ == "__main__":
     spec = OpenAISpec()
-    server = ls.LitServer(OpenAIBasicAPI(), spec=spec)
+    server = ls.LitServer(OpenAILitAPI(), spec=spec)
     server.run(port=8000)

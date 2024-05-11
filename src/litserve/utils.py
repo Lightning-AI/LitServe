@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import pickle
 from typing import Coroutine, Optional
 import uuid
 
@@ -28,3 +29,11 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
             )
             raise HTTPException(504, "Request timed out")
         return await task
+
+
+def load_and_raise(response):
+    try:
+        pickle.loads(response)
+        raise HTTPException(500, "Internal Server Error")
+    except pickle.PickleError:
+        logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")

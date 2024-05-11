@@ -19,7 +19,7 @@ from fastapi import BackgroundTasks, HTTPException
 from .base import LitSpec
 from pydantic import BaseModel, Field
 
-from ..utils import wait_for_queue_timeout, LitAPIStatus
+from ..utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 import sys
 import asyncio
 
@@ -133,6 +133,9 @@ class OpenAISpec(LitSpec):
         usage = UsageInfo()
         for i, data in enumerate(responses):
             response, status = data
+            if status == LitAPIStatus.ERROR:
+                load_and_raise(response)
+
             if status != LitAPIStatus.OK:
                 break
 

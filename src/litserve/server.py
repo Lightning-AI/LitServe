@@ -35,21 +35,13 @@ from fastapi.responses import StreamingResponse
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus
+from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 # timeout when we need to poll or wait indefinitely for a result in a loop.
 LONG_TIMEOUT = 100
-
-
-def load_and_raise(response):
-    try:
-        pickle.loads(response)
-        raise HTTPException(500, "Internal Server Error")
-    except pickle.PickleError:
-        logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
 
 
 def get_batch_from_uid(uids, lit_api, request_buffer):
