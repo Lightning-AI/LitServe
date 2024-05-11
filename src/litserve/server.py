@@ -185,9 +185,19 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                 pipe_s.send((err, LitAPIStatus.ERROR))
 
 
-def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
-    lit_api.setup(device=device)
-    # litapi = litspec(litapi)
+def inference_worker(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    device,
+    worker_id,
+    request_queue,
+    request_buffer,
+    max_batch_size,
+    batch_timeout,
+    stream,
+):
+    lit_api.setup(device)
+    # TODO: lit_spec.setup
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
@@ -235,12 +245,15 @@ async def lifespan(app: FastAPI):
 
     try:
         pickle.dumps(app.lit_api)
-    except pickle.PickleError:
-        raise ValueError(
-            "The LitAPI instance provided to LitServer cannot be moved to a worker because"
+        pickle.dumps(app.lit_spec)
+
+    except (pickle.PickleError, AttributeError) as e:
+        logging.error(
+            "The LitAPI instance provided to LitServer cannot be moved to a worker because "
             "it cannot be pickled. Please ensure all heavy-weight operations, like model "
             "creation, are defined in LitAPI's setup method."
         )
+        raise e
 
     process_list = []
     # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
@@ -253,7 +266,7 @@ async def lifespan(app: FastAPI):
             target=inference_worker,
             args=(
                 app.lit_api,
-                # app.spec,
+                app.lit_spec,
                 device,
                 worker_id,
                 app.request_queue,
@@ -296,11 +309,11 @@ class LitServer:
         lit_api.sanitize(max_batch_size)
         self.app = FastAPI(lifespan=lifespan)
         self.app.lit_api = lit_api
+        self.app.lit_spec = spec
         self.app.workers_per_device = workers_per_device
         self.app.max_batch_size = max_batch_size
         self.app.timeout = timeout
         self.app.batch_timeout = batch_timeout
-        self.app.spec = spec
         initial_pool_size = 100
         self.max_pool_size = 1000
         self.app.stream = stream
@@ -308,8 +321,8 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         # TODO: A better way to replace litapi with specs. This results in Pickle error
-        # if specs:
-        #     self.app.lit_api = specs
+        # if spec:
+        #     self.app.lit_api = spec
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
 
@@ -478,7 +491,8 @@ class LitServer:
 
         for spec in self._specs:
             spec: LitSpec
-            spec.setup(self)
+            # TODO: We need to call setup in after spawning inference workers
+            # spec.setup(self)
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])

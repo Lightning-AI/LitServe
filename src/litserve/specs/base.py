@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from litserve import LitServer
 
 
-class LitSpec:
+class LitSpec(LitAPI):
     """Spec will have its own encode, and decode.
 
     - if not then fallback to litapi
@@ -17,11 +17,9 @@ class LitSpec:
         self._endpoints = []
 
         self._server: "LitServer" = None
-        self._lit_api: LitAPI = None
 
     def setup(self, server: "LitServer"):
         self._server = server
-        self.lit_api = server.app.lit_api
 
     def add_endpoint(self, path: str, endpoint: Callable, methods: list[str]):
         """Register an endpoint in the spec."""
@@ -32,10 +30,14 @@ class LitSpec:
         return self._endpoints.copy()
 
     def decode_request(self, *args, **kwargs):
-        return self._lit_api.decode_request(*args, **kwargs)
+        return self.lit_api.decode_request(*args, **kwargs)
 
     def predict(self, *args, **kwargs):
-        return self._lit_api.predict(*args, **kwargs)
+        return self.lit_api.predict(*args, **kwargs)
 
     def encode_response(self, *args, **kwargs):
-        return self._lit_api.encode_response(*args, **kwargs)
+        return self.lit_api.encode_response(*args, **kwargs)
+
+    @property
+    def lit_api(self) -> LitAPI:
+        return self._server.app.lit_api
