@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
-import typing
 from typing import Literal, Optional, List, Dict, Union
 import uuid
 from fastapi import BackgroundTasks, HTTPException
 from .base import LitSpec
 from pydantic import BaseModel, Field
 
-from ..utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 import sys
 import asyncio
 
-if typing.TYPE_CHECKING:
-    pass
+from ..utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 
 
 def shortuuid():
