@@ -17,6 +17,7 @@ class LitSpec(LitAPI):
         self._endpoints = []
 
         self._server: "LitServer" = None
+        self._lit_api = None
 
     def setup(self, server: "LitServer"):
         self._server = server
@@ -40,4 +41,4 @@ class LitSpec(LitAPI):
 
     @property
     def lit_api(self) -> LitAPI:
-        return self._server.app.lit_api
+        return self._lit_api

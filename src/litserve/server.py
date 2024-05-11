@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import contextlib
+import copy
 import logging
 import pickle
 from contextlib import asynccontextmanager
@@ -197,7 +198,9 @@ def inference_worker(
     stream,
 ):
     lit_api.setup(device)
-    # TODO: lit_spec.setup
+    if lit_spec:
+        lit_spec._lit_api = lit_api
+        lit_api = lit_spec
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
@@ -237,56 +240,6 @@ def cleanup(request_buffer, uid):
         request_buffer.pop(uid)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    manager = Manager()
-    app.request_buffer = manager.dict()
-    app.request_queue = manager.Queue()
-
-    try:
-        pickle.dumps(app.lit_api)
-        pickle.dumps(app.lit_spec)
-
-    except (pickle.PickleError, AttributeError) as e:
-        logging.error(
-            "The LitAPI instance provided to LitServer cannot be moved to a worker because "
-            "it cannot be pickled. Please ensure all heavy-weight operations, like model "
-            "creation, are defined in LitAPI's setup method."
-        )
-        raise e
-
-    process_list = []
-    # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
-    for worker_id, device in enumerate(app.devices * app.workers_per_device):
-        if len(device) == 1:
-            device = device[0]
-
-        ctx = mp.get_context("spawn")
-        process = ctx.Process(
-            target=inference_worker,
-            args=(
-                app.lit_api,
-                app.lit_spec,
-                device,
-                worker_id,
-                app.request_queue,
-                app.request_buffer,
-                app.max_batch_size,
-                app.batch_timeout,
-                app.stream,
-            ),
-            daemon=True,
-        )
-        process.start()
-        process_list.append((process, worker_id))
-
-    yield
-
-    for process, worker_id in process_list:
-        logging.info(f"terminating worker worker_id={worker_id}")
-        process.terminate()
-
-
 class LitServer:
     def __init__(
         self,
@@ -307,16 +260,16 @@ class LitServer:
 
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size)
-        self.app = FastAPI(lifespan=lifespan)
-        self.app.lit_api = lit_api
-        self.app.lit_spec = spec
-        self.app.workers_per_device = workers_per_device
-        self.app.max_batch_size = max_batch_size
-        self.app.timeout = timeout
-        self.app.batch_timeout = batch_timeout
+        self.app = FastAPI(lifespan=self.lifespan)
+        self.lit_api = lit_api
+        self.lit_spec = spec
+        self.workers_per_device = workers_per_device
+        self.max_batch_size = max_batch_size
+        self.timeout = timeout
+        self.batch_timeout = batch_timeout
         initial_pool_size = 100
         self.max_pool_size = 1000
-        self.app.stream = stream
+        self.stream = stream
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
@@ -340,14 +293,62 @@ class LitServer:
         accelerator = self._connector.accelerator
         devices = self._connector.devices
         if accelerator == "cpu":
-            self.app.devices = [accelerator]
+            self.devices = [accelerator]
         elif accelerator in ["cuda", "mps"]:
             device_list = devices
             if isinstance(devices, int):
                 device_list = range(devices)
-            self.app.devices = [self.device_identifiers(accelerator, device) for device in device_list]
+            self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
+        manager = Manager()
+        self.request_buffer = manager.dict()
+        self.request_queue = manager.Queue()
         self.setup_server()
+
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        try:
+            pickle.dumps(self.lit_api)
+            pickle.dumps(self.lit_spec)
+
+        except (pickle.PickleError, AttributeError) as e:
+            logging.error(
+                "The LitAPI instance provided to LitServer cannot be moved to a worker because "
+                "it cannot be pickled. Please ensure all heavy-weight operations, like model "
+                "creation, are defined in LitAPI's setup method."
+            )
+            raise e
+
+        process_list = []
+        # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
+        for worker_id, device in enumerate(self.devices * self.workers_per_device):
+            if len(device) == 1:
+                device = device[0]
+
+            ctx = mp.get_context("spawn")
+            process = ctx.Process(
+                target=inference_worker,
+                args=(
+                    self.lit_api,
+                    self.lit_spec,
+                    device,
+                    worker_id,
+                    self.request_queue,
+                    self.request_buffer,
+                    self.max_batch_size,
+                    self.batch_timeout,
+                    self.stream,
+                ),
+                daemon=True,
+            )
+            process.start()
+            process_list.append((process, worker_id))
+
+        yield
+
+        for process, worker_id in process_list:
+            logging.info(f"terminating worker worker_id={worker_id}")
+            process.terminate()
 
     def new_pipe(self):
         try:
@@ -399,23 +400,21 @@ class LitServer:
                 if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
                     "Content-Type"
                 ].startswith("multipart/form-data"):
-                    self.app.request_buffer[uid] = (await request.form(), write)
+                    self.request_buffer[uid] = (await request.form(), write)
                 else:
-                    self.app.request_buffer[uid] = (await request.json(), write)
+                    self.request_buffer[uid] = (await request.json(), write)
             else:
-                self.app.request_buffer[uid] = (request, write)
+                self.request_buffer[uid] = (request, write)
 
-            self.app.request_queue.put(uid)
-            background_tasks.add_task(self.cleanup_request, self.app.request_buffer, uid)
+            self.request_queue.put(uid)
+            background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await wait_for_queue_timeout(
-                    asyncio.to_thread(self.get_from_pipe, read), self.app.timeout, uid, self.app.request_buffer
+                    asyncio.to_thread(self.get_from_pipe, read), self.timeout, uid, self.request_buffer
                 )
             else:
-                data = await wait_for_queue_timeout(
-                    self.data_reader(read), self.app.timeout, uid, self.app.request_buffer
-                )
+                data = await wait_for_queue_timeout(self.data_reader(read), self.timeout, uid, self.request_buffer)
             self.dispose_pipe(read, write)
 
             response, status = data
@@ -429,12 +428,12 @@ class LitServer:
             read, write = self.new_pipe()
 
             if self.request_type == Request:
-                self.app.request_buffer[uid] = (await request.json(), write)
+                self.request_buffer[uid] = (await request.json(), write)
             else:
-                self.app.request_buffer[uid] = (request, write)
+                self.request_buffer[uid] = (request, write)
 
-            self.app.request_queue.put(uid)
-            background_tasks.add_task(cleanup, self.app.request_buffer, uid)
+            self.request_queue.put(uid)
+            background_tasks.add_task(cleanup, self.request_buffer, uid)
 
             async def stream_from_pipe():
                 # this is a workaround for Windows since asyncio loop.add_reader is not supported.
@@ -492,7 +491,9 @@ class LitServer:
         for spec in self._specs:
             spec: LitSpec
             # TODO: We need to call setup in after spawning inference workers
-            # spec.setup(self)
+            server_copy = copy.copy(self)
+            del server_copy.app
+            spec.setup(server_copy)
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])

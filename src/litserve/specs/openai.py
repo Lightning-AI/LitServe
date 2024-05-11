@@ -104,10 +104,10 @@ class OpenAISpec(LitSpec):
 
             request_el = request.copy()
             request_el.n = 1
-            self._server.app.request_buffer[uid] = (request_el, write)
-            self._server.app.request_queue.put(uid)
+            self._server.request_buffer[uid] = (request_el, write)
+            self._server.request_queue.put(uid)
 
-            background_tasks.add_task(self._server.cleanup_request, self._server.app.request_buffer, uid)
+            background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
             pipes.append(read)
 
         responses = []
@@ -115,13 +115,13 @@ class OpenAISpec(LitSpec):
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await wait_for_queue_timeout(
                     asyncio.to_thread(self._server.get_from_pipe, read),
-                    self._server.app.timeout,
+                    self._server.timeout,
                     uid,
-                    self._server.app.request_buffer,
+                    self._server.request_buffer,
                 )
             else:
                 data = await wait_for_queue_timeout(
-                    self._server.data_reader(read), self._server.app.timeout, uid, self._server.app.request_buffer
+                    self._server.data_reader(read), self._server.timeout, uid, self._server.request_buffer
                 )
             responses.append(data)
 
