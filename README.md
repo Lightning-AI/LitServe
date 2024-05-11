@@ -524,6 +524,8 @@ if __name__ == "__main__":
 <details>
     <summary>OpenAI compatible server</summary>
 
+&nbsp;
+
 You can serve LLMs like OpenAI API endpoint specification with LitServe's `OpenAISpec` by
 providing the `spec` argument to LitServer:
 
