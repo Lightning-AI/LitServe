@@ -520,6 +520,37 @@ if __name__ == "__main__":
 
 </details>
 
+<details>
+    <summary>OpenAI compatible server</summary>
+
+You can serve LLMs like OpenAI API endpoint specification with LitServe's `OpenAISpec` by
+providing the `spec` argument to LitServer:
+
+```python
+import litserve as ls
+from litserve.specs.openai import OpenAISpec
+
+class OpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = ...
+
+    def decode_request(self, request):
+        return request["prompt"]
+
+    def predict(self, x):
+        return "This is a generated output"
+
+    def encode_response(self, output):
+        return {"text": output}
+
+if __name__ == "__main__":
+    api = OpenAILitAPI()
+    spec = OpenAISpec()
+    server = ls.LitServer(api, spec=spec)
+    server.run(port=8000)
+```
+
+</details>
 
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
