@@ -32,6 +32,23 @@ def test_e2e_default_api(killall):
     killall(process)
 
 
+def test_e2e_default_spec(openai_request_data, killall):
+    process = subprocess.Popen(
+        ["python", "tests/e2e/default_spec.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+
+    time.sleep(2)
+    resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data, headers=None)
+    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+    output = resp.json()["choices"][0]["message"]["content"]
+    expected = "encode_response called from Spec"
+    assert output == expected, "tests/default_spec.py didn't return expected output"
+    killall(process)
+
+
 def test_e2e_default_batching(killall):
     process = subprocess.Popen(
         ["python", "tests/e2e/default_batching.py"],

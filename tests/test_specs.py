@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
@@ -18,55 +19,34 @@ from litserve.examples.openai_spec_example import OpenAILitAPI, OpenAISpecWithHo
 from litserve.specs.openai import OpenAISpec
 import litserve as ls
 
-data = {
-    "model": "",
-    "messages": "string",
-    "temperature": 0.7,
-    "top_p": 1,
-    "n": 1,
-    "stream": False,
-    "presence_penalty": 0,
-    "frequency_penalty": 0,
-    "user": "string",
-}
-
 
 @pytest.mark.asyncio()
-async def test_openai_spec():
+async def test_openai_spec(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(OpenAILitAPI(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp = await ac.post("/v1/chat/completions", json=data, timeout=10)
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
 
-        assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
-            "LitAPI predict response should match with " "the generated output"
-        )
+        assert (
+            resp.json()["choices"][0]["message"]["content"] == "encode_response called from LitAPI"
+        ), "LitAPI predict response should match with the generated output"
 
 
-def test_openai_spec_with_hooks(capsys):
-    output_text = "This is a generated output"
+@pytest.mark.asyncio()
+async def test_openai_spec_with_hooks(openai_request_data):
     server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec())
-    server.app.lit_api.decode_request(data)
-    response = server.app.lit_api.encode_response(output_text)
-    assert response == {"text": output_text}, "encode_response should return a dict with text key and output value"
-    capture = capsys.readouterr()
-    assert "decode_request called from LitAPI" in capture.out, (
-        "LitAPI.decode_request should be called when Spec " "doesn't implement decode_requst"
-    )
-    assert "encode_response called from LitAPI" in capture.out, (
-        "LitAPI.encode_response should be called when " "Spec doesn't implement encode_response"
-    )
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        output = response.json()["choices"][0]["message"]["content"]
+        expected_output = "encode_response called from LitAPI"
+
+        assert output == expected_output, "Spec didn't have its own encode, and decode so must fallback to LitAPI"
 
     # Test with hooks, OpenAISpecWithHooks implements decode_request and encode_response
     server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpecWithHooks())
-    server.app.lit_api.decode_request(data)
-    response = server.app.lit_api.encode_response(output_text)
-    assert response == {"text": output_text}, "encode_response should return a dict with text key and output value"
-    capture = capsys.readouterr()
-    assert "decode_request called from Spec" in capture.out, (
-        "LitSpec.decode_request should be called because " "OpenAISpecWithHooks implements decode_requst"
-    )
-    assert "encode_response called from Spec" in capture.out, (
-        "LitSpec.encode_response should be called because" " OpenAISpecWithHooks implements encode_response"
-    )
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        response = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        output = response.json()["choices"][0]["message"]["content"]
+        expected_output = "encode_response called from Spec"
+        assert output == expected_output, "Spec had its own encode, and decode."

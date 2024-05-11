@@ -20,12 +20,10 @@ logging.basicConfig(level=logging.INFO)
 
 class OpenAISpecWithHooks(OpenAISpec):
     def decode_request(self, request):
-        print("decode_request called from Spec")
         return request.messages
 
     def encode_response(self, output):
-        print("encode_response called from Spec")
-        return {"text": output}
+        return {"text": "encode_response called from Spec"}
 
 
 class OpenAILitAPI(ls.LitAPI):
@@ -40,8 +38,7 @@ class OpenAILitAPI(ls.LitAPI):
         return "This is a generated output"
 
     def encode_response(self, output):
-        print("encode_response called from LitAPI")
-        return {"text": output}
+        return {"text": "encode_response called from LitAPI"}
 
 
 if __name__ == "__main__":

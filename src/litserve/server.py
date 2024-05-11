@@ -199,6 +199,7 @@ def inference_worker(
 ):
     lit_api.setup(device)
     if lit_spec:
+        logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
         lit_spec._lit_api = lit_api
         lit_api = lit_spec
     if stream:
@@ -300,13 +301,17 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        manager = Manager()
-        self.request_buffer = manager.dict()
-        self.request_queue = manager.Queue()
+        # manager = Manager()
+        # self.request_buffer = manager.dict()
+        # self.request_queue = manager.Queue()
         self.setup_server()
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
+        manager = Manager()
+        self.request_buffer = manager.dict()
+        self.request_queue = manager.Queue()
+
         try:
             pickle.dumps(self.lit_api)
             pickle.dumps(self.lit_spec)
@@ -343,6 +348,13 @@ class LitServer:
             )
             process.start()
             process_list.append((process, worker_id))
+
+        for spec in self._specs:
+            # Objects of Server class are referenced (not copied)
+            logging.debug(f"shallow copy for Server is created for for spec {spec}")
+            server_copy = copy.copy(self)
+            del server_copy.app
+            spec.setup(server_copy)
 
         yield
 
@@ -490,11 +502,6 @@ class LitServer:
 
         for spec in self._specs:
             spec: LitSpec
-            # Objects of Server class are referenced (not copied)
-            logging.debug(f"shallow copy for Server is created for for spec {spec}")
-            server_copy = copy.copy(self)
-            del server_copy.app
-            spec.setup(server_copy)
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])

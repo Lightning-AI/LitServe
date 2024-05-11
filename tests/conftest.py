@@ -117,3 +117,18 @@ def killall():
         process.kill()
 
     return _run
+
+
+@pytest.fixture()
+def openai_request_data():
+    return {
+        "model": "",
+        "messages": "string",
+        "temperature": 0.7,
+        "top_p": 1,
+        "n": 1,
+        "stream": False,
+        "presence_penalty": 0,
+        "frequency_penalty": 0,
+        "user": "string",
+    }
