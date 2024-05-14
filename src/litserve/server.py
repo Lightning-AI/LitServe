@@ -56,9 +56,8 @@ def load_and_raise(response):
         pickle.loads(response)
         raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
-        logger.exception(
-            f"Expected response to be a pickled exception, but received an unexpected response: {response}."
-        )
+        logger.exception(f"main process failed to load the exception from the parallel worker process. "
+                         f"{response} couldn't be unpickled.")
 
 
 async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
@@ -129,8 +128,8 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
                     pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
             logger.exception(
-                "Error occurred while processing batched requests.\n"
-                "Hint: Please ensure your LitAPI implementation is correct."
+                "LitAPI ran into an error while processing the batched request.\n"              
+                "Please check the error trace for more details."
             )
             err_pkl = pickle.dumps(e)
             with contextlib.suppress(BrokenPipeError):
@@ -157,8 +156,8 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
                 pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
             logger.exception(
-                "Error occurred while processing request uid=%s.\n"
-                "Hint: Please ensure LitAPI implementation is correct.",
+                "LitAPI ran into an error while processing the request uid=%s.\n"
+                "Please check the error trace for more details.",
                 uid,
             )
             with contextlib.suppress(BrokenPipeError):
@@ -188,8 +187,8 @@ def run_streaming_loop(lit_api: LitAPI, request_queue: Queue, request_buffer):
                 pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
             logger.exception(
-                "Error occurred while processing request uid=%s.\n"
-                "Hint: Please ensure LitAPI implementation is correct.",
+                "LitAPI ran into an error while processing the streaming request uid=%s.\n"
+                "Please check the error trace for more details.",
                 uid,
             )
             with contextlib.suppress(BrokenPipeError):
@@ -224,12 +223,12 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                         y_enc = lit_api.format_encoded_response(y_enc)
                         pipe_s.send((y_enc, LitAPIStatus.OK))
 
-            for pipe_s in pipes:
-                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+            with contextlib.suppress(BrokenPipeError):
+                for pipe_s in pipes:
+                    pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
-            logger.exception(
-                "Error occurred while processing request.\n" "Hint: Please ensure LitAPI implementation is correct."
-            )
+            logger.exception("LitAPI ran into an error while processing the streaming batched request.\n"
+                             "Please check the error trace for more details.")
             err = pickle.dumps(e)
             for pipe_s in pipes:
                 pipe_s.send((err, LitAPIStatus.ERROR))
