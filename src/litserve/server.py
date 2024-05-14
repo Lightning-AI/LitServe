@@ -56,8 +56,10 @@ def load_and_raise(response):
         pickle.loads(response)
         raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
-        logger.exception(f"main process failed to load the exception from the parallel worker process. "
-                         f"{response} couldn't be unpickled.")
+        logger.exception(
+            f"main process failed to load the exception from the parallel worker process. "
+            f"{response} couldn't be unpickled."
+        )
 
 
 async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
@@ -128,7 +130,7 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
                     pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
             logger.exception(
-                "LitAPI ran into an error while processing the batched request.\n"              
+                "LitAPI ran into an error while processing the batched request.\n"
                 "Please check the error trace for more details."
             )
             err_pkl = pickle.dumps(e)
@@ -227,8 +229,10 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                 for pipe_s in pipes:
                     pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
-            logger.exception("LitAPI ran into an error while processing the streaming batched request.\n"
-                             "Please check the error trace for more details.")
+            logger.exception(
+                "LitAPI ran into an error while processing the streaming batched request.\n"
+                "Please check the error trace for more details."
+            )
             err = pickle.dumps(e)
             for pipe_s in pipes:
                 pipe_s.send((err, LitAPIStatus.ERROR))
