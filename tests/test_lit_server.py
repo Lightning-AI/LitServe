@@ -196,6 +196,7 @@ def test_streaming_loop(loop_args):
     fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
     fake_stream_api.predict = MagicMock(side_effect=fake_predict)
     fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
+    fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     _, requests_queue, request_buffer = loop_args
     request_buffer = Manager().dict()
@@ -248,6 +249,7 @@ def test_batched_streaming_loop(loop_args):
     fake_stream_api.predict = MagicMock(side_effect=fake_predict)
     fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
     fake_stream_api.unbatch = MagicMock(side_effect=lambda inputs: inputs)
+    fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     _, requests_queue, request_buffer = loop_args
     request_buffer = Manager().dict()

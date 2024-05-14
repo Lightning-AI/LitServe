@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import json
 from abc import ABC, abstractmethod
+
+from pydantic import BaseModel
 
 
 def no_batch_unbatch_message_no_stream(obj, data):
@@ -112,6 +115,13 @@ class LitAPI(ABC):
 
         """
         pass
+
+    def format_encoded_response(self, data):
+        if isinstance(data, dict):
+            return json.dumps(data)
+        if isinstance(data, BaseModel):
+            return data.model_dump_json()
+        return data
 
     @property
     def stream(self):
