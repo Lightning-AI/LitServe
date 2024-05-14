@@ -270,9 +270,9 @@ def setup_auth():
 
 
 def cleanup(request_buffer, uid):
+    logger.debug("Cleaning up request uid=%s", uid)
     with contextlib.suppress(KeyError):
         request_buffer.pop(uid)
-    logger.debug("%s cleaned up", uid)
 
 
 @asynccontextmanager
