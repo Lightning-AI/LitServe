@@ -165,7 +165,7 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
                 pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
-def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
+def run_streaming_loop(lit_api: LitAPI, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
@@ -182,6 +182,7 @@ def run_streaming_loop(lit_api, request_queue: Queue, request_buffer):
             y_enc_gen = lit_api.encode_response(y_gen)
             for y_enc in y_enc_gen:
                 with contextlib.suppress(BrokenPipeError):
+                    y_enc = lit_api.format_encoded_response(y_enc)
                     pipe_s.send((y_enc, LitAPIStatus.OK))
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
@@ -220,6 +221,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
             for y_batch in y_enc_iter:
                 for y_enc, pipe_s in zip(y_batch, pipes):
                     with contextlib.suppress(BrokenPipeError):
+                        y_enc = lit_api.format_encoded_response(y_enc)
                         pipe_s.send((y_enc, LitAPIStatus.OK))
 
             for pipe_s in pipes:
@@ -235,6 +237,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
+    logging.info(f"setup complete for worker_id={worker_id}")
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
