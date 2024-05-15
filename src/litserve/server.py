@@ -36,6 +36,8 @@ from fastapi.responses import StreamingResponse
 from litserve import LitAPI
 from litserve.connector import _Connector
 
+logger = logging.getLogger(__name__)
+
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
@@ -54,7 +56,10 @@ def load_and_raise(response):
         pickle.loads(response)
         raise HTTPException(500, "Internal Server Error")
     except pickle.PickleError:
-        logging.error(f"Expected response to be a pickled exception, but received an unexpected response: {response}.")
+        logger.exception(
+            f"main process failed to load the exception from the parallel worker process. "
+            f"{response} couldn't be unpickled."
+        )
 
 
 async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
@@ -67,7 +72,7 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
         return await asyncio.wait_for(shield, timeout)
     except asyncio.TimeoutError:
         if uid in request_buffer:
-            logging.error(
+            logger.error(
                 f"Request was waiting in the queue for too long ({timeout} seconds) and has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
@@ -110,6 +115,7 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
         if not batches:
             continue
 
+        logger.debug(f"{len(batches)} batched requests received")
         inputs, pipes = zip(*batches)
 
         try:
@@ -123,7 +129,10 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
                 with contextlib.suppress(BrokenPipeError):
                     pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
-            logging.exception(e)
+            logger.exception(
+                "LitAPI ran into an error while processing the batched request.\n"
+                "Please check the error trace for more details."
+            )
             err_pkl = pickle.dumps(e)
             with contextlib.suppress(BrokenPipeError):
                 for pipe_s in pipes:
@@ -134,7 +143,6 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
-            logging.debug(f"Received request uid={uid}")
             try:
                 x_enc, pipe_s = request_buffer.pop(uid)
             except KeyError:
@@ -149,7 +157,11 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
-            logging.exception(e)
+            logger.exception(
+                "LitAPI ran into an error while processing the request uid=%s.\n"
+                "Please check the error trace for more details.",
+                uid,
+            )
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
@@ -176,7 +188,11 @@ def run_streaming_loop(lit_api: LitAPI, request_queue: Queue, request_buffer):
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
-            logging.exception(e)
+            logger.exception(
+                "LitAPI ran into an error while processing the streaming request uid=%s.\n"
+                "Please check the error trace for more details.",
+                uid,
+            )
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
@@ -209,10 +225,14 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
                         y_enc = lit_api.format_encoded_response(y_enc)
                         pipe_s.send((y_enc, LitAPIStatus.OK))
 
-            for pipe_s in pipes:
-                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+            with contextlib.suppress(BrokenPipeError):
+                for pipe_s in pipes:
+                    pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
         except Exception as e:
-            logging.exception(e)
+            logger.exception(
+                "LitAPI ran into an error while processing the streaming batched request.\n"
+                "Please check the error trace for more details."
+            )
             err = pickle.dumps(e)
             for pipe_s in pipes:
                 pipe_s.send((err, LitAPIStatus.ERROR))
@@ -256,6 +276,7 @@ def setup_auth():
 
 
 def cleanup(request_buffer, uid):
+    logger.debug("Cleaning up request uid=%s", uid)
     with contextlib.suppress(KeyError):
         request_buffer.pop(uid)
 
@@ -281,6 +302,7 @@ async def lifespan(app: FastAPI):
         if len(device) == 1:
             device = device[0]
 
+        logger.info(f"Starting worker worker_id={worker_id}")
         ctx = mp.get_context("spawn")
         process = ctx.Process(
             target=inference_worker,
@@ -302,7 +324,7 @@ async def lifespan(app: FastAPI):
     yield
 
     for process, worker_id in process_list:
-        logging.info(f"terminating worker worker_id={worker_id}")
+        logger.info(f"terminating worker worker_id={worker_id}")
         process.terminate()
 
 
@@ -385,6 +407,7 @@ class LitServer:
         @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            logger.debug(f"Received request uid={uid}")
 
             read, write = self.new_pipe()
 
@@ -432,6 +455,7 @@ class LitServer:
         @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            logger.debug(f"Received request uid={uid}")
 
             read, write = self.new_pipe()
 
@@ -452,7 +476,7 @@ class LitServer:
                         if status == LitAPIStatus.FINISH_STREAMING:
                             return
                         elif status == LitAPIStatus.ERROR:
-                            logging.error(
+                            logger.error(
                                 "Error occurred while streaming outputs from the inference worker. "
                                 "Please check the above traceback."
                             )
@@ -474,7 +498,7 @@ class LitServer:
                         if status == LitAPIStatus.FINISH_STREAMING:
                             return
                         if status == LitAPIStatus.ERROR:
-                            logging.error(
+                            logger.error(
                                 "Error occurred while streaming outputs from the inference worker. "
                                 "Please check the above traceback."
                             )
