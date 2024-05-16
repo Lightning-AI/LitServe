@@ -143,8 +143,8 @@ async def test_stream(simple_stream_api):
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
-        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
         resp1, resp2 = await asyncio.gather(resp1, resp2)
         assert resp1.status_code == 200, "Check if server is running and the request format is valid."
         assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
@@ -154,13 +154,20 @@ async def test_stream(simple_stream_api):
 
 @pytest.mark.asyncio()
 async def test_batched_stream_server(simple_batched_stream_api):
-    server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
+    server = LitServer(
+        simple_batched_stream_api,
+        stream=True,
+        max_batch_size=4,
+        batch_timeout=2,
+        timeout=30,
+        endpoint_path="/v1/stream/predict",
+    )
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp1 = ac.post("/stream-predict", json={"prompt": "Hello"}, timeout=10)
-        resp2 = ac.post("/stream-predict", json={"prompt": "World"}, timeout=10)
+        resp1 = ac.post("/v1/stream/predict", json={"prompt": "Hello"}, timeout=10)
+        resp2 = ac.post("/v1/stream/predict", json={"prompt": "World"}, timeout=10)
         resp1, resp2 = await asyncio.gather(resp1, resp2)
         assert resp1.status_code == 200, "Check if server is running and the request format is valid."
         assert resp2.status_code == 200, "Check if server is running and the request format is valid."
