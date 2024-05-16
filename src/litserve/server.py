@@ -338,6 +338,7 @@ class LitServer:
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
+        endpoint_path: str = "/predict",
         stream: bool = False,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
@@ -345,6 +346,10 @@ class LitServer:
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
+        if not endpoint_path.startswith("/"):
+            raise ValueError("endpoint_path must start with '/', like '/predict' or '/api/predict'.")
+
+        self.endpoint_path = endpoint_path
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size)
         self.app = FastAPI(lifespan=lifespan)
@@ -404,7 +409,6 @@ class LitServer:
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
-        @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             logger.debug(f"Received request uid={uid}")
@@ -452,7 +456,6 @@ class LitServer:
                 load_and_raise(response)
             return response
 
-        @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             logger.debug(f"Received request uid={uid}")
@@ -509,6 +512,15 @@ class LitServer:
                 return StreamingResponse(stream_from_pipe())
 
             return StreamingResponse(data_streamer())
+
+        stream = self.app.lit_api.stream
+        methods = ["POST"]
+        self.app.add_api_route(
+            self.endpoint_path,
+            stream_predict if stream else predict,
+            methods=methods,
+            dependencies=[Depends(setup_auth())],
+        )
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")

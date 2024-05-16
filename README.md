@@ -523,6 +523,16 @@ if __name__ == "__main__":
 </details>
 
 
+<details>
+  <summary>Customize endpoint path</summary>
+
+&nbsp;
+By default, LitServe exposes `/predict` endpoint for serving the model, but you can customize the API endpoint
+path by providing `LitServer(..., endpoint_path="/api/CUSTOM_PATH")`.
+
+</details>
+
+
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
 
