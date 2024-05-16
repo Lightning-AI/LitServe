@@ -240,7 +240,7 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
 
 def inference_worker(lit_api, device, worker_id, request_queue, request_buffer, max_batch_size, batch_timeout, stream):
     lit_api.setup(device=device)
-    logging.info(f"setup complete for worker_id={worker_id}")
+    print(f"setup complete for worker_id={worker_id}")
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
