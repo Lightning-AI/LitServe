@@ -534,4 +534,7 @@ class LitServer:
         except ValueError:
             raise ValueError(port_msg)
 
+        if not (1024 <= port <= 65535):
+            raise ValueError(port_msg)
+
         uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)

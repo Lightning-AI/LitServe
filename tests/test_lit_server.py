@@ -351,6 +351,9 @@ def test_server_run(mock_uvicorn):
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         server.run(port="invalid port")
 
+    with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
+        server.run(port=65536)
+
     server.run(port=8000)
     mock_uvicorn.run.assert_called()
     mock_uvicorn.reset_mock()
