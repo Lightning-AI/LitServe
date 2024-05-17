@@ -56,7 +56,7 @@ def test_e2e_batched_streaming():
     )
 
     time.sleep(5)
-    resp = requests.post("http://127.0.0.1:8000/stream-predict", json={"input": 4.0}, headers=None, stream=True)
+    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
 
     outputs = []
