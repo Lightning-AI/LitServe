@@ -343,3 +343,16 @@ def test_mocked_accelerator():
     with patch("litserve.connector._Connector._choose_gpu_accelerator_backend", return_value="mps"):
         server = LitServer(SimpleLitAPI(), devices=1, timeout=10, accelerator="auto")
         assert server._connector.accelerator == "mps"
+
+
+@patch("litserve.server.uvicorn")
+def test_server_run(mock_uvicorn):
+    server = LitServer(SimpleLitAPI())
+    with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
+        server.run(port="invalid port")
+
+    server.run(port=8000)
+    mock_uvicorn.run.assert_called()
+    mock_uvicorn.reset_mock()
+    server.run(port="8001")
+    mock_uvicorn.run.assert_called()
