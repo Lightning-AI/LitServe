@@ -405,7 +405,6 @@ class LitServer:
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
-        @self.app.post("/predict", dependencies=[Depends(setup_auth())])
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             logger.debug(f"Received request uid={uid}")
@@ -453,7 +452,6 @@ class LitServer:
                 load_and_raise(response)
             return response
 
-        @self.app.post("/stream-predict", dependencies=[Depends(setup_auth())])
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             logger.debug(f"Received request uid={uid}")
@@ -510,6 +508,9 @@ class LitServer:
                 return StreamingResponse(stream_from_pipe())
 
             return StreamingResponse(data_streamer())
+
+        fn = stream_predict if self.app.lit_api.stream else predict
+        self.app.add_api_route("/predict", fn, methods=["post"], dependencies=[Depends(setup_auth())])
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
