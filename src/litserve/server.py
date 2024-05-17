@@ -21,6 +21,7 @@ import inspect
 import multiprocessing as mp
 from multiprocessing import Manager, Queue, Pipe
 from queue import Empty
+import uvicorn
 import time
 import os
 import shutil
@@ -525,9 +526,16 @@ class LitServer:
         except Exception as e:
             print(f"Error copying file: {e}")
 
-    def run(self, port=8000, log_level="info", **kwargs):
+    def run(self, port: Union[str, int] = 8000, log_level: str = "info", **kwargs):
         self.generate_client_file()
 
-        import uvicorn
+        port_msg = f"port must be a value from 1024 to 65535 but got {port}"
+        try:
+            port = int(port)
+        except ValueError:
+            raise ValueError(port_msg)
+
+        if not (1024 <= port <= 65535):
+            raise ValueError(port_msg)
 
         uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)
