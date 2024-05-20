@@ -15,7 +15,7 @@
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
-from litserve.examples.openai_spec_example import OpenAILitAPI
+from litserve.examples.openai_spec_example import OpenAILitAPI, OpenAILitAPIWithCustomEncode
 from litserve.specs.openai import OpenAISpec
 import litserve as ls
 
@@ -30,4 +30,17 @@ async def test_openai_spec(openai_request_data):
 
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
+        ), "LitAPI predict response should match with the generated output"
+
+
+@pytest.mark.asyncio()
+async def test_override_encode(openai_request_data):
+    spec = OpenAISpec()
+    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=spec, stream=True)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        assert resp.status_code == 200, "Status code should be 200"
+
+        assert (
+            resp.json()["choices"][0]["message"]["content"] == "This output is a custom encoded output"
         ), "LitAPI predict response should match with the generated output"

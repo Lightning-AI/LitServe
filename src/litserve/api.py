@@ -56,6 +56,7 @@ def no_batch_unbatch_message_stream(obj, data):
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: callable = None
+    _spec: LitSpec = None
 
     @abstractmethod
     def setup(self, devices):
@@ -64,7 +65,7 @@ class LitAPI(ABC):
 
     def decode_request(self, request):
         """Convert the request payload to your model input."""
-        pass
+        return self._spec.decode_request(request)
 
     def batch(self, inputs):
         """Convert a list of inputs to a batched input."""
@@ -114,7 +115,7 @@ class LitAPI(ABC):
         To enable streaming, it should yield the output.
 
         """
-        pass
+        return self._spec.encode_response(output)
 
     def format_encoded_response(self, data):
         if isinstance(data, dict):
@@ -143,6 +144,7 @@ class LitAPI(ABC):
         # Case 2: spec implements a non-streaming API
         if spec:
             # TODO: Implement sanitization
+            self._spec = spec
             return
 
         original = self.unbatch.__code__ is LitAPI.unbatch.__code__

@@ -146,9 +146,9 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
             continue
 
         try:
-            x = lit_spec.decode_request(x_enc)
+            x = lit_api.decode_request(x_enc)
             y_gen = lit_api.predict(x)
-            y_enc_gen = lit_spec.encode_response(y_gen)
+            y_enc_gen = lit_api.encode_response(y_gen)
             for y_enc in y_enc_gen:
                 with contextlib.suppress(BrokenPipeError):
                     y_enc = lit_api.format_encoded_response(y_enc)
@@ -180,11 +180,11 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
         inputs, pipes = zip(*batches)
 
         try:
-            x = [lit_spec.decode_request(input) for input in inputs]
-            x = lit_spec.batch(x)
-            y_iter = lit_spec.predict(x)
-            unbatched_iter = lit_spec.unbatch(y_iter)
-            y_enc_iter = lit_spec.encode_response(unbatched_iter)
+            x = [lit_api.decode_request(input) for input in inputs]
+            x = lit_api.batch(x)
+            y_iter = lit_api.predict(x)
+            unbatched_iter = lit_api.unbatch(y_iter)
+            y_enc_iter = lit_api.encode_response(unbatched_iter)
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
@@ -208,7 +208,7 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
 
 def inference_worker(
     lit_api: LitAPI,
-    lit_spec: LitSpec,
+    lit_spec: Optional[LitSpec],
     device,
     worker_id,
     request_queue,
@@ -221,8 +221,6 @@ def inference_worker(
     print(f"setup complete for worker {worker_id}")
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
-    else:
-        lit_spec = lit_api  # duck typing
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
