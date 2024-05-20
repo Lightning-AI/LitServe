@@ -25,10 +25,6 @@ from .base import LitSpec
 
 logger = logging.getLogger(__name__)
 
-PREDICT_BATCH_RESPONSE_TYPE = List[Dict[str, str]]
-PREDICT_WO_BACTH_RESPONSE_TYPE = Dict[str, str]
-PREDICT_RESPONSE_TYPE = Generator[Union[PREDICT_BATCH_RESPONSE_TYPE, PREDICT_WO_BACTH_RESPONSE_TYPE], None, None]
-
 
 def shortuuid():
     return uuid.uuid4().hex[:6]
@@ -110,13 +106,33 @@ class OpenAISpec(LitSpec):
     def batch(self, inputs):
         return list(inputs)
 
-    def unbatch(self, output_generator):
-        # yield from output_generator
-        return output_generator
+    def unbatch(self, output):
+        return output
+
+    def validate_chat_message(self, obj):
+        return isinstance(obj, dict) and "role" in obj and "content" in obj
+
+    def encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionResponseChoice:
+        if isinstance(output, str):
+            message = {"role": "assistant", "content": output}
+        elif self.validate_chat_message(output):
+            message = output
+        elif isinstance(output, list) and output and self.validate_chat_message(output[-1]):
+            message = output[-1]
+        else:
+            error = f"Malformed output from LitAPI.predict: expected string or {{'role': '...', 'content': '...'}}, got '{output}'."
+            logger.exception(error)
+            raise HTTPException(500, error)
+
+        return ChatCompletionResponseChoice(
+            index=0,
+            message=ChatMessage(**message),
+            finish_reason="stop",
+        )
 
     async def get_from_pipe(self, uids, pipes) -> List[str]:
         responses = []
-        for uid, read in zip(uids, pipes):
+        for uid, (read, _) in zip(uids, pipes):
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await wait_for_queue_timeout(
                     asyncio.to_thread(self._server.get_from_pipe, read),
@@ -149,13 +165,16 @@ class OpenAISpec(LitSpec):
             self._server.request_queue.put(uid)
 
             background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
-            pipes.append(read)
+            pipes.append((read, write))
 
         responses = await self.get_from_pipe(uids, pipes)
 
-        choices = []
+        for read, write in pipes:
+            self._server.dispose_pipe(read, write)
 
         usage = UsageInfo()
+
+        choices = []
         for i, data in enumerate(responses):
             response, status = data
             logger.debug("Received chat completion response %s with status %s", response, status)
@@ -164,32 +183,9 @@ class OpenAISpec(LitSpec):
 
             if status != LitAPIStatus.OK:
                 break
+ 
+            response.index = i
+            choices.append(response)
 
-            if isinstance(response, str):
-                message = {"role": "assistant", "content": response}
-            elif isinstance(response, dict) and "role" in response and "content" in response:
-                message = response
-            elif isinstance(response, list) and response and isinstance(response[0], dict) and "role" in response[0] and "content" in response[0]:
-                message = response[0]
-            else:
-                error = f"Malformed output from LitAPI.predict: expected string or {{'role': '...', 'content': '...'}}, got '{response}'."
-                logger.exception(error)
-                raise HTTPException(500, error)
-
-            choices.append(
-                ChatCompletionResponseChoice(
-                    index=i,
-                    message=ChatMessage(**message),
-                    finish_reason="stop",
-                )
-            )
-            task_usage = UsageInfo.parse_obj(UsageInfo())
-            for usage_key, usage_value in task_usage.dict().items():
-                setattr(usage, usage_key, getattr(usage, usage_key) + usage_value)
-
-        model = request.model or "litserve"
+        model = request.model  # or "litserve"
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
-
-    def encode_response(self, output_generator: PREDICT_RESPONSE_TYPE) -> Generator[ChatCompletionResponse, None, None]:
-        return output_generator
-        # yield from output_generator
