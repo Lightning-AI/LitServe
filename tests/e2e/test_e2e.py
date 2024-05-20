@@ -44,7 +44,7 @@ def test_e2e_default_spec(openai_request_data, killall):
     resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     output = resp.json()["choices"][0]["message"]["content"]
-    expected = "encode_response called from Spec"
+    expected = "This is a generated output"
     assert output == expected, "tests/default_spec.py didn't return expected output"
     killall(process)
 

@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from litserve.examples.openai_spec_example import OpenAILitAPI, OpenAISpecWithHooks
+from litserve.examples.openai_spec_example import OpenAILitAPI
 from litserve.specs.openai import OpenAISpec
 
 import litserve as ls
 
 if __name__ == "__main__":
     spec = OpenAISpec()
-    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpecWithHooks())
+    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec(), stream=True)
     server.run(port=8000)
