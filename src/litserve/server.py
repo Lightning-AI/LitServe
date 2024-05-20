@@ -414,6 +414,44 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
+    async def stream_from_pipe(self, read):
+        # this is a workaround for Windows since asyncio loop.add_reader is not supported.
+        # https://docs.python.org/3/library/asyncio-platforms.html
+        while True:
+            if read.poll(LONG_TIMEOUT):
+                response, status = read.recv()
+                if status == LitAPIStatus.FINISH_STREAMING:
+                    return
+                elif status == LitAPIStatus.ERROR:
+                    logger.error(
+                        "Error occurred while streaming outputs from the inference worker. "
+                        "Please check the above traceback."
+                    )
+                    return
+                yield response
+
+            await asyncio.sleep(0.0001)
+
+    async def data_streamer(self, read):
+        data_available = asyncio.Event()
+        while True:
+            asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+            if not read.poll():
+                await data_available.wait()
+                data_available.clear()
+                asyncio.get_event_loop().remove_reader(read.fileno())
+            if read.poll():
+                response, status = read.recv()
+                if status == LitAPIStatus.FINISH_STREAMING:
+                    return
+                if status == LitAPIStatus.ERROR:
+                    logger.error(
+                        "Error occurred while streaming outputs from the inference worker. "
+                        "Please check the above traceback."
+                    )
+                    return
+                yield response
+
     def cleanup_request(self, request_buffer, uid):
         with contextlib.suppress(KeyError):
             request_buffer.pop(uid)
@@ -469,48 +507,10 @@ class LitServer:
             self.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.request_buffer, uid)
 
-            async def stream_from_pipe():
-                # this is a workaround for Windows since asyncio loop.add_reader is not supported.
-                # https://docs.python.org/3/library/asyncio-platforms.html
-                while True:
-                    if read.poll(LONG_TIMEOUT):
-                        response, status = read.recv()
-                        if status == LitAPIStatus.FINISH_STREAMING:
-                            return
-                        elif status == LitAPIStatus.ERROR:
-                            logger.error(
-                                "Error occurred while streaming outputs from the inference worker. "
-                                "Please check the above traceback."
-                            )
-                            return
-                        yield response
-
-                    await asyncio.sleep(0.0001)
-
-            async def data_streamer():
-                data_available = asyncio.Event()
-                while True:
-                    asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
-                    if not read.poll():
-                        await data_available.wait()
-                        data_available.clear()
-                        asyncio.get_event_loop().remove_reader(read.fileno())
-                    if read.poll():
-                        response, status = read.recv()
-                        if status == LitAPIStatus.FINISH_STREAMING:
-                            return
-                        if status == LitAPIStatus.ERROR:
-                            logger.error(
-                                "Error occurred while streaming outputs from the inference worker. "
-                                "Please check the above traceback."
-                            )
-                            return
-                        yield response
-
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(stream_from_pipe())
+                return StreamingResponse(self.stream_from_pipe(read))
 
-            return StreamingResponse(data_streamer())
+            return StreamingResponse(self.data_streamer(read))
 
         if not self._specs:
             stream = self.lit_api.stream
