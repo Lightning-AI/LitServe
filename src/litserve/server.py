@@ -27,6 +27,7 @@ import os
 import shutil
 from typing import Sequence, Optional, Union
 import uuid
+from litserve import specs as lit_specs
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
@@ -279,6 +280,10 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
+
+        if isinstance(spec, lit_specs.OpenAISpec):
+            logger.debug("detected OpenAI spec %s, setting stream=True", spec.__class__.__name__)
+            stream = True
 
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
