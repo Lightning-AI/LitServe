@@ -115,6 +115,9 @@ class OpenAISpec(LitSpec):
     def encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionResponseChoice:
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
+        elif isinstance(output, dict) and "content" in output:
+            message = output.copy()
+            message.update(role="assistant")
         elif self.validate_chat_message(output):
             message = output
         elif isinstance(output, list) and output and self.validate_chat_message(output[-1]):

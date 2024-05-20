@@ -444,7 +444,7 @@ if __name__ == "__main__":
 
 
 <details>
-  <summary>Stream long responses</summary>
+  <summary>Stream long responses</summaryoutput >
 
 &nbsp;
 
@@ -529,7 +529,7 @@ if __name__ == "__main__":
 </details>
 
 <details>
-    <summary>OpenAI compatible server</summary>
+    <summary>OpenAI compatible API</summary>
 
 &nbsp;
 
