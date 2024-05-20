@@ -113,7 +113,9 @@ class LitAPI(ABC):
 
     def encode_response(self, output):
         """Convert the model output to a response payload.
+
         To enable streaming, it should yield the output.
+
         """
         if self._spec:
             return self._spec.encode_response(output)
