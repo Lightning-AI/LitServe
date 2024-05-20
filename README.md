@@ -8,9 +8,9 @@
 **High-throughput serving engine for AI models**
 
 <pre>
-✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU 
-✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control        
-✅ Auth           ✅ Built on Fast API                         
+✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU
+✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control
+✅ Auth           ✅ Built on Fast API
 </pre>
 
 
@@ -544,14 +544,8 @@ class OpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = ...
 
-    def decode_request(self, request):
-        return request["prompt"]
-
     def predict(self, x):
-        return "This is a generated output"
-
-    def encode_response(self, output):
-        return {"text": output}
+        yield {"content": "This is a generated output"}
 
 if __name__ == "__main__":
     server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec())
@@ -559,24 +553,28 @@ if __name__ == "__main__":
 ```
 
 
-By default, LitServe will use LitAPI's implementation of `LitAPI.decode_request` and `LitAPI.encode_response`.
-You can also customize this behaviour and let your `spec` handle it by implementing `decode_request` and
-`encode_response` for spec as follows:
+By default, LitServe will use `OpenAISpec`'s implementation of `LitAPI.decode_request` and `LitAPI.encode_response`.
+You can also customize this behavior by overriding the LitAPI's `decode_request` and `encode_response` methods.
 
 ```python
 import litserve as ls
-from litserve.examples.openai_spec_example import OpenAILitAPI
 from litserve.specs.openai import OpenAISpec
 
-class OpenAISpecWithHooks(OpenAISpec):
-    def decode_request(self, request):
-        return request.messages
+class CustomOpenAIAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
 
-    def encode_response(self, output):
-        return {"text": "encode_response called from Spec"}
+    def encode_response(self, output_generator):
+        for output in output_generator:
+            output["content"] = "This output is a custom encoded output"
+            yield output
+
+    def predict(self, x):
+        yield {"role": "assistant", "content": "This is a generated output"}
+
 
 if __name__ == "__main__":
-    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpecWithHooks())
+    server = ls.LitServer(CustomOpenAIAPI(), spec=OpenAISpec())
     server.run(port=8000)
 ```
 
