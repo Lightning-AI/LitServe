@@ -8,9 +8,9 @@
 **High-throughput serving engine for AI models**
 
 <pre>
-✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU
-✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control
-✅ Auth           ✅ Built on Fast API
+✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU 
+✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control        
+✅ Auth           ✅ Built on Fast API                         
 </pre>
 
 
