@@ -106,7 +106,7 @@ class OpenAISpec(LitSpec):
 
     def decode_request(self, request: ChatCompletionRequest) -> List[Dict[str, str]]:
         # returns [{"role": "system", "content": "..."}, ...]
-        return request.messages
+        return [el.dict() for el in request.messages]
 
     def batch(self, inputs):
         return list(inputs)
