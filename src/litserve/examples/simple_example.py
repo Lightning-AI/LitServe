@@ -89,6 +89,7 @@ class SimpleStreamAPI(ls.LitAPI):
             print(line.decode("utf-8"))
         ```
     """
+
     def setup(self, device) -> None:
         self.model = lambda x: str(x)
 
