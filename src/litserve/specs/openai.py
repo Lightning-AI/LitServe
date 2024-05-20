@@ -165,7 +165,7 @@ class OpenAISpec(LitSpec):
         for uid in uids:
             read, write = self._server.new_pipe()
 
-            request_el = request.copy()
+            request_el = request.model_copy()
             request_el.n = 1
             self._server.request_buffer[uid] = (request_el, write)
             self._server.request_queue.put(uid)
@@ -190,7 +190,7 @@ class OpenAISpec(LitSpec):
             if status != LitAPIStatus.OK:
                 break
 
-            response.model_copy(update={"index": i})
+            response = response.model_copy(update={"index": i})
             choices.append(response)
 
         model = request.model

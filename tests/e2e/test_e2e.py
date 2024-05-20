@@ -41,7 +41,7 @@ def test_e2e_default_spec(openai_request_data, killall):
     )
 
     time.sleep(5)
-    resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data, headers=None)
+    resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     output = resp.json()["choices"][0]["message"]["content"]
     expected = "This is a generated output"
