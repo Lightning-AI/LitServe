@@ -77,13 +77,11 @@ class SimpleStreamAPI(ls.LitAPI):
         server = ls.LitServer(SimpleStreamAPI(), stream=True)
         server.run(port=8000)
         ```
-
     Then, in a new Python session, retrieve the responses as follows:
         ```
         import requests
         url = "http://127.0.0.1:8000/predict"
-
-        resp = requests.post(url, json={"input": "1, 2, 3]"}, headers=None, stream=True)
+        resp = requests.post(url, json={"input": "Hello world"}, headers=None, stream=True)
         for line in resp.iter_content(5000):
         if line:
             print(line.decode("utf-8"))
@@ -91,14 +89,14 @@ class SimpleStreamAPI(ls.LitAPI):
     """
 
     def setup(self, device) -> None:
-        self.model = lambda x: str(x)
+        self.model = lambda x, y: f"{x}: {y}"
 
     def decode_request(self, request):
         return request["input"]
 
     def predict(self, x):
-        for i in range(10):
-            yield self.model(i)
+        for i in range(3):
+            yield self.model(i, x.encode("utf-8").decode())
 
     def encode_response(self, output_stream):
         for output in output_stream:
