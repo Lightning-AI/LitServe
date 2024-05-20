@@ -123,10 +123,12 @@ def killall():
 def openai_request_data():
     return {
         "model": "",
-        "messages": "string",
+        "messages": [{"role": "string", "content": "string"}],
         "temperature": 0.7,
         "top_p": 1,
         "n": 1,
+        "max_tokens": 0,
+        "stop": "string",
         "stream": False,
         "presence_penalty": 0,
         "frequency_penalty": 0,
