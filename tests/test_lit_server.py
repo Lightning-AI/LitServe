@@ -116,7 +116,7 @@ def test_single_loop(simple_litapi, loop_args):
     request_buffer[2] = {"input": 5.0}, FakePipe()
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, requests_queue, request_buffer)
+        run_single_loop(lit_api_mock, None, requests_queue, request_buffer)
 
 
 def test_run(killall):
@@ -203,7 +203,7 @@ def test_streaming_loop(loop_args):
     request_buffer[1] = {"prompt": "Hello"}, FakeStreamPipe(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, requests_queue, request_buffer)
+        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, request_buffer)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
@@ -257,7 +257,9 @@ def test_batched_streaming_loop(loop_args):
     request_buffer[2] = {"prompt": "World"}, FakeBatchedStreamPipe(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="finish streaming"):
-        run_batched_streaming_loop(fake_stream_api, requests_queue, request_buffer, max_batch_size=2, batch_timeout=2)
+        run_batched_streaming_loop(
+            fake_stream_api, fake_stream_api, requests_queue, request_buffer, max_batch_size=2, batch_timeout=2
+        )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
 

@@ -71,7 +71,7 @@ def collate_requests(lit_api, request_queue: Queue, request_buffer, max_batch_si
     return get_batch_from_uid(uids, lit_api, request_buffer)
 
 
-def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     while True:
         batches = collate_requests(
             lit_api,
@@ -107,7 +107,7 @@ def run_batched_loop(lit_api, request_queue: Queue, request_buffer, max_batch_si
                     pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
-def run_single_loop(lit_api, request_queue: Queue, request_buffer):
+def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
@@ -134,7 +134,7 @@ def run_single_loop(lit_api, request_queue: Queue, request_buffer):
                 pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
-def run_streaming_loop(lit_api: LitAPI, request_queue: Queue, request_buffer):
+def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_buffer):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
@@ -146,9 +146,9 @@ def run_streaming_loop(lit_api: LitAPI, request_queue: Queue, request_buffer):
             continue
 
         try:
-            x = lit_api.decode_request(x_enc)
+            x = lit_spec.decode_request(x_enc)
             y_gen = lit_api.predict(x)
-            y_enc_gen = lit_api.encode_response(y_gen)
+            y_enc_gen = lit_spec.encode_response(y_gen)
             for y_enc in y_enc_gen:
                 with contextlib.suppress(BrokenPipeError):
                     y_enc = lit_api.format_encoded_response(y_enc)
@@ -165,7 +165,7 @@ def run_streaming_loop(lit_api: LitAPI, request_queue: Queue, request_buffer):
                 pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
-def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
     while True:
         batches = collate_requests(
             lit_api,
@@ -180,11 +180,11 @@ def run_batched_streaming_loop(lit_api, request_queue: Queue, request_buffer, ma
         inputs, pipes = zip(*batches)
 
         try:
-            x = [lit_api.decode_request(input) for input in inputs]
-            x = lit_api.batch(x)
-            y_iter = lit_api.predict(x)
-            unbatched_iter = lit_api.unbatch(y_iter)
-            y_enc_iter = lit_api.encode_response(unbatched_iter)
+            x = [lit_spec.decode_request(input) for input in inputs]
+            x = lit_spec.batch(x)
+            y_iter = lit_spec.predict(x)
+            unbatched_iter = lit_spec.unbatch(y_iter)
+            y_enc_iter = lit_spec.encode_response(unbatched_iter)
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
@@ -221,20 +221,21 @@ def inference_worker(
     print(f"setup complete for worker {worker_id}")
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
-        lit_spec._lit_api = lit_api
-        lit_api = lit_spec
+    else:
+        lit_spec = lit_api  # duck typing
     if stream:
         if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+            run_batched_streaming_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
         else:
-            run_streaming_loop(lit_api, request_queue, request_buffer)
+            run_streaming_loop(lit_api, lit_spec, request_queue, request_buffer)
         return
 
     if max_batch_size > 1:
-        run_batched_loop(lit_api, request_queue, request_buffer, max_batch_size, batch_timeout)
+        run_batched_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
     else:
         run_single_loop(
             lit_api,
+            lit_spec,
             request_queue,
             request_buffer,
         )
@@ -282,7 +283,7 @@ class LitServer:
             raise ValueError("max_batch_size must be greater than 0")
 
         lit_api.stream = stream
-        lit_api.sanitize(max_batch_size)
+        lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.lit_api = lit_api
         self.lit_spec = spec
@@ -296,9 +297,6 @@ class LitServer:
         self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
-        # TODO: A better way to replace litapi with specs. This results in Pickle error
-        # if spec:
-        #     self.app.lit_api = spec
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
 
@@ -323,9 +321,6 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        # manager = Manager()
-        # self.request_buffer = manager.dict()
-        # self.request_queue = manager.Queue()
         self.setup_server()
 
     @asynccontextmanager

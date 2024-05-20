@@ -17,6 +17,8 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
+from litserve.specs.base import LitSpec
+
 
 def no_batch_unbatch_message_no_stream(obj, data):
     return f"""
@@ -60,7 +62,6 @@ class LitAPI(ABC):
         """Setup the model so it can be called in `predict`."""
         pass
 
-    @abstractmethod
     def decode_request(self, request):
         """Convert the request payload to your model input."""
         pass
@@ -107,7 +108,6 @@ class LitAPI(ABC):
         """Convert a batched output to a list of outputs."""
         return self._default_unbatch(output)
 
-    @abstractmethod
     def encode_response(self, output):
         """Convert the model output to a response payload.
 
@@ -131,11 +131,15 @@ class LitAPI(ABC):
     def stream(self, value):
         self._stream = value
 
-    def sanitize(self, max_batch_size: int):
+    def sanitize(self, max_batch_size: int, spec: LitSpec):
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
             self._default_unbatch = self._unbatch_no_stream
+
+        if spec:
+            # TODO: Implement sanitization
+            return
         original = self.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             self.stream

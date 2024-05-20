@@ -11,36 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List, Dict, Union
+
 import litserve as ls
-from litserve.specs.openai import OpenAISpec, ChatCompletionRequest
+from litserve.specs.openai import OpenAISpec
 import logging
 
-logging.basicConfig(level=logging.INFO)
-
-
-class OpenAISpecWithHooks(OpenAISpec):
-    def decode_request(self, request):
-        return request.messages
-
-    def encode_response(self, output):
-        return {"text": "encode_response called from Spec"}
+logging.basicConfig(level=logging.DEBUG)
 
 
 class OpenAILitAPI(ls.LitAPI):
     def setup(self, device):
-        self.model = ...
+        self.model = None
 
-    def decode_request(self, request: ChatCompletionRequest):
-        print("decode_request called from LitAPI")
-        return request
-
-    def predict(self, x):
-        return "This is a generated output"
-
-    def encode_response(self, output):
-        return {"text": "encode_response called from LitAPI"}
+    def predict(self, x: List[Dict[str, str]]) -> Union[List[Dict[str, str]], Dict[str, str]]:
+        yield {"role": "assistant", "content": "This is a generated output"}
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpecWithHooks())
+    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec(), stream=True)
     server.run(port=8000)
