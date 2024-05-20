@@ -23,7 +23,7 @@ import litserve as ls
 @pytest.mark.asyncio()
 async def test_openai_spec(openai_request_data):
     spec = OpenAISpec()
-    server = ls.LitServer(OpenAILitAPI(), spec=spec, stream=True)
+    server = ls.LitServer(OpenAILitAPI(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
@@ -36,7 +36,7 @@ async def test_openai_spec(openai_request_data):
 @pytest.mark.asyncio()
 async def test_override_encode(openai_request_data):
     spec = OpenAISpec()
-    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=spec, stream=True)
+    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"

@@ -25,22 +25,15 @@ class OpenAILitAPI(ls.LitAPI):
         self.model = None
 
     def predict(self, x: Dict[str, str]) -> Union[List[Dict[str, str]], Dict[str, str]]:
-        yield {"role": "assistant", "content": "This is a generated output"}
+        yield "This is a generated output"
 
 
-class OpenAILitAPIWithCustomEncode(ls.LitAPI):
-    def setup(self, device):
-        self.model = None
-
+class OpenAILitAPIWithCustomEncode(OpenAILitAPI):
     def encode_response(self, output_generator):
         for output in output_generator:
-            output["content"] = "This output is a custom encoded output"
-            yield output
-
-    def predict(self, x: Dict[str, str]) -> Union[List[Dict[str, str]], Dict[str, str]]:
-        yield {"role": "assistant", "content": "This is a generated output"}
+            yield "This output is a custom encoded output"
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=OpenAISpec(), stream=True)
+    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=OpenAISpec())
     server.run(port=8000)

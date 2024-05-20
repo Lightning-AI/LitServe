@@ -15,14 +15,14 @@ import json
 import time
 from typing import Literal, Optional, List, Dict, Union, Generator
 import uuid
-from fastapi import BackgroundTasks
-from .base import LitSpec
+from fastapi import BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 import logging
 import sys
 import asyncio
 
 from ..utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
+from .base import LitSpec
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +118,9 @@ class OpenAISpec(LitSpec):
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
     ) -> ChatCompletionResponse:
         logger.debug("Received chat completion request %s", request)
+        if request.stream:
+            raise HTTPException(400, "Stream is not supported")
+
         uids = [uuid.uuid4() for _ in range(request.n)]
         pipes = []
         for uid in uids:
@@ -173,9 +176,5 @@ class OpenAISpec(LitSpec):
         model = request.model or "litserve"
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
 
-    def _encode_wo_batch(self, output: Dict[str, str]):
-        return output
-
     def encode_response(self, output_generator: PREDICT_RESPONSE_TYPE) -> Generator[ChatCompletionResponse, None, None]:
-        for output in output_generator:
-            yield self._encode_wo_batch(output)
+        yield from output_generator
