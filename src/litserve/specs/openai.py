@@ -113,6 +113,23 @@ class OpenAISpec(LitSpec):
     def unbatch(self, output_generator):
         yield from output_generator
 
+    async def get_from_pipe(self, uids, pipes) -> List[str]:
+        responses = []
+        for uid, read in zip(uids, pipes):
+            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+                data = await wait_for_queue_timeout(
+                    asyncio.to_thread(self._server.get_from_pipe, read),
+                    self._server.timeout,
+                    uid,
+                    self._server.request_buffer,
+                )
+            else:
+                data = await wait_for_queue_timeout(
+                    self._server.data_reader(read), self._server.timeout, uid, self._server.request_buffer
+                )
+            responses.append(data)
+        return responses
+
     async def chat_completion(
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
     ) -> ChatCompletionResponse:
@@ -133,20 +150,7 @@ class OpenAISpec(LitSpec):
             background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
             pipes.append(read)
 
-        responses = []
-        for uid, read in zip(uids, pipes):
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await wait_for_queue_timeout(
-                    asyncio.to_thread(self._server.get_from_pipe, read),
-                    self._server.timeout,
-                    uid,
-                    self._server.request_buffer,
-                )
-            else:
-                data = await wait_for_queue_timeout(
-                    self._server.data_reader(read), self._server.timeout, uid, self._server.request_buffer
-                )
-            responses.append(data)
+        responses = await self.get_from_pipe(uids, pipes)
 
         choices = []
 
