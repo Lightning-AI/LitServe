@@ -111,7 +111,8 @@ class OpenAISpec(LitSpec):
         return list(inputs)
 
     def unbatch(self, output_generator):
-        yield from output_generator
+        # yield from output_generator
+        return output_generator
 
     async def get_from_pipe(self, uids, pipes) -> List[str]:
         responses = []
@@ -157,17 +158,28 @@ class OpenAISpec(LitSpec):
         usage = UsageInfo()
         for i, data in enumerate(responses):
             response, status = data
-            logger.debug("Received chat completion response %s with status %s", data, status)
+            logger.debug("Received chat completion response %s with status %s", response, status)
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
 
             if status != LitAPIStatus.OK:
                 break
 
+            if isinstance(response, str):
+                message = {"role": "assistant", "content": response}
+            elif isinstance(response, dict) and "role" in response and "content" in response:
+                message = response
+            elif isinstance(response, list) and response and isinstance(response[0], dict) and "role" in response[0] and "content" in response[0]:
+                message = response[0]
+            else:
+                error = f"Malformed output from LitAPI.predict: expected string or {{'role': '...', 'content': '...'}}, got '{response}'."
+                logger.exception(error)
+                raise HTTPException(500, error)
+
             choices.append(
                 ChatCompletionResponseChoice(
                     index=i,
-                    message=ChatMessage(role="assistant", content=response),
+                    message=ChatMessage(**message),
                     finish_reason="stop",
                 )
             )
@@ -179,4 +191,5 @@ class OpenAISpec(LitSpec):
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
 
     def encode_response(self, output_generator: PREDICT_RESPONSE_TYPE) -> Generator[ChatCompletionResponse, None, None]:
-        yield from output_generator
+        return output_generator
+        # yield from output_generator

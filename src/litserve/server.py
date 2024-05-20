@@ -219,7 +219,9 @@ def inference_worker(
     stream,
 ):
     lit_api.setup(device)
-    print(f"setup complete for worker {worker_id}")
+    message = f"Setup complete for worker {worker_id}"
+    print(message)
+    logger.info(message)
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
@@ -280,10 +282,6 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
-
-        if isinstance(spec, lit_specs.OpenAISpec):
-            logger.debug("detected OpenAI spec %s, setting stream=True", spec.__class__.__name__)
-            stream = True
 
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
