@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
-from typing import Literal, Optional, List, Dict, Union, Generator
+from typing import Literal, Optional, List, Dict, Union
 import uuid
 from fastapi import BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
@@ -120,7 +120,10 @@ class OpenAISpec(LitSpec):
         elif isinstance(output, list) and output and self.validate_chat_message(output[-1]):
             message = output[-1]
         else:
-            error = f"Malformed output from LitAPI.predict: expected string or {{'role': '...', 'content': '...'}}, got '{output}'."
+            error = (
+                "Malformed output from LitAPI.predict: expected"
+                f"string or {{'role': '...', 'content': '...'}}, got '{output}'."
+            )
             logger.exception(error)
             raise HTTPException(500, error)
 
@@ -183,9 +186,9 @@ class OpenAISpec(LitSpec):
 
             if status != LitAPIStatus.OK:
                 break
- 
+
             response.index = i
             choices.append(response)
 
-        model = request.model  # or "litserve"
+        model = request.model
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)

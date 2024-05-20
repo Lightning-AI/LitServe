@@ -65,7 +65,9 @@ class LitAPI(ABC):
 
     def decode_request(self, request):
         """Convert the request payload to your model input."""
-        return self._spec.decode_request(request)
+        if self._spec:
+            return self._spec.decode_request(request)
+        return request
 
     def batch(self, inputs):
         """Convert a list of inputs to a batched input."""
@@ -111,11 +113,11 @@ class LitAPI(ABC):
 
     def encode_response(self, output):
         """Convert the model output to a response payload.
-
         To enable streaming, it should yield the output.
-
         """
-        return self._spec.encode_response(output)
+        if self._spec:
+            return self._spec.encode_response(output)
+        return output
 
     def format_encoded_response(self, data):
         if isinstance(data, dict):

@@ -27,7 +27,6 @@ import os
 import shutil
 from typing import Sequence, Optional, Union
 import uuid
-from litserve import specs as lit_specs
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
@@ -219,7 +218,7 @@ def inference_worker(
     stream,
 ):
     lit_api.setup(device)
-    message = f"Setup complete for worker {worker_id}"
+    message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
     if lit_spec:
@@ -412,15 +411,17 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
-    async def stream_from_pipe(self, read):
+    async def stream_from_pipe(self, read, write):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
         # https://docs.python.org/3/library/asyncio-platforms.html
         while True:
             if read.poll(LONG_TIMEOUT):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
+                    self.dispose_pipe(read, write)
                     return
                 elif status == LitAPIStatus.ERROR:
+                    self.dispose_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -430,7 +431,7 @@ class LitServer:
 
             await asyncio.sleep(0.0001)
 
-    async def data_streamer(self, read):
+    async def data_streamer(self, read, write):
         data_available = asyncio.Event()
         while True:
             asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
@@ -441,8 +442,10 @@ class LitServer:
             if read.poll():
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
+                    self.dispose_pipe(read, write)
                     return
                 if status == LitAPIStatus.ERROR:
+                    self.dispose_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -506,9 +509,9 @@ class LitServer:
             background_tasks.add_task(cleanup, self.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(self.stream_from_pipe(read))
+                return StreamingResponse(self.stream_from_pipe(read, write))
 
-            return StreamingResponse(self.data_streamer(read))
+            return StreamingResponse(self.data_streamer(read, write))
 
         if not self._specs:
             stream = self.lit_api.stream
