@@ -444,7 +444,7 @@ if __name__ == "__main__":
 
 
 <details>
-  <summary>Stream long responses</summary>
+  <summary>Stream long responses</summaryoutput >
 
 &nbsp;
 
@@ -528,6 +528,57 @@ if __name__ == "__main__":
 
 </details>
 
+<details>
+    <summary>OpenAI compatible API</summary>
+
+&nbsp;
+
+You can serve LLMs like OpenAI API endpoint specification with LitServe's `OpenAISpec` by
+providing the `spec` argument to LitServer:
+
+```python
+import litserve as ls
+from litserve.specs.openai import OpenAISpec
+
+class OpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = ...
+
+    def predict(self, x):
+        yield {"content": "This is a generated output"}
+
+if __name__ == "__main__":
+    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec())
+    server.run(port=8000)
+```
+
+
+By default, LitServe will use `OpenAISpec`'s implementation of `LitAPI.decode_request` and `LitAPI.encode_response`.
+You can also customize this behavior by overriding the LitAPI's `decode_request` and `encode_response` methods.
+
+```python
+import litserve as ls
+from litserve.specs.openai import OpenAISpec
+
+class CustomOpenAIAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def encode_response(self, output_generator):
+        for output in output_generator:
+            output["content"] = "This output is a custom encoded output"
+            yield output
+
+    def predict(self, x):
+        yield {"role": "assistant", "content": "This is a generated output"}
+
+
+if __name__ == "__main__":
+    server = ls.LitServer(CustomOpenAIAPI(), spec=OpenAISpec())
+    server.run(port=8000)
+```
+
+</details>
 
 # Contribute
 LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.

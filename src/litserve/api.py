@@ -17,6 +17,8 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
+from litserve.specs.base import LitSpec
+
 
 def no_batch_unbatch_message_no_stream(obj, data):
     return f"""
@@ -54,16 +56,18 @@ def no_batch_unbatch_message_stream(obj, data):
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: callable = None
+    _spec: LitSpec = None
 
     @abstractmethod
     def setup(self, devices):
         """Setup the model so it can be called in `predict`."""
         pass
 
-    @abstractmethod
     def decode_request(self, request):
         """Convert the request payload to your model input."""
-        pass
+        if self._spec:
+            return self._spec.decode_request(request)
+        return request
 
     def batch(self, inputs):
         """Convert a list of inputs to a batched input."""
@@ -107,14 +111,15 @@ class LitAPI(ABC):
         """Convert a batched output to a list of outputs."""
         return self._default_unbatch(output)
 
-    @abstractmethod
     def encode_response(self, output):
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.
 
         """
-        pass
+        if self._spec:
+            return self._spec.encode_response(output)
+        return output
 
     def format_encoded_response(self, data):
         if isinstance(data, dict):
@@ -131,11 +136,21 @@ class LitAPI(ABC):
     def stream(self, value):
         self._stream = value
 
-    def sanitize(self, max_batch_size: int):
+    def sanitize(self, max_batch_size: int, spec: LitSpec):
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
             self._default_unbatch = self._unbatch_no_stream
+
+        # we will sanitize regularly if no spec
+        # in case, we have spec then:
+        # case 1: spec implements a streaming API
+        # Case 2: spec implements a non-streaming API
+        if spec:
+            # TODO: Implement sanitization
+            self._spec = spec
+            return
+
         original = self.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             self.stream

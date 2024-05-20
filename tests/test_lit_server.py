@@ -26,6 +26,7 @@ import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
+import pytest
 
 from litserve.connector import _Connector
 from litserve.server import (
@@ -36,8 +37,6 @@ from litserve.server import (
     run_batched_streaming_loop,
 )
 from litserve.server import LitServer
-
-import pytest
 
 
 def test_new_pipe(lit_server):
@@ -59,31 +58,31 @@ def test_index(sync_testclient):
     assert sync_testclient.get("/").text == "litserve running"
 
 
-@patch("litserve.server.lifespan")
+@patch("litserve.server.LitServer.lifespan")
 def test_device_identifiers(lifespan_mock, simple_litapi):
     server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
     assert server.device_identifiers("cpu", 1) == ["cpu:1"]
     assert server.device_identifiers("cpu", [1, 2]) == ["cpu:1", "cpu:2"]
 
     server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
-    assert server.app.devices == ["cpu"]
+    assert server.devices == ["cpu"]
 
     server = LitServer(simple_litapi, accelerator="cuda", devices=1, timeout=10)
-    assert server.app.devices == [["cuda:0"]]
+    assert server.devices == [["cuda:0"]]
 
     server = LitServer(simple_litapi, accelerator="cuda", devices=[1, 2], timeout=10)
     # [["cuda:1"], ["cuda:2"]]
-    assert server.app.devices[0][0] == "cuda:1"
-    assert server.app.devices[1][0] == "cuda:2"
+    assert server.devices[0][0] == "cuda:1"
+    assert server.devices[1][0] == "cuda:2"
 
 
 @patch("litserve.server.run_batched_loop")
 @patch("litserve.server.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 5, max_batch_size=2, batch_timeout=0, stream=False)
+    inference_worker(*[MagicMock()] * 6, max_batch_size=2, batch_timeout=0, stream=False)
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 5, max_batch_size=1, batch_timeout=0, stream=False)
+    inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
     mock_single_loop.assert_called_once()
 
 
@@ -117,10 +116,10 @@ def test_single_loop(simple_litapi, loop_args):
     request_buffer[2] = {"input": 5.0}, FakePipe()
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, requests_queue, request_buffer)
+        run_single_loop(lit_api_mock, None, requests_queue, request_buffer)
 
 
-def test_run():
+def test_run(killall):
     process = subprocess.Popen(
         ["python", "tests/simple_server.py"],
         stdout=subprocess.DEVNULL,
@@ -131,9 +130,9 @@ def test_run():
     time.sleep(5)
     assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
-    assert '{"output":16.0}' in output, "tests/simple_server.py didn't return expected output"
+    assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
     os.remove("client.py")
-    process.kill()
+    killall(process)
 
 
 @pytest.mark.asyncio()
@@ -204,7 +203,7 @@ def test_streaming_loop(loop_args):
     request_buffer[1] = {"prompt": "Hello"}, FakeStreamPipe(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, requests_queue, request_buffer)
+        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, request_buffer)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
@@ -258,7 +257,9 @@ def test_batched_streaming_loop(loop_args):
     request_buffer[2] = {"prompt": "World"}, FakeBatchedStreamPipe(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="finish streaming"):
-        run_batched_streaming_loop(fake_stream_api, requests_queue, request_buffer, max_batch_size=2, batch_timeout=2)
+        run_batched_streaming_loop(
+            fake_stream_api, fake_stream_api, requests_queue, request_buffer, max_batch_size=2, batch_timeout=2
+        )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
 
