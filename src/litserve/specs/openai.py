@@ -187,7 +187,7 @@ class OpenAISpec(LitSpec):
             if status != LitAPIStatus.OK:
                 break
 
-            response.index = i
+            response.model_copy(update={"index": i})
             choices.append(response)
 
         model = request.model

@@ -11,29 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Dict, Union
 
 import litserve as ls
-from litserve.specs.openai import OpenAISpec
+from litserve.specs.openai import OpenAISpec, ChatCompletionResponseChoice, ChatMessage
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-class OpenAILitAPI(ls.LitAPI):
+class TestAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def predict(self, x: Dict[str, str]) -> Union[List[Dict[str, str]], Dict[str, str]]:
-        yield "This is a generated output"
+    def predict(self, x):
+        return "This is a generated output"
 
 
-class OpenAILitAPIWithCustomEncode(OpenAILitAPI):
-    def encode_response(self, output_generator):
-        for output in output_generator:
-            yield "This output is a custom encoded output"
+class TestAPIWithCustomEncode(TestAPI):
+    def encode_response(self, output):
+        return ChatCompletionResponseChoice(
+            index=0,
+            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
+            finish_reason="stop",
+        )
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=OpenAISpec())
+    server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
     server.run(port=8000)

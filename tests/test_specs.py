@@ -15,7 +15,7 @@
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
-from litserve.examples.openai_spec_example import OpenAILitAPI, OpenAILitAPIWithCustomEncode
+from litserve.examples.openai_spec_example import TestAPI, TestAPIWithCustomEncode
 from litserve.specs.openai import OpenAISpec
 import litserve as ls
 
@@ -23,7 +23,7 @@ import litserve as ls
 @pytest.mark.asyncio()
 async def test_openai_spec(openai_request_data):
     spec = OpenAISpec()
-    server = ls.LitServer(OpenAILitAPI(), spec=spec)
+    server = ls.LitServer(TestAPI(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
@@ -36,11 +36,11 @@ async def test_openai_spec(openai_request_data):
 @pytest.mark.asyncio()
 async def test_override_encode(openai_request_data):
     spec = OpenAISpec()
-    server = ls.LitServer(OpenAILitAPIWithCustomEncode(), spec=spec)
+    server = ls.LitServer(TestAPIWithCustomEncode(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
 
         assert (
-            resp.json()["choices"][0]["message"]["content"] == "This output is a custom encoded output"
+            resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output"
         ), "LitAPI predict response should match with the generated output"
