@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import time
 from typing import Literal, Optional, List, Dict, Union, Generator
 import uuid
@@ -161,15 +160,14 @@ class OpenAISpec(LitSpec):
             if status != LitAPIStatus.OK:
                 break
 
-            response = json.loads(response)
             choices.append(
                 ChatCompletionResponseChoice(
                     index=i,
-                    message=ChatMessage(role="assistant", content=response["content"]),
-                    finish_reason=response.get("finish_reason", "stop"),
+                    message=ChatMessage(role="assistant", content=response),
+                    finish_reason="stop",
                 )
             )
-            task_usage = UsageInfo.parse_obj(response["usage"]) if "usage" in response else UsageInfo()
+            task_usage = UsageInfo.parse_obj(UsageInfo())
             for usage_key, usage_value in task_usage.dict().items():
                 setattr(usage, usage_key, getattr(usage, usage_key) + usage_value)
 
