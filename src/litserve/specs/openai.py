@@ -75,6 +75,27 @@ class ChatCompletionResponse(BaseModel):
     usage: UsageInfo
 
 
+class Delta(BaseModel):
+    role: str
+    content: str
+
+
+class StreamingChoice(BaseModel):
+    index: int
+    delta: Delta
+    logprobs: Optional[dict]
+    finish_reason: Optional[Literal["stop", "length"]]
+
+
+class ChatCompletionChunk(BaseModel):
+    id: str
+    object: str
+    created: int
+    model: str
+    system_fingerprint: str
+    choices: List[StreamingChoice]
+
+
 class OpenAISpec(LitSpec):
     def __init__(
         self,
@@ -97,21 +118,6 @@ class OpenAISpec(LitSpec):
         self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
     ) -> ChatCompletionResponse:
         logger.debug("Received chat completion request %s", request)
-        # if request.stop is not None:
-        #     raise HTTPException(status_code=400, detail="Parameter stop not currently supported")
-        #
-        # if request.frequency_penalty:
-        #     raise HTTPException(status_code=400, detail="Parameter frequency_penalty not currently supported")
-        #
-        # if request.presence_penalty:
-        #     raise HTTPException(status_code=400, detail="Parameter presence_penalty not currently supported")
-        #
-        # if request.max_tokens is not None:
-        #     raise HTTPException(status_code=400, detail="Parameter max_tokens not currently supported")
-        #
-        # if request.top_p != 1.0:
-        #     raise HTTPException(status_code=400, detail="Parameter top_p not currently supported")
-
         uids = [uuid.uuid4() for _ in range(request.n)]
         pipes = []
         for uid in uids:

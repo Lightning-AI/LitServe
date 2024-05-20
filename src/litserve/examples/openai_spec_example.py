@@ -24,8 +24,15 @@ class OpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def predict(self, x: List[Dict[str, str]]) -> Union[List[Dict[str, str]], Dict[str, str]]:
+    def predict(self, x: Dict[str, str]) -> Union[List[Dict[str, str]], Dict[str, str]]:
         yield {"role": "assistant", "content": "This is a generated output"}
+
+
+class OpenAIBatchedLitAPI(OpenAILitAPI):
+    def predict(self, x: List[List[Dict[str, str]]]) -> Union[List[Dict[str, str]], Dict[str, str]]:
+        n = len(x)
+        for i in range(n):
+            yield {"role": "assistant", "content": "This is a generated output"}
 
 
 if __name__ == "__main__":
