@@ -177,9 +177,9 @@ class OpenAISpec(LitSpec):
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
         usage = None
-        for i, response in enumerate(pipe_responses):
+        for i, streaming_response in enumerate(pipe_responses):
             choices = []
-            async for choice in response:
+            async for choice in streaming_response:
                 choice = json.loads(choice)
                 logger.debug(choice)
                 choice = ChatCompletionStreamingChoice(**choice)
@@ -192,9 +192,9 @@ class OpenAISpec(LitSpec):
         model = request.model
         usage = UsageInfo()
         choices = []
-        for i, response in enumerate(pipe_responses):
+        for i, streaming_response in enumerate(pipe_responses):
             msgs = ""
-            async for choice in response:
+            async for choice in streaming_response:
                 choice = json.loads(choice)
                 choice = ChatCompletionStreamingChoice(**choice)
                 logger.debug(choice)
