@@ -190,16 +190,16 @@ class OpenAISpec(LitSpec):
         usage = UsageInfo()
         choices = []
         for i, response in enumerate(pipe_responses):
+            msgs = ""
             async for choice in response:
                 choice = json.loads(choice)
+                choice = StreamingChoice(**choice)
                 logger.debug(choice)
-                choice["message"] = choice.pop("delta")
-                choice = ChatCompletionResponseChoice(**choice)
-                choice.index = i
-                choices.append(choice)
-                break
+                # Is " " correct choice to concat with?
+                msgs += " " + choice.delta.content
 
-            async for _ in response:
-                pass
+            msg = {"role": "assistant", "content": msgs}
+            choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
+            choices.append(choice)
 
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
