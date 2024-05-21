@@ -199,7 +199,10 @@ class OpenAISpec(LitSpec):
                 choice = ChatCompletionStreamingChoice(**choice)
                 logger.debug(choice)
                 # Is " " correct choice to concat with?
-                msgs += " " + choice.delta.content
+                if msgs:
+                    msgs += " " + choice.delta.content
+                else:
+                    msgs = choice.delta.content
 
             msg = {"role": "assistant", "content": msgs}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")

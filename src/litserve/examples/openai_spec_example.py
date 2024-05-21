@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import litserve as ls
-from litserve.specs.openai import OpenAISpec, ChatCompletionResponseChoice, ChatMessage
+from litserve.specs.openai import OpenAISpec, ChatMessage, ChatCompletionStreamingChoice
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -29,9 +29,9 @@ class TestAPI(ls.LitAPI):
 
 class TestAPIWithCustomEncode(TestAPI):
     def encode_response(self, output):
-        yield ChatCompletionResponseChoice(
+        yield ChatCompletionStreamingChoice(
             index=0,
-            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
+            delta=ChatMessage(role="assistant", content="This is a custom encoded output"),
             finish_reason="stop",
         )
 
