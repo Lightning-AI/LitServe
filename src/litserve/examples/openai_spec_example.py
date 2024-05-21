@@ -24,12 +24,12 @@ class TestAPI(ls.LitAPI):
         self.model = None
 
     def predict(self, x):
-        return "This is a generated output"
+        yield "This is a generated output"
 
 
 class TestAPIWithCustomEncode(TestAPI):
     def encode_response(self, output):
-        return ChatCompletionResponseChoice(
+        yield ChatCompletionResponseChoice(
             index=0,
             message=ChatMessage(role="assistant", content="This is a custom encoded output"),
             finish_reason="stop",

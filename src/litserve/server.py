@@ -36,6 +36,7 @@ from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 from litserve.connector import _Connector
+from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 
@@ -281,6 +282,8 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
+        if isinstance(spec, OpenAISpec):
+            stream = True
 
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)

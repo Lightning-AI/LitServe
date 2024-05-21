@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import time
 from typing import Literal, Optional, List, Dict, Union
 import uuid
@@ -18,11 +19,14 @@ from fastapi import BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 import logging
 import sys
-import asyncio
 
-from ..utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 from .base import LitSpec
 
+logging.basicConfig(
+    format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
+    datefmt="%Y-%m-%d:%H:%M:%S",
+    level=logging.DEBUG,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -107,12 +111,13 @@ class OpenAISpec(LitSpec):
         return list(inputs)
 
     def unbatch(self, output):
-        return output
+        yield output
 
     def validate_chat_message(self, obj):
         return isinstance(obj, dict) and "role" in obj and "content" in obj
 
-    def encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionResponseChoice:
+    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionResponseChoice:
+        logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
         elif isinstance(output, dict) and "content" in output:
@@ -136,21 +141,23 @@ class OpenAISpec(LitSpec):
             finish_reason="stop",
         )
 
-    async def get_from_pipe(self, uids, pipes) -> List[str]:
+    def encode_response(
+        self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]
+    ) -> ChatCompletionResponseChoice:
+        for output in output_generator:
+            yield self._encode_response(output)
+
+    async def get_from_pipes(self, uids, pipes) -> List[str]:
         responses = []
-        for uid, (read, _) in zip(uids, pipes):
+        for uid, (read, write) in zip(uids, pipes):
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await wait_for_queue_timeout(
-                    asyncio.to_thread(self._server.get_from_pipe, read),
-                    self._server.timeout,
-                    uid,
-                    self._server.request_buffer,
-                )
+                data = self._server.stream_from_pipe(read, write)
             else:
-                data = await wait_for_queue_timeout(
-                    self._server.data_reader(read), self._server.timeout, uid, self._server.request_buffer
-                )
+                data = self._server.data_streamer(read, write)
+
+            data = await anext(data)
             responses.append(data)
+
         return responses
 
     async def chat_completion(
@@ -173,7 +180,7 @@ class OpenAISpec(LitSpec):
             background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
             pipes.append((read, write))
 
-        responses = await self.get_from_pipe(uids, pipes)
+        responses = await self.get_from_pipes(uids, pipes)
 
         for read, write in pipes:
             self._server.dispose_pipe(read, write)
@@ -182,14 +189,9 @@ class OpenAISpec(LitSpec):
 
         choices = []
         for i, data in enumerate(responses):
-            response, status = data
-            logger.debug("Received chat completion response %s with status %s", response, status)
-            if status == LitAPIStatus.ERROR:
-                load_and_raise(response)
-
-            if status != LitAPIStatus.OK:
-                break
-
+            response = json.loads(data)
+            logger.debug("Received chat completion response %s", response)
+            response = ChatCompletionResponseChoice(**response)
             response = response.model_copy(update={"index": i})
             choices.append(response)
 
