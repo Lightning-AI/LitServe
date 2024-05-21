@@ -22,6 +22,7 @@ import sys
 from fastapi.responses import StreamingResponse
 
 from .base import LitSpec
+from ..utils import azip
 
 logger = logging.getLogger(__name__)
 
@@ -177,9 +178,9 @@ class OpenAISpec(LitSpec):
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
         usage = None
-        for i, streaming_response in enumerate(pipe_responses):
+        async for streaming_response in azip(*pipe_responses):
             choices = []
-            async for choice in streaming_response:
+            for i, choice in enumerate(streaming_response):
                 choice = json.loads(choice)
                 logger.debug(choice)
                 choice = ChatCompletionStreamingChoice(**choice)
