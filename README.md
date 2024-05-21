@@ -549,44 +549,75 @@ You can serve LLMs like OpenAI API endpoint specification with LitServe's `OpenA
 providing the `spec` argument to LitServer:
 
 ```python
+from transformers import pipeline
 import litserve as ls
-from litserve.specs.openai import OpenAISpec
 
-class OpenAILitAPI(ls.LitAPI):
+
+class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
-        self.model = ...
+        self.generator = pipeline('text-generation', model='gpt2', device=device)
 
-    def predict(self, x):
-        yield {"content": "This is a generated output"}
+    def predict(self, prompt):
+        out = self.generator(prompt)
+        return out[0]["generated_text"]
 
-if __name__ == "__main__":
-    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec())
+
+if __name__ == '__main__':
+    api = GPT2LitAPI()
+    server = ls.LitServer(api, accelerator='auto', spec=ls.OpenAISpec())
     server.run(port=8000)
 ```
 
+By default, LitServe will use `decode_request` and `encode_response` provided by `OpenAISpec`,
+so you don't need to provide them in `LitAPI`.
 
-By default, LitServe will use `OpenAISpec`'s implementation of `LitAPI.decode_request` and `LitAPI.encode_response`.
-You can also customize this behavior by overriding the LitAPI's `decode_request` and `encode_response` methods.
+In this case, `predict` is expected to take an input with the following shape:
+```python
+[{"role": "system", "content": "You are a helpful assistant."},
+ {"role": "user", "content": "Hello there"},
+ {"role": "assistant", "content": "Hello, how can I help?"},
+ {"role": "user", "content": "What is the capital of Australia?"}]
+```
+
+and produce an output with one of the following shapes:
+- `"Canberra"`
+- `{"content": "Canberra"}`
+- `[{"content": "Canberra"}]`
+- `{"role": "assistant", "content": "Canberra"}`
+- `[{"role": "assistant", "content": "Canberra"}]`
+
+
+You can also customize this behavior by overriding `decode_request` and `encode_response`
+in `LitAPI`. In this case:
+
+- `decode_request` takes a `litserve.specs.openai.ChatCompletionRequest` in input
+- `encode_response` returns a `litserve.specs.openai.ChatCompletionResponseChoice`
+
+See the OpenAI [Pydantic models](src/litserve/specs/openai.py) for reference.
+
+Here is an example of overriding `encode_response` in `LitAPI`:
 
 ```python
 import litserve as ls
-from litserve.specs.openai import OpenAISpec
+from litserve.specs.openai import ChatCompletionResponseChoice
 
-class CustomOpenAIAPI(ls.LitAPI):
+class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def encode_response(self, output_generator):
-        for output in output_generator:
-            output["content"] = "This output is a custom encoded output"
-            yield output
-
     def predict(self, x):
-        yield {"role": "assistant", "content": "This is a generated output"}
+        return {"role": "assistant", "content": "This is a generated output"}
+
+    def encode_response(self, output: dict) -> ChatCompletionResponseChoice:
+        return ChatCompletionResponseChoice(
+            index=0,
+            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
+            finish_reason="stop",
+        )
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(CustomOpenAIAPI(), spec=OpenAISpec())
+    server = ls.LitServer(GPT2LitAPI(), spec=ls.OpenAISpec())
     server.run(port=8000)
 ```
 
