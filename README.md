@@ -444,7 +444,7 @@ if __name__ == "__main__":
 
 
 <details>
-  <summary>Stream long responses</summaryoutput >
+  <summary>Stream long responses</summary>
 
 &nbsp;
 
