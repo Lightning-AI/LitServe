@@ -19,14 +19,11 @@ from fastapi import BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 import logging
 import sys
+from fastapi.responses import StreamingResponse
 
 from .base import LitSpec
 
-logging.basicConfig(
-    format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
-    datefmt="%Y-%m-%d:%H:%M:%S",
-    level=logging.DEBUG,
-)
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,9 +79,9 @@ class StreamingChoice(BaseModel):
 
 
 class ChatCompletionChunk(BaseModel):
-    id: str
-    object: str
-    created: int
+    id: str = Field(default_factory=lambda: f"chatcmpl-{shortuuid()}")
+    object: str = "chat.completion"
+    created: int = Field(default_factory=lambda: int(time.time()))
     model: str
     system_fingerprint: str
     choices: List[StreamingChoice]
@@ -155,12 +152,8 @@ class OpenAISpec(LitSpec):
 
         return responses
 
-    async def chat_completion(
-        self, request: ChatCompletionRequest, background_tasks: BackgroundTasks
-    ) -> ChatCompletionResponse:
+    async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
         logger.debug("Received chat completion request %s", request)
-        if request.stream:
-            raise HTTPException(400, "Stream is not supported")
 
         uids = [uuid.uuid4() for _ in range(request.n)]
         pipes = []
@@ -185,10 +178,18 @@ class OpenAISpec(LitSpec):
         choices = []
         for i, data in enumerate(responses):
             response = json.loads(data)
-            logger.debug("Received chat completion response %s", response)
-            response = ChatCompletionResponseChoice(**response)
+            logger.info("Received chat completion response %s", response)
+            if request.stream:
+                response["delta"] = response.pop("message")
+                response = StreamingChoice(**response)
+            else:
+                response = ChatCompletionResponseChoice(**response)
             response = response.model_copy(update={"index": i})
             choices.append(response)
 
         model = request.model
+        if request.stream:
+            return StreamingResponse(
+                ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
+            )
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
