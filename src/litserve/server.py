@@ -107,15 +107,25 @@ def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, ma
                     pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
+def _get_single_request(request_queue: Queue, request_buffer):
+    try:
+        uid = request_queue.get(timeout=1.0)
+        try:
+            # Can we send some metadata from server here
+            x_enc, pipe_s = request_buffer.pop(uid)
+            return uid, x_enc, pipe_s
+        except KeyError:
+            return None
+    except (Empty, ValueError):
+        return None
+
+
 def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
     while True:
-        try:
-            uid = request_queue.get(timeout=1.0)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
-        except (Empty, ValueError):
+        data = _get_single_request(request_queue, request_buffer)
+        if data:
+            uid, x_enc, pipe_s = data
+        else:
             continue
         try:
             x = lit_api.decode_request(x_enc)
@@ -136,15 +146,11 @@ def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
 
 def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_buffer):
     while True:
-        try:
-            uid = request_queue.get(timeout=1.0)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
-        except (Empty, ValueError):
+        data = _get_single_request(request_queue, request_buffer)
+        if data:
+            uid, x_enc, pipe_s = data
+        else:
             continue
-
         try:
             x = lit_api.decode_request(x_enc)
             y_gen = lit_api.predict(x)
@@ -180,7 +186,7 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
         inputs, pipes = zip(*batches)
 
         try:
-            x = [lit_api.decode_request(input) for input in inputs]
+            x = [lit_api.decode_request(input_) for input_ in inputs]
             x = lit_api.batch(x)
             y_iter = lit_api.predict(x)
             unbatched_iter = lit_api.unbatch(y_iter)
