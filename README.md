@@ -47,11 +47,11 @@ LitServe is a high-throughput serving engine for deploying AI models at scale. L
 Why we wrote LitServe:
 
 1. Work with any model: LLMs, vision, time-series, etc...
-3. We wanted a zero abstraction, minimal, hackable code-base without bloat.
-5. Built for enterprise scale (not demos, etc...).
-6. Easy enough for researchers, scalable and hackable for engineers.
-2. Work on any hardware (GPU/TPU) automatically.
-5. Let you focus on model performance, not the serving boilerplate.
+2. We wanted a zero abstraction, minimal, hackable code-base without bloat.
+3. Built for enterprise scale (not demos, etc...).
+4. Easy enough for researchers, scalable and hackable for engineers.
+5. Work on any hardware (GPU/TPU) automatically.
+6. Let you focus on model performance, not the serving boilerplate.
 
 Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
@@ -98,8 +98,8 @@ pip install git+https://github.com/Lightning-AI/litserve.git@main
 Install from source:
 
 ```bash
-git clone https://github.com/Lightning-AI/litserve
-cd litserve
+git clone https://github.com/Lightning-AI/LitServe
+cd LitServe
 pip install -e '.[all]'
 ```
 
