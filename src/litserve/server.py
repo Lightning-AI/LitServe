@@ -396,12 +396,12 @@ class LitServer:
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    def get_from_pipe(self, read):
+    def _win_data_reader(self, read):
         while True:
             if read.poll(LONG_TIMEOUT):
                 return read.recv()
 
-    async def data_reader(self, read):
+    async def _data_reader(self, read):
         data_available = asyncio.Event()
         asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
 
@@ -411,7 +411,7 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
-    async def stream_from_pipe(self, read, write):
+    async def win_data_streamer(self, read, write):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
         # https://docs.python.org/3/library/asyncio-platforms.html
         while True:
@@ -457,6 +457,19 @@ class LitServer:
         with contextlib.suppress(KeyError):
             request_buffer.pop(uid)
 
+    async def get_from_pipe(self, read):
+        if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+            data = asyncio.to_thread(self._win_data_reader, read)
+        else:
+            data = self._data_reader(read)
+        return data
+
+    async def stream_from_pipe(self, read, write):
+        if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
+            return StreamingResponse(self.win_data_streamer(read, write))
+
+        return StreamingResponse(self.data_streamer(read, write))
+
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(setup_auth())])
         async def index(request: Request) -> Response:
@@ -481,13 +494,9 @@ class LitServer:
             self.request_queue.put(uid)
             background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await wait_for_queue_timeout(
-                    asyncio.to_thread(self.get_from_pipe, read), self.timeout, uid, self.request_buffer
-                )
-            else:
-                data = await wait_for_queue_timeout(self.data_reader(read), self.timeout, uid, self.request_buffer)
+            data = await wait_for_queue_timeout(await self.get_from_pipe(read), self.timeout, uid, self.request_buffer)
             self.dispose_pipe(read, write)
+            logger.info(data)
 
             response, status = data
             if status == LitAPIStatus.ERROR:
@@ -508,10 +517,7 @@ class LitServer:
             self.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.request_buffer, uid)
 
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(self.stream_from_pipe(read, write))
-
-            return StreamingResponse(self.data_streamer(read, write))
+            return await self.stream_from_pipe(read, write)
 
         if not self._specs:
             stream = self.lit_api.stream

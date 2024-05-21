@@ -17,8 +17,6 @@ import uuid
 from fastapi import BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 import logging
-import sys
-import asyncio
 
 from ..utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 from .base import LitSpec
@@ -136,20 +134,12 @@ class OpenAISpec(LitSpec):
             finish_reason="stop",
         )
 
-    async def get_from_pipe(self, uids, pipes) -> List[str]:
+    async def get_from_pipes(self, uids, pipes) -> List[str]:
         responses = []
         for uid, (read, _) in zip(uids, pipes):
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await wait_for_queue_timeout(
-                    asyncio.to_thread(self._server.get_from_pipe, read),
-                    self._server.timeout,
-                    uid,
-                    self._server.request_buffer,
-                )
-            else:
-                data = await wait_for_queue_timeout(
-                    self._server.data_reader(read), self._server.timeout, uid, self._server.request_buffer
-                )
+            data = await wait_for_queue_timeout(
+                await self._server.get_from_pipe(read), self._server.timeout, uid, self._server.request_buffer
+            )
             responses.append(data)
         return responses
 
@@ -173,7 +163,7 @@ class OpenAISpec(LitSpec):
             background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
             pipes.append((read, write))
 
-        responses = await self.get_from_pipe(uids, pipes)
+        responses = await self.get_from_pipes(uids, pipes)
 
         for read, write in pipes:
             self._server.dispose_pipe(read, write)
