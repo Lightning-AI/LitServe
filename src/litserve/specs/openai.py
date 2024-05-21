@@ -13,7 +13,7 @@
 # limitations under the License.
 import json
 import time
-from typing import Literal, Optional, List, Dict, Union
+from typing import Literal, Optional, List, Dict, Union, AsyncGenerator
 import uuid
 from fastapi import BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
@@ -134,19 +134,19 @@ class OpenAISpec(LitSpec):
 
     def encode_response(self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]) -> StreamingChoice:
         for output in output_generator:
+            logger.info(output)
             yield self._encode_response(output)
 
-    async def get_from_pipes(self, uids, pipes) -> List:
-        choices = []
+    async def get_from_pipes(self, uids, pipes) -> List[AsyncGenerator]:
+        choice_pipes = []
         for uid, (read, write) in zip(uids, pipes):
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = self._server.win_data_streamer(read, write)
             else:
                 data = self._server.data_streamer(read, write)
 
-            # data = await anext(data)
-            choices.append(data)
-        return choices
+            choice_pipes.append(data)
+        return choice_pipes
 
     async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
         logger.debug("Received chat completion request %s", request)
@@ -155,55 +155,51 @@ class OpenAISpec(LitSpec):
         pipes = []
         for uid in uids:
             read, write = self._server.new_pipe()
-
             request_el = request.model_copy()
             request_el.n = 1
             self._server.request_buffer[uid] = (request_el, write)
             self._server.request_queue.put(uid)
-
             background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
             pipes.append((read, write))
 
         responses = await self.get_from_pipes(uids, pipes)
-
         for read, write in pipes:
             self._server.dispose_pipe(read, write)
 
         if request.stream:
             return StreamingResponse(self.streaming_completion(request, responses))
 
-        usage = UsageInfo()
+        return await self.non_streaming_completion(request, responses)
 
-        choices = []
-        for i, data in enumerate(responses):
-            data = await anext(data)
-            response = json.loads(data)
-            logger.info("Received chat completion response %s", response)
-            if request.stream:
-                response["delta"] = response.pop("message")
-                response = StreamingChoice(**response)
-            else:
-                response = ChatCompletionResponseChoice(**response)
-            response = response.model_copy(update={"index": i})
-            choices.append(response)
-
-        model = request.model
-        if request.stream:
-            return StreamingResponse(
-                ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
-            )
-        return ChatCompletionResponse(model=model, choices=choices, usage=usage)
-
-    async def streaming_completion(self, request: ChatCompletionRequest, responses: List):
+    async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
         usage = UsageInfo()
-        for i, response in enumerate(responses):
+        for i, response in enumerate(pipe_responses):
             choices = []
             async for choice in response:
                 choice = json.loads(choice)
-                logger.info(choice)
+                logger.debug(choice)
                 choice = StreamingChoice(**choice)
                 choice.index = i
                 choices.append(choice)
 
             yield ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
+
+    async def non_streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
+        model = request.model
+        usage = UsageInfo()
+        choices = []
+        for i, response in enumerate(pipe_responses):
+            async for choice in response:
+                choice = json.loads(choice)
+                logger.debug(choice)
+                choice["message"] = choice.pop("delta")
+                choice = ChatCompletionResponseChoice(**choice)
+                choice.index = i
+                choices.append(choice)
+                break
+
+            async for _ in response:
+                pass
+
+        return ChatCompletionResponse(model=model, choices=choices, usage=usage)
