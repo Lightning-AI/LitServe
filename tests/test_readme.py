@@ -66,6 +66,8 @@ def test_readme(tmp_path):
                 f"\n Code:\n{code}"
             )
         else:
-            assert (
-                process.returncode == 0
-            ), f"Code exited with {process.returncode}.\n Please check the code for correctness:\n```\n{code}\n```"
+            assert process.returncode == 0, (
+                f"Code exited with {process.returncode}. "
+                f"Error: {errs}\n"
+                f"Please check the code for correctness:\n```\n{code}\n```"
+            )
