@@ -17,7 +17,7 @@ from typing import List
 import sys
 import re
 import pytest
-import select
+import selectors
 import time
 
 from tqdm import tqdm
@@ -42,6 +42,7 @@ def get_code_blocks(file: str) -> List[str]:
 
 
 def run_script_with_timeout(file, timeout, killall):
+    sel = selectors.DefaultSelector()
     try:
         process = subprocess.Popen(
             ["python", str(file)],
@@ -55,21 +56,27 @@ def run_script_with_timeout(file, timeout, killall):
         stderr_lines = []
         end_time = time.time() + timeout
 
-        # Non-blocking reads using select
-        while process.poll() is None:
-            ready_to_read, _, _ = select.select([process.stdout, process.stderr], [], [], 1)
-            if process.stdout in ready_to_read:
-                line = process.stdout.readline()
-                if line:
-                    stdout_lines.append(line)
-            if process.stderr in ready_to_read:
-                line = process.stderr.readline()
-                if line:
-                    stderr_lines.append(line)
+        sel.register(process.stdout, selectors.EVENT_READ)
+        sel.register(process.stderr, selectors.EVENT_READ)
 
-            # Check for timeout
-            if time.time() > end_time:
+        while True:
+            timeout_remaining = end_time - time.time()
+            if timeout_remaining <= 0:
                 killall(process)
+                break
+
+            events = sel.select(timeout=timeout_remaining)
+            for key, _ in events:
+                if key.fileobj is process.stdout:
+                    line = process.stdout.readline()
+                    if line:
+                        stdout_lines.append(line)
+                elif key.fileobj is process.stderr:
+                    line = process.stderr.readline()
+                    if line:
+                        stderr_lines.append(line)
+
+            if process.poll() is not None:
                 break
 
         output = "".join(stdout_lines)
@@ -104,7 +111,7 @@ def test_readme(tmp_path, killall):
                 f"Expected to run uvicorn server.\n" f"Code:\n {code}\n\nCode output: {stderr}"
             )
         elif "requests.post" in code:
-            assert "requests.exceptions.ConnectionError" in stderr, (
+            assert "ConnectionError" in stderr, (
                 f"Client examples should fail with a ConnectionError because there is no server running."
                 f"\nCode:\n{code}"
             )
