@@ -57,11 +57,14 @@ def test_readme(tmp_path):
 
         errs = errs.decode("utf-8")
         if "server.run" in code:
-            assert uvicorn_msg in errs, f"Expected to run uvicorn server.\n Outputs: {errs}"
+            assert uvicorn_msg in errs, (
+                f"Expected to run uvicorn server.\n" f"Code:\n {code}\n\n" f"Code output: {errs}"
+            )
         elif "requests.post" in code:
-            assert (
-                "requests.exceptions.ConnectionError" in errs
-            ), f"Client examples should fail with a ConnectionError because there is no server running. \n {code}"
+            assert "requests.exceptions.ConnectionError" in errs, (
+                f"Client examples should fail with a ConnectionError because there is no server running."
+                f"\n Code:\n{code}"
+            )
         else:
             assert (
                 process.returncode == 0
