@@ -84,6 +84,7 @@ class ChatCompletionChunk(BaseModel):
     model: str
     system_fingerprint: str
     choices: List[ChatCompletionStreamingChoice]
+    usage: Optional[UsageInfo]
 
 
 class OpenAISpec(LitSpec):
@@ -175,7 +176,7 @@ class OpenAISpec(LitSpec):
 
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
-        usage = UsageInfo()
+        usage = None
         for i, response in enumerate(pipe_responses):
             choices = []
             async for choice in response:
