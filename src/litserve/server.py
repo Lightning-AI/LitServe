@@ -414,7 +414,7 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
-    async def stream_from_pipe(self, read, write):
+    async def win_data_streamer(self, read, write):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
         # https://docs.python.org/3/library/asyncio-platforms.html
         while True:
@@ -512,7 +512,7 @@ class LitServer:
             background_tasks.add_task(cleanup, self.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(self.stream_from_pipe(read, write))
+                return StreamingResponse(self.win_data_streamer(read, write))
 
             return StreamingResponse(self.data_streamer(read, write))
 

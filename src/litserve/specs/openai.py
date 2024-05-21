@@ -23,7 +23,6 @@ from fastapi.responses import StreamingResponse
 
 from .base import LitSpec
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -108,7 +107,7 @@ class OpenAISpec(LitSpec):
     def validate_chat_message(self, obj):
         return isinstance(obj, dict) and "role" in obj and "content" in obj
 
-    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionResponseChoice:
+    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> StreamingChoice:
         logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
@@ -127,30 +126,27 @@ class OpenAISpec(LitSpec):
             logger.exception(error)
             raise HTTPException(500, error)
 
-        return ChatCompletionResponseChoice(
+        return StreamingChoice(
             index=0,
-            message=ChatMessage(**message),
+            delta=ChatMessage(**message),
             finish_reason="stop",
         )
 
-    def encode_response(
-        self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]
-    ) -> ChatCompletionResponseChoice:
+    def encode_response(self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]) -> StreamingChoice:
         for output in output_generator:
             yield self._encode_response(output)
 
-    async def get_from_pipes(self, uids, pipes) -> List[str]:
-        responses = []
+    async def get_from_pipes(self, uids, pipes) -> List:
+        choices = []
         for uid, (read, write) in zip(uids, pipes):
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = self._server.stream_from_pipe(read, write)
+                data = self._server.win_data_streamer(read, write)
             else:
                 data = self._server.data_streamer(read, write)
 
-            data = await anext(data)
-            responses.append(data)
-
-        return responses
+            # data = await anext(data)
+            choices.append(data)
+        return choices
 
     async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
         logger.debug("Received chat completion request %s", request)
@@ -173,10 +169,14 @@ class OpenAISpec(LitSpec):
         for read, write in pipes:
             self._server.dispose_pipe(read, write)
 
+        if request.stream:
+            return StreamingResponse(self.streaming_completion(request, responses))
+
         usage = UsageInfo()
 
         choices = []
         for i, data in enumerate(responses):
+            data = await anext(data)
             response = json.loads(data)
             logger.info("Received chat completion response %s", response)
             if request.stream:
@@ -193,3 +193,17 @@ class OpenAISpec(LitSpec):
                 ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
             )
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
+
+    async def streaming_completion(self, request: ChatCompletionRequest, responses: List):
+        model = request.model
+        usage = UsageInfo()
+        for i, response in enumerate(responses):
+            choices = []
+            async for choice in response:
+                choice = json.loads(choice)
+                logger.info(choice)
+                choice = StreamingChoice(**choice)
+                choice.index = i
+                choices.append(choice)
+
+            yield ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
