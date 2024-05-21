@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # Code extraction adapted from https://github.com/tassaron/get_code_from_markdown
-
 import subprocess
 from typing import List
 import sys
 import re
 import pytest
+import select
+import time
+
+from tqdm import tqdm
 
 uvicorn_msg = "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"
 
@@ -38,36 +41,76 @@ def get_code_blocks(file: str) -> List[str]:
         return extract_code_blocks(lines)
 
 
+def run_script_with_timeout(file, timeout, killall):
+    try:
+        process = subprocess.Popen(
+            ["python", str(file)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=1,  # Line-buffered
+            universal_newlines=True,  # Decode bytes to string
+        )
+
+        stdout_lines = []
+        stderr_lines = []
+        end_time = time.time() + timeout
+
+        # Non-blocking reads using select
+        while process.poll() is None:
+            ready_to_read, _, _ = select.select([process.stdout, process.stderr], [], [], 1)
+            if process.stdout in ready_to_read:
+                line = process.stdout.readline()
+                if line:
+                    stdout_lines.append(line)
+            if process.stderr in ready_to_read:
+                line = process.stderr.readline()
+                if line:
+                    stderr_lines.append(line)
+
+            # Check for timeout
+            if time.time() > end_time:
+                killall(process)
+                break
+
+        output = "".join(stdout_lines)
+        errors = "".join(stderr_lines)
+
+        # Get the return code of the process
+        returncode = process.returncode
+
+    except Exception as e:
+        output = ""
+        errors = str(e)
+        returncode = -1  # Indicate failure in running the process
+
+    return returncode, output, errors
+
+
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="Windows CI is slow and this test is just a sanity check.")
-def test_readme(tmp_path):
+def test_readme(tmp_path, killall):
     d = tmp_path / "readme_codes"
-    d.mkdir()
+    d.mkdir(exist_ok=True)
     code_blocks = get_code_blocks("README.md")
     assert len(code_blocks) > 0, "No code block found in README.md"
 
-    for i, code in enumerate(code_blocks):
+    for i, code in enumerate(tqdm(code_blocks)):
         file = d / f"{i}.py"
         file.write_text(code)
 
-        try:
-            process = subprocess.run(["python", str(file)], capture_output=True, timeout=5)
-            errs = process.stderr or b""
-        except subprocess.TimeoutExpired as e:
-            errs = e.stderr or b""
+        returncode, stdout, stderr = run_script_with_timeout(file, timeout=5, killall=killall)
 
-        errs = errs.decode("utf-8")
         if "server.run" in code:
-            assert uvicorn_msg in errs, (
-                f"Expected to run uvicorn server.\n" f"Code:\n {code}\n\n" f"Code output: {errs}"
+            assert uvicorn_msg in stderr, (
+                f"Expected to run uvicorn server.\n" f"Code:\n {code}\n\nCode output: {stderr}"
             )
         elif "requests.post" in code:
-            assert "requests.exceptions.ConnectionError" in errs, (
+            assert "requests.exceptions.ConnectionError" in stderr, (
                 f"Client examples should fail with a ConnectionError because there is no server running."
-                f"\n Code:\n{code}"
+                f"\nCode:\n{code}"
             )
         else:
-            assert process.returncode == 0, (
-                f"Code exited with {process.returncode}. "
-                f"Error: {errs}\n"
+            assert returncode == 0, (
+                f"Code exited with {returncode}.\n"
+                f"Error: {stderr}\n"
                 f"Please check the code for correctness:\n```\n{code}\n```"
             )
