@@ -456,7 +456,6 @@ as a generator (a Python function that yields output).
 For example, streaming long responses generated over time:
 
 ```python
-import json
 import litserve as ls
 
 class SimpleStreamAPI(ls.LitAPI):
@@ -472,13 +471,26 @@ class SimpleStreamAPI(ls.LitAPI):
 
     def encode_response(self, output):
         for out in output:
-            yield json.dumps({"output": out})
+            yield {"output": out}
 
 
 if __name__ == "__main__":
     api = SimpleStreamAPI()
     server = ls.LitServer(api, stream=True)
     server.run(port=8000)
+```
+
+To consume a streaming response, your client should iterate through the response content as follows, otherwise 
+your response content would be concatenated as a byte string.
+
+```python
+import requests
+
+url = "http://127.0.0.1:8000/predict"
+resp = requests.post(url, json={"input": 1.0}, headers=None, stream=True)
+for line in resp.iter_content(5000):
+    if line:
+        print(line.decode("utf-8"))
 ```
 
 &nbsp;

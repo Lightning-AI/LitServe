@@ -13,7 +13,6 @@
 # limitations under the License.
 import numpy as np
 
-import json
 import litserve as ls
 
 
@@ -30,7 +29,7 @@ class SimpleStreamAPI(ls.LitAPI):
 
     def encode_response(self, output_stream):
         for outputs in output_stream:
-            yield [json.dumps({"output": output}) for output in outputs]
+            yield [{"output": output} for output in outputs]
 
 
 if __name__ == "__main__":
