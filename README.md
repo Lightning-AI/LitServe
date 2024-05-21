@@ -559,7 +559,7 @@ class GPT2LitAPI(ls.LitAPI):
 
     def predict(self, prompt):
         out = self.generator(prompt)
-        return out[0]["generated_text"]
+        yield out[0]["generated_text"]
 
 
 if __name__ == '__main__':
@@ -618,21 +618,17 @@ Here is an example of overriding `encode_response` in `LitAPI`:
 
 ```python
 import litserve as ls
-from litserve.specs.openai import ChatCompletionResponseChoice
+from litserve.specs.openai import ChatMessage
 
 class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
     def predict(self, x):
-        return {"role": "assistant", "content": "This is a generated output"}
+        yield {"role": "assistant", "content": "This is a generated output"}
 
-    def encode_response(self, output: dict) -> ChatCompletionResponseChoice:
-        return ChatCompletionResponseChoice(
-            index=0,
-            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
-            finish_reason="stop",
-        )
+    def encode_response(self, output: dict) -> ChatMessage:
+        yield ChatMessage(role="assistant", content="This is a custom encoded output")
 
 
 if __name__ == "__main__":

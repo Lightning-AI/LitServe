@@ -109,7 +109,7 @@ class OpenAISpec(LitSpec):
     def validate_chat_message(self, obj):
         return isinstance(obj, dict) and "role" in obj and "content" in obj
 
-    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionStreamingChoice:
+    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatMessage:
         logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
@@ -128,15 +128,9 @@ class OpenAISpec(LitSpec):
             logger.exception(error)
             raise HTTPException(500, error)
 
-        return ChatCompletionStreamingChoice(
-            index=0,
-            delta=ChatMessage(**message),
-            finish_reason="stop",
-        )
+        return ChatMessage(**message)
 
-    def encode_response(
-        self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]
-    ) -> ChatCompletionStreamingChoice:
+    def encode_response(self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatMessage:
         for output in output_generator:
             logger.info(output)
             yield self._encode_response(output)
@@ -180,11 +174,14 @@ class OpenAISpec(LitSpec):
         usage = None
         async for streaming_response in azip(*pipe_responses):
             choices = []
-            for i, choice in enumerate(streaming_response):
-                choice = json.loads(choice)
-                logger.debug(choice)
-                choice = ChatCompletionStreamingChoice(**choice)
-                choice.index = i
+            for i, chat_msg in enumerate(streaming_response):
+                chat_msg = json.loads(chat_msg)
+                logger.debug(chat_msg)
+                chat_msg = ChatMessage(**chat_msg)
+                choice = ChatCompletionStreamingChoice(
+                    index=i, delta=chat_msg, system_fingerprint="", usage=usage, finish_reason="stop"
+                )
+
                 choices.append(choice)
 
             yield ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
@@ -195,15 +192,15 @@ class OpenAISpec(LitSpec):
         choices = []
         for i, streaming_response in enumerate(pipe_responses):
             msgs = ""
-            async for choice in streaming_response:
-                choice = json.loads(choice)
-                choice = ChatCompletionStreamingChoice(**choice)
-                logger.debug(choice)
+            async for chat_msg in streaming_response:
+                chat_msg = json.loads(chat_msg)
+                logger.debug(chat_msg)
+                chat_msg = ChatMessage(**chat_msg)
                 # Is " " correct choice to concat with?
                 if msgs:
-                    msgs += " " + choice.delta.content
+                    msgs += " " + chat_msg.content
                 else:
-                    msgs = choice.delta.content
+                    msgs = chat_msg.content
 
             msg = {"role": "assistant", "content": msgs}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
