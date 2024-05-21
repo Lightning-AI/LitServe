@@ -70,7 +70,7 @@ class ChatCompletionResponse(BaseModel):
     usage: UsageInfo
 
 
-class StreamingChoice(BaseModel):
+class ChatCompletionStreamingChoice(BaseModel):
     index: int
     delta: ChatMessage
     logprobs: Optional[dict] = None
@@ -79,11 +79,11 @@ class StreamingChoice(BaseModel):
 
 class ChatCompletionChunk(BaseModel):
     id: str = Field(default_factory=lambda: f"chatcmpl-{shortuuid()}")
-    object: str = "chat.completion"
+    object: str = "chat.completion.chunk"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str
     system_fingerprint: str
-    choices: List[StreamingChoice]
+    choices: List[ChatCompletionStreamingChoice]
 
 
 class OpenAISpec(LitSpec):
@@ -107,7 +107,7 @@ class OpenAISpec(LitSpec):
     def validate_chat_message(self, obj):
         return isinstance(obj, dict) and "role" in obj and "content" in obj
 
-    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> StreamingChoice:
+    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatCompletionStreamingChoice:
         logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
@@ -126,13 +126,15 @@ class OpenAISpec(LitSpec):
             logger.exception(error)
             raise HTTPException(500, error)
 
-        return StreamingChoice(
+        return ChatCompletionStreamingChoice(
             index=0,
             delta=ChatMessage(**message),
             finish_reason="stop",
         )
 
-    def encode_response(self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]) -> StreamingChoice:
+    def encode_response(
+        self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]
+    ) -> ChatCompletionStreamingChoice:
         for output in output_generator:
             logger.info(output)
             yield self._encode_response(output)
@@ -179,7 +181,7 @@ class OpenAISpec(LitSpec):
             async for choice in response:
                 choice = json.loads(choice)
                 logger.debug(choice)
-                choice = StreamingChoice(**choice)
+                choice = ChatCompletionStreamingChoice(**choice)
                 choice.index = i
                 choices.append(choice)
 
@@ -193,7 +195,7 @@ class OpenAISpec(LitSpec):
             msgs = ""
             async for choice in response:
                 choice = json.loads(choice)
-                choice = StreamingChoice(**choice)
+                choice = ChatCompletionStreamingChoice(**choice)
                 logger.debug(choice)
                 # Is " " correct choice to concat with?
                 msgs += " " + choice.delta.content
