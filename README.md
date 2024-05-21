@@ -586,9 +586,28 @@ and produce an output with one of the following shapes:
 - `{"role": "assistant", "content": "Canberra"}`
 - `[{"role": "assistant", "content": "Canberra"}]`
 
+The above server can be queried using a standard OpenAI client:
 
-You can also customize this behavior by overriding `decode_request` and `encode_response`
-in `LitAPI`. In this case:
+```python
+import requests
+
+response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
+    "model": "my-gpt2",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "Hello!"
+      }
+    ]
+  })
+```
+
+You can also customize the behavior of `decode_request` and `encode_response` by
+overriding them in `LitAPI`. In this case:
 
 - `decode_request` takes a `litserve.specs.openai.ChatCompletionRequest` in input
 - `encode_response` returns a `litserve.specs.openai.ChatCompletionResponseChoice`
