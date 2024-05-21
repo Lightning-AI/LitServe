@@ -132,7 +132,7 @@ class OpenAISpec(LitSpec):
 
     def encode_response(self, output_generator: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatMessage:
         for output in output_generator:
-            logger.info(output)
+            logger.debug(output)
             yield self._encode_response(output)
 
     async def get_from_pipes(self, uids, pipes) -> List[AsyncGenerator]:
