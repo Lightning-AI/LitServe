@@ -10,3 +10,4 @@ psutil
 requests
 lightning >2.0.0
 torch >2.0.0
+transformers
