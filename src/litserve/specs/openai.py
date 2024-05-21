@@ -74,15 +74,10 @@ class ChatCompletionResponse(BaseModel):
     usage: UsageInfo
 
 
-class Delta(BaseModel):
-    role: str
-    content: str
-
-
 class StreamingChoice(BaseModel):
     index: int
-    delta: Delta
-    logprobs: Optional[dict]
+    delta: ChatMessage
+    logprobs: Optional[dict] = None
     finish_reason: Optional[Literal["stop", "length"]]
 
 
