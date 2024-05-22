@@ -67,10 +67,10 @@ async def test_openai_spec_validation(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(IncorrectAPI1(), spec=spec)
     with pytest.raises(ValueError, match="predict is not a generator"):
-        async with LifespanManager(server.app):
-            print("triggered lifespan setup")
+        async with LifespanManager(server.app) as manager:
+            await manager.shutdown()
 
     server = ls.LitServer(IncorrectAPI2(), spec=spec)
     with pytest.raises(ValueError, match="encode_response is not a generator"):
-        async with LifespanManager(server.app):
-            print("triggered lifespan setup")
+        async with LifespanManager(server.app) as manager:
+            await manager.shutdown()
