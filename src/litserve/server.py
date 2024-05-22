@@ -566,7 +566,9 @@ class LitServer:
             self.app.add_api_route(
                 endpoint, stream_predict if stream else predict, methods=methods, dependencies=[Depends(setup_auth())]
             )
-            self.app.add_api_route(endpoint, experimental, methods=methods, dependencies=[Depends(setup_auth())])
+            self.app.add_api_route(
+                "/experimental/predict", experimental, methods=methods, dependencies=[Depends(setup_auth())]
+            )
 
         for spec in self._specs:
             spec: LitSpec
