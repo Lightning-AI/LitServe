@@ -593,6 +593,7 @@ import requests
 
 response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
     "model": "my-gpt2",
+    "stream": False,  # You can stream chunked response by setting this True
     "messages": [
       {
         "role": "system",

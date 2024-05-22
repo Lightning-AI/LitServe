@@ -77,7 +77,7 @@ class ChatCompletionResponse(BaseModel):
 
 
 class ChatCompletionStreamingChoice(BaseModel):
-    delta: ChoiceDelta
+    delta: Optional[ChoiceDelta]
     finish_reason: Optional[Literal["stop", "length", "tool_calls", "content_filter", "function_call"]] = None
     index: int
     logprobs: Optional[dict] = None
@@ -196,6 +196,13 @@ class OpenAISpec(LitSpec):
             chunk = ChatCompletionChunk(model=model, choices=choices, usage=usage).json()
             logger.debug(chunk)
             yield f"data: {chunk}\n\n"
+
+        last_chunk = ChatCompletionChunk(
+            model=model,
+            choices=[ChatCompletionStreamingChoice(index=0, delta=ChoiceDelta(), finish_reason="stop")],
+            usage=usage,
+        ).json()
+        yield f"data: {last_chunk}\n\n"
         yield "data: [DONE]\n\n"
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
@@ -203,18 +210,16 @@ class OpenAISpec(LitSpec):
         usage = UsageInfo()
         choices = []
         for i, streaming_response in enumerate(pipe_responses):
-            msgs = ""
+            msgs = []
             async for chat_msg in streaming_response:
                 chat_msg = json.loads(chat_msg)
                 logger.debug(chat_msg)
                 chat_msg = ChatMessage(**chat_msg)
                 # Is " " correct choice to concat with?
-                if msgs:
-                    msgs += " " + chat_msg.content
-                else:
-                    msgs = chat_msg.content
+                msgs.append(chat_msg.content)
 
-            msg = {"role": "assistant", "content": msgs}
+            content = " ".join(msgs)
+            msg = {"role": "assistant", "content": content}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
 

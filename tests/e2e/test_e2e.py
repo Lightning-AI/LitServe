@@ -15,6 +15,7 @@ import json
 import requests
 import subprocess
 import time
+from openai import OpenAI
 
 
 def test_e2e_default_api(killall):
@@ -83,4 +84,45 @@ def test_e2e_batched_streaming(killall):
 
     assert len(outputs) == 10, "streaming server should have 10 outputs"
     assert {"output": 16.0} in outputs, "server didn't return expected output"
+    killall(process)
+
+
+def test_openai_parity(killall):
+    process = subprocess.Popen(
+        ["python", "tests/e2e/default_openaispec.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+    time.sleep(5)
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",  # required, but unused
+    )
+    response = client.chat.completions.create(
+        model="lit",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "How are you?"},
+        ],
+    )
+    assert response.choices[0].message.content == "This is a generated output", (
+        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+    )
+
+    response = client.chat.completions.create(
+        model="lit",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "How are you?"},
+        ],
+        stream=True,
+    )
+
+    expected_outputs = ["This is a generated output", None]
+    for r, expected_out in zip(response, expected_outputs):
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+        )
+
     killall(process)
