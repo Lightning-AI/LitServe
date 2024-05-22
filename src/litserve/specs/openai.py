@@ -42,6 +42,11 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class ChoiceDelta(ChatMessage):
+    content: Optional[str] = None
+    role: Optional[Literal["system", "user", "assistant", "tool"]] = None
+
+
 class ChatCompletionRequest(BaseModel):
     model: Optional[str] = ""
     messages: List[ChatMessage]
@@ -72,10 +77,10 @@ class ChatCompletionResponse(BaseModel):
 
 
 class ChatCompletionStreamingChoice(BaseModel):
+    delta: ChoiceDelta
+    finish_reason: Optional[Literal["stop", "length", "tool_calls", "content_filter", "function_call"]] = None
     index: int
-    delta: ChatMessage
     logprobs: Optional[dict] = None
-    finish_reason: Optional[Literal["stop", "length"]]
 
 
 class ChatCompletionChunk(BaseModel):
@@ -83,7 +88,7 @@ class ChatCompletionChunk(BaseModel):
     object: str = "chat.completion.chunk"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str
-    system_fingerprint: str
+    system_fingerprint: Optional[str] = None
     choices: List[ChatCompletionStreamingChoice]
     usage: Optional[UsageInfo]
 
@@ -165,7 +170,7 @@ class OpenAISpec(LitSpec):
             self._server.dispose_pipe(read, write)
 
         if request.stream:
-            return StreamingResponse(self.streaming_completion(request, responses))
+            return StreamingResponse(self.streaming_completion(request, responses), media_type="text/event-stream")
 
         return await self.non_streaming_completion(request, responses)
 
@@ -177,14 +182,25 @@ class OpenAISpec(LitSpec):
             for i, chat_msg in enumerate(streaming_response):
                 chat_msg = json.loads(chat_msg)
                 logger.debug(chat_msg)
-                chat_msg = ChatMessage(**chat_msg)
+                chat_msg = ChoiceDelta(**chat_msg)
                 choice = ChatCompletionStreamingChoice(
-                    index=i, delta=chat_msg, system_fingerprint="", usage=usage, finish_reason="stop"
+                    index=i, delta=chat_msg, system_fingerprint="", usage=usage, finish_reason=None
                 )
 
                 choices.append(choice)
 
-            yield ChatCompletionChunk(model=model, choices=choices, usage=usage, system_fingerprint="").json()
+            chunk = ChatCompletionChunk(model=model, choices=choices, usage=usage).json()
+            logger.debug(chunk)
+            yield chunk
+        yield ChatCompletionChunk(
+            model=model,
+            choices=[
+                ChatCompletionStreamingChoice(
+                    index=0, delta=ChoiceDelta(role=None, content=None), usage=None, finish_reason="stop"
+                )
+            ],
+            usage=None,
+        ).json()
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
