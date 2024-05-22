@@ -8,9 +8,9 @@
 **High-throughput serving engine for AI models**
 
 <pre>
-✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU
-✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control       
-✅ Auth           ✅ Built on Fast API                        
+✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU   
+✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control          
+✅ Auth           ✅ Built on Fast API  ✅ Custom specs (Open AI)
 </pre>
 
 
@@ -47,11 +47,11 @@ LitServe is a high-throughput serving engine for deploying AI models at scale. L
 Why we wrote LitServe:
 
 1. Work with any model: LLMs, vision, time-series, etc...
-3. We wanted a zero abstraction, minimal, hackable code-base without bloat.
-5. Built for enterprise scale (not demos, etc...).
-6. Easy enough for researchers, scalable and hackable for engineers.
-2. Work on any hardware (GPU/TPU) automatically.
-5. Let you focus on model performance, not the serving boilerplate.
+2. We wanted a zero abstraction, minimal, hackable code-base without bloat.
+3. Built for enterprise scale (not demos, etc...).
+4. Easy enough for researchers, scalable and hackable for engineers.
+5. Work on any hardware (GPU/TPU) automatically.
+6. Let you focus on model performance, not the serving boilerplate.
 
 Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
@@ -98,8 +98,8 @@ pip install git+https://github.com/Lightning-AI/litserve.git@main
 Install from source:
 
 ```bash
-git clone https://github.com/Lightning-AI/litserve
-cd litserve
+git clone https://github.com/Lightning-AI/LitServe
+cd LitServe
 pip install -e '.[all]'
 ```
 
@@ -549,44 +549,94 @@ You can serve LLMs like OpenAI API endpoint specification with LitServe's `OpenA
 providing the `spec` argument to LitServer:
 
 ```python
+from transformers import pipeline
 import litserve as ls
-from litserve.specs.openai import OpenAISpec
 
-class OpenAILitAPI(ls.LitAPI):
+
+class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
-        self.model = ...
+        self.generator = pipeline('text-generation', model='gpt2', device=device)
 
-    def predict(self, x):
-        yield {"content": "This is a generated output"}
+    def predict(self, prompt):
+        out = self.generator(prompt)
+        return out[0]["generated_text"]
 
-if __name__ == "__main__":
-    server = ls.LitServer(OpenAILitAPI(), spec=OpenAISpec())
+
+if __name__ == '__main__':
+    api = GPT2LitAPI()
+    server = ls.LitServer(api, accelerator='auto', spec=ls.OpenAISpec())
     server.run(port=8000)
 ```
 
+By default, LitServe will use `decode_request` and `encode_response` provided by `OpenAISpec`,
+so you don't need to provide them in `LitAPI`.
 
-By default, LitServe will use `OpenAISpec`'s implementation of `LitAPI.decode_request` and `LitAPI.encode_response`.
-You can also customize this behavior by overriding the LitAPI's `decode_request` and `encode_response` methods.
+In this case, `predict` is expected to take an input with the following shape:
+```python
+[{"role": "system", "content": "You are a helpful assistant."},
+ {"role": "user", "content": "Hello there"},
+ {"role": "assistant", "content": "Hello, how can I help?"},
+ {"role": "user", "content": "What is the capital of Australia?"}]
+```
+
+and produce an output with one of the following shapes:
+- `"Canberra"`
+- `{"content": "Canberra"}`
+- `[{"content": "Canberra"}]`
+- `{"role": "assistant", "content": "Canberra"}`
+- `[{"role": "assistant", "content": "Canberra"}]`
+
+The above server can be queried using a standard OpenAI client:
+
+```python
+import requests
+
+response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
+    "model": "my-gpt2",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": "Hello!"
+      }
+    ]
+  })
+```
+
+You can also customize the behavior of `decode_request` and `encode_response` by
+overriding them in `LitAPI`. In this case:
+
+- `decode_request` takes a `litserve.specs.openai.ChatCompletionRequest` in input
+- `encode_response` returns a `litserve.specs.openai.ChatCompletionResponseChoice`
+
+See the OpenAI [Pydantic models](src/litserve/specs/openai.py) for reference.
+
+Here is an example of overriding `encode_response` in `LitAPI`:
 
 ```python
 import litserve as ls
-from litserve.specs.openai import OpenAISpec
+from litserve.specs.openai import ChatCompletionResponseChoice
 
-class CustomOpenAIAPI(ls.LitAPI):
+class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def encode_response(self, output_generator):
-        for output in output_generator:
-            output["content"] = "This output is a custom encoded output"
-            yield output
-
     def predict(self, x):
-        yield {"role": "assistant", "content": "This is a generated output"}
+        return {"role": "assistant", "content": "This is a generated output"}
+
+    def encode_response(self, output: dict) -> ChatCompletionResponseChoice:
+        return ChatCompletionResponseChoice(
+            index=0,
+            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
+            finish_reason="stop",
+        )
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(CustomOpenAIAPI(), spec=OpenAISpec())
+    server = ls.LitServer(GPT2LitAPI(), spec=ls.OpenAISpec())
     server.run(port=8000)
 ```
 
