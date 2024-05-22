@@ -52,7 +52,7 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
         try:
-            x_enc, pipe_s = request_buffer.pop(uid)
+            x_enc, pipe_s, _ = request_buffer.pop(uid)
         except KeyError:
             continue
         batches.append((x_enc, pipe_s))
@@ -112,63 +112,71 @@ def _get_single_request(request_queue: Queue, request_buffer):
         uid = request_queue.get(timeout=1.0)
         try:
             # Can we send some metadata from server here
-            x_enc, pipe_s = request_buffer.pop(uid)
-            return uid, x_enc, pipe_s
+            x_enc, pipe_s, meta = request_buffer.pop(uid)
+            return uid, x_enc, pipe_s, meta
         except KeyError:
             return None
     except (Empty, ValueError):
         return None
 
 
-def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
+def run_experimental_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
+    logger.info("Starting experimental loop")
     while True:
         data = _get_single_request(request_queue, request_buffer)
         if data:
-            uid, x_enc, pipe_s = data
+            uid, x_enc, pipe_s, meta = data
         else:
             continue
-        try:
-            x = lit_api.decode_request(x_enc)
-            y = lit_api.predict(x)
-            y_enc = lit_api.encode_response(y)
 
+        if meta.get("stream"):
+            logging.info("Stream received")
+            run_streaming_loop(data, lit_api, lit_spec, request_queue, request_buffer)
+        else:
+            logging.info("Non stream received")
+            run_single_loop(data, lit_api, lit_spec, request_queue, request_buffer)
+
+
+def run_single_loop(data, lit_api, lit_spec, request_queue: Queue, request_buffer):
+    uid, x_enc, pipe_s, meta = data
+    try:
+        x = lit_api.decode_request(x_enc)
+        y = lit_api.predict(x)
+        y_enc = lit_api.encode_response(y)
+
+        with contextlib.suppress(BrokenPipeError):
+            pipe_s.send((y_enc, LitAPIStatus.OK))
+    except Exception as e:
+        logger.exception(
+            "LitAPI ran into an error while processing the request uid=%s.\n"
+            "Please check the error trace for more details.",
+            uid,
+        )
+        with contextlib.suppress(BrokenPipeError):
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+
+
+def run_streaming_loop(data, lit_api: LitAPI, lit_spec, request_queue: Queue, request_buffer):
+    logger.debug(data)
+    uid, x_enc, pipe_s, meta = data
+    try:
+        x = lit_api.decode_request(x_enc)
+        y_gen = lit_api.iter_predict(x)
+        y_enc_gen = lit_api.iter_encode_response(y_gen)
+        for y_enc in y_enc_gen:
             with contextlib.suppress(BrokenPipeError):
+                y_enc = lit_api.format_encoded_response(y_enc)
                 pipe_s.send((y_enc, LitAPIStatus.OK))
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the request uid=%s.\n"
-                "Please check the error trace for more details.",
-                uid,
-            )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
-
-
-def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_buffer):
-    while True:
-        data = _get_single_request(request_queue, request_buffer)
-        if data:
-            uid, x_enc, pipe_s = data
-        else:
-            continue
-        try:
-            x = lit_api.decode_request(x_enc)
-            y_gen = lit_api.predict(x)
-            y_enc_gen = lit_api.encode_response(y_gen)
-            for y_enc in y_enc_gen:
-                with contextlib.suppress(BrokenPipeError):
-                    y_enc = lit_api.format_encoded_response(y_enc)
-                    pipe_s.send((y_enc, LitAPIStatus.OK))
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the streaming request uid=%s.\n"
-                "Please check the error trace for more details.",
-                uid,
-            )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+        with contextlib.suppress(BrokenPipeError):
+            pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+    except Exception as e:
+        logger.exception(
+            "LitAPI ran into an error while processing the streaming request uid=%s.\n"
+            "Please check the error trace for more details.",
+            uid,
+        )
+        with contextlib.suppress(BrokenPipeError):
+            pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
 def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
@@ -226,25 +234,18 @@ def inference_worker(
     lit_api.setup(device)
     message = f"Setup complete for worker {worker_id}."
     print(message)
-    logger.info(message)
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
-    if stream:
-        if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
-        else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, request_buffer)
-        return
 
-    if max_batch_size > 1:
-        run_batched_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
-    else:
-        run_single_loop(
-            lit_api,
-            lit_spec,
-            request_queue,
-            request_buffer,
+    if max_batch_size == 1:
+        return run_experimental_loop(lit_api, lit_spec, request_queue, request_buffer)
+
+    if max_batch_size > 1 and stream:
+        return run_batched_streaming_loop(
+            lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout
         )
+
+    return run_batched_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
 
 
 def no_auth():
@@ -481,9 +482,39 @@ class LitServer:
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
+        async def experimental(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+            uid = uuid.uuid4()
+            read, write = self.new_pipe()
+
+            if self.request_type == Request:
+                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
+                    "Content-Type"
+                ].startswith("multipart/form-data"):
+                    data = await request.form()
+                else:
+                    data = await request.json()
+            else:
+                data = request
+
+            meta = {"stream": data.get("stream", False)}
+            self.request_buffer[uid] = (data, write, meta)
+            self.request_queue.put(uid)
+            background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
+
+            if meta["stream"]:
+                return await self.stream_from_pipe(read, write)
+
+            data = await wait_for_queue_timeout(await self.get_from_pipe(read), self.timeout, uid, self.request_buffer)
+            self.dispose_pipe(read, write)
+            response, status = data
+            if status == LitAPIStatus.ERROR:
+                load_and_raise(response)
+            return response
+
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             logger.debug(f"Received request uid={uid}")
+            meta = {"stream": False}
 
             read, write = self.new_pipe()
 
@@ -491,9 +522,9 @@ class LitServer:
                 if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
                     "Content-Type"
                 ].startswith("multipart/form-data"):
-                    self.request_buffer[uid] = (await request.form(), write)
+                    self.request_buffer[uid] = (await request.form(), write, meta)
                 else:
-                    self.request_buffer[uid] = (await request.json(), write)
+                    self.request_buffer[uid] = (await request.json(), write, meta)
             else:
                 self.request_buffer[uid] = (request, write)
 
@@ -502,7 +533,7 @@ class LitServer:
 
             data = await wait_for_queue_timeout(await self.get_from_pipe(read), self.timeout, uid, self.request_buffer)
             self.dispose_pipe(read, write)
-            logger.info(data)
+            logger.debug(data)
 
             response, status = data
             if status == LitAPIStatus.ERROR:
@@ -514,11 +545,12 @@ class LitServer:
             logger.debug(f"Received request uid={uid}")
 
             read, write = self.new_pipe()
+            meta = {"stream": True}
 
             if self.request_type == Request:
-                self.request_buffer[uid] = (await request.json(), write)
+                self.request_buffer[uid] = (await request.json(), write, meta)
             else:
-                self.request_buffer[uid] = (request, write)
+                self.request_buffer[uid] = (request, write, meta)
 
             self.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.request_buffer, uid)
@@ -534,6 +566,7 @@ class LitServer:
             self.app.add_api_route(
                 endpoint, stream_predict if stream else predict, methods=methods, dependencies=[Depends(setup_auth())]
             )
+            self.app.add_api_route(endpoint, experimental, methods=methods, dependencies=[Depends(setup_auth())])
 
         for spec in self._specs:
             spec: LitSpec

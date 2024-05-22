@@ -90,7 +90,11 @@ class LitAPI(ABC):
 
     @abstractmethod
     def predict(self, x):
-        """Run the model on the input and return or yield the output."""
+        """Run the model on the input and return the output."""
+        pass
+
+    def iter_predict(self, x):
+        """Run the model on the input and yield the output."""
         pass
 
     def _unbatch_no_stream(self, output):
@@ -114,12 +118,22 @@ class LitAPI(ABC):
     def encode_response(self, output):
         """Convert the model output to a response payload.
 
-        To enable streaming, it should yield the output.
+        It should return the output.
 
         """
         if self._spec:
             return self._spec.encode_response(output)
         return output
+
+    def iter_encode_response(self, output):
+        """Convert the model output to a response payload.
+
+        It should yield the output.
+
+        """
+        if self._spec:
+            yield self._spec.encode_response(output)
+        yield output
 
     def format_encoded_response(self, data):
         if isinstance(data, dict):
