@@ -15,7 +15,7 @@ import json
 import time
 from typing import Literal, Optional, List, Dict, Union, AsyncGenerator
 import uuid
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import BackgroundTasks, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 import logging
 import sys
@@ -100,6 +100,7 @@ class OpenAISpec(LitSpec):
         super().__init__()
         # register the endpoint
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
+        self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
 
     def decode_request(self, request: ChatCompletionRequest) -> List[Dict[str, str]]:
         # returns [{"role": "system", "content": "..."}, ...]
@@ -151,6 +152,9 @@ class OpenAISpec(LitSpec):
             choice_pipes.append(data)
         return choice_pipes
 
+    async def options_chat_completions(self, request: Request):
+        return Response(status_code=200)
+
     async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
         logger.debug("Received chat completion request %s", request)
 
@@ -170,7 +174,7 @@ class OpenAISpec(LitSpec):
             self._server.dispose_pipe(read, write)
 
         if request.stream:
-            return StreamingResponse(self.streaming_completion(request, responses), media_type="text/event-stream")
+            return StreamingResponse(self.streaming_completion(request, responses), media_type="application/x-ndjson")
 
         return await self.non_streaming_completion(request, responses)
 
@@ -191,16 +195,8 @@ class OpenAISpec(LitSpec):
 
             chunk = ChatCompletionChunk(model=model, choices=choices, usage=usage).json()
             logger.debug(chunk)
-            yield chunk
-        yield ChatCompletionChunk(
-            model=model,
-            choices=[
-                ChatCompletionStreamingChoice(
-                    index=0, delta=ChoiceDelta(role=None, content=None), usage=None, finish_reason="stop"
-                )
-            ],
-            usage=None,
-        ).json()
+            yield f"data: {chunk}\n\n"
+        yield "data: [DONE]\n\n"
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
