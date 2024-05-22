@@ -98,8 +98,11 @@ class ChatCompletionChunk(BaseModel):
 
 
 LITAPI_VALIDATION_MSG = """LitAPI.predict and LitAPI.encode_response must be a generator (use yield instead or return)
-while using the OpenAISpec. Please follow the below examples:
+while using the OpenAISpec.
 
+Error: {}
+
+Please follow the below examples for guidance on how to use the spec:
 
 If your current code looks like this:
 
@@ -160,15 +163,14 @@ class OpenAISpec(LitSpec):
         from litserve import LitAPI
 
         super().setup(server)
+
         lit_api = self._server.lit_api
         if not inspect.isgeneratorfunction(lit_api.predict):
-            print(inspect.isgeneratorfunction(lit_api.predict))
-            raise ValueError(LITAPI_VALIDATION_MSG)
+            raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
         if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
-            print(inspect.isgeneratorfunction(lit_api.encode_response))
-            raise ValueError(LITAPI_VALIDATION_MSG)
+            raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
         print("OpenAI spec setup complete")
 
     def decode_request(self, request: ChatCompletionRequest) -> List[Dict[str, str]]:
