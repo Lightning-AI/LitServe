@@ -41,7 +41,14 @@ def get_code_blocks(file: str) -> List[str]:
         return extract_code_blocks(lines)
 
 
-def run_script_with_timeout(file, timeout, killall):
+def get_extra_time(content: str) -> int:
+    if "torch" in content or "transformers" in content:
+        return 5
+
+    return 0
+
+
+def run_script_with_timeout(file, timeout, extra_time, killall):
     sel = selectors.DefaultSelector()
     try:
         process = subprocess.Popen(
@@ -54,7 +61,7 @@ def run_script_with_timeout(file, timeout, killall):
 
         stdout_lines = []
         stderr_lines = []
-        end_time = time.time() + timeout
+        end_time = time.time() + timeout + extra_time
 
         sel.register(process.stdout, selectors.EVENT_READ)
         sel.register(process.stderr, selectors.EVENT_READ)
@@ -103,8 +110,9 @@ def test_readme(tmp_path, killall):
     for i, code in enumerate(tqdm(code_blocks)):
         file = d / f"{i}.py"
         file.write_text(code)
+        extra_time = get_extra_time(code)
 
-        returncode, stdout, stderr = run_script_with_timeout(file, timeout=5, killall=killall)
+        returncode, stdout, stderr = run_script_with_timeout(file, timeout=5, extra_time=extra_time, killall=killall)
 
         if "server.run" in code:
             assert uvicorn_msg in stderr, (
