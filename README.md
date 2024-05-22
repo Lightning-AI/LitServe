@@ -611,7 +611,7 @@ You can also customize the behavior of `decode_request` and `encode_response` by
 overriding them in `LitAPI`. In this case:
 
 - `decode_request` takes a `litserve.specs.openai.ChatCompletionRequest` in input
-- `encode_response` returns a `litserve.specs.openai.ChatMessage`
+- `encode_response` yields a `litserve.specs.openai.ChatMessage`
 
 See the OpenAI [Pydantic models](src/litserve/specs/openai.py) for reference.
 
