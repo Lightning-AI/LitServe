@@ -176,7 +176,7 @@ class OpenAISpec(LitSpec):
         responses = await self.get_from_pipe(uids, pipes)
 
         for read, write in pipes:
-            self._server.dispose_pipe(read, write)
+            self._server.close_pipe(read, write)
 
         usage = UsageInfo()
 

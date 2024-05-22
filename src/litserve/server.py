@@ -291,10 +291,7 @@ class LitServer:
         self.max_batch_size = max_batch_size
         self.timeout = timeout
         self.batch_timeout = batch_timeout
-        initial_pool_size = 100
-        self.max_pool_size = 1000
         self.stream = stream
-        self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         specs = spec if spec is not None else []
@@ -379,17 +376,12 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-    def new_pipe(self):
-        try:
-            pipe_s, pipe_r = self.pipe_pool.pop()
-        except IndexError:
-            pipe_s, pipe_r = Pipe()
-        return pipe_s, pipe_r
+    def new_pipe(self) -> tuple:
+        return Pipe()
 
-    def dispose_pipe(self, pipe_s, pipe_r):
-        if len(self.pipe_pool) >= self.max_pool_size:
-            return
-        self.pipe_pool.append((pipe_s, pipe_r))
+    def close_pipe(self, pipe_s, pipe_r):
+        pipe_s.close()
+        pipe_r.close()
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
@@ -418,10 +410,10 @@ class LitServer:
             if read.poll(LONG_TIMEOUT):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.dispose_pipe(read, write)
+                    self.close_pipe(read, write)
                     return
                 elif status == LitAPIStatus.ERROR:
-                    self.dispose_pipe(read, write)
+                    self.close_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -442,10 +434,10 @@ class LitServer:
             if read.poll():
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.dispose_pipe(read, write)
+                    self.close_pipe(read, write)
                     return
                 if status == LitAPIStatus.ERROR:
-                    self.dispose_pipe(read, write)
+                    self.close_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -487,7 +479,7 @@ class LitServer:
                 )
             else:
                 data = await wait_for_queue_timeout(self.data_reader(read), self.timeout, uid, self.request_buffer)
-            self.dispose_pipe(read, write)
+            self.close_pipe(read, write)
 
             response, status = data
             if status == LitAPIStatus.ERROR:

@@ -39,21 +39,6 @@ from litserve.server import (
 from litserve.server import LitServer
 
 
-def test_new_pipe(lit_server):
-    pool_size = lit_server.max_pool_size
-    for _ in range(pool_size):
-        lit_server.new_pipe()
-
-    assert len(lit_server.pipe_pool) == 0, "All available pipes from the pipe_pool were used up, which makes it empty"
-    assert len(lit_server.new_pipe()) == 2, "lit_server.new_pipe() always must return a tuple of read and write pipes"
-
-
-def test_dispose_pipe(lit_server):
-    for i in range(lit_server.max_pool_size + 10):
-        lit_server.dispose_pipe(*Pipe())
-    assert len(lit_server.pipe_pool) == lit_server.max_pool_size, "pipe_pool size must be less than max_pool_size"
-
-
 def test_index(sync_testclient):
     assert sync_testclient.get("/").text == "litserve running"
 
@@ -88,7 +73,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
 
 @pytest.fixture()
 def loop_args():
-    from multiprocessing import Manager, Queue, Pipe
+    from multiprocessing import Manager, Queue
 
     requests_queue = Queue()
     request_buffer = Manager().dict()
