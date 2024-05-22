@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import typing
 import time
 from typing import Literal, Optional, List, Dict, Union, AsyncGenerator
 import uuid
@@ -20,9 +21,12 @@ from pydantic import BaseModel, Field
 import logging
 import sys
 from fastapi.responses import StreamingResponse
-
+import inspect
 from .base import LitSpec
 from ..utils import azip
+
+if typing.TYPE_CHECKING:
+    from litserve import LitServer
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +97,56 @@ class ChatCompletionChunk(BaseModel):
     usage: Optional[UsageInfo]
 
 
+LITAPI_VALIDATION_MSG = """LitAPI.predict and LitAPI.encode_response must be a generator (use yield instead or return)
+while using the OpenAISpec. Please follow the below examples:
+
+
+If your current code looks like this:
+
+```
+import litserve as ls
+from litserve.specs.openai import ChatMessage
+
+class ExampleAPI(ls.LitAPI):
+    ...
+    def predict(self, x):
+        return "This is a generated output"
+
+    def encode_response(self, output: dict):
+        return ChatMessage(role="assistant", content="This is a custom encoded output")
+```
+
+You should modify it to:
+
+```
+import litserve as ls
+from litserve.specs.openai import ChatMessage
+
+class ExampleAPI(ls.LitAPI):
+    ...
+    def predict(self, x):
+        yield "This is a generated output"
+
+    def encode_response(self, output):
+        yield ChatMessage(role="assistant", content="This is a custom encoded output")
+```
+
+
+You can also yield responses in chunks. LitServe will handle the streaming for you:
+
+```
+class ExampleAPI(ls.LitAPI):
+    ...
+    def predict(self, x):
+        yield from self.model(x)
+
+    def encode_response(self, output):
+        for out in output:
+            yield ChatMessage(role="assistant", content=out)
+```
+"""
+
+
 class OpenAISpec(LitSpec):
     def __init__(
         self,
@@ -101,6 +155,21 @@ class OpenAISpec(LitSpec):
         # register the endpoint
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
         self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
+
+    def setup(self, server: "LitServer"):
+        from litserve import LitAPI
+
+        super().setup(server)
+        lit_api = self._server.lit_api
+        if not inspect.isgeneratorfunction(lit_api.predict):
+            print(inspect.isgeneratorfunction(lit_api.predict))
+            raise ValueError(LITAPI_VALIDATION_MSG)
+
+        is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
+        if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
+            print(inspect.isgeneratorfunction(lit_api.encode_response))
+            raise ValueError(LITAPI_VALIDATION_MSG)
+        print("OpenAI spec setup complete")
 
     def decode_request(self, request: ChatCompletionRequest) -> List[Dict[str, str]]:
         # returns [{"role": "system", "content": "..."}, ...]
@@ -197,9 +266,12 @@ class OpenAISpec(LitSpec):
             logger.debug(chunk)
             yield f"data: {chunk}\n\n"
 
+        choices = [
+            ChatCompletionStreamingChoice(index=i, delta=ChoiceDelta(), finish_reason="stop") for i in range(request.n)
+        ]
         last_chunk = ChatCompletionChunk(
             model=model,
-            choices=[ChatCompletionStreamingChoice(index=0, delta=ChoiceDelta(), finish_reason="stop")],
+            choices=choices,
             usage=usage,
         ).json()
         yield f"data: {last_chunk}\n\n"
