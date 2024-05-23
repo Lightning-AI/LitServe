@@ -34,7 +34,8 @@
   <a href="https://lightning.ai/">Lightning AI</a> •
   <a href="#get-started">Get started</a> •
   <a href="#examples">Examples</a> •
-  <a href="#features">Features</a>
+  <a href="#features">Features</a> •
+  <a href="https://lightning.ai/docs/litserve">Docs</a>
 </p>
 
 </div>
