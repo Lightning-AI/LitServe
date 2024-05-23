@@ -621,7 +621,7 @@ Here is an example of overriding `encode_response` in `LitAPI`:
 
 ```python
 import litserve as ls
-from litserve.specs.openai import ChatCompletionResponseChoice
+from litserve.specs.openai import ChatCompletionResponseChoice, ChatMessage
 
 class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
