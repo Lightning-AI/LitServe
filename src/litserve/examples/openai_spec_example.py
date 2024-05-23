@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import litserve as ls
-from litserve.specs.openai import OpenAISpec, ChatCompletionResponseChoice, ChatMessage
+from litserve.specs.openai import OpenAISpec, ChatMessage
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -24,16 +24,12 @@ class TestAPI(ls.LitAPI):
         self.model = None
 
     def predict(self, x):
-        return "This is a generated output"
+        yield "This is a generated output"
 
 
 class TestAPIWithCustomEncode(TestAPI):
     def encode_response(self, output):
-        return ChatCompletionResponseChoice(
-            index=0,
-            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
-            finish_reason="stop",
-        )
+        yield ChatMessage(role="assistant", content="This is a custom encoded output")
 
 
 if __name__ == "__main__":

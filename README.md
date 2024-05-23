@@ -562,7 +562,7 @@ class GPT2LitAPI(ls.LitAPI):
 
     def predict(self, prompt):
         out = self.generator(prompt)
-        return out[0]["generated_text"]
+        yield out[0]["generated_text"]
 
 
 if __name__ == '__main__':
@@ -596,6 +596,7 @@ import requests
 
 response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
     "model": "my-gpt2",
+    "stream": False,  # You can stream chunked response by setting this True
     "messages": [
       {
         "role": "system",
@@ -613,7 +614,7 @@ You can also customize the behavior of `decode_request` and `encode_response` by
 overriding them in `LitAPI`. In this case:
 
 - `decode_request` takes a `litserve.specs.openai.ChatCompletionRequest` in input
-- `encode_response` returns a `litserve.specs.openai.ChatCompletionResponseChoice`
+- `encode_response` yields a `litserve.specs.openai.ChatMessage`
 
 See the OpenAI [Pydantic models](src/litserve/specs/openai.py) for reference.
 
@@ -621,21 +622,17 @@ Here is an example of overriding `encode_response` in `LitAPI`:
 
 ```python
 import litserve as ls
-from litserve.specs.openai import ChatCompletionResponseChoice
+from litserve.specs.openai import ChatMessage
 
 class GPT2LitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
     def predict(self, x):
-        return {"role": "assistant", "content": "This is a generated output"}
+        yield {"role": "assistant", "content": "This is a generated output"}
 
-    def encode_response(self, output: dict) -> ChatCompletionResponseChoice:
-        return ChatCompletionResponseChoice(
-            index=0,
-            message=ChatMessage(role="assistant", content="This is a custom encoded output"),
-            finish_reason="stop",
-        )
+    def encode_response(self, output: dict) -> ChatMessage:
+        yield ChatMessage(role="assistant", content="This is a custom encoded output")
 
 
 if __name__ == "__main__":

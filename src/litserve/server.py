@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 import inspect
 import multiprocessing as mp
 from multiprocessing import Manager, Queue, Pipe
+from multiprocessing.connection import Connection
 from queue import Empty
 import uvicorn
 import time
@@ -36,6 +37,7 @@ from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 from litserve.connector import _Connector
+from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 
@@ -138,6 +140,7 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
+            logger.debug("uid=%s", uid)
             try:
                 x_enc, pipe_s = request_buffer.pop(uid)
             except KeyError:
@@ -281,6 +284,8 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
+        if isinstance(spec, OpenAISpec):
+            stream = True
 
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
@@ -403,7 +408,7 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
-    async def stream_from_pipe(self, read, write):
+    async def win_data_streamer(self, read, write):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
         # https://docs.python.org/3/library/asyncio-platforms.html
         while True:
@@ -423,21 +428,19 @@ class LitServer:
 
             await asyncio.sleep(0.0001)
 
-    async def data_streamer(self, read, write):
+    async def data_streamer(self, read: Connection, write: Connection):
         data_available = asyncio.Event()
         while True:
-            asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
-            if not read.poll():
+            if not read.poll(1):
+                asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
                 await data_available.wait()
                 data_available.clear()
                 asyncio.get_event_loop().remove_reader(read.fileno())
-            if read.poll():
+            if read.poll(1):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.close_pipe(read, write)
                     return
                 if status == LitAPIStatus.ERROR:
-                    self.close_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -501,7 +504,7 @@ class LitServer:
             background_tasks.add_task(cleanup, self.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(self.stream_from_pipe(read, write))
+                return StreamingResponse(self.win_data_streamer(read, write))
 
             return StreamingResponse(self.data_streamer(read, write))
 

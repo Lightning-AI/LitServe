@@ -19,6 +19,7 @@ import uuid
 
 from fastapi import HTTPException
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,3 +56,12 @@ def load_and_raise(response):
             f"main process failed to load the exception from the parallel worker process. "
             f"{response} couldn't be unpickled."
         )
+
+
+async def azip(*async_iterables):
+    iterators = [ait.__aiter__() for ait in async_iterables]
+    while True:
+        results = await asyncio.gather(*(ait.__anext__() for ait in iterators), return_exceptions=True)
+        if any(isinstance(result, StopAsyncIteration) for result in results):
+            break
+        yield tuple(results)

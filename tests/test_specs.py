@@ -16,7 +16,7 @@ import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
 from litserve.examples.openai_spec_example import TestAPI, TestAPIWithCustomEncode
-from litserve.specs.openai import OpenAISpec
+from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
 
 
@@ -44,3 +44,33 @@ async def test_override_encode(openai_request_data):
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output"
         ), "LitAPI predict response should match with the generated output"
+
+
+class IncorrectAPI1(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        return "This is a generated output"
+
+
+class IncorrectAPI2(IncorrectAPI1):
+    def predict(self, x):
+        yield "This is a generated output"
+
+    def encode_response(self, output):
+        return ChatMessage(role="assistant", content="This is a generated output")
+
+
+@pytest.mark.asyncio()
+async def test_openai_spec_validation(openai_request_data):
+    spec = OpenAISpec()
+    server = ls.LitServer(IncorrectAPI1(), spec=spec)
+    with pytest.raises(ValueError, match="predict is not a generator"):
+        async with LifespanManager(server.app) as manager:
+            await manager.shutdown()
+
+    server = ls.LitServer(IncorrectAPI2(), spec=spec)
+    with pytest.raises(ValueError, match="encode_response is not a generator"):
+        async with LifespanManager(server.app) as manager:
+            await manager.shutdown()
