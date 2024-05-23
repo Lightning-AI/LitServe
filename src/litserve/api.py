@@ -93,10 +93,6 @@ class LitAPI(ABC):
         """Run the model on the input and return the output."""
         pass
 
-    def iter_predict(self, x):
-        """Run the model on the input and yield the output."""
-        pass
-
     def _unbatch_no_stream(self, output):
         if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
             return list(output)
@@ -124,16 +120,6 @@ class LitAPI(ABC):
         if self._spec:
             return self._spec.encode_response(output)
         return output
-
-    def iter_encode_response(self, output):
-        """Convert the model output to a response payload.
-
-        It should yield the output.
-
-        """
-        if self._spec:
-            yield self._spec.encode_response(output)
-        yield output
 
     def format_encoded_response(self, data):
         if isinstance(data, dict):

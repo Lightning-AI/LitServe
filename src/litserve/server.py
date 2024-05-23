@@ -163,8 +163,8 @@ def run_streaming_loop(data, lit_api: LitAPI, lit_spec, request_queue: Queue, re
     uid, x_enc, pipe_s, meta = data
     try:
         x = lit_api.decode_request(x_enc)
-        y_gen = lit_api.iter_predict(x)
-        y_enc_gen = lit_api.iter_encode_response(y_gen)
+        y_gen = lit_api.predict(x)
+        y_enc_gen = lit_api.encode_response(y_gen)
         for y_enc in y_enc_gen:
             with contextlib.suppress(BrokenPipeError):
                 y_enc = lit_api.format_encoded_response(y_enc)
