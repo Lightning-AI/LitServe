@@ -42,9 +42,19 @@ class UsageInfo(BaseModel):
     completion_tokens: Optional[int] = 0
 
 
+class TextContentPart(BaseModel):
+    type: str
+    text: str
+
+
+class ImageContentPart(BaseModel):
+    type: str
+    image_url: str
+
+
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: Union[str, List[Union[TextContentPart, ImageContentPart]]]
 
 
 class ChoiceDelta(ChatMessage):
