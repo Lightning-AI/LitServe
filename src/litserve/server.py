@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 import inspect
 import multiprocessing as mp
 from multiprocessing import Manager, Queue, Pipe
+from multiprocessing.connection import Connection
 from queue import Empty
 import uvicorn
 import time
@@ -427,16 +428,15 @@ class LitServer:
 
             await asyncio.sleep(0.0001)
 
-    async def data_streamer(self, read, write):
+    async def data_streamer(self, read: Connection, write: Connection):
         data_available = asyncio.Event()
         while True:
-            asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
-            if not read.poll():
+            if not read.poll(1):
                 asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
                 await data_available.wait()
                 data_available.clear()
                 asyncio.get_event_loop().remove_reader(read.fileno())
-            if read.poll():
+            if read.poll(1):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
                     return
