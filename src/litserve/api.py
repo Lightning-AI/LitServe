@@ -137,9 +137,9 @@ class LitAPI(ABC):
 
     def format_encoded_response(self, data):
         if isinstance(data, dict):
-            return json.dumps(data)
+            return json.dumps(data) + "\n"
         if isinstance(data, BaseModel):
-            return data.model_dump_json()
+            return data.model_dump_json() + "\n"
         return data
 
     @property

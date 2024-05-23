@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 import inspect
 import multiprocessing as mp
 from multiprocessing import Manager, Queue, Pipe
+from multiprocessing.connection import Connection
 from queue import Empty
 import uvicorn
 import time
@@ -36,6 +37,7 @@ from fastapi.responses import StreamingResponse
 
 from litserve import LitAPI
 from litserve.connector import _Connector
+from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
 
@@ -288,6 +290,8 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
+        if isinstance(spec, OpenAISpec):
+            stream = True
 
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
@@ -298,10 +302,7 @@ class LitServer:
         self.max_batch_size = max_batch_size
         self.timeout = timeout
         self.batch_timeout = batch_timeout
-        initial_pool_size = 100
-        self.max_pool_size = 1000
         self.stream = stream
-        self.pipe_pool = [Pipe() for _ in range(initial_pool_size)]
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         specs = spec if spec is not None else []
@@ -386,17 +387,12 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-    def new_pipe(self):
-        try:
-            pipe_s, pipe_r = self.pipe_pool.pop()
-        except IndexError:
-            pipe_s, pipe_r = Pipe()
-        return pipe_s, pipe_r
+    def new_pipe(self) -> tuple:
+        return Pipe()
 
-    def dispose_pipe(self, pipe_s, pipe_r):
-        if len(self.pipe_pool) >= self.max_pool_size:
-            return
-        self.pipe_pool.append((pipe_s, pipe_r))
+    def close_pipe(self, pipe_s, pipe_r):
+        pipe_s.close()
+        pipe_r.close()
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
@@ -425,10 +421,10 @@ class LitServer:
             if read.poll(LONG_TIMEOUT):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.dispose_pipe(read, write)
+                    self.close_pipe(read, write)
                     return
                 elif status == LitAPIStatus.ERROR:
-                    self.dispose_pipe(read, write)
+                    self.close_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -438,21 +434,19 @@ class LitServer:
 
             await asyncio.sleep(0.0001)
 
-    async def _data_streamer(self, read, write):
+    async def _data_streamer(self, read: Connection, write: Connection):
         data_available = asyncio.Event()
         while True:
-            asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
-            if not read.poll():
+            if not read.poll(1):
+                asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
                 await data_available.wait()
                 data_available.clear()
                 asyncio.get_event_loop().remove_reader(read.fileno())
-            if read.poll():
+            if read.poll(1):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.dispose_pipe(read, write)
                     return
                 if status == LitAPIStatus.ERROR:
-                    self.dispose_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
@@ -532,7 +526,7 @@ class LitServer:
             background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
             data = await wait_for_queue_timeout(await self.get_from_pipe(read), self.timeout, uid, self.request_buffer)
-            self.dispose_pipe(read, write)
+            self.close_pipe(read, write)
             logger.debug(data)
 
             response, status = data
@@ -555,7 +549,7 @@ class LitServer:
             self.request_queue.put(uid)
             background_tasks.add_task(cleanup, self.request_buffer, uid)
 
-            return await self.stream_from_pipe(read, write)
+            return await self.win_data_streamer(read, write)
 
         if not self._specs:
             stream = self.lit_api.stream
