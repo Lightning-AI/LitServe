@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 import typing
 import time
@@ -243,14 +244,21 @@ class OpenAISpec(LitSpec):
 
         responses = await self.get_from_pipes(uids, pipes)
 
+        def callback(_=None):
+            for read, write in pipes:
+                self._server.close_pipe(read, write)
+
         if request.stream:
+            background_tasks.add_task(callback)
             return StreamingResponse(
                 self.streaming_completion(request, responses),
                 media_type="application/x-ndjson",
                 background=background_tasks,
             )
 
-        return await self.non_streaming_completion(request, responses)
+        response_task = asyncio.create_task(self.non_streaming_completion(request, responses))
+        response_task.add_done_callback(lambda task: callback)
+        return await response_task
 
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
