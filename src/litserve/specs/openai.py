@@ -242,7 +242,7 @@ class OpenAISpec(LitSpec):
 
         responses = await self.get_from_pipes(uids, pipes)
         for read, write in pipes:
-            self._server.dispose_pipe(read, write)
+            self._server.close_pipe(read, write)
 
         if request.stream:
             return StreamingResponse(self.streaming_completion(request, responses), media_type="application/x-ndjson")
