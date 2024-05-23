@@ -139,6 +139,7 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
+            logger.debug("uid=%s", uid)
             try:
                 x_enc, pipe_s = request_buffer.pop(uid)
             except KeyError:
@@ -437,10 +438,8 @@ class LitServer:
             if read.poll():
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.close_pipe(read, write)
                     return
                 if status == LitAPIStatus.ERROR:
-                    self.close_pipe(read, write)
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
