@@ -42,7 +42,7 @@ class UsageInfo(BaseModel):
     completion_tokens: Optional[int] = 0
 
 
-class TextContentPart(BaseModel):
+class TextContent(BaseModel):
     type: str
     text: str
 
