@@ -642,7 +642,7 @@ if __name__ == "__main__":
 ```
 &nbsp;
 
-LitServe's OpenAISpec also enables capability to handle images in the input. Below is an example of how to set this up using LitServe.
+LitServe's `OpenAISpec` can also handle images in the input. Here is an example:
 
 ```python
 import litserve as ls
