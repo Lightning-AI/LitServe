@@ -139,7 +139,7 @@ def openai_request_data():
 @pytest.fixture()
 def openai_request_data_with_image():
     return {
-        "model": "",
+        "model": "lit",
         "messages": [
             {
                 "role": "user",
