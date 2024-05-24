@@ -47,7 +47,7 @@ class TextContent(BaseModel):
     text: str
 
 
-class ImageContentPart(BaseModel):
+class ImageContent(BaseModel):
     type: str
     image_url: str
 
