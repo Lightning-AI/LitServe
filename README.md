@@ -695,7 +695,7 @@ When using `OpenAISpec`, `predict` is expected to take an input with the followi
 
   },
    {"role": "assistant", "content": "This image shows a wooden boardwalk extending through a lush green marshland."},
-   {"role": "user", "content": "How is the weather depicted in the image?"}]
+   {"role": "user", "content": "What is the weather like in the image?"}]
   ```
 
 The above server can be queried using a standard OpenAI client:
