@@ -640,7 +640,90 @@ if __name__ == "__main__":
     server = ls.LitServer(GPT2LitAPI(), spec=ls.OpenAISpec())
     server.run(port=8000)
 ```
+&nbsp;
 
+LitServe's OpenAISpec also enables capability to handle images in the input. Below is an example of how to set this up using LitServe.
+
+```python
+import litserve as ls
+from litserve.specs.openai import ChatMessage
+
+class OpenAISpecLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        if isinstance(x[1]["content"], list):
+            # handle mixed text and image input
+            image_url = x[1]["content"][1]["image_url"]
+
+            yield {"role": "assistant", "content": "\n\nThis image shows a wooden boardwalk extending through a lush green marshland."}
+        else:
+            yield {"role": "assistant", "content": "This is a generated output"}
+
+    def encode_response(self, output: dict) -> ChatMessage:
+        yield ChatMessage(role="assistant", content="This is a custom encoded output")
+
+
+if __name__ == "__main__":
+    server = ls.LitServer(OpenAISpecLitAPI(), spec=ls.OpenAISpec())
+    server.run(port=8000)
+```
+
+In this case, `predict` is expected to take an input with the following shape:
+
+- Text Input Example:
+  ```
+  [{"role": "system", "content": "You are a helpful assistant."},
+   {"role": "user", "content": "Hello there"},
+   {"role": "assistant", "content": "Hello, how can I help?"},
+   {"role": "user", "content": "What is the capital of Australia?"}]
+  ```
+- Mixed Text and Image Input Example:
+
+  ```
+  [{"role": "system", "content": "You are a helpful assistant."},
+   {
+   "role": "user",
+   "content": [
+                  {"type": "text", "text": "What's in this image?"},
+                  {
+                      "type": "image_url",
+                      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                  },
+              ]
+
+  },
+   {"role": "assistant", "content": "This image shows a wooden boardwalk extending through a lush green marshland."},
+   {"role": "user", "content": "How is the weather depicted in the image?"}]
+  ```
+
+The above server can be queried using a standard OpenAI client:
+
+```python
+import requests
+
+response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
+    "model": "lit",
+    "stream": False,  # You can stream chunked response by setting this True
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful assistant."
+      },
+      {
+        "role": "user",
+        "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                },
+            ]
+      }
+    ]
+  })
+```
 </details>
 
 # Contribute
