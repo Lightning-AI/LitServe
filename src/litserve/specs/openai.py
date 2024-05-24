@@ -54,7 +54,7 @@ class ImageContent(BaseModel):
 
 class ChatMessage(BaseModel):
     role: str
-    content: Union[str, List[Union[TextContentPart, ImageContentPart]]]
+    content: Union[str, List[Union[TextContent, ImageContent]]]
 
 
 class ChoiceDelta(ChatMessage):
