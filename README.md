@@ -670,7 +670,7 @@ if __name__ == "__main__":
     server.run(port=8000)
 ```
 
-In this case, `predict` is expected to take an input with the following shape:
+When using `OpenAISpec`, `predict` is expected to take an input with the following shape:
 
 - Text Input Example:
   ```
