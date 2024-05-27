@@ -12,12 +12,12 @@ assignees: ''
 
 ### To Reproduce
 
-Steps to reproduce the behavior:
+Attach a [Lightning Studio](https://lightning.ai/studios) which is fully reproducible (code, dependencies, environment, etc...) to reproduce this:   
 
-1. Go to '...'
-1. Run '....'
-1. Scroll down to '....'
-1. See error
+1. Create a [Studio](https://lightning.ai/studios).    
+2. Reproduce the issue in the Studio.    
+3. [Publish the Studio](https://lightning.ai/docs/overview/studios/publishing#how-to-publish).
+4. Paste the Studio link here.    
 
 <!-- If you have a code sample, error messages, stack traces, please provide it here as well -->
 
@@ -31,8 +31,9 @@ Minimal means having the shortest code but still preserving the bug. -->
 <!-- A clear and concise description of what you expected to happen. -->
 
 ### Environment
+If you published a Studio with your bug report, we can automatically get this information. Otherwise, please describe:   
 
-- PyTorch Version (e.g., 1.0):
+- PyTorch/Jax/Tensorflow Version (e.g., 1.0):
 - OS (e.g., Linux):
 - How you installed PyTorch (`conda`, `pip`, source):
 - Build command you used (if compiling from source):
