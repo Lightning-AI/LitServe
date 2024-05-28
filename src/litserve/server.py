@@ -50,10 +50,10 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 LONG_TIMEOUT = 100
 
 
-def _inject_meta(meta_kwargs: dict, func, *args, **kwargs):
+def _inject_meta(context_kwargs: dict, func, *args, **kwargs):
     sig = inspect.signature(func)
-    if "meta_kwargs" in sig.parameters:
-        return func(*args, **kwargs, meta_kwargs=meta_kwargs)
+    if "context_kwargs" in sig.parameters:
+        return func(*args, **kwargs, context_kwargs=context_kwargs)
     return func(*args, **kwargs)
 
 
@@ -127,19 +127,19 @@ def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
         except (Empty, ValueError):
             continue
         try:
-            meta_kwargs = {}
+            context_kwargs = {}
             x = _inject_meta(
-                meta_kwargs,
+                context_kwargs,
                 lit_api.decode_request,
                 x_enc,
             )
             y = _inject_meta(
-                meta_kwargs,
+                context_kwargs,
                 lit_api.predict,
                 x,
             )
             y_enc = _inject_meta(
-                meta_kwargs,
+                context_kwargs,
                 lit_api.encode_response,
                 y,
             )
@@ -169,19 +169,19 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
             continue
 
         try:
-            meta_kwargs = {}
+            context_kwargs = {}
             x = _inject_meta(
-                meta_kwargs,
+                context_kwargs,
                 lit_api.decode_request,
                 x_enc,
             )
             y_gen = _inject_meta(
-                meta_kwargs,
+                context_kwargs,
                 lit_api.predict,
                 x,
             )
             y_enc_gen = _inject_meta(
-                meta_kwargs,
+                context_kwargs,
                 lit_api.encode_response,
                 y_gen,
             )
