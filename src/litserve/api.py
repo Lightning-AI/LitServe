@@ -14,7 +14,6 @@
 import inspect
 import json
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -64,10 +63,10 @@ class LitAPI(ABC):
         """Setup the model so it can be called in `predict`."""
         pass
 
-    def decode_request(self, request, meta_kwargs: Optional[dict] = None):
+    def decode_request(self, request, **kwargs):
         """Convert the request payload to your model input."""
         if self._spec:
-            return self._spec.decode_request(request, meta_kwargs)
+            return self._spec.decode_request(request, **kwargs)
         return request
 
     def batch(self, inputs):
@@ -90,7 +89,7 @@ class LitAPI(ABC):
         raise NotImplementedError(message)
 
     @abstractmethod
-    def predict(self, x, meta_kwargs: Optional[dict] = None):
+    def predict(self, x):
         """Run the model on the input and return or yield the output."""
         pass
 
@@ -112,14 +111,14 @@ class LitAPI(ABC):
         """Convert a batched output to a list of outputs."""
         return self._default_unbatch(output)
 
-    def encode_response(self, output, meta_kwargs: Optional[dict] = None):
+    def encode_response(self, output, **kwargs):
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.
 
         """
         if self._spec:
-            return self._spec.encode_response(output, meta_kwargs)
+            return self._spec.encode_response(output, **kwargs)
         return output
 
     def format_encoded_response(self, data):
