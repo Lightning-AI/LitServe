@@ -126,3 +126,51 @@ def test_openai_parity(killall):
         )
 
     killall(process)
+
+
+def test_openai_parity_with_image_input(killall):
+    process = subprocess.Popen(
+        ["python", "tests/e2e/default_openaispec.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+    time.sleep(5)
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",  # required, but unused
+    )
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                },
+            ],
+        },
+    ]
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+    )
+    assert response.choices[0].message.content == "This is a generated output", (
+        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+    )
+
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+        stream=True,
+    )
+
+    expected_outputs = ["This is a generated output", None]
+    for r, expected_out in zip(response, expected_outputs):
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+        )
+
+    killall(process)
