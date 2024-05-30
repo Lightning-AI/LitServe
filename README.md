@@ -56,9 +56,8 @@ Why we wrote LitServe:
 
 Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
-
 <div align="center" style="height: 200">
-<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/31c1f472-825d-4a9b-8fc3-b37a7502a403" />
+<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" />
 </div>
 
 &nbsp;
