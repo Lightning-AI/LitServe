@@ -12,19 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import inspect
 import json
-import typing
-import time
-from typing import Literal, Optional, List, Dict, Union, AsyncGenerator
-import uuid
-from fastapi import BackgroundTasks, HTTPException, Request, Response
-from pydantic import BaseModel, Field
 import logging
 import sys
+import time
+import typing
+import uuid
+from enum import Enum
+from typing import AsyncGenerator, Dict, List, Literal, Optional, Union
+
+from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
-import inspect
-from .base import LitSpec
+from pydantic import BaseModel, Field
+
 from ..utils import azip
+from .base import LitSpec
 
 if typing.TYPE_CHECKING:
     from litserve import LitServer
@@ -56,6 +59,12 @@ class Function(BaseModel):
     name: str
     description: str
     parameters: Dict[str, object]
+
+
+class ToolChoice(str, Enum):
+    auto: str = "auto"
+    none: str = "none"
+    any: str = "any"
 
 
 class Tool(BaseModel):
@@ -100,6 +109,7 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = 0.0
     user: Optional[str] = None
     tools: Optional[List[Tool]] = None
+    tool_choice: Optional[ToolChoice] = ToolChoice.auto
 
 
 class ChatCompletionResponseChoice(BaseModel):
