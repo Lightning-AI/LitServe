@@ -58,7 +58,7 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
 
 
 <div align="center" style="height: 200">
-<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/154cdf20-4b44-4f8d-a30c-4669b9c2e582" />
+<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/31c1f472-825d-4a9b-8fc3-b37a7502a403" />
 </div>
 
 &nbsp;
