@@ -32,8 +32,8 @@
 
 <p align="center">
   <a href="https://lightning.ai/">Lightning AI</a> •
-  <a href="#get-started">Get started</a> •
-  <a href="#examples">Examples</a> •
+  <a href="https://lightning.ai/docs/litserve/home/get-started">Get started</a> •
+  <a href="https://lightning.ai/docs/litserve/examples">Examples</a> •
   <a href="#features">Features</a> •
   <a href="https://lightning.ai/docs/litserve">Docs</a>
 </p>
@@ -88,26 +88,7 @@ Install LitServe via pip:
 pip install litserve
 ```
 
-<details>
-  <summary>Advanced install options</summary>
-&nbsp;
-
-Install the main branch:
-
-```bash
-pip install git+https://github.com/Lightning-AI/litserve.git@main
-```
-&nbsp;
-
-Install from source:
-
-```bash
-git clone https://github.com/Lightning-AI/LitServe
-cd LitServe
-pip install -e '.[all]'
-```
-
-</details>
+[Advanced install options](https://lightning.ai/docs/litserve/home/install)    
 
 &nbsp;
 
