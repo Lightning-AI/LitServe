@@ -682,14 +682,17 @@ response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
 ```
 </details>    
 
+&nbsp;
+
 > [!NOTE]
 > Our goal is not to jump on every hype train, but instead support features that scale
 under the most demanding enterprise deployments.
 
 # Contribute
-LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community). Let's make the world's most advanced AI inference engine.
+LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community).    
+Let's make the world's most advanced AI inference engine.
 
 # License
 
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
-See LICENSE file for details.
+See [LICENSE](https://github.com/Lightning-AI/LitServe/blob/main/LICENSE) file for details.
