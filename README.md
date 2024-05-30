@@ -32,8 +32,8 @@
 
 <p align="center">
   <a href="https://lightning.ai/">Lightning AI</a> •
-  <a href="#get-started">Get started</a> •
-  <a href="#examples">Examples</a> •
+  <a href="https://lightning.ai/docs/litserve/home/get-started">Get started</a> •
+  <a href="https://lightning.ai/docs/litserve/examples">Examples</a> •
   <a href="#features">Features</a> •
   <a href="https://lightning.ai/docs/litserve">Docs</a>
 </p>
@@ -79,43 +79,18 @@ Explore various examples that show different models deployed with LitServe:
 | [Stable diffusion 2](https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2)  | **(Vision)** Deploy Stable diffusion 2 for tasks like image generation | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 | [Text-speech (XTTS V2)](https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model)  | **(Speech)** Deploy a text to speech voice cloning API. | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 
-&nbsp;
-
-# Install LitServe
-Install LitServe via pip:
-
-```bash
-pip install litserve
-```
-
-<details>
-  <summary>Advanced install options</summary>
-&nbsp;
-
-Install the main branch:
-
-```bash
-pip install git+https://github.com/Lightning-AI/litserve.git@main
-```
-&nbsp;
-
-Install from source:
-
-```bash
-git clone https://github.com/Lightning-AI/LitServe
-cd LitServe
-pip install -e '.[all]'
-```
-
-</details>
-
-&nbsp;
-
 # Get started
 LitServe has a minimal API that allows enterprise-scale, with full control.
 
 1. Implement the LitAPI class which describes the inference process for the model(s).
 2. Enable the specific optimizations (such as batching or streaming) in the LitServer.
+
+## Install LitServe
+Install LitServe via pip (or use the [advanced install](https://lightning.ai/docs/litserve/home/install) instructions):
+
+```bash
+pip install litserve
+```
 
 ## Implement a server
 Here's a hello world example:
@@ -181,31 +156,12 @@ The way the payload is structured is up to the implementation of the `LitAPI` su
 # Features
 LitServe supports multiple advanced state-of-the-art features.
 
-| Feature  | description  |
-|---|---|
-| Accelerators  | CPU, GPU, Multi-GPU, mps  |
-| Auto-GPU  | Detects and auto-runs on all GPUs on a machine  |
-| Model types  | LLMs, Vision, Time series, any model type...  |
-| ML frameworks  | PyTorch, Jax, Tensorflow, numpy, etc...  |
-| Batching | ✅ |
-| API authentication | ✅ |
-| Multiple models in a single API | ✅ |
-| Full request/response control | ✅ |
-| Automatic schema validation | ✅ |
-| Handle timeouts | ✅ |
-| Handle disconnects | ✅ |
-| Streaming | ✅ |
-
-> [!NOTE]
-> Our goal is not to jump on every hype train, but instead support features that scale
-under the most demanding enterprise deployments.
-
-## Feature details
-
-Explore each feature in detail:
+&nbsp; &nbsp; ✅ All model types: LLMs, vision, time series, etc...    
+&nbsp;   
+&nbsp; &nbsp; ✅ All ML frameworks: PyTorch, Jax, Tensorflow, Hugging Face...    
 
 <details>
-    <summary>Use accelerators automatically (GPUs, CPU, mps)</summary>
+    <summary>✅ Use accelerators automatically (GPUs, CPU, mps)</summary>
 &nbsp;
 
 LitServe automatically detects GPUs on a machine and uses them when available:
@@ -242,7 +198,7 @@ server = ls.LitServer(SimpleLitAPI(), accelerator="mps")
 </details>
 
 <details>
-  <summary>Serve on multi-GPUs</summary>
+  <summary>✅ Serve on multi-GPUs</summary>
 
 &nbsp;
 
@@ -335,7 +291,7 @@ server = ls.LitServer(SimpleTorchAPI(), accelerator="cuda", devices=4, workers_p
 </details>
 
 <details>
-  <summary>Timeouts and disconnections</summary>
+  <summary>✅ Handle timeouts and disconnections</summary>
 
 &nbsp;
 
@@ -368,7 +324,7 @@ server = ls.LitServer(SimpleLitAPI(), timeout=False)
 </details>
 
 <details>
-  <summary>Use API key authentication</summary>
+  <summary>✅ Use API key authentication</summary>
 
 &nbsp;
 
@@ -384,7 +340,7 @@ Clients are expected to auth with the same API key set in the `X-API-Key` HTTP h
 </details>
 
 <details>
-  <summary>Dynamic batching</summary>
+  <summary>✅ Dynamic batching</summary>
 &nbsp;
 
 LitServe can combine individual requests into a batch to improve throughput.
@@ -448,7 +404,7 @@ if __name__ == "__main__":
 
 
 <details>
-  <summary>Stream long responses</summary>
+  <summary>✅ Stream long responses</summary>
 
 &nbsp;
 
@@ -502,7 +458,7 @@ for line in resp.iter_content(5000):
 </details>
 
 <details>
-  <summary>Automatic schema validation</summary>
+  <summary>✅ Automatic schema validation</summary>
 
 &nbsp;
 
@@ -545,7 +501,7 @@ if __name__ == "__main__":
 </details>
 
 <details>
-    <summary>OpenAI compatible API</summary>
+    <summary>✅ OpenAI compatible API</summary>
 
 &nbsp;
 
@@ -724,31 +680,19 @@ response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
     ]
   })
 ```
-</details>
+</details>    
+
+&nbsp;
+
+> [!NOTE]
+> Our goal is not to jump on every hype train, but instead support features that scale
+under the most demanding enterprise deployments.
 
 # Contribute
-LitServe is a community project accepting contributions. Let's make the world's most advanced AI inference engine.
-
-
-<details>
-  <summary>Run tests</summary>
-
-Use `pytest` to run tests locally.
-
-First, install test dependencies:
-
-```shell
-pip install -r _requirements/test.txt
-```
-
-Run the tests
-```shell
-pytest tests
-```
-
-</details>
+LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community).    
+Let's make the world's most advanced AI inference engine.
 
 # License
 
 litserve is released under the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) license.
-See LICENSE file for details.
+See [LICENSE](https://github.com/Lightning-AI/LitServe/blob/main/LICENSE) file for details.
