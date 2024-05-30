@@ -52,9 +52,34 @@ class ImageContent(BaseModel):
     image_url: str
 
 
+class FunctionDefinition(BaseModel):
+    name: str
+    description: str
+    parameters: Dict[str, object]
+
+
+class Tool(BaseModel):
+    type: Literal["function"]
+    function: FunctionDefinition
+
+
+class FunctionCall(BaseModel):
+    name: str
+    arguments: str
+
+
+class ToolCall(BaseModel):
+    id: str = "null"
+    type: str = "function"
+    function: FunctionCall
+
+
 class ChatMessage(BaseModel):
     role: str
     content: Union[str, List[Union[TextContent, ImageContent]]]
+    name: Optional[str] = None
+    tool_calls: Optional[List[ToolCall]] = None
+    tool_call_id: Optional[List[str]] = None
 
 
 class ChoiceDelta(ChatMessage):
@@ -74,6 +99,7 @@ class ChatCompletionRequest(BaseModel):
     presence_penalty: Optional[float] = 0.0
     frequency_penalty: Optional[float] = 0.0
     user: Optional[str] = None
+    tools: Optional[List[Tool]] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
