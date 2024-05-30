@@ -52,7 +52,7 @@ class ImageContent(BaseModel):
     image_url: str
 
 
-class FunctionDefinition(BaseModel):
+class Function(BaseModel):
     name: str
     description: str
     parameters: Dict[str, object]
@@ -60,7 +60,7 @@ class FunctionDefinition(BaseModel):
 
 class Tool(BaseModel):
     type: Literal["function"]
-    function: FunctionDefinition
+    function: Function
 
 
 class FunctionCall(BaseModel):
@@ -79,7 +79,7 @@ class ChatMessage(BaseModel):
     content: Union[str, List[Union[TextContent, ImageContent]]]
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
-    tool_call_id: Optional[List[str]] = None
+    tool_call_id: Optional[str] = None
 
 
 class ChoiceDelta(ChatMessage):
