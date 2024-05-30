@@ -89,7 +89,7 @@ class LitAPI(ABC):
         raise NotImplementedError(message)
 
     @abstractmethod
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output."""
         pass
 
