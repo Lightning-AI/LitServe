@@ -1,8 +1,6 @@
 <div align="center">
 <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserveLogo.png" alt="LitGPT" height="90px"/>
 
-&nbsp;
-
 # LitServe
 
 **High-throughput serving engine for AI models**
@@ -17,15 +15,6 @@
 
 ---
 
-
-<p align="center">
-
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>
-
-</p>
-
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/litserve)
 ![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg) [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE) [![Discord](https://img.shields.io/discord/1077906959069626439?style=plastic)](https://discord.gg/VptPCZkGNa)
 
@@ -38,6 +27,16 @@
   <a href="https://lightning.ai/docs/litserve">Docs</a>
 </p>
 
+<p align="center">
+
+&nbsp;
+  
+<a target="_blank" href="https://lightning.ai/docs/litserve/home">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Get started"/>
+</a>
+
+</p>
+
 </div>
 
 &nbsp;
@@ -45,8 +44,13 @@
 # Deploy AI models Lightning fast ⚡
 LitServe is a high-throughput serving engine for deploying AI models at scale. LitServe generates an API endpoint for a model, handles batching, streaming, autoscaling across CPU/GPUs and more.
 
-Why we wrote LitServe:
+Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
 
+
+<details>
+  <summary> Why we wrote LitServe:</summary>
+
+&nbsp;
 1. Work with any model: LLMs, vision, time-series, etc...
 2. We wanted a zero abstraction, minimal, hackable code-base without bloat.
 3. Built for enterprise scale (not demos, etc...).
@@ -54,13 +58,12 @@ Why we wrote LitServe:
 5. Work on any hardware (GPU/TPU) automatically.
 6. Let you focus on model performance, not the serving boilerplate.
 
-Think of LitServe as PyTorch Lightning for model serving (if you're familiar with Lightning) but supports every framework like PyTorch, JAX, Tensorflow and more.
+&nbsp;
 
-
-
+</details>
 
 <div align="center" style="height: 200">
-<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/7542b03a-59b0-4678-85bd-cf9110843332" />
+<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" />
 </div>
 
 &nbsp;
@@ -78,6 +81,8 @@ Explore various examples that show different models deployed with LitServe:
 | [Open AI Whisper](https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model)  | **(Audio)** Deploy Open AI Whisper for tasks like speech to text | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 | [Stable diffusion 2](https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2)  | **(Vision)** Deploy Stable diffusion 2 for tasks like image generation | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
 | [Text-speech (XTTS V2)](https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model)  | **(Speech)** Deploy a text to speech voice cloning API. | <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model"><img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/></a>
+
+&nbsp;
 
 # Get started
 LitServe has a minimal API that allows enterprise-scale, with full control.
