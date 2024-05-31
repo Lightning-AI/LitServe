@@ -695,16 +695,25 @@ class OpenAISpecLitAPI(ls.LitAPI):
     def decode_request(request: ChatCompletionRequest):
         tools = request.tools
         messages = request.messages
-        prompt = # do something with tools and messages
+        # do something with tools and messages, to get the prompt
+        prompt = "parsed prompt" 
         return prompt
 
     def predict(self, x):
-        out = # do something with x
+         # do something with x
+        out = "generated output"
         yield out
 
     def encode_response(self, output_generator) -> ChatMessage:
         for output in output_generator:
-            tool_calls = # parse tool calls from output
+            # parse tool calls from output
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "function_1", "arguments": '{"arg_1": "arg_1_value"}'},
+                }
+            ]
             yield ChatMessage(role="assistant", content="", tool_calls=tool_calls)
 
 
