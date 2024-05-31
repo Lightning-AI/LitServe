@@ -32,7 +32,7 @@
 &nbsp;
   
 <a target="_blank" href="https://lightning.ai/docs/litserve/home">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Get started"/>
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/get-started-badge.svg" alt="Get started"/>
 </a>
 
 </p>
@@ -682,6 +682,82 @@ response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
                 },
             ]
       }
+    ]
+  })
+```
+
+&nbsp;
+
+LitServe's `OpenAISpec` can also handle tools in the input and tool_calls in the output.. Here is an example:
+
+```python
+import litserve as ls
+from litserve.specs.openai import ChatMessage, ChatCompletionRequest
+
+class OpenAISpecLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def decode_request(self, request: ChatCompletionRequest):
+        tools = request.tools
+        messages = request.messages
+        # do something with tools and messages, to get the prompt
+        prompt = "parsed prompt" 
+        return prompt
+
+    def predict(self, x):
+         # do something with x, to get the output
+        out = "generated output"
+        yield out
+
+    def encode_response(self, output_generator) -> ChatMessage:
+        for output in output_generator:
+            # parse tool calls from output
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "function_1", "arguments": '{"arg_1": "arg_1_value"}'},
+                }
+            ]
+            yield ChatMessage(role="assistant", content="", tool_calls=tool_calls)
+
+
+if __name__ == "__main__":
+    server = ls.LitServer(OpenAISpecLitAPI(), spec=ls.OpenAISpec())
+    server.run(port=8000)
+```
+
+The above server can be queried using a standard OpenAI client:
+
+```python
+import requests
+
+response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
+    "model": "lit",
+    "stream": False,  # You can stream chunked response by setting this True
+    "tools" : [
+        {
+            "type": "function",
+            "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA",
+                },
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+                },
+                "required": ["location"],
+            },
+            }
+        }
+    ],
+    "messages": [
+      {"role": "user", "content": "What's the weather like in Boston today?"}
     ]
   })
 ```

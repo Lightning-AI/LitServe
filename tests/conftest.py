@@ -162,3 +162,37 @@ def openai_request_data_with_image():
         "frequency_penalty": 0,
         "user": "string",
     }
+
+
+@pytest.fixture()
+def openai_request_data_with_tools():
+    return {
+        "model": "lit",
+        "messages": [{"role": "user", "content": "What's the weather like in Boston today?"}],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_current_weather",
+                    "description": "Get the current weather in a given location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {"type": "string", "description": "The city and state, e.g. San Francisco, CA"},
+                            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+                        },
+                        "required": ["location"],
+                    },
+                },
+            }
+        ],
+        "temperature": 0.7,
+        "top_p": 1,
+        "n": 1,
+        "max_tokens": 0,
+        "stop": "string",
+        "stream": False,
+        "presence_penalty": 0,
+        "frequency_penalty": 0,
+        "user": "string",
+    }

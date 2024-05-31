@@ -32,6 +32,21 @@ class TestAPIWithCustomEncode(TestAPI):
         yield ChatMessage(role="assistant", content="This is a custom encoded output")
 
 
+class TestAPIWithToolCalls(TestAPI):
+    def encode_response(self, output):
+        yield ChatMessage(
+            role="assistant",
+            content="",
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "function_1", "arguments": '{"arg_1": "arg_1_value"}'},
+                }
+            ],
+        )
+
+
 if __name__ == "__main__":
     server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
     server.run(port=8000)
