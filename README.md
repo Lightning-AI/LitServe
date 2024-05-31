@@ -15,15 +15,6 @@
 
 ---
 
-
-<p align="center">
-
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
-</a>
-
-</p>
-
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/litserve)
 ![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg) [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE) [![Discord](https://img.shields.io/discord/1077906959069626439?style=plastic)](https://discord.gg/VptPCZkGNa)
 
@@ -34,6 +25,14 @@
   <a href="https://lightning.ai/docs/litserve/examples">Examples</a> •
   <a href="#features">Features</a> •
   <a href="https://lightning.ai/docs/litserve">Docs</a>
+</p>
+
+<p align="center">
+
+<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
+</a>
+
 </p>
 
 </div>
