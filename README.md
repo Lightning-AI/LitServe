@@ -29,6 +29,8 @@
 
 <p align="center">
 
+&nbsp;
+  
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
 </a>
