@@ -14,6 +14,7 @@
 import inspect
 import json
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -57,6 +58,7 @@ class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: callable = None
     _spec: LitSpec = None
+    _device: Optional[str] = None
 
     @abstractmethod
     def setup(self, devices):
@@ -135,6 +137,14 @@ class LitAPI(ABC):
     @stream.setter
     def stream(self, value):
         self._stream = value
+
+    @property
+    def device(self):
+        return self._device
+
+    @device.setter
+    def device(self, value):
+        self._device = value
 
     def sanitize(self, max_batch_size: int, spec: LitSpec):
         if self.stream:

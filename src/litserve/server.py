@@ -254,6 +254,7 @@ def inference_worker(
     stream,
 ):
     lit_api.setup(device)
+    lit_api.device = device
     message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
