@@ -78,7 +78,7 @@ class FunctionCall(BaseModel):
 
 
 class ToolCall(BaseModel):
-    id: str = "null"
+    id: Optional[str] = None
     type: str = "function"
     function: FunctionCall
 
