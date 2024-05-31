@@ -692,7 +692,7 @@ class OpenAISpecLitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def decode_request(request: ChatCompletionRequest):
+    def decode_request(self, request: ChatCompletionRequest):
         tools = request.tools
         messages = request.messages
         # do something with tools and messages, to get the prompt
