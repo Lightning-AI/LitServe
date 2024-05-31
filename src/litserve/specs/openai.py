@@ -342,15 +342,18 @@ class OpenAISpec(LitSpec):
         choices = []
         for i, streaming_response in enumerate(pipe_responses):
             msgs = []
+            tool_calls = None
             async for chat_msg in streaming_response:
                 chat_msg = json.loads(chat_msg)
                 logger.debug(chat_msg)
                 chat_msg = ChatMessage(**chat_msg)
                 # Is " " correct choice to concat with?
                 msgs.append(chat_msg.content)
+                if chat_msg.tool_calls:
+                    tool_calls = chat_msg.tool_calls
 
             content = " ".join(msgs)
-            msg = {"role": "assistant", "content": content}
+            msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
 
