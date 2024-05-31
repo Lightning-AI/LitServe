@@ -700,7 +700,7 @@ class OpenAISpecLitAPI(ls.LitAPI):
         return prompt
 
     def predict(self, x):
-         # do something with x
+         # do something with x, to get the output
         out = "generated output"
         yield out
 
