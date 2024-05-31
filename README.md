@@ -763,6 +763,35 @@ response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
 ```
 </details>    
 
+<details>
+    <summary>✅ Track context throughout the request lifecycle</summary>
+
+&nbsp;
+
+You can pass around and track context throughout a request lifecycle by adding a special argument `context` to the 
+`LitAPI` methods.
+
+```python
+import litserve as ls 
+
+class TrackLitAPI(ls.examples.SimpleLitAPI):
+    def predict(self, x, context):
+        context["input_value"] = x
+        return self.model(x)
+
+    def encode_response(self, output, context):
+        # Retrieve the context from LitPI.predict inside encode_response
+        input_value = context["input_value"]
+        return {"output": input_value * output}
+
+if __name__=="__main__":
+    api = TrackLitAPI() 
+    server = ls.LitServer(api)
+    server.run(port=8000)
+```
+
+</details>
+
 &nbsp;
 
 > [!NOTE]

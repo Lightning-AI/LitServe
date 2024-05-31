@@ -50,6 +50,13 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 LONG_TIMEOUT = 100
 
 
+def _inject_context(context: dict, func, *args, **kwargs):
+    sig = inspect.signature(func)
+    if "context" in sig.parameters:
+        return func(*args, **kwargs, context=context)
+    return func(*args, **kwargs)
+
+
 def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
@@ -120,9 +127,22 @@ def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
         except (Empty, ValueError):
             continue
         try:
-            x = lit_api.decode_request(x_enc)
-            y = lit_api.predict(x)
-            y_enc = lit_api.encode_response(y)
+            context = {}
+            x = _inject_context(
+                context,
+                lit_api.decode_request,
+                x_enc,
+            )
+            y = _inject_context(
+                context,
+                lit_api.predict,
+                x,
+            )
+            y_enc = _inject_context(
+                context,
+                lit_api.encode_response,
+                y,
+            )
 
             with contextlib.suppress(BrokenPipeError):
                 pipe_s.send((y_enc, LitAPIStatus.OK))
@@ -149,9 +169,22 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
             continue
 
         try:
-            x = lit_api.decode_request(x_enc)
-            y_gen = lit_api.predict(x)
-            y_enc_gen = lit_api.encode_response(y_gen)
+            context = {}
+            x = _inject_context(
+                context,
+                lit_api.decode_request,
+                x_enc,
+            )
+            y_gen = _inject_context(
+                context,
+                lit_api.predict,
+                x,
+            )
+            y_enc_gen = _inject_context(
+                context,
+                lit_api.encode_response,
+                y_gen,
+            )
             for y_enc in y_enc_gen:
                 with contextlib.suppress(BrokenPipeError):
                     y_enc = lit_api.format_encoded_response(y_enc)

@@ -38,12 +38,12 @@ class LitSpec:
         return self._endpoints.copy()
 
     @abstractmethod
-    def decode_request(self, request):
+    def decode_request(self, request, meta_kwargs):
         """Convert the request payload to your model input."""
         pass
 
     @abstractmethod
-    def encode_response(self, output):
+    def encode_response(self, output, meta_kwargs):
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.

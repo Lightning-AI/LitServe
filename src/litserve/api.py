@@ -63,10 +63,10 @@ class LitAPI(ABC):
         """Setup the model so it can be called in `predict`."""
         pass
 
-    def decode_request(self, request):
+    def decode_request(self, request, **kwargs):
         """Convert the request payload to your model input."""
         if self._spec:
-            return self._spec.decode_request(request)
+            return self._spec.decode_request(request, **kwargs)
         return request
 
     def batch(self, inputs):
@@ -89,7 +89,7 @@ class LitAPI(ABC):
         raise NotImplementedError(message)
 
     @abstractmethod
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output."""
         pass
 
@@ -111,14 +111,14 @@ class LitAPI(ABC):
         """Convert a batched output to a list of outputs."""
         return self._default_unbatch(output)
 
-    def encode_response(self, output):
+    def encode_response(self, output, **kwargs):
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.
 
         """
         if self._spec:
-            return self._spec.encode_response(output)
+            return self._spec.encode_response(output, **kwargs)
         return output
 
     def format_encoded_response(self, data):

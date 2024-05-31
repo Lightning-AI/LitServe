@@ -13,6 +13,8 @@
 # limitations under the License.
 import asyncio
 import inspect
+import pickle
+import re
 import subprocess
 import time
 from multiprocessing import Pipe, Manager
@@ -37,6 +39,7 @@ from litserve.server import (
     run_batched_streaming_loop,
 )
 from litserve.server import LitServer
+import litserve as ls
 
 
 def test_index(sync_testclient):
@@ -345,3 +348,44 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.reset_mock()
     server.run(port="8001")
     mock_uvicorn.run.assert_called()
+
+
+class IndentityAPI(ls.examples.SimpleLitAPI):
+    def predict(self, x, context):
+        context["input"] = x
+        return self.model(x)
+
+    def encode_response(self, output, context):
+        input = context["input"]
+        return {"output": input}
+
+
+class PredictError(ls.examples.SimpleLitAPI):
+    def predict(self, x, y, context):
+        context["input"] = x
+        return self.model(x)
+
+    def encode_response(self, output, context):
+        input = context["input"]
+        return {"output": input}
+
+
+@pytest.mark.asyncio()
+@patch("litserve.server.load_and_raise")
+async def test_inject_context(mocked_load_and_raise):
+    def dummy_load_and_raise(resp):
+        raise pickle.loads(resp)
+
+    mocked_load_and_raise.side_effect = dummy_load_and_raise
+
+    api = IndentityAPI()
+    server = LitServer(api)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
+
+    api = PredictError()
+    server = LitServer(api)
+    with pytest.raises(TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")):
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
