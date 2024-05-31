@@ -52,7 +52,6 @@ class SimpleTorchAPI(ls.LitAPI):
                 return self.linear(x)
 
         self.model = Linear().to(device)
-        self.device = device
 
     def decode_request(self, request):
         import torch
