@@ -174,3 +174,69 @@ def test_openai_parity_with_image_input(killall):
         )
 
     killall(process)
+
+
+def test_openai_parity_with_tools(killall):
+    process = subprocess.Popen(
+        ["python", "tests/e2e/default_openaispec_tools.py"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+    time.sleep(5)
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",  # required, but unused
+    )
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_current_weather",
+                "description": "Get the current weather in a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                        "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+                    },
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+    messages = [
+        {"role": "user", "content": "What's the weather like in Boston today?"},
+    ]
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+        tools=tools,
+    )
+    assert response.choices[0].message.content == "", (
+        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+    )
+    assert response.choices[0].message.tool_calls[0].function.name == "get_current_weather", (
+        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+    )
+
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+        stream=True,
+    )
+
+    expected_outputs = ["", None]
+    for r, expected_out in zip(response, expected_outputs):
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+        )
+        if r.choices[0].delta.tool_calls:
+            assert r.choices[0].delta.tool_calls[0].function.name == "get_current_weather", (
+                f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            )
+
+    killall(process)
