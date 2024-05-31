@@ -32,7 +32,7 @@ class TestAPIWithCustomEncode(TestAPI):
         yield ChatMessage(role="assistant", content="This is a custom encoded output")
 
 
-class TestAPIWithToolsCalls(TestAPI):
+class TestAPIWithToolCalls(TestAPI):
     def encode_response(self, output):
         yield ChatMessage(
             role="assistant",

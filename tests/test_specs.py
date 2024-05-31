@@ -15,7 +15,7 @@
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
-from litserve.examples.openai_spec_example import TestAPI, TestAPIWithCustomEncode, TestAPIWithToolsCalls
+from litserve.examples.openai_spec_example import TestAPI, TestAPIWithCustomEncode, TestAPIWithToolCalls
 from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
 
@@ -62,7 +62,7 @@ async def test_override_encode(openai_request_data):
 @pytest.mark.asyncio()
 async def test_openai_spec_with_tools(openai_request_data_with_tools):
     spec = OpenAISpec()
-    server = ls.LitServer(TestAPIWithToolsCalls(), spec=spec)
+    server = ls.LitServer(TestAPIWithToolCalls(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
