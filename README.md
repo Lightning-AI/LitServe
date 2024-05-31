@@ -764,7 +764,7 @@ response = requests.post("http://127.0.0.1:8000/v1/chat/completions", json={
 </details>    
 
 <details>
-    <summary>✅ Track context throughout request lifecycle</summary>
+    <summary>✅ Track context throughout the request lifecycle</summary>
 
 &nbsp;
 
