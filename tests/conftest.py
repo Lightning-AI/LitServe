@@ -168,7 +168,7 @@ def openai_request_data_with_image():
 def openai_request_data_with_tools():
     return {
         "model": "lit",
-        "messages": [{"role": "user", "content": "What'''s the weather like in Boston today?"}],
+        "messages": [{"role": "user", "content": "What's the weather like in Boston today?"}],
         "tools": [
             {
                 "type": "function",
