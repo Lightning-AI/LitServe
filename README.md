@@ -32,7 +32,7 @@
 &nbsp;
   
 <a target="_blank" href="https://lightning.ai/docs/litserve/home">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/get-started-badge.svg" alt="Get started"/>
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/get-started-badge.svg" height="36px" alt="Get started"/>
 </a>
 
 </p>
