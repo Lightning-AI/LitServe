@@ -117,13 +117,15 @@ def test_run(killall):
 
     time.sleep(5)
     try:
-        assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+        assert os.path.exists(
+            "client.py"
+        ), f"Expected client file to be created at {os.getcwd()} after starting the server"
         output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
         assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
         os.remove("client.py")
     except Exception as e:
         raise e
-    finally: 
+    finally:
         killall(process)
 
 
