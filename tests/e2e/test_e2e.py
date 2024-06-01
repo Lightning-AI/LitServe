@@ -27,10 +27,14 @@ def test_e2e_default_api(killall):
     )
 
     time.sleep(5)
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
-    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
-    assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
-    killall(process)
+    try:
+        resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
+        assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+        assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
 
 
 def test_e2e_default_spec(openai_request_data, killall):
@@ -42,12 +46,16 @@ def test_e2e_default_spec(openai_request_data, killall):
     )
 
     time.sleep(5)
-    resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
-    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
-    output = resp.json()["choices"][0]["message"]["content"]
-    expected = "This is a generated output"
-    assert output == expected, "tests/default_spec.py didn't return expected output"
-    killall(process)
+    try:
+        resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
+        assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+        output = resp.json()["choices"][0]["message"]["content"]
+        expected = "This is a generated output"
+        assert output == expected, "tests/default_spec.py didn't return expected output"
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
 
 
 def test_e2e_default_batching(killall):
@@ -59,10 +67,14 @@ def test_e2e_default_batching(killall):
     )
 
     time.sleep(5)
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
-    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
-    assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
-    killall(process)
+    try:
+        resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
+        assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+        assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
 
 
 def test_e2e_batched_streaming(killall):
@@ -74,17 +86,21 @@ def test_e2e_batched_streaming(killall):
     )
 
     time.sleep(5)
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
-    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+    try:
+        resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+        assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
 
-    outputs = []
-    for line in resp.iter_content(chunk_size=4000):
-        if line:
-            outputs.append(json.loads(line.decode("utf-8")))
+        outputs = []
+        for line in resp.iter_content(chunk_size=4000):
+            if line:
+                outputs.append(json.loads(line.decode("utf-8")))
 
-    assert len(outputs) == 10, "streaming server should have 10 outputs"
-    assert {"output": 16.0} in outputs, "server didn't return expected output"
-    killall(process)
+        assert len(outputs) == 10, "streaming server should have 10 outputs"
+        assert {"output": 16.0} in outputs, "server didn't return expected output"
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
 
 
 def test_openai_parity(killall):
@@ -95,37 +111,40 @@ def test_openai_parity(killall):
         stdin=subprocess.DEVNULL,
     )
     time.sleep(5)
-    client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
-        api_key="lit",  # required, but unused
-    )
-    response = client.chat.completions.create(
-        model="lit",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "How are you?"},
-        ],
-    )
-    assert response.choices[0].message.content == "This is a generated output", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
-    )
-
-    response = client.chat.completions.create(
-        model="lit",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "How are you?"},
-        ],
-        stream=True,
-    )
-
-    expected_outputs = ["This is a generated output", None]
-    for r, expected_out in zip(response, expected_outputs):
-        assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+    try:
+        client = OpenAI(
+            base_url="http://127.0.0.1:8000/v1",
+            api_key="lit",  # required, but unused
+        )
+        response = client.chat.completions.create(
+            model="lit",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "How are you?"},
+            ],
+        )
+        assert response.choices[0].message.content == "This is a generated output", (
+            f"Server didn't return expected output" f"\nOpenAI client output: {response}"
         )
 
-    killall(process)
+        response = client.chat.completions.create(
+            model="lit",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "How are you?"},
+            ],
+            stream=True,
+        )
+
+        expected_outputs = ["This is a generated output", None]
+        for r, expected_out in zip(response, expected_outputs):
+            assert r.choices[0].delta.content == expected_out, (
+                f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            )
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
 
 
 def test_openai_parity_with_image_input(killall):
@@ -136,44 +155,47 @@ def test_openai_parity_with_image_input(killall):
         stdin=subprocess.DEVNULL,
     )
     time.sleep(5)
-    client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
-        api_key="lit",  # required, but unused
-    )
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "What's in this image?"},
-                {
-                    "type": "image_url",
-                    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
-                },
-            ],
-        },
-    ]
-    response = client.chat.completions.create(
-        model="lit",
-        messages=messages,
-    )
-    assert response.choices[0].message.content == "This is a generated output", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
-    )
-
-    response = client.chat.completions.create(
-        model="lit",
-        messages=messages,
-        stream=True,
-    )
-
-    expected_outputs = ["This is a generated output", None]
-    for r, expected_out in zip(response, expected_outputs):
-        assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+    try:
+        client = OpenAI(
+            base_url="http://127.0.0.1:8000/v1",
+            api_key="lit",  # required, but unused
+        )
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What's in this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                    },
+                ],
+            },
+        ]
+        response = client.chat.completions.create(
+            model="lit",
+            messages=messages,
+        )
+        assert response.choices[0].message.content == "This is a generated output", (
+            f"Server didn't return expected output" f"\nOpenAI client output: {response}"
         )
 
-    killall(process)
+        response = client.chat.completions.create(
+            model="lit",
+            messages=messages,
+            stream=True,
+        )
+
+        expected_outputs = ["This is a generated output", None]
+        for r, expected_out in zip(response, expected_outputs):
+            assert r.choices[0].delta.content == expected_out, (
+                f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            )
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
 
 
 def test_openai_parity_with_tools(killall):
@@ -184,59 +206,62 @@ def test_openai_parity_with_tools(killall):
         stdin=subprocess.DEVNULL,
     )
     time.sleep(5)
-    client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
-        api_key="lit",  # required, but unused
-    )
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_current_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA",
-                        },
-                        "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
-                    },
-                    "required": ["location"],
-                },
-            },
-        }
-    ]
-    messages = [
-        {"role": "user", "content": "What's the weather like in Boston today?"},
-    ]
-    response = client.chat.completions.create(
-        model="lit",
-        messages=messages,
-        tools=tools,
-    )
-    assert response.choices[0].message.content == "", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
-    )
-    assert response.choices[0].message.tool_calls[0].function.name == "get_current_weather", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
-    )
-
-    response = client.chat.completions.create(
-        model="lit",
-        messages=messages,
-        stream=True,
-    )
-
-    expected_outputs = ["", None]
-    for r, expected_out in zip(response, expected_outputs):
-        assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+    try:
+        client = OpenAI(
+            base_url="http://127.0.0.1:8000/v1",
+            api_key="lit",  # required, but unused
         )
-        if r.choices[0].delta.tool_calls:
-            assert r.choices[0].delta.tool_calls[0].function.name == "get_current_weather", (
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_current_weather",
+                    "description": "Get the current weather in a given location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "The city and state, e.g. San Francisco, CA",
+                            },
+                            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+                        },
+                        "required": ["location"],
+                    },
+                },
+            }
+        ]
+        messages = [
+            {"role": "user", "content": "What's the weather like in Boston today?"},
+        ]
+        response = client.chat.completions.create(
+            model="lit",
+            messages=messages,
+            tools=tools,
+        )
+        assert response.choices[0].message.content == "", (
+            f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        )
+        assert response.choices[0].message.tool_calls[0].function.name == "get_current_weather", (
+            f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        )
+
+        response = client.chat.completions.create(
+            model="lit",
+            messages=messages,
+            stream=True,
+        )
+
+        expected_outputs = ["", None]
+        for r, expected_out in zip(response, expected_outputs):
+            assert r.choices[0].delta.content == expected_out, (
                 f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
             )
-
-    killall(process)
+            if r.choices[0].delta.tool_calls:
+                assert r.choices[0].delta.tool_calls[0].function.name == "get_current_weather", (
+                    f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+                )
+    except Exception as e:
+        raise e
+    finally:
+        killall(process)
