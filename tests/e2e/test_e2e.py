@@ -12,68 +12,68 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
+import psutil
 import requests
 import subprocess
 import time
+
 from openai import OpenAI
+from functools import wraps
 
 
-def test_e2e_default_api(killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_api.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
+def e2e_from_file(filename):
+    def decorator(test_fn):
+        @wraps(test_fn)
+        def wrapper(*args, **kwargs):
+            process = subprocess.Popen(
+                ["python", filename],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+            )
+            time.sleep(5)
 
-    time.sleep(5)
+            try:
+                test_fn(*args, **kwargs)
+            except Exception:
+                raise
+            finally:
+                parent = psutil.Process(process.pid)
+                for child in parent.children(recursive=True):
+                    child.kill()
+                process.kill()
+
+        return wrapper
+
+    return decorator
+
+
+@e2e_from_file("tests/e2e/default_api.py")
+def test_e2e_default_api():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
-    killall(process)
 
 
-def test_e2e_default_spec(openai_request_data, killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_spec.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-
-    time.sleep(5)
+@e2e_from_file("tests/e2e/default_spec.py")
+def test_e2e_default_spec(openai_request_data):
     resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     output = resp.json()["choices"][0]["message"]["content"]
     expected = "This is a generated output"
     assert output == expected, "tests/default_spec.py didn't return expected output"
-    killall(process)
 
 
-def test_e2e_default_batching(killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_batching.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-
-    time.sleep(5)
+@e2e_from_file("tests/e2e/default_batching.py")
+def test_e2e_default_batching():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
-    killall(process)
 
 
-def test_e2e_batched_streaming(killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_batched_streaming.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-
-    time.sleep(5)
+@e2e_from_file("tests/e2e/default_batched_streaming.py")
+def test_e2e_batched_streaming():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
 
@@ -84,17 +84,10 @@ def test_e2e_batched_streaming(killall):
 
     assert len(outputs) == 10, "streaming server should have 10 outputs"
     assert {"output": 16.0} in outputs, "server didn't return expected output"
-    killall(process)
 
 
-def test_openai_parity(killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_openaispec.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-    time.sleep(5)
+@e2e_from_file("tests/e2e/default_openaispec.py")
+def test_openai_parity():
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
         api_key="lit",  # required, but unused
@@ -125,17 +118,9 @@ def test_openai_parity(killall):
             f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
         )
 
-    killall(process)
 
-
-def test_openai_parity_with_image_input(killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_openaispec.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-    time.sleep(5)
+@e2e_from_file("tests/e2e/default_openaispec.py")
+def test_openai_parity_with_image_input():
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
         api_key="lit",  # required, but unused
@@ -173,17 +158,9 @@ def test_openai_parity_with_image_input(killall):
             f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
         )
 
-    killall(process)
 
-
-def test_openai_parity_with_tools(killall):
-    process = subprocess.Popen(
-        ["python", "tests/e2e/default_openaispec_tools.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-    time.sleep(5)
+@e2e_from_file("tests/e2e/default_openaispec_tools.py")
+def test_openai_parity_with_tools():
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
         api_key="lit",  # required, but unused
@@ -239,4 +216,10 @@ def test_openai_parity_with_tools(killall):
                 f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
             )
 
-    killall(process)
+
+@e2e_from_file("tests/simple_server.py")
+def test_run():
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
+    os.remove("client.py")

@@ -15,8 +15,6 @@ import asyncio
 import inspect
 import pickle
 import re
-import subprocess
-import time
 from multiprocessing import Pipe, Manager
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
@@ -24,7 +22,6 @@ from fastapi import Request, Response
 
 import torch
 import torch.nn as nn
-import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
@@ -105,22 +102,6 @@ def test_single_loop(simple_litapi, loop_args):
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_single_loop(lit_api_mock, None, requests_queue, request_buffer)
-
-
-def test_run(killall):
-    process = subprocess.Popen(
-        ["python", "tests/simple_server.py"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
-    )
-
-    time.sleep(5)
-    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
-    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
-    assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
-    os.remove("client.py")
-    killall(process)
 
 
 @pytest.mark.asyncio()
