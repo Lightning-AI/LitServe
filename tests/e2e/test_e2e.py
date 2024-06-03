@@ -31,17 +31,19 @@ def e2e_from_file(filename):
                 stdin=subprocess.DEVNULL,
             )
             time.sleep(5)
- 
+
             try:
                 test_fn(*args, **kwargs)
-            except Exception as e:
+            except Exception:
                 raise
             finally:
                 parent = psutil.Process(process.pid)
                 for child in parent.children(recursive=True):
                     child.kill()
                 process.kill()
+
         return wrapper
+
     return decorator
 
 
@@ -215,9 +217,7 @@ def test_openai_parity_with_tools():
 
 @e2e_from_file("tests/simple_server.py")
 def test_run():
-    assert os.path.exists(
-        "client.py"
-    ), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
     os.remove("client.py")

@@ -15,8 +15,6 @@ import asyncio
 import inspect
 import pickle
 import re
-import subprocess
-import time
 from multiprocessing import Pipe, Manager
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
@@ -24,7 +22,6 @@ from fastapi import Request, Response
 
 import torch
 import torch.nn as nn
-import os
 from httpx import AsyncClient
 
 from unittest.mock import patch, MagicMock
