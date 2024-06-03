@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
 import psutil
 import requests
 import subprocess
@@ -210,3 +211,13 @@ def test_openai_parity_with_tools():
             assert r.choices[0].delta.tool_calls[0].function.name == "get_current_weather", (
                 f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
             )
+
+
+@e2e_from_file("tests/simple_server.py")
+def test_run():
+    assert os.path.exists(
+        "client.py"
+    ), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
+    os.remove("client.py")
