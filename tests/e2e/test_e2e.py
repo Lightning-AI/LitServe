@@ -19,10 +19,11 @@ import subprocess
 import time
 
 from openai import OpenAI
-
+from functools import wraps
 
 def e2e_from_file(filename):
     def decorator(test_fn):
+        @wraps(test_fn)
         def wrapper(*args, **kwargs):
             process = subprocess.Popen(
                 ["python", filename],
