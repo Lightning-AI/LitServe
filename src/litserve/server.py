@@ -170,6 +170,8 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
 
         try:
             context = {}
+            if isinstance(lit_spec, OpenAISpec):
+                lit_spec.populate_context(context, x_enc)
             x = _inject_context(
                 context,
                 lit_api.decode_request,

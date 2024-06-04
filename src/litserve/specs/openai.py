@@ -220,6 +220,11 @@ class OpenAISpec(LitSpec):
             raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
         print("OpenAI spec setup complete")
 
+    def populate_context(self, context, request):
+        data = request.dict()
+        data.pop("messages")
+        context.update(data)
+
     def decode_request(
         self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
     ) -> List[Dict[str, str]]:
