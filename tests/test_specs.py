@@ -123,7 +123,7 @@ class PrePopulatedAPI(ls.LitAPI):
 async def test_oai_prepopulated_context(openai_request_data):
     openai_request_data["max_tokens"] = 3
     spec = OpenAISpec()
-    server = ls.LitServer(PrePoulatedAPI(), spec=spec)
+    server = ls.LitServer(PrePopulatedAPI(), spec=spec)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert (
