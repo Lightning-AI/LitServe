@@ -790,6 +790,34 @@ if __name__=="__main__":
     server.run(port=8000)
 ```
 
+
+`LitSpec` can pre-populate the context by defining a `populate_context(context, request)` method. 
+This method takes the context and the raw HTTP request as input. 
+
+`OpenAISpec` automatically pre-populate the `context` with the client request. 
+
+Here is an example that pre-populates the context using a custom spec.
+
+```python
+import litserve as ls
+
+class CustomSpec(ls.specs.OpenAISpec):
+    def populate_context(self, context, request):
+        context["CUSTOM_VALUE_X"] = "This a random value"
+
+class TestAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x, context):
+        yield context["CUSTOM_VALUE_X"]
+
+if __name__ == "__main__":
+    api = TestAPI()
+    server = ls.LitServer(api, spec=CustomSpec())
+    server.run(port=8000)
+```
+
 </details>
 
 &nbsp;
