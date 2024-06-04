@@ -791,10 +791,10 @@ if __name__=="__main__":
 ```
 
 
-`LitSpec` can pre-populate the context by defining a `populate_context(context, request)` method. 
-This method takes the context and the raw HTTP request as input. 
+LitSpec can pre-populate the context by defining a `populate_context(context, request)` method. This method takes the 
+context and the raw HTTP request as inputs.
 
-`OpenAISpec` automatically pre-populate the `context` with the client request. 
+`OpenAISpec` automatically pre-populate the `context` with the ChatCompletion client request. 
 
 Here is an example that pre-populates the context using a custom spec.
 
