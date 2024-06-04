@@ -791,12 +791,12 @@ if __name__=="__main__":
 ```
 
 
-LitSpec can pre-populate the context by defining a `populate_context(context, request)` method. This method takes the 
+`LitSpec` can pre-populate the `context` by defining a `populate_context(context, request)` method. This method takes the 
 context and the raw HTTP request as inputs.
 
-`OpenAISpec` automatically pre-populate the `context` with the ChatCompletion client request. 
+`OpenAISpec` automatically populates the `context` with the `ChatCompletion` request meta-data (e.g. `temperature`, `max_tokens`), see the [request model](src/litserve/specs/openai.py#L99) for reference.
 
-Here is an example that pre-populates the context using a custom spec.
+Here is an example that populates the `context` using a custom spec.
 
 ```python
 import litserve as ls

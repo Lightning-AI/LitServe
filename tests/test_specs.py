@@ -108,7 +108,7 @@ async def test_openai_spec_validation(openai_request_data):
             await manager.shutdown()
 
 
-class PrePoulatedAPI(ls.LitAPI):
+class PrePopulatedAPI(ls.LitAPI):
     def setup(self, device):
         self.sentence = ["This", "is", "a", "sample", "response"]
 
