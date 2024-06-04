@@ -106,3 +106,26 @@ async def test_openai_spec_validation(openai_request_data):
     with pytest.raises(ValueError, match="encode_response is not a generator"):
         async with LifespanManager(server.app) as manager:
             await manager.shutdown()
+
+
+class PrePoulatedAPI(ls.LitAPI):
+    def setup(self, device):
+        self.sentence = ["This", "is", "a", "sample", "response"]
+
+    def predict(self, prompt, context):
+        for count, token in enumerate(self.sentence, start=1):
+            yield token
+            if count >= context["max_tokens"]:
+                return
+
+
+@pytest.mark.asyncio()
+async def test_oai_prepopulated_context(openai_request_data):
+    openai_request_data["max_tokens"] = 3
+    spec = OpenAISpec()
+    server = ls.LitServer(PrePoulatedAPI(), spec=spec)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        assert (
+            resp.json()["choices"][0]["message"]["content"] == "This is a"
+        ), "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
