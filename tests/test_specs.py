@@ -110,7 +110,7 @@ async def test_openai_spec_validation(openai_request_data):
 
 class PrePopulatedAPI(ls.LitAPI):
     def setup(self, device):
-        self.sentence = ["This", "is", "a", "sample", "response"]
+        self.sentence = ["This", " is", " a", " sample", " response"]
 
     def predict(self, prompt, context):
         for count, token in enumerate(self.sentence, start=1):
