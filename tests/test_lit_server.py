@@ -373,12 +373,12 @@ async def test_inject_context(mocked_load_and_raise):
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
 
 
-def test_custom_api_path(sync_testclient):
+def test_custom_api_path():
     with pytest.raises(ValueError, match="api_path must start with '/'. "):
-        LitServer(SimpleLitAPI(), api_path="predict")
+        LitServer(ls.examples.SimpleLitAPI(), api_path="predict")
 
-    server = LitServer(SimpleLitAPI(), api_path="/v1/custom_predict")
+    server = LitServer(ls.examples.SimpleLitAPI(), api_path="/v1/custom_predict")
     url = server.api_path
     with TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
-        assert response.status_code == 200
+        assert response.status_code == 200, "Server response should be 200 (OK)"
