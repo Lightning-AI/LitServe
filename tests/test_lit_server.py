@@ -37,6 +37,7 @@ from litserve.server import (
 )
 from litserve.server import LitServer
 import litserve as ls
+from fastapi.testclient import TestClient
 
 
 def test_index(sync_testclient):
@@ -370,3 +371,14 @@ async def test_inject_context(mocked_load_and_raise):
     with pytest.raises(TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+
+
+def test_custom_api_path():
+    with pytest.raises(ValueError, match="api_path must start with '/'. "):
+        LitServer(ls.examples.SimpleLitAPI(), api_path="predict")
+
+    server = LitServer(ls.examples.SimpleLitAPI(), api_path="/v1/custom_predict")
+    url = server.api_path
+    with TestClient(server.app) as client:
+        response = client.post(url, json={"input": 4.0})
+        assert response.status_code == 200, "Server response should be 200 (OK)"

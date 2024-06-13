@@ -821,6 +821,26 @@ if __name__ == "__main__":
 
 </details>
 
+<details>
+  <summary>Customize the endpoint path</summary>
+
+&nbsp;
+
+By default, LitServe exposes the `/predict` endpoint for serving the model. 
+You can customize this endpoint path by providing the `api_path` argument in `LitServer` as follows:
+
+```python
+import litserve as ls
+from litserve.examples import SimpleLitAPI
+
+if __name__ == '__main__':
+    api = SimpleLitAPI()
+    server = ls.LitServer(api, api_path="/my_api/classify")
+    server.run(port=8000)
+```
+
+</details>
+
 &nbsp;
 
 > [!NOTE]
