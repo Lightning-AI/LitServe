@@ -313,6 +313,7 @@ class LitServer:
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
+        api_path: str = "/predict",
         stream: bool = False,
         spec: Optional[LitSpec] = None,
     ):
@@ -323,6 +324,13 @@ class LitServer:
         if isinstance(spec, OpenAISpec):
             stream = True
 
+        if not api_path.startswith("/"):
+            raise ValueError(
+                "api_path must start with '/'. "
+                "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
+            )
+
+        self.api_path = api_path
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
@@ -549,7 +557,7 @@ class LitServer:
             stream = self.lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
-            endpoint = "/predict"
+            endpoint = self.api_path
             methods = ["POST"]
             self.app.add_api_route(
                 endpoint, stream_predict if stream else predict, methods=methods, dependencies=[Depends(setup_auth())]
