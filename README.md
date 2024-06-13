@@ -822,7 +822,7 @@ if __name__ == "__main__":
 </details>
 
 <details>
-  <summary>Customize endpoint path</summary>
+  <summary>Customize the endpoint path</summary>
 
 &nbsp;
 
