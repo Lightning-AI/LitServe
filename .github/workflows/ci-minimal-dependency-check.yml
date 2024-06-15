@@ -26,7 +26,7 @@ jobs:
       - name: Install LitServe
         run: |
           pip --version
-          pip install . -U -q
+          pip install . psutil  -U -q
           pip list
 
       - name: Tests
