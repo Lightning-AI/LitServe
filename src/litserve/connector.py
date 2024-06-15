@@ -72,7 +72,10 @@ class _Connector:
 
     @staticmethod
     def _choose_gpu_accelerator_backend():
-        import torch
+        try:
+            import torch
+        except ImportError:
+            return None
 
         if check_cuda_with_nvidia_smi() > 0:
             return "cuda"
