@@ -26,7 +26,7 @@ import uvicorn
 import time
 import os
 import shutil
-from typing import Sequence, Optional, Union
+from typing import Sequence, Optional, Union, List
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -50,7 +50,7 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 LONG_TIMEOUT = 100
 
 
-def _inject_context(context: dict, func, *args, **kwargs):
+def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
     if "context" in sig.parameters:
         return func(*args, **kwargs, context=context)
@@ -96,12 +96,24 @@ def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, ma
         inputs, pipes = zip(*batches)
 
         try:
-            x = [lit_api.decode_request(input) for input in inputs]
+            contexts = [{}] * len(inputs)
+            if hasattr(lit_spec, "populate_context"):
+                for input, context in (inputs, contexts):
+                    lit_spec.populate_context(context, input)
+
+            x = [
+                _inject_context(
+                    context,
+                    lit_api.decode_request,
+                    input,
+                )
+                for input, context in zip(inputs, contexts)
+            ]
             x = lit_api.batch(x)
-            y = lit_api.predict(x)
+            y = _inject_context(contexts, lit_api.predict, x)
             outputs = lit_api.unbatch(y)
-            for y, pipe_s in zip(outputs, pipes):
-                y_enc = lit_api.encode_response(y)
+            for y, pipe_s, context in zip(outputs, pipes, contexts):
+                y_enc = _inject_context(context, lit_api.encode_response, y)
 
                 with contextlib.suppress(BrokenPipeError):
                     pipe_s.send((y_enc, LitAPIStatus.OK))
