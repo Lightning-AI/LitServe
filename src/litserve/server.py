@@ -480,7 +480,7 @@ class LitServer:
             if not read.poll():
                 await data_available.wait()
                 data_available.clear()
-            if read.poll():
+            if read.poll(0.001):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
                     asyncio.get_event_loop().remove_reader(read.fileno())
