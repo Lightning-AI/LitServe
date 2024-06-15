@@ -74,13 +74,15 @@ class _Connector:
     def _choose_gpu_accelerator_backend():
         try:
             import torch
+
+            if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
+                return "mps"
         except ImportError:
             return None
 
         if check_cuda_with_nvidia_smi() > 0:
             return "cuda"
-        if torch.backends.mps.is_available() and platform.processor() in ("arm", "arm64"):
-            return "mps"
+
         return None
 
 
