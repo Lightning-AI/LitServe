@@ -140,6 +140,8 @@ def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
             continue
         try:
             context = {}
+            if hasattr(lit_spec, "populate_context"):
+                lit_spec.populate_context(context, x_enc)
             x = _inject_context(
                 context,
                 lit_api.decode_request,
@@ -230,11 +232,23 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
         inputs, pipes = zip(*batches)
 
         try:
-            x = [lit_api.decode_request(input) for input in inputs]
+            contexts = [{}] * len(inputs)
+            if hasattr(lit_spec, "populate_context"):
+                for input, context in (inputs, contexts):
+                    lit_spec.populate_context(context, input)
+
+            x = [
+                _inject_context(
+                    context,
+                    lit_api.decode_request,
+                    input,
+                )
+                for input, context in zip(inputs, contexts)
+            ]
             x = lit_api.batch(x)
-            y_iter = lit_api.predict(x)
+            y_iter = _inject_context(contexts, lit_api.predict, x)
             unbatched_iter = lit_api.unbatch(y_iter)
-            y_enc_iter = lit_api.encode_response(unbatched_iter)
+            y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
