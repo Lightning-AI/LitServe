@@ -1,7 +1,8 @@
 import subprocess
 import psutil
 import time
-import requests
+import json
+import urllib.request
 
 
 def main():
@@ -11,8 +12,13 @@ def main():
     print("Waiting for server to start...")
     time.sleep(5)
     try:
-        response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
-        assert response.status_code == 200
+        url = "http://127.0.0.1:8000/predict"
+        data = json.dumps({"input": 4.0}).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        response = urllib.request.urlopen(request)
+        status_code = response.getcode()
+        assert status_code == 200
     except Exception:
         raise
 
