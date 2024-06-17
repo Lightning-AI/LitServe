@@ -476,24 +476,30 @@ class LitServer:
         data_available = asyncio.Event()
         loop = asyncio.get_event_loop()
         loop.add_reader(read.fileno(), data_available.set)
-        while True:
-            # Calling poll blocks the event loop, so keep the timeout low
-            if not read.poll():
+        try:
+            while True:
                 await data_available.wait()
                 data_available.clear()
-            if read.poll(0.001):
-                response, status = read.recv()
-                if status == LitAPIStatus.FINISH_STREAMING:
+                try:
+                    if read.poll(0.001):
+                        response, status = read.recv()
+                        if status == LitAPIStatus.FINISH_STREAMING:
+                            loop.remove_reader(read.fileno())
+                            return
+                        if status == LitAPIStatus.ERROR:
+                            logger.error(
+                                "Error occurred while streaming outputs from the inference worker. "
+                                "Please check the above traceback."
+                            )
+                            loop.remove_reader(read.fileno())
+                            return
+                        yield response
+                except Exception as e:
+                    logger.error(f"Exception occurred: {e}")
                     loop.remove_reader(read.fileno())
                     return
-                if status == LitAPIStatus.ERROR:
-                    logger.error(
-                        "Error occurred while streaming outputs from the inference worker. "
-                        "Please check the above traceback."
-                    )
-                    loop.remove_reader(read.fileno())
-                    return
-                yield response
+        finally:
+            loop.remove_reader(read.fileno())
 
     def cleanup_request(self, request_buffer, uid):
         with contextlib.suppress(KeyError):
