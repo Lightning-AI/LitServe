@@ -1,0 +1,33 @@
+name: Minimal dependency check
+
+on:
+  push:
+    branches: [main, "release/*"]
+  pull_request:
+    branches: [main, "release/*"]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pytester:
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+
+      - name: Install LitServe
+        run: |
+          pip --version
+          pip install . psutil  -U -q
+          pip list
+
+      - name: Tests
+        run: python tests/minimal_run.py
