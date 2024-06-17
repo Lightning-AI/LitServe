@@ -474,7 +474,8 @@ class LitServer:
 
     async def data_streamer(self, read: Connection, write: Connection):
         data_available = asyncio.Event()
-        asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+        loop = asyncio.get_event_loop()
+        loop.add_reader(read.fileno(), data_available.set)
         while True:
             # Calling poll blocks the event loop, so keep the timeout low
             if not read.poll():
@@ -483,14 +484,14 @@ class LitServer:
             if read.poll(0.001):
                 response, status = read.recv()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    asyncio.get_event_loop().remove_reader(read.fileno())
+                    loop.remove_reader(read.fileno())
                     return
                 if status == LitAPIStatus.ERROR:
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
                     )
-                    asyncio.get_event_loop().remove_reader(read.fileno())
+                    loop.remove_reader(read.fileno())
                     return
                 yield response
 
