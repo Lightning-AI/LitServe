@@ -820,6 +820,56 @@ if __name__ == "__main__":
     server.run(port=8000)
 ```
 
+When using `context` with dynamic batching, the `predict` method will receive a list of `context` items, 
+one for each request in the batch.
+The `decode_request` and `encode_response` methods will process the `context` for each individual request as usual.
+
+
+```python
+import litserve as ls
+
+class SimpleBatchedAPI(ls.examples.SimpleBatchedAPI):
+    def predict(self, x_batch, context):
+        # context contains a list of dictionary 
+        for c, x in zip(context, x_batch):
+            c["input"] = x
+        return self.model(x_batch)
+
+    def encode_response(self, output, context):
+        input = context["input"]
+        return {"output": input}
+
+if __name__=="__main__":
+    api = SimpleBatchedAPI() 
+    server = ls.LitServer(api)
+    server.run(port=8000)
+```
+
+When you enable batching with streaming, your `encode_response` method will receive a list of `context` items, 
+one for each request in the batch.
+
+```python
+import litserve as ls
+
+class BatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
+    def predict(self, x_batch, context):
+        # context contains a list of dictionary 
+        for c, x in zip(context, x_batch):
+            c["input"] = x
+        yield self.model(x_batch)
+
+    def encode_response(self, output_stream, context):
+        for _ in output_stream:
+            # context contains a list of dictionary 
+            yield [{"output": ctx["input"]} for ctx in context]
+
+if __name__=="__main__":
+    api = BatchedStreamingAPI()
+    server = ls.LitServer(api, max_batch_size=2, batch_timeout=0.01, stream=True)
+    server.run(port=8000)
+```
+
+
 </details>
 
 <details>
