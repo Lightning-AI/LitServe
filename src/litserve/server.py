@@ -467,6 +467,7 @@ class LitServer:
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
                     )
+                    yield response, status
                     return
                 if send_status:
                     yield response, status
@@ -493,6 +494,7 @@ class LitServer:
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
                     )
+                    yield response, status
                     return
                 if send_status:
                     yield response, status

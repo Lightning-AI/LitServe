@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..utils import azip
+from ..utils import azip, LitAPIStatus, load_and_raise
 from .base import LitSpec
 
 if typing.TYPE_CHECKING:
@@ -272,9 +272,9 @@ class OpenAISpec(LitSpec):
         choice_pipes = []
         for uid, (read, write) in zip(uids, pipes):
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = self._server.win_data_streamer(read, write)
+                data = self._server.win_data_streamer(read, write, send_status=True)
             else:
-                data = self._server.data_streamer(read, write)
+                data = self._server.data_streamer(read, write, send_status=True)
 
             choice_pipes.append(data)
         return choice_pipes
@@ -320,8 +320,10 @@ class OpenAISpec(LitSpec):
         usage = None
         async for streaming_response in azip(*pipe_responses):
             choices = []
-            for i, chat_msg in enumerate(streaming_response):
-                chat_msg = json.loads(chat_msg)
+            for i, (response, status) in enumerate(streaming_response):
+                if status == LitAPIStatus.ERROR:
+                    load_and_raise(response)
+                chat_msg = json.loads(response)
                 logger.debug(chat_msg)
                 chat_msg = ChoiceDelta(**chat_msg)
                 choice = ChatCompletionStreamingChoice(
@@ -345,15 +347,17 @@ class OpenAISpec(LitSpec):
         yield f"data: {last_chunk}\n\n"
         yield "data: [DONE]\n\n"
 
-    async def non_streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
+    async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
         model = request.model
         usage = UsageInfo()
         choices = []
-        for i, streaming_response in enumerate(pipe_responses):
+        for i, streaming_response in enumerate(generator_list):
             msgs = []
             tool_calls = None
-            async for chat_msg in streaming_response:
-                chat_msg = json.loads(chat_msg)
+            async for response, status in streaming_response:
+                if status == LitAPIStatus.ERROR:
+                    load_and_raise(response)
+                chat_msg = json.loads(response)
                 logger.debug(chat_msg)
                 chat_msg = ChatMessage(**chat_msg)
                 msgs.append(chat_msg.content)
@@ -364,5 +368,6 @@ class OpenAISpec(LitSpec):
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
+            i += 1
 
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
