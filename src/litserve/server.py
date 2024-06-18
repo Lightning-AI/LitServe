@@ -474,30 +474,38 @@ class LitServer:
 
     async def data_streamer(self, read: Connection, write: Connection):
         data_available = asyncio.Event()
+        queue = asyncio.Queue()
         loop = asyncio.get_event_loop()
-        loop.add_reader(read.fileno(), data_available.set)
+
+        def reader():
+            try:
+                while read.poll():  # Check if there's data available to read
+                    response, status = read.recv()
+                    queue.put_nowait((response, status))
+                    data_available.set()
+            except Exception as e:
+                logger.error(f"Exception in reader: {e}")
+
+        loop.add_reader(read.fileno(), reader)
+
         try:
             while True:
                 await data_available.wait()
                 data_available.clear()
-                try:
-                    if read.poll(0.001):
-                        response, status = read.recv()
-                        if status == LitAPIStatus.FINISH_STREAMING:
-                            loop.remove_reader(read.fileno())
-                            return
-                        if status == LitAPIStatus.ERROR:
-                            logger.error(
-                                "Error occurred while streaming outputs from the inference worker. "
-                                "Please check the above traceback."
-                            )
-                            loop.remove_reader(read.fileno())
-                            return
-                        yield response
-                except Exception as e:
-                    logger.error(f"Exception occurred: {e}")
-                    loop.remove_reader(read.fileno())
-                    return
+
+                while not queue.empty():
+                    response, status = await queue.get()
+                    if status == LitAPIStatus.FINISH_STREAMING:
+                        loop.remove_reader(read.fileno())
+                        return
+                    if status == LitAPIStatus.ERROR:
+                        logger.error(
+                            "Error occurred while streaming outputs from the inference worker. "
+                            "Please check the above traceback."
+                        )
+                        loop.remove_reader(read.fileno())
+                        return
+                    yield response
         finally:
             loop.remove_reader(read.fileno())
 
