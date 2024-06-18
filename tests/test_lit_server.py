@@ -342,7 +342,29 @@ class IndentityAPI(ls.examples.SimpleLitAPI):
         return {"output": input}
 
 
-class PredictError(ls.examples.SimpleLitAPI):
+class IndentityBatchedAPI(ls.examples.SimpleBatchedAPI):
+    def predict(self, x_batch, context):
+        for c, x in zip(context, x_batch):
+            c["input"] = x
+        return self.model(x_batch)
+
+    def encode_response(self, output, context):
+        input = context["input"]
+        return {"output": input}
+
+
+class IndentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
+    def predict(self, x_batch, context):
+        for c, x in zip(context, x_batch):
+            c["input"] = x
+        yield self.model(x_batch)
+
+    def encode_response(self, output_stream, context):
+        for _ in output_stream:
+            yield [{"output": ctx["input"]} for ctx in context]
+
+
+class PredictErrorAPI(ls.examples.SimpleLitAPI):
     def predict(self, x, y, context):
         context["input"] = x
         return self.model(x)
@@ -360,14 +382,26 @@ async def test_inject_context(mocked_load_and_raise):
 
     mocked_load_and_raise.side_effect = dummy_load_and_raise
 
+    # Test context injection with single loop
     api = IndentityAPI()
     server = LitServer(api)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
-    api = PredictError()
-    server = LitServer(api)
+    # Test context injection with batched loop
+    server = LitServer(IndentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
+
+    # Test context injection with batched streaming loop
+    server = LitServer(IndentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
+
+    server = LitServer(PredictErrorAPI())
     with pytest.raises(TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
