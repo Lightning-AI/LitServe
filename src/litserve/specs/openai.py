@@ -368,6 +368,5 @@ class OpenAISpec(LitSpec):
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
-            i += 1
 
         return ChatCompletionResponse(model=model, choices=choices, usage=usage)
