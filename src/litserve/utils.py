@@ -49,13 +49,14 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
 
 def load_and_raise(response):
     try:
-        pickle.loads(response)
-        raise HTTPException(500, "Internal Server Error")
+        exception = pickle.loads(response)
+        raise exception
     except pickle.PickleError:
         logger.exception(
             f"main process failed to load the exception from the parallel worker process. "
             f"{response} couldn't be unpickled."
         )
+        raise
 
 
 async def azip(*async_iterables):

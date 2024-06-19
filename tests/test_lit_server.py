@@ -18,7 +18,7 @@ import re
 from multiprocessing import Pipe, Manager
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
-from fastapi import Request, Response
+from fastapi import Request, Response, HTTPException
 
 import torch
 import torch.nn as nn
@@ -416,3 +416,16 @@ def test_custom_api_path():
     with TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
+
+
+class TestHTTPExceptionAPI(ls.examples.SimpleLitAPI):
+    def decode_request(self, request):
+        raise HTTPException(501, "decode request is bad")
+
+
+def test_http_exception():
+    server = LitServer(TestHTTPExceptionAPI())
+    with TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 501, "Server raises 501 error"
+        assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
