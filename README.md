@@ -68,6 +68,22 @@ Think of LitServe as PyTorch Lightning for model serving (if you're familiar wit
 
 &nbsp;
 
+# Deployment options    
+LitServe is developed by Lightning AI - An AI development platform which provides infrastructure for deploying AI models.    
+Self manage your own deployments or use Lightning Studios to deploy production-grade models without cloud headaches.    
+
+&nbsp;
+
+<div align="center" style="height: 200">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" height="36px" alt="Deploy on Studios"/>
+</div>
+
+&nbsp;
+
+<div align="center" style="height: 200">
+<img width="640" alt="image" src="https://github.com/Lightning-AI/LitServe/assets/3640001/df873649-8b5c-4215-b340-e50da34e1181">
+</div>
+
 # Examples
 Explore various examples that show different models deployed with LitServe:
 
