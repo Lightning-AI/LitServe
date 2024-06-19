@@ -93,7 +93,8 @@ LitServe has a minimal API that allows enterprise-scale, with full control.
 1. Implement the LitAPI class which describes the inference process for the model(s).
 2. Enable the specific optimizations (such as batching or streaming) in the LitServer.
 
-## Install LitServe
+#### Install LitServe  
+
 Install LitServe via pip (or use the [advanced install](https://lightning.ai/docs/litserve/home/install) instructions):
 
 ```bash
@@ -104,7 +105,7 @@ pip install litserve
 Here's a hello world example:
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/studio-badge.svg" alt="Open In Studio"/>
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
 </a>
 
 ```python
