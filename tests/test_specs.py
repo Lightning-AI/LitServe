@@ -129,3 +129,20 @@ async def test_oai_prepopulated_context(openai_request_data):
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a"
         ), "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
+
+
+class WrongLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, prompt):
+        yield "This is a sample generated text"
+        raise Exception("random error")
+
+
+@pytest.mark.asyncio()
+async def test_fail_http(openai_request_data):
+    server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        assert resp.status_code == 500, "Server raises an exception so client should fail"

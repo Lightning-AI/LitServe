@@ -478,7 +478,7 @@ class LitServer:
         asyncio.get_event_loop().remove_reader(read.fileno())
         return read.recv()
 
-    async def win_data_streamer(self, read, write):
+    async def win_data_streamer(self, read, write, send_status=False):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
         # https://docs.python.org/3/library/asyncio-platforms.html
         while True:
@@ -493,12 +493,16 @@ class LitServer:
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
                     )
+                    yield response, status
                     return
-                yield response
+                if send_status:
+                    yield response, status
+                else:
+                    yield response
 
             await asyncio.sleep(0.0001)
 
-    async def data_streamer(self, read: Connection, write: Connection):
+    async def data_streamer(self, read: Connection, write: Connection, send_status=False):
         data_available = asyncio.Event()
         while True:
             # Calling poll blocks the event loop, so keep the timeout low
@@ -516,8 +520,12 @@ class LitServer:
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
                     )
+                    yield response, status
                     return
-                yield response
+                if send_status:
+                    yield response, status
+                else:
+                    yield response
 
     def cleanup_request(self, request_buffer, uid):
         with contextlib.suppress(KeyError):
