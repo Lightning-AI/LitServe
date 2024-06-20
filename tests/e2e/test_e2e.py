@@ -49,6 +49,14 @@ def e2e_from_file(filename):
     return decorator
 
 
+@e2e_from_file("tests/simple_server.py")
+def test_run():
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
+    os.remove("client.py")
+
+
 @e2e_from_file("tests/e2e/default_api.py")
 def test_e2e_default_api():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
@@ -217,9 +225,19 @@ def test_openai_parity_with_tools():
             )
 
 
-@e2e_from_file("tests/simple_server.py")
-def test_run():
-    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
-    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
-    assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
-    os.remove("client.py")
+@e2e_from_file("tests/e2e/default_openai_with_batching.py")
+def test_e2e_openai_with_batching(openai_request_data):
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",  # required, but unused
+    )
+    response = client.chat.completions.create(
+        model="lit",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "How are you?"},
+        ],
+    )
+    assert response.choices[0].message.content == (
+        "Hi! It's nice to meet you. Is there something I can " "help you with or would you like to chat? "
+    ), f"Server didn't return expected output OpenAI client output: {response}"
