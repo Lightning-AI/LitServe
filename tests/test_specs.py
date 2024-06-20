@@ -14,6 +14,7 @@
 
 import pytest
 from asgi_lifespan import LifespanManager
+from fastapi import HTTPException
 from httpx import AsyncClient
 from litserve.examples.openai_spec_example import TestAPI, TestAPIWithCustomEncode, TestAPIWithToolCalls
 from litserve.specs.openai import OpenAISpec, ChatMessage
@@ -137,12 +138,13 @@ class WrongLitAPI(ls.LitAPI):
 
     def predict(self, prompt):
         yield "This is a sample generated text"
-        raise Exception("test LitAPI.predict error")
+        raise HTTPException(501, "test LitAPI.predict error")
 
 
 @pytest.mark.asyncio()
 async def test_fail_http(openai_request_data):
     server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        with pytest.raises(Exception, match="test LitAPI.predict error"):
-            await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        assert res.status_code == 501, "Server raises 501 error"
+        assert res.text == '{"detail":"test LitAPI.predict error"}'
