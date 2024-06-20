@@ -534,6 +534,8 @@ class LitServer:
                             "Please check the above traceback."
                         )
                         loop.remove_reader(read.fileno())
+                        if send_status:
+                            yield response, status
                         return
                     if send_status:
                         yield response, status
