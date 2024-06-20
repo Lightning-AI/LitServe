@@ -505,7 +505,7 @@ class LitServer:
 
         def reader():
             try:
-                while read.poll(0.001):  # Check if there's data available to read
+                while read.poll():  # Check if there's data available to read
                     response, status = read.recv()
                     queue.put_nowait((response, status))
                     data_available.set()
