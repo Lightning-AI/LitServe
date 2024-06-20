@@ -98,7 +98,7 @@ def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, ma
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
-                for input, context in (inputs, contexts):
+                for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
             x = [
@@ -234,7 +234,7 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
-                for input, context in (inputs, contexts):
+                for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
             x = [
