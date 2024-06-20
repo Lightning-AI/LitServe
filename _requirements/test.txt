@@ -1,4 +1,4 @@
-coverage[toml] >=5.0
+coverage[toml] >=7.5.3
 pytest >=8.0
 pytest-cov
 mypy ==1.9.0
@@ -6,7 +6,6 @@ pytest-asyncio
 asgi-lifespan
 python-multipart
 psutil
-
 requests
 lightning >2.0.0
 torch >2.0.0
