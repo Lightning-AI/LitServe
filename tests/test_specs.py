@@ -137,12 +137,12 @@ class WrongLitAPI(ls.LitAPI):
 
     def predict(self, prompt):
         yield "This is a sample generated text"
-        raise Exception("random error")
+        raise Exception("test LitAPI.predict error")
 
 
 @pytest.mark.asyncio()
 async def test_fail_http(openai_request_data):
     server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
-        assert resp.status_code == 500, "Server raises an exception so client should fail"
+        with pytest.raises(Exception, match="test LitAPI.predict error"):
+            await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
