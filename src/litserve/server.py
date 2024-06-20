@@ -470,12 +470,13 @@ class LitServer:
 
     async def data_reader(self, read):
         data_available = asyncio.Event()
-        asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+        loop = asyncio.get_event_loop()
+        loop.add_reader(read.fileno(), data_available.set)
 
         if not read.poll():
             await data_available.wait()
         data_available.clear()
-        asyncio.get_event_loop().remove_reader(read.fileno())
+        loop.remove_reader(read.fileno())
         return read.recv()
 
     async def win_data_streamer(self, read, write, send_status=False):
