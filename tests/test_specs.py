@@ -14,6 +14,7 @@
 
 import pytest
 from asgi_lifespan import LifespanManager
+from fastapi import HTTPException
 from httpx import AsyncClient
 from litserve.examples.openai_spec_example import TestAPI, TestAPIWithCustomEncode, TestAPIWithToolCalls
 from litserve.specs.openai import OpenAISpec, ChatMessage
@@ -129,3 +130,21 @@ async def test_oai_prepopulated_context(openai_request_data):
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a"
         ), "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
+
+
+class WrongLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, prompt):
+        yield "This is a sample generated text"
+        raise HTTPException(501, "test LitAPI.predict error")
+
+
+@pytest.mark.asyncio()
+async def test_fail_http(openai_request_data):
+    server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        assert res.status_code == 501, "Server raises 501 error"
+        assert res.text == '{"detail":"test LitAPI.predict error"}'
