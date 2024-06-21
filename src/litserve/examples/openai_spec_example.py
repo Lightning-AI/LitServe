@@ -74,6 +74,14 @@ class OpenAIBatchContext(ls.LitAPI):
             assert ctx["temperature"] == 1.0, f"context {ctx} is not 1.0"
 
 
+class OpenAIWithUsage(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        yield {"content": "This is a generated output", "prompt_tokens": 5, "completion_tokens": 10}
+
+
 if __name__ == "__main__":
     server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
     server.run(port=8000)
