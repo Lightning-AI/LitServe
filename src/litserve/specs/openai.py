@@ -20,7 +20,7 @@ import time
 import typing
 import uuid
 from enum import Enum
-from typing import AsyncGenerator, Dict, List, Literal, Optional, Union
+from typing import AsyncGenerator, Dict, List, Literal, Optional, Union, Generator
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
@@ -43,6 +43,17 @@ class UsageInfo(BaseModel):
     prompt_tokens: int = 0
     total_tokens: int = 0
     completion_tokens: Optional[int] = 0
+
+    def __add__(self, other: "UsageInfo") -> "UsageInfo":
+        other.prompt_tokens += self.prompt_tokens
+        other.completion_tokens += self.completion_tokens
+        other.total_tokens += self.total_tokens
+        return other
+
+    def __radd__(self, other):
+        if other == 0:
+            return self
+        return self.__add__(other)
 
 
 class TextContent(BaseModel):
@@ -237,10 +248,20 @@ class OpenAISpec(LitSpec):
     def unbatch(self, output):
         yield output
 
+    def extract_usage_info(self, output: Dict) -> Dict:
+        prompt_tokens: int = output.pop("prompt_tokens", 0)
+        completion_tokens: int = output.pop("completion_tokens", 0)
+        total_tokens: int = output.pop("total_tokens", 0)
+        return {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }
+
     def validate_chat_message(self, obj):
         return isinstance(obj, dict) and "role" in obj and "content" in obj
 
-    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> ChatMessage:
+    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> Dict:
         logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
@@ -258,12 +279,12 @@ class OpenAISpec(LitSpec):
             )
             logger.exception(error)
             raise HTTPException(500, error)
-
-        return ChatMessage(**message)
+        usage_info = self.extract_usage_info(message)
+        return {**message, **usage_info}
 
     def encode_response(
         self, output_generator: Union[Dict[str, str], List[Dict[str, str]]], context_kwargs: Optional[dict] = None
-    ) -> ChatMessage:
+    ) -> Generator[Dict, None, None]:
         for output in output_generator:
             logger.debug(output)
             yield self._encode_response(output)
@@ -320,19 +341,21 @@ class OpenAISpec(LitSpec):
         usage = None
         async for streaming_response in azip(*pipe_responses):
             choices = []
+            usage_info = {}
             for i, (response, status) in enumerate(streaming_response):
                 if status == LitAPIStatus.ERROR:
                     load_and_raise(response)
-                chat_msg = json.loads(response)
-                logger.debug(chat_msg)
-                chat_msg = ChoiceDelta(**chat_msg)
+                encoded_response = json.loads(response)
+                logger.debug(encoded_response)
+                chat_msg = ChoiceDelta(**encoded_response)
+                usage_info[i] = UsageInfo(**encoded_response)
                 choice = ChatCompletionStreamingChoice(
-                    index=i, delta=chat_msg, system_fingerprint="", usage=usage, finish_reason=None
+                    index=i, delta=chat_msg, system_fingerprint="", finish_reason=None
                 )
 
                 choices.append(choice)
 
-            chunk = ChatCompletionChunk(model=model, choices=choices, usage=usage).json()
+            chunk = ChatCompletionChunk(model=model, choices=choices, usage=sum(usage_info.values())).json()
             logger.debug(chunk)
             yield f"data: {chunk}\n\n"
 
@@ -349,7 +372,7 @@ class OpenAISpec(LitSpec):
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
         model = request.model
-        usage = UsageInfo()
+        usages = []
         choices = []
         for i, streaming_response in enumerate(generator_list):
             msgs = []
@@ -357,9 +380,11 @@ class OpenAISpec(LitSpec):
             async for response, status in streaming_response:
                 if status == LitAPIStatus.ERROR:
                     load_and_raise(response)
-                chat_msg = json.loads(response)
-                logger.debug(chat_msg)
-                chat_msg = ChatMessage(**chat_msg)
+                # data from LitAPI.encode_response
+                encoded_response = json.loads(response)
+                logger.debug(encoded_response)
+                chat_msg = ChatMessage(**encoded_response)
+                usages.append(UsageInfo(**encoded_response))
                 msgs.append(chat_msg.content)
                 if chat_msg.tool_calls:
                     tool_calls = chat_msg.tool_calls
@@ -369,4 +394,4 @@ class OpenAISpec(LitSpec):
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
 
-        return ChatCompletionResponse(model=model, choices=choices, usage=usage)
+        return ChatCompletionResponse(model=model, choices=choices, usage=sum(usages))

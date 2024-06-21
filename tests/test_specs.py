@@ -50,7 +50,9 @@ async def test_openai_token_usage(openai_request_data):
         assert (
             result["choices"][0]["message"]["content"] == "This is a generated output"
         ), "LitAPI predict response should match with the generated output"
-        assert result["usage"]["completion_tokens"] == 15
+        assert result["usage"]["prompt_tokens"] == 5
+        assert result["usage"]["completion_tokens"] == 10
+        assert result["usage"]["total_tokens"] == 15
 
 
 @pytest.mark.asyncio()
