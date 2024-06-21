@@ -110,7 +110,7 @@ def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, ma
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
-                for input, context in (inputs, contexts):
+                for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
             x = [
@@ -246,7 +246,7 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
-                for input, context in (inputs, contexts):
+                for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
             x = [
@@ -482,12 +482,13 @@ class LitServer:
 
     async def data_reader(self, read):
         data_available = asyncio.Event()
-        asyncio.get_event_loop().add_reader(read.fileno(), data_available.set)
+        loop = asyncio.get_event_loop()
+        loop.add_reader(read.fileno(), data_available.set)
 
         if not read.poll():
             await data_available.wait()
         data_available.clear()
-        asyncio.get_event_loop().remove_reader(read.fileno())
+        loop.remove_reader(read.fileno())
         return read.recv()
 
     async def win_data_streamer(self, read, write, send_status=False):
