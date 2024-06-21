@@ -341,21 +341,21 @@ class OpenAISpec(LitSpec):
         usage = None
         async for streaming_response in azip(*pipe_responses):
             choices = []
-            usage_info = {}
+            usage_infos = []
             for i, (response, status) in enumerate(streaming_response):
                 if status == LitAPIStatus.ERROR:
                     load_and_raise(response)
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
                 chat_msg = ChoiceDelta(**encoded_response)
-                usage_info[i] = UsageInfo(**encoded_response)
+                usage_infos.append(UsageInfo(**encoded_response))
                 choice = ChatCompletionStreamingChoice(
                     index=i, delta=chat_msg, system_fingerprint="", finish_reason=None
                 )
 
                 choices.append(choice)
 
-            chunk = ChatCompletionChunk(model=model, choices=choices, usage=sum(usage_info.values())).json()
+            chunk = ChatCompletionChunk(model=model, choices=choices, usage=sum(usage_infos)).json()
             logger.debug(chunk)
             yield f"data: {chunk}\n\n"
 
