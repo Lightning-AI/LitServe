@@ -79,7 +79,12 @@ class OpenAIWithUsage(ls.LitAPI):
         self.model = None
 
     def predict(self, x):
-        yield {"content": "This is a generated output", "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
+        yield "This is a generated output"
+
+    def encode_response(self, output):
+        yield {"role": "assistant", "content": ""}
+        for out in output:
+            yield {"role": "assistant", "content": out, "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
 
 
 if __name__ == "__main__":
