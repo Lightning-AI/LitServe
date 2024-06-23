@@ -22,6 +22,7 @@ from litserve.examples.openai_spec_example import (
     TestAPIWithToolCalls,
     OpenAIWithUsage,
     OpenAIBatchingWithUsage,
+    OpenAIWithUsageEncodeResponse,
 )
 from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
@@ -40,10 +41,15 @@ async def test_openai_spec(openai_request_data):
         ), "LitAPI predict response should match with the generated output"
 
 
+# OpenAIWithUsage
 @pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("api", "batch_size"),
-    [(OpenAIBatchingWithUsage(), 2), (OpenAIWithUsage(), 1)],
+    [
+        (OpenAIWithUsage(), 1),
+        (OpenAIWithUsageEncodeResponse(), 1),
+        (OpenAIBatchingWithUsage(), 2),
+    ],
 )
 async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
     server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)

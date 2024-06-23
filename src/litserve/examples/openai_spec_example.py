@@ -79,10 +79,23 @@ class OpenAIWithUsage(ls.LitAPI):
         self.model = None
 
     def predict(self, x):
+        yield {
+            "role": "assistant",
+            "content": "10 + 6 is equal to 16.",
+            "prompt_tokens": 25,
+            "completion_tokens": 10,
+            "total_tokens": 35,
+        }
+
+
+class OpenAIWithUsageEncodeResponse(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
         yield "10 + 6 is equal to 16."
 
     def encode_response(self, output):
-        yield {"role": "assistant", "content": ""}
         for out in output:
             yield {"role": "assistant", "content": out}
 
