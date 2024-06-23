@@ -45,23 +45,21 @@ async def test_openai_spec(openai_request_data):
     ("api", "batch_size"),
     [(OpenAIBatchingWithUsage(), 2), (OpenAIWithUsage(), 1)],
 )
-async def test_openai_token_usage(api, batch_size, openai_request_data):
+async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
     server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
         result = resp.json()
         content = result["choices"][0]["message"]["content"]
-        assert content == "This is a generated output", "LitAPI predict response should match with the generated output"
-        assert result["usage"]["prompt_tokens"] == 5
-        assert result["usage"]["completion_tokens"] == 10
-        assert result["usage"]["total_tokens"] == 15
+        assert content == "10 + 6 is equal to 16.", "LitAPI predict response should match with the generated output"
+        assert result["usage"] == openai_response_data["usage"]
 
         # with streaming
-        # TODO: test with streaming and batching
         openai_request_data["stream"] = True
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
+        assert result["usage"] == openai_response_data["usage"]
 
 
 @pytest.mark.asyncio()

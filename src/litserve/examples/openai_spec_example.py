@@ -79,14 +79,14 @@ class OpenAIWithUsage(ls.LitAPI):
         self.model = None
 
     def predict(self, x):
-        yield "This is a generated output"
+        yield "10 + 6 is equal to 16."
 
     def encode_response(self, output):
         yield {"role": "assistant", "content": ""}
         for out in output:
             yield {"role": "assistant", "content": out}
 
-        yield {"role": "assistant", "content": "", "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
+        yield {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
 
 
 class OpenAIBatchingWithUsage(OpenAIWithUsage):
@@ -95,7 +95,7 @@ class OpenAIBatchingWithUsage(OpenAIWithUsage):
 
     def predict(self, x):
         n = len(x)
-        yield ["This is a generated output"] * n
+        yield ["10 + 6 is equal to 16."] * n
 
     def encode_response(self, output_stream_batch, context):
         n = len(context)
@@ -103,7 +103,7 @@ class OpenAIBatchingWithUsage(OpenAIWithUsage):
             yield [{"role": "assistant", "content": out} for out in output_batch]
 
         yield [
-            {"role": "assistant", "content": "", "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
+            {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
         ] * n
 
     def unbatch(self, output):

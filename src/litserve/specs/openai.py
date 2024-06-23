@@ -338,10 +338,11 @@ class OpenAISpec(LitSpec):
 
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
         model = request.model
-        usage = None
+        usage_info = None
         async for streaming_response in azip(*pipe_responses):
             choices = []
             usage_infos = []
+            # iterate over n choices
             for i, (response, status) in enumerate(streaming_response):
                 if status == LitAPIStatus.ERROR:
                     load_and_raise(response)
@@ -355,28 +356,36 @@ class OpenAISpec(LitSpec):
 
                 choices.append(choice)
 
-            chunk = ChatCompletionChunk(model=model, choices=choices, usage=sum(usage_infos)).json()
+            usage_info = sum(usage_infos)
+            chunk = ChatCompletionChunk(model=model, choices=choices, usage=None).json()
             logger.debug(chunk)
             yield f"data: {chunk}\n\n"
 
         choices = [
-            ChatCompletionStreamingChoice(index=i, delta=ChoiceDelta(), finish_reason="stop") for i in range(request.n)
+            ChatCompletionStreamingChoice(
+                index=i,
+                delta=ChoiceDelta(),
+                finish_reason="stop",
+            )
+            for i in range(request.n)
         ]
         last_chunk = ChatCompletionChunk(
             model=model,
             choices=choices,
-            usage=usage,
+            usage=usage_info,
         ).json()
         yield f"data: {last_chunk}\n\n"
         yield "data: [DONE]\n\n"
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
         model = request.model
-        usages = []
+        usage_infos = []
         choices = []
+        # iterate over n choices
         for i, streaming_response in enumerate(generator_list):
             msgs = []
             tool_calls = None
+            usage = None
             async for response, status in streaming_response:
                 if status == LitAPIStatus.ERROR:
                     load_and_raise(response)
@@ -384,7 +393,7 @@ class OpenAISpec(LitSpec):
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
                 chat_msg = ChatMessage(**encoded_response)
-                usages.append(UsageInfo(**encoded_response))
+                usage = UsageInfo(**encoded_response)
                 msgs.append(chat_msg.content)
                 if chat_msg.tool_calls:
                     tool_calls = chat_msg.tool_calls
@@ -393,5 +402,6 @@ class OpenAISpec(LitSpec):
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
+            usage_infos.append(usage)  # always use the last item from encode_response
 
-        return ChatCompletionResponse(model=model, choices=choices, usage=sum(usages))
+        return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
