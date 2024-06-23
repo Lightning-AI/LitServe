@@ -636,7 +636,7 @@ if __name__ == "__main__":
 The OpenAI response includes usage information, which contains the number of tokens for the prompt, generated text, and 
 total tokens for the given request.
 
-With LitServe this can be achieved using the `encode_response` method to yield usage information as follows:
+With LitServe, this can be achieved using the encode_response method to yield usage information as follows:
 
 ```python
 import litserve as ls
@@ -651,11 +651,11 @@ class OpenAIUsageAPI(ls.LitAPI):
     def encode_response(self, output):
         for out in output:
             yield {"role": "assistant", "content": out}
-        # Get the usage info and yield as last output
+        # Get the usage info and yield it as the last output
         yield {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
 ```
 
-An equivalent but simpler approach without the need to override the `encode_response` method is as follows:
+An equivalent, but simpler, approach without the need to override the `encode_response` method is as follows:
 
 ```python
 import litserve as ls
