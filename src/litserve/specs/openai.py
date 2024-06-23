@@ -356,6 +356,7 @@ class OpenAISpec(LitSpec):
 
                 choices.append(choice)
 
+            # Only use the last item from encode_response
             usage_info = sum(usage_infos)
             chunk = ChatCompletionChunk(model=model, choices=choices, usage=None).json()
             logger.debug(chunk)
@@ -402,6 +403,6 @@ class OpenAISpec(LitSpec):
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
-            usage_infos.append(usage)  # always use the last item from encode_response
+            usage_infos.append(usage)  # Only use the last item from encode_response
 
         return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))

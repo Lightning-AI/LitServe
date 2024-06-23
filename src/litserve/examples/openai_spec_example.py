@@ -93,7 +93,8 @@ class OpenAIWithUsageEncodeResponse(ls.LitAPI):
         self.model = None
 
     def predict(self, x):
-        yield "10 + 6 is equal to 16."
+        # streaming tokens
+        yield from ["10", " +", " ", "6", " is", " equal", " to", " ", "16", "."]
 
     def encode_response(self, output):
         for out in output:
