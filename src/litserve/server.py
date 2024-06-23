@@ -329,12 +329,6 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         )
 
 
-def setup_auth():
-    if LIT_SERVER_API_KEY:
-        return api_key_auth
-    return no_auth
-
-
 def cleanup(request_buffer, uid):
     logger.debug("Cleaning up request uid=%s", uid)
     with contextlib.suppress(KeyError):
@@ -562,7 +556,7 @@ class LitServer:
             request_buffer.pop(uid)
 
     def setup_server(self):
-        @self.app.get("/", dependencies=[Depends(setup_auth())])
+        @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
@@ -624,14 +618,19 @@ class LitServer:
             endpoint = self.api_path
             methods = ["POST"]
             self.app.add_api_route(
-                endpoint, stream_predict if stream else predict, methods=methods, dependencies=[Depends(setup_auth())]
+                endpoint,
+                stream_predict if stream else predict,
+                methods=methods,
+                dependencies=[Depends(self.setup_auth())],
             )
 
         for spec in self._specs:
             spec: LitSpec
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
-                self.app.add_api_route(path, endpoint=endpoint, methods=methods, dependencies=[Depends(setup_auth())])
+                self.app.add_api_route(
+                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
+                )
 
     def generate_client_file(self):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
@@ -661,3 +660,10 @@ class LitServer:
             raise ValueError(port_msg)
 
         uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)
+
+    def setup_auth(self):
+        if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
+            return self.lit_api.authorize
+        if LIT_SERVER_API_KEY:
+            return api_key_auth
+        return no_auth
