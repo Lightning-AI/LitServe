@@ -21,6 +21,7 @@ from litserve.examples.openai_spec_example import (
     TestAPIWithCustomEncode,
     TestAPIWithToolCalls,
     OpenAIWithUsage,
+    OpenAIBatchingWithUsage,
 )
 from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
@@ -40,8 +41,12 @@ async def test_openai_spec(openai_request_data):
 
 
 @pytest.mark.asyncio()
-async def test_openai_token_usage(openai_request_data):
-    server = ls.LitServer(OpenAIWithUsage(), spec=ls.OpenAISpec())
+@pytest.mark.parametrize(
+    ("api", "batch_size"),
+    [(OpenAIBatchingWithUsage(), 2), (OpenAIWithUsage(), 1)],
+)
+async def test_openai_token_usage(api, batch_size, openai_request_data):
+    server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"

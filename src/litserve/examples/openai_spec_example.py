@@ -84,7 +84,30 @@ class OpenAIWithUsage(ls.LitAPI):
     def encode_response(self, output):
         yield {"role": "assistant", "content": ""}
         for out in output:
-            yield {"role": "assistant", "content": out, "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
+            yield {"role": "assistant", "content": out}
+
+        yield {"role": "assistant", "content": "", "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
+
+
+class OpenAIBatchingWithUsage(OpenAIWithUsage):
+    def batch(self, inputs):
+        return inputs
+
+    def predict(self, x):
+        n = len(x)
+        yield ["This is a generated output"] * n
+
+    def encode_response(self, output_stream_batch, context):
+        n = len(context)
+        for output_batch in output_stream_batch:
+            yield [{"role": "assistant", "content": out} for out in output_batch]
+
+        yield [
+            {"role": "assistant", "content": "", "prompt_tokens": 5, "completion_tokens": 10, "total_tokens": 15}
+        ] * n
+
+    def unbatch(self, output):
+        return output
 
 
 if __name__ == "__main__":
