@@ -362,6 +362,16 @@ LIT_SERVER_API_KEY=supersecretkey python main.py
 
 Clients are expected to auth with the same API key set in the `X-API-Key` HTTP header.
 
+Alternatively, implement a method named `authorize` in the LitAPI subclass to provide custom authentication:
+
+```python
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+def authorize(self, auth: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    raise HTTPException(status_code=401, detail="Not authorized")
+```
+
 </details>
 
 <details>
