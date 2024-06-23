@@ -92,7 +92,56 @@ def collate_requests(
     return None
 
 
-def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, request_buffer: Dict):
+    while True:
+        try:
+            uid = request_queue.get(timeout=1.0)
+            try:
+                x_enc, pipe_s = request_buffer.pop(uid)
+            except KeyError:
+                continue
+        except (Empty, ValueError):
+            continue
+        try:
+            context = {}
+            if hasattr(lit_spec, "populate_context"):
+                lit_spec.populate_context(context, x_enc)
+            x = _inject_context(
+                context,
+                lit_api.decode_request,
+                x_enc,
+            )
+            y = _inject_context(
+                context,
+                lit_api.predict,
+                x,
+            )
+            y_enc = _inject_context(
+                context,
+                lit_api.encode_response,
+                y,
+            )
+
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send((y_enc, LitAPIStatus.OK))
+        except Exception as e:
+            logger.exception(
+                "LitAPI ran into an error while processing the request uid=%s.\n"
+                "Please check the error trace for more details.",
+                uid,
+            )
+            with contextlib.suppress(BrokenPipeError):
+                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+
+
+def run_batched_loop(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    request_buffer: Dict,
+    max_batch_size: int,
+    batch_timeout: float,
+):
     while True:
         batches = collate_requests(
             lit_api,
@@ -140,49 +189,7 @@ def run_batched_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, ma
                     pipe_s.send((err_pkl, LitAPIStatus.ERROR))
 
 
-def run_single_loop(lit_api, lit_spec, request_queue: Queue, request_buffer):
-    while True:
-        try:
-            uid = request_queue.get(timeout=1.0)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
-        except (Empty, ValueError):
-            continue
-        try:
-            context = {}
-            if hasattr(lit_spec, "populate_context"):
-                lit_spec.populate_context(context, x_enc)
-            x = _inject_context(
-                context,
-                lit_api.decode_request,
-                x_enc,
-            )
-            y = _inject_context(
-                context,
-                lit_api.predict,
-                x,
-            )
-            y_enc = _inject_context(
-                context,
-                lit_api.encode_response,
-                y,
-            )
-
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((y_enc, LitAPIStatus.OK))
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the request uid=%s.\n"
-                "Please check the error trace for more details.",
-                uid,
-            )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
-
-
-def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_buffer):
+def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, request_buffer: Dict):
     while True:
         try:
             uid = request_queue.get(timeout=1.0)
@@ -229,7 +236,14 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec, request_queue: Queue, request_
                 pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
 
 
-def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_buffer, max_batch_size, batch_timeout):
+def run_batched_streaming_loop(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    request_buffer: Dict,
+    max_batch_size: int,
+    batch_timeout: float,
+):
     while True:
         batches = collate_requests(
             lit_api,
@@ -285,13 +299,13 @@ def run_batched_streaming_loop(lit_api, lit_spec, request_queue: Queue, request_
 def inference_worker(
     lit_api: LitAPI,
     lit_spec: Optional[LitSpec],
-    device,
-    worker_id,
-    request_queue,
-    request_buffer,
-    max_batch_size,
-    batch_timeout,
-    stream,
+    device: str,
+    worker_id: int,
+    request_queue: Queue,
+    request_buffer: Dict,
+    max_batch_size: int,
+    batch_timeout: float,
+    stream: bool,
 ):
     lit_api.setup(device)
     lit_api.device = device
