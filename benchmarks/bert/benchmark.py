@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 
 import random
+random.seed(10)
 
 phrases = [
     "In the midst of a bustling city, amidst the constant hum of traffic and the chatter of countless conversations, there exists a serene park where people come to escape the chaos. Children play on the swings, their laughter echoing through the air, while adults stroll along the winding paths, lost in thought. The trees, tall and majestic, provide a canopy of shade, and the flowers bloom in a riot of colors, adding to the park's charm. It's a place where time seems to slow down, offering a moment of peace and reflection in an otherwise hectic world.",
@@ -94,11 +95,12 @@ async def async_benchmark_server(data, num_requests, concurrency=8):
     print(f"Total benchmark time: {total_time*1000:.2f} ms")
     print(f"Average response time: {average_time * 1000:.2f} ms")
     print(f"Median response time: {median_time * 1000:.2f} ms")
+    print("-"*20)
 
     return total_time, responses
 
 
-def main():
+def main(num_samples):
     times = []
     warmup_data = "Warmup request text"
 
@@ -106,7 +108,7 @@ def main():
     warmup_server(URL, warmup_data)
     # asyncio.run(warmup_server_async(URL, warmup_data))
 
-    for i in range(10):
+    for i in range(num_samples):
         n = 32
         data = create_random_batch(n)
 
@@ -125,4 +127,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(num_samples=10)

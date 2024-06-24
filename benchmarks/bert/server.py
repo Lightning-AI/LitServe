@@ -1,6 +1,8 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from jsonargparse import CLI
+from litserve.utils import log_time
+
 import litserve as ls
 
 
@@ -12,23 +14,24 @@ class HuggingFaceLitAPI(ls.LitAPI):
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name, torch_dtype=torch.float16).to(
             device
         )
-
     def decode_request(self, request):
         return request["text"]
 
+    @log_time
     def batch(self, inputs):
         print(len(inputs))
         return self.tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
 
+    @log_time
     @torch.inference_mode
     def predict(self, inputs):
         inputs = inputs.to(self.device)
         logits = self.model(**inputs).logits
         predicted_class_ids = logits.argmax(1)
-        return predicted_class_ids
+        return predicted_class_ids.tolist()
 
     def unbatch(self, outputs):
-        return outputs.tolist()
+        return outputs
 
     def encode_response(self, output):
         return {"label_idx": output}
@@ -47,7 +50,7 @@ def main(
         batch_timeout=batch_timeout,
         timeout=200,
     )
-    server.run()
+    server.run(log_level="warning")
 
 
 if __name__ == "__main__":

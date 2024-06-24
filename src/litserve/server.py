@@ -39,7 +39,7 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
+from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
         return func(*args, **kwargs, context=context)
     return func(*args, **kwargs)
 
-
+@log_time
 def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
     for uid in uids:
@@ -67,7 +67,7 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
         batches.append((x_enc, pipe_s))
     return batches
 
-
+# @log_time
 def collate_requests(
     lit_api: LitAPI, request_queue: Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
 ) -> Optional[List]:
