@@ -16,6 +16,9 @@ import logging
 import pickle
 from typing import Coroutine, Optional
 import uuid
+import time
+import asyncio
+from functools import wraps
 
 from fastapi import HTTPException
 
@@ -66,3 +69,26 @@ async def azip(*async_iterables):
         if any(isinstance(result, StopAsyncIteration) for result in results):
             break
         yield tuple(results)
+
+
+
+def log_time(func):
+    if asyncio.iscoroutinefunction(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = await func(*args, **kwargs)
+            end_time = time.time()
+            elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
+            print(f"{func.__name__} took {elapsed_time:.2f} ms to complete")
+            return result
+    else:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            end_time = time.time()
+            elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
+            print(f"{func.__name__} took {elapsed_time:.2f} ms to complete")
+            return result
+    return wrapper

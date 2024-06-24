@@ -380,6 +380,15 @@ class LitServer:
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
+
+        @self.app.middleware("http")
+        async def add_process_time_header(request: Request, call_next):
+            start_time = time.time()
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            response.headers["X-Process-Time"] = str(process_time)
+            return response
+
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
