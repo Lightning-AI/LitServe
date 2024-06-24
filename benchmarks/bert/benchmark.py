@@ -103,8 +103,8 @@ def main():
     warmup_data = "Warmup request text"
 
     # Perform warmup requests
-    # warmup_server(URL, warmup_data)
-    asyncio.run(warmup_server_async(URL, warmup_data))
+    warmup_server(URL, warmup_data)
+    # asyncio.run(warmup_server_async(URL, warmup_data))
 
     for i in range(10):
         n = 32
