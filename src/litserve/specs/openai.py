@@ -20,7 +20,7 @@ import time
 import typing
 import uuid
 from enum import Enum
-from typing import AsyncGenerator, Dict, List, Literal, Optional, Union, Generator
+from typing import AsyncGenerator, Dict, List, Literal, Optional, Union, Iterator
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
@@ -100,6 +100,12 @@ class ChatMessage(BaseModel):
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
+
+
+class ChatMessageWithUsage(ChatMessage):
+    prompt_tokens: Optional[int] = 0
+    total_tokens: Optional[int] = 0
+    completion_tokens: Optional[int] = 0
 
 
 class ChoiceDelta(ChatMessage):
@@ -284,7 +290,7 @@ class OpenAISpec(LitSpec):
 
     def encode_response(
         self, output_generator: Union[Dict[str, str], List[Dict[str, str]]], context_kwargs: Optional[dict] = None
-    ) -> Generator[Dict, None, None]:
+    ) -> Iterator[Union[ChatMessage, ChatMessageWithUsage]]:
         for output in output_generator:
             logger.debug(output)
             yield self._encode_response(output)
