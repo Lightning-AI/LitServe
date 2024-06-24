@@ -137,6 +137,31 @@ def openai_request_data():
 
 
 @pytest.fixture()
+def openai_response_data():
+    return {
+        "id": "chatcmpl-9dEtoQu4g45g3431SZ2s98S",
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "index": 0,
+                "logprobs": None,
+                "message": {
+                    "content": "10 + 6 is equal to 16.",
+                    "role": "assistant",
+                    "function_call": None,
+                    "tool_calls": None,
+                },
+            }
+        ],
+        "created": 1719139092,
+        "model": "gpt-3.5-turbo-0125",
+        "object": "chat.completion",
+        "system_fingerprint": None,
+        "usage": {"completion_tokens": 10, "prompt_tokens": 25, "total_tokens": 35},
+    }
+
+
+@pytest.fixture()
 def openai_request_data_with_image():
     return {
         "model": "lit",

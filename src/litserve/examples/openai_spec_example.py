@@ -74,6 +74,56 @@ class OpenAIBatchContext(ls.LitAPI):
             assert ctx["temperature"] == 1.0, f"context {ctx} is not 1.0"
 
 
+class OpenAIWithUsage(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        yield {
+            "role": "assistant",
+            "content": "10 + 6 is equal to 16.",
+            "prompt_tokens": 25,
+            "completion_tokens": 10,
+            "total_tokens": 35,
+        }
+
+
+class OpenAIWithUsageEncodeResponse(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        # streaming tokens
+        yield from ["10", " +", " ", "6", " is", " equal", " to", " ", "16", "."]
+
+    def encode_response(self, output):
+        for out in output:
+            yield {"role": "assistant", "content": out}
+
+        yield {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
+
+
+class OpenAIBatchingWithUsage(OpenAIWithUsage):
+    def batch(self, inputs):
+        return inputs
+
+    def predict(self, x):
+        n = len(x)
+        yield ["10 + 6 is equal to 16."] * n
+
+    def encode_response(self, output_stream_batch, context):
+        n = len(context)
+        for output_batch in output_stream_batch:
+            yield [{"role": "assistant", "content": out} for out in output_batch]
+
+        yield [
+            {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
+        ] * n
+
+    def unbatch(self, output):
+        return output
+
+
 if __name__ == "__main__":
     server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
     server.run(port=8000)

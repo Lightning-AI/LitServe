@@ -633,6 +633,68 @@ if __name__ == "__main__":
 ```
 &nbsp;
 
+The OpenAI response includes usage information, which contains the number of tokens for the prompt, generated text, and 
+total tokens for the given request.
+
+With LitServe, this can be achieved using the encode_response method to yield usage information as follows:
+
+```python
+import litserve as ls
+
+class OpenAIUsageAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        yield "10 + 6 is equal to 16."
+
+    def encode_response(self, output):
+        for out in output:
+            yield {"role": "assistant", "content": out}
+        # Get the usage info and yield it as the last output
+        yield {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
+```
+
+An equivalent, but simpler, approach without the need to override the `encode_response` method is as follows:
+
+```python
+import litserve as ls
+
+class OpenAIUsageAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        yield {"role": "assistant", "content": "10 + 6 is equal to 16.", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35}
+```
+
+The server response using either of the above approaches would include token usage data as shown below:
+
+```json
+{
+    "id": "chatcmpl-9dEtoQgtrtr3451SZ2s98S",
+    "choices": [
+        {
+            "finish_reason": "stop",
+            "index": 0,
+            "logprobs": null,
+            "message": {
+                "content": "10 + 6 is equal to 16.",
+                "role": "assistant",
+                "function_call": null,
+                "tool_calls": null
+            }
+        }
+    ],
+    "created": 1719139092,
+    "model": "gpt-3.5-turbo-0125",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "usage": {"completion_tokens": 10, "prompt_tokens": 25, "total_tokens": 35}
+}
+```
+
+
 LitServe's `OpenAISpec` can also handle images in the input. Here is an example:
 
 ```python
@@ -901,7 +963,7 @@ if __name__=="__main__":
 </details>
 
 <details>
-  <summary>Customize the endpoint path</summary>
+  <summary>✅ Customize the endpoint path</summary>
 
 &nbsp;
 
