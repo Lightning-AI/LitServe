@@ -35,7 +35,7 @@ class HuggingFaceLitAPI(ls.LitAPI):
 
 
 def main(
-    batch_size: int = 4,
+    batch_size: int = 8,
     batch_timeout: float = 0.01,
 ):
     print(batch_size, batch_timeout)
