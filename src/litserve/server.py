@@ -34,6 +34,7 @@ from fastapi.security import APIKeyHeader
 import sys
 
 from fastapi.responses import StreamingResponse
+from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -380,6 +381,9 @@ class LitServer:
         lit_api.stream = stream
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
+        # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
+        if not stream:
+            self.app.add_middleware(GZipMiddleware, minimum_size=1000)
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
