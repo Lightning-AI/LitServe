@@ -59,6 +59,7 @@ def run_benchmark(batch_size:int):
         batch = create_random_batch(batch_size)
         t0 = time.time()
         y = run_model(batch)
+        torch.cuda.synchronize()
         t1 = time.time()
         times.append(t1 - t0)
 
@@ -66,8 +67,8 @@ def run_benchmark(batch_size:int):
     average_time = sum(times) / len(times)
     median_time = statistics.median(times)
     print("Benchmark for batch size", batch_size)
-    print(f"Average response time: {average_time * 1000:.2f} ms")
-    print(f"Median response time: {median_time * 1000:.2f} ms")
+    print(f"Average inference time: {average_time * 1000:.2f} ms")
+    print(f"Median inference time: {median_time * 1000:.2f} ms")
     print("-"*20)
 
 

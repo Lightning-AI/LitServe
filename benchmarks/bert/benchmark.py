@@ -90,11 +90,13 @@ async def async_benchmark_server(data, num_requests, concurrency=8):
     t1 = time.time()
     total_time = t1 - t0
     average_time = sum(response_times) / len(response_times)
+    min_time = min(response_times)
     median_time = statistics.median(response_times)
 
     print(f"Total benchmark time: {total_time*1000:.2f} ms")
-    print(f"Average response time: {average_time * 1000:.2f} ms")
-    print(f"Median response time: {median_time * 1000:.2f} ms")
+    print(f"Average response time per request: {average_time * 1000:.2f} ms")
+    print(f"Median response time per request: {median_time * 1000:.2f} ms")
+    print(f"Minimum response time per request: {min_time * 1000:.2f} ms")
     print("-"*20)
 
     return total_time, responses
@@ -121,10 +123,12 @@ def main(num_samples, warmup:bool=True):
         times.append(total_time)
 
     average_time = sum(times) / len(times)
+    min_time = min(times)
     median_time = statistics.median(times)
 
     print(f"Average total benchmark time: {average_time * 1000:.2f} ms")
     print(f"Median total benchmark time: {median_time * 1000:.2f} ms")
+    print(f"Minimum total benchmark time: {min_time * 1000:.2f} ms")
 
 
 if __name__ == "__main__":

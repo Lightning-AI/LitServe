@@ -22,7 +22,7 @@ class HuggingFaceLitAPI(ls.LitAPI):
         print(len(inputs))
         return self.tokenizer(inputs, return_tensors="pt", padding=True, truncation=True)
 
-    @log_time
+    # @log_time
     @torch.inference_mode
     def predict(self, inputs):
         inputs = inputs.to(self.device)
@@ -48,7 +48,7 @@ def main(
         max_batch_size=batch_size,
         workers_per_device=1,
         batch_timeout=batch_timeout,
-        timeout=200,
+        timeout=10,
     )
     server.run(log_level="warning")
 

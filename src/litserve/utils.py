@@ -94,8 +94,7 @@ def log_time(func):
     return wrapper
 
 class Timing:
-    def __init__(self, func=None, name:str=None):
-        self.func = func
+    def __init__(self, name:str=None):
         self.start_time = None
         self.end_time = None
         self.elapsed_time = None

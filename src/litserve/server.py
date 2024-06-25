@@ -484,7 +484,7 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-    @log_time
+    # @log_time
     def new_pipe(self) -> tuple:
         return Pipe()
 
@@ -505,7 +505,7 @@ class LitServer:
     @log_time
     async def data_reader(self, read):
         data_available = asyncio.Event()
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         loop.add_reader(read.fileno(), data_available.set)
         await data_available.wait()
         loop.remove_reader(read.fileno())
@@ -538,7 +538,7 @@ class LitServer:
     async def data_streamer(self, read: Connection, write: Connection, send_status=False):
         data_available = asyncio.Event()
         queue = asyncio.Queue()
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def reader():
             try:
@@ -593,15 +593,14 @@ class LitServer:
 
             read, write = self.new_pipe()
 
-            with Timing(name="await request"):
-                if self.request_type == Request:
-                    if (request.headers["Content-Type"] == "application/x-www-form-urlencoded" or
-                            request.headers["Content-Type"].startswith("multipart/form-data")):
-                        buffer_data = (await request.form(), write)
-                    else:
-                        buffer_data = (await request.json(), write)
+            if self.request_type == Request:
+                if (request.headers["Content-Type"] == "application/x-www-form-urlencoded" or
+                        request.headers["Content-Type"].startswith("multipart/form-data")):
+                    buffer_data = (await request.form(), write)
                 else:
-                    buffer_data = (request, write)
+                    buffer_data = (await request.json(), write)
+            else:
+                buffer_data = (request, write)
 
             self.request_buffer[uid] = buffer_data
             self.request_queue.put_nowait(uid)
