@@ -480,6 +480,7 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
+    @log_time
     def new_pipe(self) -> tuple:
         return Pipe()
 
@@ -497,6 +498,7 @@ class LitServer:
             if read.poll(LONG_TIMEOUT):
                 return read.recv()
 
+    @log_time
     async def data_reader(self, read):
         data_available = asyncio.Event()
         loop = asyncio.get_event_loop()

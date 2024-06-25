@@ -100,13 +100,14 @@ async def async_benchmark_server(data, num_requests, concurrency=8):
     return total_time, responses
 
 
-def main(num_samples):
+def main(num_samples, warmup:bool=True):
     times = []
-    warmup_data = "Warmup request text"
+    if warmup:
+        warmup_data = "Warmup request text"
 
-    # Perform warmup requests
-    warmup_server(URL, warmup_data)
-    # asyncio.run(warmup_server_async(URL, warmup_data))
+        # Perform warmup requests
+        warmup_server(URL, warmup_data)
+        # asyncio.run(warmup_server_async(URL, warmup_data))
 
     for i in range(num_samples):
         n = 32
@@ -127,4 +128,4 @@ def main(num_samples):
 
 
 if __name__ == "__main__":
-    main(num_samples=10)
+    main(num_samples=1, warmup=False)
