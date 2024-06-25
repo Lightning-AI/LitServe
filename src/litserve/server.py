@@ -172,7 +172,8 @@ def run_batched_loop(
                 for input, context in zip(inputs, contexts)
             ]
             x = lit_api.batch(x)
-            y = _inject_context(contexts, lit_api.predict, x)
+            with Timing("inference"):
+                y = _inject_context(contexts, lit_api.predict, x)
             outputs = lit_api.unbatch(y)
             for y, pipe_s, context in zip(outputs, pipes, contexts):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
@@ -613,8 +614,8 @@ class LitServer:
                 )
             else:
                 data = await wait_for_queue_timeout(self.data_reader(read), self.timeout, uid, self.request_buffer)
-            self.close_pipe(read, write)
 
+            self.close_pipe(read, write)
             response, status = data
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
