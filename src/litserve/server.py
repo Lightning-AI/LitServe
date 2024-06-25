@@ -39,7 +39,7 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time
+from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing
 
 logger = logging.getLogger(__name__)
 
@@ -503,10 +503,7 @@ class LitServer:
         data_available = asyncio.Event()
         loop = asyncio.get_event_loop()
         loop.add_reader(read.fileno(), data_available.set)
-
-        if not read.poll():
-            await data_available.wait()
-        data_available.clear()
+        await data_available.wait()
         loop.remove_reader(read.fileno())
         return read.recv()
 
@@ -585,23 +582,26 @@ class LitServer:
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
+        @log_time
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             logger.debug(f"Received request uid={uid}")
 
             read, write = self.new_pipe()
 
-            if self.request_type == Request:
-                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
-                    "Content-Type"
-                ].startswith("multipart/form-data"):
-                    self.request_buffer[uid] = (await request.form(), write)
+            with Timing(name="await request"):
+                if self.request_type == Request:
+                    if (request.headers["Content-Type"] == "application/x-www-form-urlencoded" or
+                            request.headers["Content-Type"].startswith("multipart/form-data")):
+                        buffer_data = (await request.form(), write)
+                    else:
+                        buffer_data = (await request.json(), write)
                 else:
-                    self.request_buffer[uid] = (await request.json(), write)
-            else:
-                self.request_buffer[uid] = (request, write)
+                    buffer_data = (request, write)
 
-            self.request_queue.put(uid)
+            self.request_buffer[uid] = buffer_data
+            self.request_queue.put_nowait(uid)
+
             background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):

@@ -92,3 +92,20 @@ def log_time(func):
             print(f"{func.__name__} took {elapsed_time:.2f} ms to complete")
             return result
     return wrapper
+
+class Timing:
+    def __init__(self, func=None, name:str=None):
+        self.func = func
+        self.start_time = None
+        self.end_time = None
+        self.elapsed_time = None
+        self.name = name
+
+    def __enter__(self):
+        self.start_time = time.time()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_time = time.time()
+        self.elapsed_time = (self.end_time - self.start_time) * 1000  # Convert to milliseconds
+        print(f"{self.name} took {self.elapsed_time:.2f} ms")

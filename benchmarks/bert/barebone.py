@@ -72,5 +72,5 @@ def run_benchmark(batch_size:int):
 
 
 if __name__ == '__main__':
-    for batch_size in [8, 16, 32]:
+    for batch_size in [1, 8, 16, 32]:
         run_benchmark(batch_size)
