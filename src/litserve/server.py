@@ -42,7 +42,14 @@ from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing
 
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+file_handler1 = logging.FileHandler('logs/app.log')
+formatter1 = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler1.setFormatter(formatter1)
+logger.addHandler(file_handler1)
+
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -485,7 +492,7 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-    # @log_time
+    @log_time
     def new_pipe(self) -> tuple:
         return Pipe()
 
@@ -508,7 +515,8 @@ class LitServer:
         data_available = asyncio.Event()
         loop = asyncio.get_running_loop()
         loop.add_reader(read.fileno(), data_available.set)
-        await data_available.wait()
+        if not read.poll():
+            await data_available.wait()
         loop.remove_reader(read.fileno())
         return read.recv()
 
@@ -603,8 +611,9 @@ class LitServer:
             else:
                 buffer_data = (request, write)
 
-            self.request_buffer[uid] = buffer_data
-            self.request_queue.put_nowait(uid)
+            with Timing("put request"):
+                self.request_buffer[uid] = buffer_data
+                self.request_queue.put_nowait(uid)
 
             background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 

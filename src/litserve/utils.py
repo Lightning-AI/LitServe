@@ -25,6 +25,14 @@ from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
+# Set up second logger
+server_logger = logging.getLogger('LitServer')
+server_logger.setLevel(logging.INFO)
+file_handler2 = logging.FileHandler('logs/LitServer_log.log')
+formatter2 = logging.Formatter("%(asctime)s,%(name)s,%(message)s",)
+file_handler2.setFormatter(formatter2)
+server_logger.addHandler(file_handler2)
+
 
 class LitAPIStatus:
     OK = "OK"
@@ -80,7 +88,7 @@ def log_time(func):
             result = await func(*args, **kwargs)
             end_time = time.time()
             elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
-            print(f"{func.__name__} took {elapsed_time:.2f} ms to complete")
+            server_logger.info(f"{func.__name__} (ms), {elapsed_time:.3f}")
             return result
     else:
         @wraps(func)
@@ -89,7 +97,7 @@ def log_time(func):
             result = func(*args, **kwargs)
             end_time = time.time()
             elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
-            print(f"{func.__name__} took {elapsed_time:.2f} ms to complete")
+            server_logger.info(f"{func.__name__} (ms), {elapsed_time:.2f}")
             return result
     return wrapper
 
@@ -107,4 +115,4 @@ class Timing:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.end_time = time.time()
         self.elapsed_time = (self.end_time - self.start_time) * 1000  # Convert to milliseconds
-        print(f"{self.name} took {self.elapsed_time:.2f} ms")
+        server_logger.info(f"{self.name} (ms), {self.elapsed_time:.2f}")
