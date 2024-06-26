@@ -79,6 +79,9 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
 def collate_requests(
     lit_api: LitAPI, request_queue: Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
 ) -> Optional[List]:
+    if request_queue.qsize() >= max_batch_size:
+        uids = [request_queue.get_nowait() for _ in range(max_batch_size)]
+        return uids
     uids = []
     entered_at = time.time()
     end_time = entered_at + batch_timeout
@@ -95,7 +98,7 @@ def collate_requests(
             continue
 
     if uids:
-        return get_batch_from_uid(uids, lit_api, request_buffer)
+        return uids
 
     return None
 
@@ -151,15 +154,17 @@ def run_batched_loop(
     batch_timeout: float,
 ):
     while True:
-        batches = collate_requests(
-            lit_api,
-            request_queue,
-            request_buffer,
-            max_batch_size,
-            batch_timeout,
-        )
-        if not batches:
+        with Timing("batch_wait_time"):
+            uids = collate_requests(
+                lit_api,
+                request_queue,
+                request_buffer,
+                max_batch_size,
+                batch_timeout,
+            )
+        if not uids:
             continue
+        batches = get_batch_from_uid(uids, lit_api, request_buffer)
 
         logger.debug(f"{len(batches)} batched requests received")
         inputs, pipes = zip(*batches)
