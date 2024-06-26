@@ -40,7 +40,7 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing
+from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing, server_logger
 
 
 logger = logging.getLogger(__name__)
@@ -154,17 +154,20 @@ def run_batched_loop(
     batch_timeout: float,
 ):
     while True:
-        with Timing("batch_wait_time"):
-            uids = collate_requests(
-                lit_api,
-                request_queue,
-                request_buffer,
-                max_batch_size,
-                batch_timeout,
-            )
+        t0 = time.time()
+        uids = collate_requests(
+            lit_api,
+            request_queue,
+            request_buffer,
+            max_batch_size,
+            batch_timeout,
+        )
+        t1 = time.time()
         if not uids:
             continue
+        server_logger.info(f"batch_wait_time (ms), {(t1-t0)*1000}")
         batches = get_batch_from_uid(uids, lit_api, request_buffer)
+        server_logger.info(f"batch_size, {len(uids)}")
 
         logger.debug(f"{len(batches)} batched requests received")
         inputs, pipes = zip(*batches)
