@@ -20,7 +20,7 @@ jobs:
           python-version: 3.9
 
       - name: Install dependencies
-        run: pip install -U build twine==5.1.1
+        run: pip install -U build twine==4.0.2
       - name: Build package
         run: python -m build
       - name: Check package
