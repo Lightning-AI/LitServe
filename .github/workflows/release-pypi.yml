@@ -6,34 +6,48 @@ on: # Trigger the workflow on push or pull request, but only for the main branch
     branches: [main]
   release:
     types: [published]
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-pypi.yml'
 
 # based on https://github.com/pypa/gh-action-pypi-publish
 
 jobs:
-  build:
+  build-package:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Pull reusable 🤖 actions️
+        uses: actions/checkout@v4
+        with:
+          ref: v0.11.3.post0
+          path: .cicd
+          repository: Lightning-AI/utilities
       - uses: actions/setup-python@v5
         with:
           python-version: 3.9
 
-      - name: Install dependencies
-        run: pip install -U build twine
-      - name: Build package
-        run: python -m build
-      - name: Check package
-        run: twine check dist/*
+      - name: Prepare build env.
+        run: pip install -r ./.cicd/requirements/gha-package.txt
+      - name: Create 📦 package
+        uses: .cicd/.github/actions/pkg-create
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pypi-packages-${{ github.sha }}
+          path: dist
 
-      # We do this, since failures on test.pypi aren't that bad
-      #  - name: Publish to Test PyPI
-      #    if: startsWith(github.event.ref, 'refs/tags') || github.event_name == 'release'
-      #    uses: pypa/gh-action-pypi-publish@v1.9.0
-      #    with:
-      #      user: __token__
-      #      password: ${{ secrets.test_pypi_password }}
-      #      repository_url: https://test.pypi.org/legacy/
+  publish-package:
+    needs: build-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: pypi-packages-${{ github.sha }}
+          path: dist
+      - run: ls -lh dist/
 
       - name: Publish distribution 📦 to PyPI
         if: startsWith(github.event.ref, 'refs/tags') || github.event_name == 'release'
