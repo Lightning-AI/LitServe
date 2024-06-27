@@ -40,7 +40,7 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing, server_logger
+from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing, server_logger, pipe_send, pipe_read
 
 
 logger = logging.getLogger(__name__)
@@ -194,7 +194,8 @@ def run_batched_loop(
                 y_enc = _inject_context(context, lit_api.encode_response, y)
 
                 with contextlib.suppress(BrokenPipeError):
-                    pipe_s.send((y_enc, LitAPIStatus.OK))
+                    pipe_send(pipe_s, (y_enc, LitAPIStatus.OK))
+                    # pipe_s.send((y_enc, LitAPIStatus.OK))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the batched request.\n"
@@ -526,7 +527,8 @@ class LitServer:
         if not read.poll():
             await data_available.wait()
         loop.remove_reader(read.fileno())
-        return read.recv()
+        # return read.recv()
+        return pipe_read(read)
 
     async def win_data_streamer(self, read, write, send_status=False):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.

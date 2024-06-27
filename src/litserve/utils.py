@@ -18,6 +18,7 @@ from typing import Coroutine, Optional
 import uuid
 import time
 import asyncio
+from multiprocessing.connection import Connection
 from functools import wraps
 
 from fastapi import HTTPException
@@ -116,3 +117,12 @@ class Timing:
         self.end_time = time.time()
         self.elapsed_time = (self.end_time - self.start_time) * 1000  # Convert to milliseconds
         server_logger.info(f"{self.name} (ms), {self.elapsed_time:.2f}")
+
+
+def pipe_send(conn:Connection, data):
+    with Timing("pipe_send"):
+        conn.send(data)
+
+def pipe_read(conn:Connection):
+    with Timing("pipe_read"):
+        return conn.recv()
