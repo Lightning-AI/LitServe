@@ -32,7 +32,7 @@ jobs:
       - name: Prepare build env.
         run: pip install -r ./.cicd/requirements/gha-package.txt
       - name: Create 📦 package
-        uses: .cicd/.github/actions/pkg-create
+        uses: ./.cicd/.github/actions/pkg-create
       - uses: actions/upload-artifact@v3
         with:
           name: pypi-packages-${{ github.sha }}
