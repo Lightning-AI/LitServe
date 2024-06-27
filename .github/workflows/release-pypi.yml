@@ -20,7 +20,7 @@ jobs:
           python-version: 3.9
 
       - name: Install dependencies
-        run: pip install -U build twine
+        run: pip install -U build twine importlib_metadata==7.2.1
       - name: Build package
         run: python -m build
       - name: Check package
