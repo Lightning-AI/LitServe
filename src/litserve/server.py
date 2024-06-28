@@ -454,8 +454,6 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
-        
-        manager = Manager()
         self.request_buffer = None
         ctx = mp.get_context('spawn')
         self.request_queue = ctx.Queue()
