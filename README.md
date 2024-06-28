@@ -63,6 +63,17 @@ Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch
 &nbsp;
 
 # Quick start
+
+&nbsp;
+
+<div align="center">
+<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
+</a>
+</div>
+
+&nbsp;
+
 Install LitServe via pip (or [advanced installs](https://lightning.ai/docs/litserve/home/install)):
 
 ```bash
@@ -71,10 +82,6 @@ pip install litserve
     
 ### Define a server    
 Here's a hello world example ([explore real examples](https://lightning.ai/docs/litserve/examples)):
-
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
-</a>
 
 ```python
 # server.py
