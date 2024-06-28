@@ -85,18 +85,18 @@ def log_time(func):
     if asyncio.iscoroutinefunction(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            start_time = time.time()
+            start_time = time.perf_counter()
             result = await func(*args, **kwargs)
-            end_time = time.time()
+            end_time = time.perf_counter()
             elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
             server_logger.info(f"{func.__name__} (ms), {elapsed_time:.3f}")
             return result
     else:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            start_time = time.time()
+            start_time = time.perf_counter()
             result = func(*args, **kwargs)
-            end_time = time.time()
+            end_time = time.perf_counter()
             elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
             server_logger.info(f"{func.__name__} (ms), {elapsed_time:.2f}")
             return result
@@ -110,11 +110,11 @@ class Timing:
         self.name = name
 
     def __enter__(self):
-        self.start_time = time.time()
+        self.start_time = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.end_time = time.time()
+        self.end_time = time.perf_counter()
         self.elapsed_time = (self.end_time - self.start_time) * 1000  # Convert to milliseconds
         server_logger.info(f"{self.name} (ms), {self.elapsed_time:.2f}")
 
