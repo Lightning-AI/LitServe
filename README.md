@@ -70,7 +70,7 @@ pip install litserve
 ```
     
 ### Define a server    
-Here's a hello world example ([explore real examples](#examples)):
+Here's a hello world example ([explore real examples](https://lightning.ai/docs/litserve/examples)):
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
@@ -132,7 +132,7 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 &nbsp;
 
 # Examples
-Explore various examples that show different models deployed with LitServe:
+[Explore various examples](https://lightning.ai/docs/litserve/examples) that show different models deployed with LitServe:
 
 | Example  | description | Deploy on Studios |
 |---|---|---|
