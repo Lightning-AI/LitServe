@@ -170,7 +170,7 @@ Self manage your own deployments or use Lightning Studios to deploy production-g
 LitServe supports multiple advanced state-of-the-art features.
 
 ✅ [All model types: LLMs, vision, time series, etc...](https://lightning.ai/docs/litserve/examples).        
-✅ [Auto-GPU selection](https://lightning.ai/docs/litserve/features/gpu-inference).    
+✅ [Auto-GPU scaling](https://lightning.ai/docs/litserve/features/gpu-inference).    
 ✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication).    
 ✅ [Autoscaling](https://lightning.ai/docs/litserve/features/autoscaling).    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching).    
