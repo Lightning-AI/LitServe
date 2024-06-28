@@ -43,7 +43,7 @@
 &nbsp;
 
 # Deploy AI models Lightning fast ⚡
-LitServe is a high-throughput serving engine designed for seamless AI model deployment at scale. It creates an API endpoint for models, managing batching, streaming, and autoscaling across CPUs and GPUs and more.
+LitServe is a high-throughput serving engine designed to deploy AI models at scale. It creates an API endpoint for models, managing batching, streaming, and autoscaling across CPUs and GPUs and more.
 
 ✅ **Supports all models:** LLMs, vision, time-series, etc...     
 ✅ **Developer friendly:** Focus on AI deployment not infrastructure.    
