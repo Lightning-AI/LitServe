@@ -11,41 +11,46 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import queue
 import asyncio
 import contextlib
 import copy
-import random
-import logging
-import pickle
-from UltraDict import UltraDict
-from contextlib import asynccontextmanager
 import inspect
+import logging
 import multiprocessing as mp
-from multiprocessing import Manager, Queue, Pipe
-
+import os
+import pickle
+import queue
+import shutil
+import sys
+import threading
+import time
+import uuid
+from contextlib import asynccontextmanager
+from multiprocessing import Manager, Pipe, Queue
 from multiprocessing.connection import Connection
 from queue import Empty
+from typing import Dict, List, Optional, Sequence, Union
+
 import uvicorn
-import time
-import os
-import shutil
-from typing import Sequence, Optional, Union, List, Dict
-import uuid
-
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
-from fastapi.security import APIKeyHeader
-import sys
-
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
+from fastapi.security import APIKeyHeader
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing, server_logger, pipe_send, pipe_read
-
+from litserve.utils import (
+    LitAPIStatus,
+    Timing,
+    load_and_raise,
+    log_time,
+    pipe_read,
+    pipe_send,
+    server_logger,
+    wait_for_queue_timeout,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -510,7 +515,6 @@ class LitServer:
             spec.setup(server_copy)
 
 
-        import threading
         t = threading.Thread(target=self.consumer, daemon=True)
         t.start()
 
