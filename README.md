@@ -111,10 +111,10 @@ Now run the server via the command-line
 python server.py
 ```
 
-These 2 minimal APIs that allow enterprise-scale, with full control.
+These 2 minimal APIs allow enterprise-scale, with full control.
 
-- LitAPI: Describes how the server will handle a request.
-- LitServer: Specify optimizations (such as batching, streaming, GPUs).
+⚡️ LitAPI: Describes how the server will handle a request.    
+⚡️ LitServer: Specify optimizations (such as batching, streaming, GPUs).
     
 ### Query the server
 LitServe automatically generates a client when it starts. Use this client to test the server:
@@ -123,7 +123,7 @@ LitServe automatically generates a client when it starts. Use this client to tes
 python client.py
 ```
 
-Or ping the server yourself directly
+Or query the server yourself directly
 ```python
 import requests
 response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
