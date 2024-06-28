@@ -158,17 +158,23 @@ def run_batched_loop(
     batch_timeout: float,
 ):
     while True:
-        t0 = time.perf_counter()
-        try:
-            data = request_queue.get(timeout=0.001) # uid, (data, write)
-            uids = [e[0] for e in data]
-            inputs = [e[1][0] for e in data]
-            pipes = [e[1][1] for e in data]
-        except (Empty, ValueError):
+        t0 = time.time()
+        uids = collate_requests(
+            lit_api,
+            request_queue,
+            request_buffer,
+            max_batch_size,
+            batch_timeout,
+        )
+        t1 = time.time()
+        if not uids:
             continue
-        t1 = time.perf_counter()
-        server_logger.info(f"batch_loop-queue.get (ms), {(t1-t0)*1000}")
+        server_logger.info(f"batch_wait_time (ms), {(t1-t0)*1000}")
+        batches = get_batch_from_uid(uids, lit_api, request_buffer)
         server_logger.info(f"batch_size, {len(uids)}")
+
+        logger.debug(f"{len(batches)} batched requests received")
+        inputs, pipes = zip(*batches)
 
         try:
             contexts = [{}] * len(inputs)
@@ -454,7 +460,8 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
-        self.request_buffer = None
+        manager = Manager()
+        self.request_buffer = manager.dict()
         ctx = mp.get_context('spawn')
         self.request_queue = ctx.Queue()
 
@@ -640,7 +647,6 @@ class LitServer:
                 continue
 
         if uids:
-            print(uids)
             return uids
 
     
@@ -653,9 +659,10 @@ class LitServer:
             t1 = time.perf_counter()
             if items:
                 server_logger.info(f"aggregate_requests (ms), {(t1-t0)*1000}")
-                logger.info(f"sending %s items in Manager", len(items))
-                self.request_queue.put_nowait(items) # uid (data, write)
-
+                with Timing("put_request"):
+                    for uid, data in items:
+                        self.request_buffer[uid] = data
+                        self.request_queue.put_nowait(uid)
 
 
     def setup_server(self):
