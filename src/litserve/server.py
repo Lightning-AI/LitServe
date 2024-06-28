@@ -18,6 +18,7 @@ import copy
 import random
 import logging
 import pickle
+from UltraDict import UltraDict
 from contextlib import asynccontextmanager
 import inspect
 import multiprocessing as mp
@@ -157,18 +158,17 @@ def run_batched_loop(
     batch_timeout: float,
 ):
     while True:
-        t0 = time.time()
+        t0 = time.perf_counter()
         try:
-            data = request_queue.get(timeout=1.0) # uid, (data, write)
+            data = request_queue.get(timeout=0.001) # uid, (data, write)
             uids = [e[0] for e in data]
             inputs = [e[1][0] for e in data]
             pipes = [e[1][1] for e in data]
         except (Empty, ValueError):
             continue
-
-        t1 = time.time()        
+        t1 = time.perf_counter()
+        server_logger.info(f"batch_loop-queue.get (ms), {(t1-t0)*1000}")
         server_logger.info(f"batch_size, {len(uids)}")
-        server_logger.info(f"batch_wait_time (ms), {(t1-t0)*1000}")
 
         try:
             contexts = [{}] * len(inputs)
@@ -393,6 +393,10 @@ class LitServer:
             )
 
         
+        
+        self.queue = queue.Queue()
+
+
         self.queue = queue.Queue()
 
         self.api_path = api_path
@@ -420,6 +424,7 @@ class LitServer:
         self.stream = stream
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self.pipe_pool = [Pipe() for _ in range(1000)]
+        self.queue = queue.Queue()
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -449,9 +454,11 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
+        
         manager = Manager()
-        self.request_buffer = manager.dict()
-        self.request_queue = manager.Queue()
+        self.request_buffer = None
+        ctx = mp.get_context('spawn')
+        self.request_queue = ctx.Queue()
 
         try:
             pickle.dumps(self.lit_api)
@@ -509,7 +516,7 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-    @log_time
+    # @log_time
     def new_pipe(self) -> tuple:
         try:
             return self.pipe_pool.pop()
@@ -643,16 +650,14 @@ class LitServer:
     def consumer(self):
         print("Running consumer")
         while True:
+            t0 = time.perf_counter()
             items = collate_requests(None, self.queue, {}, self.max_batch_size, self.batch_timeout)
+            t1 = time.perf_counter()
             if items:
-                print(f"sending {len(items)} items in Manager")
-                self.request_queue.put_nowait(items)
-                # uid (data, write)
-                # for uid, data in items:
-                #     self.request_buffer[uid] = data
-                #     self.request_queue.put_nowait(items)
-                    # conn.send(("129", "OK"))
-                    # print("Sent")
+                server_logger.info(f"aggregate_requests (ms), {(t1-t0)*1000}")
+                logger.info(f"sending %s items in Manager", len(items))
+                self.request_queue.put_nowait(items) # uid (data, write)
+
 
 
     def setup_server(self):
@@ -676,10 +681,8 @@ class LitServer:
             else:
                 buffer_data = (request, write)
 
-            with Timing("put request"):
-                self.queue.put_nowait((uid, buffer_data))
-                # self.request_buffer[uid] = buffer_data
-                # self.request_queue.put_nowait(uid)
+            # with Timing("put request"):
+            self.queue.put_nowait((uid, buffer_data))
 
             background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
