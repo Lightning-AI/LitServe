@@ -68,7 +68,8 @@ Install LitServe via pip (or [advanced installs](https://lightning.ai/docs/litse
 ```bash
 pip install litserve
 ```
-
+    
+### Define a server    
 Here's a hello world example ([explore real examples](#examples)):
 
 <a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
@@ -112,11 +113,9 @@ python server.py
 
 These 2 minimal APIs that allow enterprise-scale, with full control.
 
-- **LitAPI:** Describes how the server will handle a request.
-- **LitServer:** Specify optimizations (such as batching, streaming, GPUs).
-
-&nbsp;
-
+- LitAPI: Describes how the server will handle a request.
+- LitServer: Specify optimizations (such as batching, streaming, GPUs).
+    
 ### Query the server
 LitServe automatically generates a client when it starts. Use this client to test the server:
 
