@@ -53,6 +53,7 @@ from litserve.utils import (
     server_logger,
     wait_for_queue_timeout,
 )
+from litserve.lit_process import LitSMQ, cleanup_shared_memory, LitDict
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -62,122 +63,6 @@ file_handler1.setFormatter(formatter1)
 logger.addHandler(file_handler1)
 
 BUFFER_SIZE = 10000
-
-
-class LitSMQ:
-    def __init__(self, name: str, metadata_shm: shared_memory.SharedMemory, data_shm: shared_memory.SharedMemory):
-        self.data_size = data_shm.size
-        self.name = name
-        self.lock = Lock()
-
-        self.metadata_shm = metadata_shm
-        self.data_shm = data_shm
-        self.metadata_buffer = metadata_shm.buf
-        self.data_buffer = data_shm.buf
-
-        self.head_index = 0
-        self.tail_index = 4
-
-    @staticmethod
-    def create(name, data_size=10_000):
-        try:
-            metadata_shm = shared_memory.SharedMemory(create=True, size=128, name=name + '_metadata')
-            # Initialize head and tail to zero
-            metadata_shm.buf[0:128] = b'\x00' * 128
-        except FileExistsError:
-            metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
-        
-        try:
-            data_shm = shared_memory.SharedMemory(create=True, size=data_size, name=name + '_data')
-        except FileExistsError:
-            data_shm = shared_memory.SharedMemory(name=name + '_data')
-
-        return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
-
-    @staticmethod
-    def attach(name):
-        try:
-            metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
-            data_shm = shared_memory.SharedMemory(name=name + '_data')
-            return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
-        except FileNotFoundError as e:
-            print(f"Error attaching shared memory: {e}")
-            raise e
-
-    def put(self, item):
-        item_bytes = pickle.dumps(item)
-        item_size = len(item_bytes)
-        if item_size + 4 > self.data_size:
-            raise ValueError("Item size exceeds queue capacity")
-
-        with self.lock:
-            head = int.from_bytes(self.metadata_buffer[self.head_index:self.head_index+4], 'little')
-            tail = int.from_bytes(self.metadata_buffer[self.tail_index:self.tail_index+4], 'little')
-
-            if tail >= head:
-                if tail + item_size + 4 > self.data_size:
-                    if head <= item_size + 4:
-                        raise ValueError("Queue is full")
-                    # Wrap around
-                    tail = 0
-            elif tail + item_size + 4 > head:
-                raise ValueError("Queue is full")
-
-            self.data_buffer[tail:tail + 4] = item_size.to_bytes(4, 'little')
-            tail += 4
-            self.data_buffer[tail:tail + item_size] = item_bytes
-            tail += item_size
-            self.metadata_buffer[self.tail_index:self.tail_index+4] = tail.to_bytes(4, 'little')
-
-    def get(self):
-        with self.lock:
-            head = int.from_bytes(self.metadata_buffer[self.head_index:self.head_index+4], 'little')
-            tail = int.from_bytes(self.metadata_buffer[self.tail_index:self.tail_index+4], 'little')
-
-            if head == tail:
-                return None  # Queue is empty
-
-            item_size = int.from_bytes(self.data_buffer[head:head + 4], 'little')
-            head += 4
-            item_bytes = self.data_buffer[head:head + item_size]
-            head += item_size
-
-            if head == self.data_size:
-                head = 0
-
-            self.metadata_buffer[self.head_index:self.head_index+4] = head.to_bytes(4, 'little')
-
-            item = pickle.loads(item_bytes)
-            return item
-
-    def close(self):
-        self.metadata_shm.close()
-        self.data_shm.close()
-
-    def unlink(self):
-        self.metadata_shm.unlink()
-        self.data_shm.unlink()
-
-    def get_shared_memory_names(self):
-        return self.metadata_shm.name, self.data_shm.name
-
-
-def cleanup_shared_memory(metadata_shm_name, data_shm_name):
-    try:
-        metadata_shm = shared_memory.SharedMemory(name=metadata_shm_name)
-        metadata_shm.unlink()
-        metadata_shm.close()
-        print(f"Unlinked and closed shared memory: {metadata_shm_name}")
-    except FileNotFoundError:
-        print(f"Shared memory {metadata_shm_name} not found for cleanup.")
-
-    try:
-        data_shm = shared_memory.SharedMemory(name=data_shm_name)
-        data_shm.unlink()
-        data_shm.close()
-        print(f"Unlinked and closed shared memory: {data_shm_name}")
-    except FileNotFoundError:
-        print(f"Shared memory {data_shm_name} not found for cleanup.")
 
 
 # if defined, it will require clients to auth with X-API-Key in the header
@@ -313,10 +198,11 @@ def run_batched_loop(
     sl: List,
     result_sml: List,
     queue_name,
-    metadata_shm_name,
-    data_shm_name,
+    shared_dict_name
 ):
     queue = LitSMQ.attach(queue_name)
+    shared_dict = LitDict(name=shared_dict_name)
+
     # shared_queue = SimpleSharedMemoryQueue.create(sm_queue)
     offset = 0
     while True:
@@ -364,6 +250,7 @@ def run_batched_loop(
                 with contextlib.suppress(BrokenPipeError):
                     # pipe_send(pipe_s, (y_enc, LitAPIStatus.OK))
                     result_sml[uid] = y_enc
+                    shared_dict.put(uid, (y_enc, LitAPIStatus.OK))
 
         except Exception as e:
             logger.exception(
@@ -374,6 +261,7 @@ def run_batched_loop(
             with contextlib.suppress(BrokenPipeError):
                 for pipe_s in pipes:
                     result_sml[uid] = -1
+                    shared_dict.put(uid, (err_pkl, LitAPIStatus.ERROR))
 
 
 def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: mp.Queue, request_buffer: Dict):
@@ -498,6 +386,7 @@ def inference_worker(
     queue_name,
     metadata_shm_name,
     data_shm_name,
+    shared_dict_name
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -524,8 +413,7 @@ def inference_worker(
             sl,
             result_sml,
             queue_name,
-            metadata_shm_name,
-            data_shm_name,
+            shared_dict_name
         )
     else:
         run_single_loop(
@@ -641,13 +529,18 @@ class LitServer:
         self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_100_000)
         metadata_shm_name, data_shm_name = self.sm_queue.get_shared_memory_names()
 
+        shared_dict_name = "shared_dict"
+        num_buckets = 128
+        data_size = 10_000
+        self.shared_dict = LitDict(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
+
         def signal_handler(sig, frame):
             print("Signal received, cleaning up shared memory...")
             cleanup_shared_memory(metadata_shm_name, data_shm_name)
             sys.exit(0)
 
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
+        # signal.signal(signal.SIGINT, signal_handler)
+        # signal.signal(signal.SIGTERM, signal_handler)
 
         smm = SharedMemoryManager()
         smm.start()
@@ -696,6 +589,7 @@ class LitServer:
                     queue_name,
                     metadata_shm_name,
                     data_shm_name,
+                    shared_dict_name
                 ),
                 daemon=True,
             )
@@ -714,6 +608,7 @@ class LitServer:
 
         yield
 
+        cleanup_shared_memory(shared_dict_name)
         self.sm_queue.close()
         self.sm_queue.unlink()
         smm.shutdown()
@@ -746,17 +641,11 @@ class LitServer:
     @log_time
     async def data_reader(self, uid, read):
         while True:
-            if self.result_sml[uid] > 0 or self.result_sml == -1:
-                return self.result_sml[uid], ""
+            item = self.shared_dict.get(uid)
+            if item:
+                self.shared_dict.remove(uid)
+                return item
             await asyncio.sleep(0.001)
-        # data_available = asyncio.Event()
-        # loop = asyncio.get_running_loop()
-        # loop.add_reader(read.fileno(), data_available.set)
-        # if not read.poll():
-        #     await data_available.wait()
-        # loop.remove_reader(read.fileno())
-        # # return read.recv()
-        # return pipe_read(read)
 
     async def win_data_streamer(self, read, write, send_status=False):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
