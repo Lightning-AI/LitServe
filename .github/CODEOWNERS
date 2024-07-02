@@ -6,6 +6,7 @@
 
 # CI/CD and configs
 /.github/       @borda
+*.yaml          @borda
 *.yml           @borda
 
 # devel requirements
