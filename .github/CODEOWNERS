@@ -7,3 +7,6 @@
 # CI/CD and configs
 /.github/       @borda
 *.yml           @borda
+
+# devel requirements
+/_requirements/ @borda @lantiga
