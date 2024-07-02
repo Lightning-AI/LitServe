@@ -616,7 +616,7 @@ class LitServer:
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         queue_name = "simple_lit"
-        self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_000)
+        self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_100_000)
         metadata_shm_name, data_shm_name = self.sm_queue.get_shared_memory_names()
 
         def signal_handler(sig, frame):
