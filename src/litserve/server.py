@@ -17,16 +17,19 @@ import copy
 import inspect
 import logging
 import multiprocessing as mp
+from multiprocessing.managers import SharedMemoryManager
 import os
 import pickle
 import queue
 import shutil
+import signal
 import sys
 import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
 from multiprocessing import Manager, Pipe, Queue
+from multiprocessing import shared_memory, Lock
 from multiprocessing.connection import Connection
 from queue import Empty
 from typing import Dict, List, Optional, Sequence, Union
@@ -59,6 +62,114 @@ formatter1 = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messa
 file_handler1.setFormatter(formatter1)
 logger.addHandler(file_handler1)
 
+BUFFER_SIZE = 10000
+
+class LitSMQ:
+    def __init__(self, name: str, metadata_shm: shared_memory.SharedMemory, data_shm: shared_memory.SharedMemory):
+        self.data_size = data_shm.size
+        self.name = name
+        self.lock = Lock()
+
+        self.metadata_shm = metadata_shm
+        self.data_shm = data_shm
+        self.metadata_buffer = metadata_shm.buf
+        self.data_buffer = data_shm.buf
+
+        self.head_index = 0
+        self.tail_index = 4
+
+    @staticmethod
+    def create(name, data_size=10_000):
+        try:
+            metadata_shm = shared_memory.SharedMemory(create=True, size=128, name=name + '_metadata')
+        except FileExistsError:
+            metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
+        try:
+            data_shm = shared_memory.SharedMemory(create=True, size=data_size, name=name + '_data')
+        except FileExistsError:
+            data_shm = shared_memory.SharedMemory(name=name + '_data')
+        
+        # Initialize head and tail to zero if creating the segment
+        if metadata_shm.buf[:4] == b'\x00' * 4:
+            metadata_shm.buf[0:128] = b'\x00' * 128
+
+        return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
+
+    @staticmethod
+    def attach(name):
+        try:
+            metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
+            data_shm = shared_memory.SharedMemory(name=name + '_data')
+            return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
+        except FileNotFoundError as e:
+            print(f"Error attaching shared memory: {e}")
+            raise e
+
+    def put(self, item):
+        item_bytes = pickle.dumps(item)
+        item_size = len(item_bytes)
+        if item_size + 4 > self.data_size:
+            raise ValueError("Item size exceeds queue capacity")
+
+        with self.lock:
+            head = int.from_bytes(self.metadata_buffer[self.head_index:self.head_index+4], 'little')
+            tail = int.from_bytes(self.metadata_buffer[self.tail_index:self.tail_index+4], 'little')
+
+            if tail + item_size + 4 > self.data_size:
+                raise ValueError("Queue is full")
+
+            self.data_buffer[tail:tail + 4] = item_size.to_bytes(4, 'little')
+            tail += 4
+            self.data_buffer[tail:tail + item_size] = item_bytes
+            tail += item_size
+            self.metadata_buffer[self.tail_index:self.tail_index+4] = tail.to_bytes(4, 'little')
+
+    def get(self):
+        with self.lock:
+            head = int.from_bytes(self.metadata_buffer[self.head_index:self.head_index+4], 'little')
+            tail = int.from_bytes(self.metadata_buffer[self.tail_index:self.tail_index+4], 'little')
+
+            if head == tail:
+                return None  # Queue is empty
+
+            item_size = int.from_bytes(self.data_buffer[head:head + 4], 'little')
+            head += 4
+            item_bytes = self.data_buffer[head:head + item_size]
+            head += item_size
+            self.metadata_buffer[self.head_index:self.head_index+4] = head.to_bytes(4, 'little')
+
+            item = pickle.loads(item_bytes)
+            return item
+
+    def close(self):
+        self.metadata_shm.close()
+        self.data_shm.close()
+
+    def unlink(self):
+        self.metadata_shm.unlink()
+        self.data_shm.unlink()
+
+    def get_shared_memory_names(self):
+        return self.metadata_shm.name, self.data_shm.name
+
+def cleanup_shared_memory(metadata_shm_name, data_shm_name):
+    try:
+        metadata_shm = shared_memory.SharedMemory(name=metadata_shm_name)
+        metadata_shm.unlink()
+        metadata_shm.close()
+        print(f"Unlinked and closed shared memory: {metadata_shm_name}")
+    except FileNotFoundError:
+        print(f"Shared memory {metadata_shm_name} not found for cleanup.")
+
+    try:
+        data_shm = shared_memory.SharedMemory(name=data_shm_name)
+        data_shm.unlink()
+        data_shm.close()
+        print(f"Unlinked and closed shared memory: {data_shm_name}")
+    except FileNotFoundError:
+        print(f"Shared memory {data_shm_name} not found for cleanup.")
+
+
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
@@ -88,10 +199,30 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
 
 # @log_time
 def collate_requests(
-    lit_api: LitAPI, request_queue: mp.Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
+    lit_api: LitAPI, request_queue: mp.Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float, sl, offset, sm_queue
 ) -> Optional[List]:
-    if request_queue.qsize() >= max_batch_size:
-        return [request_queue.get_nowait() for _ in range(max_batch_size)]
+    curr = sl[0]
+    uids = []
+    entered_at = time.time()
+    end_time = entered_at + batch_timeout
+
+    while time.time() < end_time and len(uids) < max_batch_size:
+        remaining_time = end_time - time.time()
+        if remaining_time <= 0:
+            break
+        item = sm_queue.get()
+        if item is not None:
+            uids.append(item)
+
+    if uids:
+        return offset, uids
+
+    return None
+
+# @log_time
+def consumer_collate(
+    lit_api: LitAPI, request_queue: Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
+) -> Optional[List]:
     uids = []
     entered_at = time.time()
     end_time = entered_at + batch_timeout
@@ -162,7 +293,16 @@ def run_batched_loop(
     request_buffer: Dict,
     max_batch_size: int,
     batch_timeout: float,
+    sl: List,
+    result_sml: List,
+    queue_name,
+    metadata_shm_name,
+    data_shm_name
+
 ):
+    queue = LitSMQ.attach(queue_name)
+    # shared_queue = SimpleSharedMemoryQueue.create(sm_queue)
+    offset = 0
     while True:
         t0 = time.time()
         uids = collate_requests(
@@ -171,16 +311,25 @@ def run_batched_loop(
             request_buffer,
             max_batch_size,
             batch_timeout,
+            sl,
+            offset,
+            queue
         )
         t1 = time.time()
         if not uids:
             continue
+        offset, items = uids
+        batches = [e[1] for e in items]
+        uids = [e[0] for e in items]
+        print(uids)
         server_logger.info(f"batch_wait_time (ms), {(t1 - t0) * 1000}")
-        batches = get_batch_from_uid(uids, lit_api, request_buffer)
-        server_logger.info(f"batch_size, {len(uids)}")
+        # batches = get_batch_from_uid(uids, lit_api, request_buffer)
+        server_logger.info(f"batch_size, {len(batches)}")
 
         logger.debug(f"{len(batches)} batched requests received")
-        inputs, pipes = zip(*batches)
+        pipes = batches
+        inputs = [1]* len(pipes)  # fake
+        # inputs, pipes = zip(*batches)
 
         try:
             contexts = [{}] * len(inputs)
@@ -200,12 +349,13 @@ def run_batched_loop(
             with Timing("inference"):
                 y = _inject_context(contexts, lit_api.predict, x)
             outputs = lit_api.unbatch(y)
-            for y, pipe_s, context in zip(outputs, pipes, contexts):
+            for y, pipe_s, context, uid in zip(outputs, pipes, contexts, uids):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
 
                 with contextlib.suppress(BrokenPipeError):
-                    pipe_send(pipe_s, (y_enc, LitAPIStatus.OK))
-                    # pipe_s.send((y_enc, LitAPIStatus.OK))
+                    # pipe_send(pipe_s, (y_enc, LitAPIStatus.OK))
+                    result_sml[uid] = y_enc
+
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the batched request.\n"
@@ -214,7 +364,7 @@ def run_batched_loop(
             err_pkl = pickle.dumps(e)
             with contextlib.suppress(BrokenPipeError):
                 for pipe_s in pipes:
-                    pipe_s.send((err_pkl, LitAPIStatus.ERROR))
+                    result_sml[uid] = -1
 
 
 def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: mp.Queue, request_buffer: Dict):
@@ -334,6 +484,9 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
+    sl: List,
+    result_sml:List,
+    queue_name, metadata_shm_name, data_shm_name
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -350,7 +503,7 @@ def inference_worker(
         return
 
     if max_batch_size > 1:
-        run_batched_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
+        run_batched_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout, sl, result_sml, queue_name, metadata_shm_name, data_shm_name)
     else:
         run_single_loop(
             lit_api,
@@ -404,7 +557,6 @@ class LitServer:
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
 
-        self.queue = queue.Queue()
 
         self.queue = queue.Queue()
 
@@ -463,10 +615,28 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
-        manager = Manager()
-        self.request_buffer = manager.dict()
-        ctx = mp.get_context("spawn")
-        self.request_queue = ctx.Queue()
+        queue_name = "simple_lit"
+        self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_000)
+        metadata_shm_name, data_shm_name = self.sm_queue.get_shared_memory_names()
+
+        def signal_handler(sig, frame):
+            print("Signal received, cleaning up shared memory...")
+            cleanup_shared_memory(metadata_shm_name, data_shm_name)
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        smm = SharedMemoryManager()
+        smm.start()
+        items = [0] + [pickle.dumps([0, None])]*BUFFER_SIZE
+        self.sl = smm.ShareableList(items)
+        self.result_sml = smm.ShareableList([0]*BUFFER_SIZE)
+                
+        # manager = Manager()
+        self.request_buffer = None #manager.dict()
+        # ctx = mp.get_context("spawn")
+        self.request_queue = None #ctx.Queue()
 
         try:
             pickle.dumps(self.lit_api)
@@ -499,6 +669,9 @@ class LitServer:
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
+                    self.sl,
+                    self.result_sml,
+                    queue_name, metadata_shm_name, data_shm_name,
                 ),
                 daemon=True,
             )
@@ -518,7 +691,9 @@ class LitServer:
 
         yield
 
-        # t.join()
+        self.sm_queue.close()
+        self.sm_queue.unlink()      
+        smm.shutdown()
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
@@ -546,15 +721,19 @@ class LitServer:
                 return read.recv()
 
     @log_time
-    async def data_reader(self, read):
-        data_available = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        loop.add_reader(read.fileno(), data_available.set)
-        if not read.poll():
-            await data_available.wait()
-        loop.remove_reader(read.fileno())
-        # return read.recv()
-        return pipe_read(read)
+    async def data_reader(self, uid, read):
+        while True:
+            if self.result_sml[uid]>0 or self.result_sml==-1:
+                return self.result_sml[uid], ""
+            await asyncio.sleep(0.001)
+        # data_available = asyncio.Event()
+        # loop = asyncio.get_running_loop()
+        # loop.add_reader(read.fileno(), data_available.set)
+        # if not read.poll():
+        #     await data_available.wait()
+        # loop.remove_reader(read.fileno())
+        # # return read.recv()
+        # return pipe_read(read)
 
     async def win_data_streamer(self, read, write, send_status=False):
         # this is a workaround for Windows since asyncio loop.add_reader is not supported.
@@ -626,56 +805,44 @@ class LitServer:
         with contextlib.suppress(KeyError):
             request_buffer.pop(uid)
 
-    async def acollate_requests(
-        lit_api: LitAPI, request_queue: asyncio.Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
-    ) -> Optional[List]:
-        if request_queue.qsize() >= max_batch_size:
-            uids = [request_queue.get_nowait() for _ in range(max_batch_size)]
-            return uids
-        uids = []
-        entered_at = time.time()
-        end_time = entered_at + batch_timeout
-
-        while time.time() < end_time and len(uids) < max_batch_size:
-            remaining_time = end_time - time.time()
-            if remaining_time <= 0:
-                break
-
-            try:
-                uid = await wait_for_queue_timeout(
-                    request_queue.get(), timeout=remaining_time, uid=0, request_buffer={}
-                )
-                uids.append(uid)
-            except Empty:
-                continue
-
-        if uids:
-            return uids
-
     def consumer(self):
         print("Running consumer")
+        offset = 1
         while True:
+            offset = offset%BUFFER_SIZE
             t0 = time.perf_counter()
-            items = collate_requests(None, self.queue, {}, self.max_batch_size, self.batch_timeout)
+            items = consumer_collate(None, self.queue, {}, self.max_batch_size, self.batch_timeout)
             t1 = time.perf_counter()
             if items:
                 server_logger.info(f"aggregate_requests (ms), {(t1 - t0) * 1000}")
                 with Timing("put_request"):
+                    # uid, buffer_data
+                    # data = (uid, write)
                     for uid, data in items:
-                        self.request_buffer[uid] = data
-                        self.request_queue.put_nowait(uid)
+                        self.sm_queue.put((uid, data[1]))
+                        item = pickle.dumps((uid, data[1]))
+                        self.sl[offset] = item
+                        self.sl[0] = offset
+                        offset += 1
 
     def setup_server(self):
+        self.uid = 0
+
+        def get_uid():
+            self.uid+=1
+            return self.uid
+
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
         @log_time
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
-            uid = uuid.uuid4()
+            uid = get_uid()
             logger.debug(f"Received request uid={uid}")
 
-            read, write = self.new_pipe()
+            # read, write = self.new_pipe()
+            read, write = None, None
 
             if self.request_type == Request:
                 if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
@@ -697,9 +864,9 @@ class LitServer:
                     asyncio.to_thread(self.get_from_pipe, read), self.timeout, uid, self.request_buffer
                 )
             else:
-                data = await wait_for_queue_timeout(self.data_reader(read), self.timeout, uid, self.request_buffer)
+                data = await wait_for_queue_timeout(self.data_reader(uid, read), self.timeout, uid, self.request_buffer)
 
-            self.close_pipe(read, write)
+            # self.close_pipe(read, write)
             response, status = data
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
