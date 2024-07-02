@@ -165,11 +165,13 @@ class LitAPI(ABC):
         if (
             self.stream
             and max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(self.predict),
-                inspect.isgeneratorfunction(self.encode_response),
-                (original or inspect.isgeneratorfunction(self.unbatch)),
-            ])
+            and not all(
+                [
+                    inspect.isgeneratorfunction(self.predict),
+                    inspect.isgeneratorfunction(self.encode_response),
+                    (original or inspect.isgeneratorfunction(self.unbatch)),
+                ]
+            )
         ):
             raise ValueError(
                 """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
@@ -194,10 +196,12 @@ class LitAPI(ABC):
              """
             )
 
-        if self.stream and not all([
-            inspect.isgeneratorfunction(self.predict),
-            inspect.isgeneratorfunction(self.encode_response),
-        ]):
+        if self.stream and not all(
+            [
+                inspect.isgeneratorfunction(self.predict),
+                inspect.isgeneratorfunction(self.encode_response),
+            ]
+        ):
             raise ValueError(
                 """When `stream=True` both `lit_api.predict` and
              `lit_api.encode_response` must generate values using `yield`.

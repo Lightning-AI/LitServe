@@ -27,10 +27,12 @@ from fastapi import HTTPException
 logger = logging.getLogger(__name__)
 
 # Set up second logger
-server_logger = logging.getLogger('LitServer')
+server_logger = logging.getLogger("LitServer")
 server_logger.setLevel(logging.INFO)
-file_handler2 = logging.FileHandler('logs/LitServer_log.log')
-formatter2 = logging.Formatter("%(asctime)s,%(name)s,%(message)s",)
+file_handler2 = logging.FileHandler("logs/LitServer_log.log")
+formatter2 = logging.Formatter(
+    "%(asctime)s,%(name)s,%(message)s",
+)
 file_handler2.setFormatter(formatter2)
 server_logger.addHandler(file_handler2)
 
@@ -80,9 +82,9 @@ async def azip(*async_iterables):
         yield tuple(results)
 
 
-
 def log_time(func):
     if asyncio.iscoroutinefunction(func):
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
             start_time = time.perf_counter()
@@ -92,6 +94,7 @@ def log_time(func):
             server_logger.info(f"{func.__name__} (ms), {elapsed_time:.3f}")
             return result
     else:
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.perf_counter()
@@ -100,10 +103,12 @@ def log_time(func):
             elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
             server_logger.info(f"{func.__name__} (ms), {elapsed_time:.2f}")
             return result
+
     return wrapper
 
+
 class Timing:
-    def __init__(self, name:str=None):
+    def __init__(self, name: str = None):
         self.start_time = None
         self.end_time = None
         self.elapsed_time = None
@@ -119,10 +124,11 @@ class Timing:
         server_logger.info(f"{self.name} (ms), {self.elapsed_time:.2f}")
 
 
-def pipe_send(conn:Connection, data):
+def pipe_send(conn: Connection, data):
     with Timing("pipe_send"):
         conn.send(data)
 
-def pipe_read(conn:Connection):
+
+def pipe_read(conn: Connection):
     with Timing("pipe_read"):
         return conn.recv()
