@@ -81,24 +81,24 @@ class LitSMQ:
     @staticmethod
     def create(name, data_size=10_000):
         try:
-            metadata_shm = shared_memory.SharedMemory(create=True, size=128, name=name + "_metadata")
+            metadata_shm = shared_memory.SharedMemory(create=True, size=128, name=name + '_metadata')
             # Initialize head and tail to zero
-            metadata_shm.buf[0:128] = b"\x00" * 128
+            metadata_shm.buf[0:128] = b'\x00' * 128
         except FileExistsError:
-            metadata_shm = shared_memory.SharedMemory(name=name + "_metadata")
-
+            metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
+        
         try:
-            data_shm = shared_memory.SharedMemory(create=True, size=data_size, name=name + "_data")
+            data_shm = shared_memory.SharedMemory(create=True, size=data_size, name=name + '_data')
         except FileExistsError:
-            data_shm = shared_memory.SharedMemory(name=name + "_data")
+            data_shm = shared_memory.SharedMemory(name=name + '_data')
 
         return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
 
     @staticmethod
     def attach(name):
         try:
-            metadata_shm = shared_memory.SharedMemory(name=name + "_metadata")
-            data_shm = shared_memory.SharedMemory(name=name + "_data")
+            metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
+            data_shm = shared_memory.SharedMemory(name=name + '_data')
             return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
         except FileNotFoundError as e:
             print(f"Error attaching shared memory: {e}")
@@ -111,31 +111,41 @@ class LitSMQ:
             raise ValueError("Item size exceeds queue capacity")
 
         with self.lock:
-            head = int.from_bytes(self.metadata_buffer[self.head_index : self.head_index + 4], "little")
-            tail = int.from_bytes(self.metadata_buffer[self.tail_index : self.tail_index + 4], "little")
+            head = int.from_bytes(self.metadata_buffer[self.head_index:self.head_index+4], 'little')
+            tail = int.from_bytes(self.metadata_buffer[self.tail_index:self.tail_index+4], 'little')
 
-            if tail + item_size + 4 > self.data_size:
+            if tail >= head:
+                if tail + item_size + 4 > self.data_size:
+                    if head <= item_size + 4:
+                        raise ValueError("Queue is full")
+                    # Wrap around
+                    tail = 0
+            elif tail + item_size + 4 > head:
                 raise ValueError("Queue is full")
 
-            self.data_buffer[tail : tail + 4] = item_size.to_bytes(4, "little")
+            self.data_buffer[tail:tail + 4] = item_size.to_bytes(4, 'little')
             tail += 4
-            self.data_buffer[tail : tail + item_size] = item_bytes
+            self.data_buffer[tail:tail + item_size] = item_bytes
             tail += item_size
-            self.metadata_buffer[self.tail_index : self.tail_index + 4] = tail.to_bytes(4, "little")
+            self.metadata_buffer[self.tail_index:self.tail_index+4] = tail.to_bytes(4, 'little')
 
     def get(self):
         with self.lock:
-            head = int.from_bytes(self.metadata_buffer[self.head_index : self.head_index + 4], "little")
-            tail = int.from_bytes(self.metadata_buffer[self.tail_index : self.tail_index + 4], "little")
+            head = int.from_bytes(self.metadata_buffer[self.head_index:self.head_index+4], 'little')
+            tail = int.from_bytes(self.metadata_buffer[self.tail_index:self.tail_index+4], 'little')
 
             if head == tail:
                 return None  # Queue is empty
 
-            item_size = int.from_bytes(self.data_buffer[head : head + 4], "little")
+            item_size = int.from_bytes(self.data_buffer[head:head + 4], 'little')
             head += 4
-            item_bytes = self.data_buffer[head : head + item_size]
+            item_bytes = self.data_buffer[head:head + item_size]
             head += item_size
-            self.metadata_buffer[self.head_index : self.head_index + 4] = head.to_bytes(4, "little")
+
+            if head == self.data_size:
+                head = 0
+
+            self.metadata_buffer[self.head_index:self.head_index+4] = head.to_bytes(4, 'little')
 
             item = pickle.loads(item_bytes)
             return item
