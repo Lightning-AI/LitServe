@@ -47,7 +47,7 @@ class LitSMQ:
             raise e
 
     def put(self, item):
-        item_bytes = pickle.dumps(item)
+        item_bytes = pickle.dumps(item, protocol=pickle.HIGHEST_PROTOCOL)
         item_size = len(item_bytes)
         if item_size + 4 > self.data_size:
             raise ValueError("Item size exceeds queue capacity")
@@ -158,7 +158,7 @@ class LitDict:
             # Deserialize the bucket
             if bucket_size == 0:
                 bucket = []
-                bucket_start = self._find_empty_space(len(pickle.dumps((key, value))) + 8)
+                bucket_start = self._find_empty_space(len(pickle.dumps((key, value), protocol=pickle.HIGHEST_PROTOCOL)) + 8)
             else:
                 bucket_data = bytes(self.data_buffer[bucket_start:bucket_start + bucket_size])
                 bucket = pickle.loads(bucket_data) if bucket_data.strip(b'\x00') else []
@@ -172,7 +172,7 @@ class LitDict:
                 bucket.append((key, value))
 
             # Serialize the updated bucket
-            bucket_data = pickle.dumps(bucket)
+            bucket_data = pickle.dumps(bucket, protocol=pickle.HIGHEST_PROTOCOL)
             if len(bucket_data) > self.data_size - bucket_start:
                 raise ValueError("Data size exceeds shared memory capacity")
 
@@ -218,7 +218,7 @@ class LitDict:
                     del bucket[i]
                     break
 
-            bucket_data = pickle.dumps(bucket)
+            bucket_data = pickle.dumps(bucket, protocol=pickle.HIGHEST_PROTOCOL)
             if len(bucket_data) > self.data_size - bucket_start:
                 raise ValueError("Data size exceeds shared memory capacity")
 
