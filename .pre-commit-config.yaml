@@ -23,7 +23,7 @@ repos:
       - id: detect-private-key
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.15.2
+    rev: v3.16.0
     hooks:
       - id: pyupgrade
         args: ["--py38-plus"]
@@ -59,7 +59,7 @@ repos:
           - pydocstyle
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.7
+    rev: v0.5.0
     hooks:
       - id: ruff-format
         args: ["--preview"]
