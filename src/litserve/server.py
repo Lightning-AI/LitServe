@@ -15,10 +15,8 @@ import queue
 import asyncio
 import contextlib
 import copy
-import random
 import logging
 import pickle
-from UltraDict import UltraDict
 from contextlib import asynccontextmanager
 import inspect
 import multiprocessing as mp
@@ -44,13 +42,22 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise, log_time, Timing, server_logger, pipe_send, pipe_read
+from litserve.utils import (
+    wait_for_queue_timeout,
+    LitAPIStatus,
+    load_and_raise,
+    log_time,
+    Timing,
+    server_logger,
+    pipe_send,
+    pipe_read,
+)
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-file_handler1 = logging.FileHandler('logs/app.log')
-formatter1 = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler1 = logging.FileHandler("logs/app.log")
+formatter1 = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 file_handler1.setFormatter(formatter1)
 logger.addHandler(file_handler1)
 
@@ -68,6 +75,7 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
         return func(*args, **kwargs, context=context)
     return func(*args, **kwargs)
 
+
 @log_time
 def get_batch_from_uid(uids, lit_api, request_buffer):
     batches = []
@@ -79,13 +87,13 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
         batches.append((x_enc, pipe_s))
     return batches
 
+
 # @log_time
 def collate_requests(
     lit_api: LitAPI, request_queue: mp.Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
 ) -> Optional[List]:
     if request_queue.qsize() >= max_batch_size:
-        uids = [request_queue.get_nowait() for _ in range(max_batch_size)]
-        return uids
+        return [request_queue.get_nowait() for _ in range(max_batch_size)]
     uids = []
     entered_at = time.time()
     end_time = entered_at + batch_timeout
@@ -169,7 +177,7 @@ def run_batched_loop(
         t1 = time.time()
         if not uids:
             continue
-        server_logger.info(f"batch_wait_time (ms), {(t1-t0)*1000}")
+        server_logger.info(f"batch_wait_time (ms), {(t1 - t0) * 1000}")
         batches = get_batch_from_uid(uids, lit_api, request_buffer)
         server_logger.info(f"batch_size, {len(uids)}")
 
@@ -398,10 +406,7 @@ class LitServer:
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
 
-        
-        
         self.queue = queue.Queue()
-
 
         self.queue = queue.Queue()
 
@@ -462,7 +467,7 @@ class LitServer:
     async def lifespan(self, app: FastAPI):
         manager = Manager()
         self.request_buffer = manager.dict()
-        ctx = mp.get_context('spawn')
+        ctx = mp.get_context("spawn")
         self.request_queue = ctx.Queue()
 
         try:
@@ -509,8 +514,8 @@ class LitServer:
             del server_copy.app
             spec.setup(server_copy)
 
-
         import threading
+
         t = threading.Thread(target=self.consumer, daemon=True)
         t.start()
 
@@ -525,7 +530,7 @@ class LitServer:
     def new_pipe(self) -> tuple:
         try:
             return self.pipe_pool.pop()
-        except:
+        except Exception:
             return Pipe()
 
     def close_pipe(self, pipe_s, pipe_r):
@@ -624,7 +629,6 @@ class LitServer:
         with contextlib.suppress(KeyError):
             request_buffer.pop(uid)
 
-
     async def acollate_requests(
         lit_api: LitAPI, request_queue: asyncio.Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
     ) -> Optional[List]:
@@ -641,15 +645,15 @@ class LitServer:
                 break
 
             try:
-                uid = await wait_for_queue_timeout(request_queue.get(), timeout=remaining_time, uid=0, request_buffer={})
+                uid = await wait_for_queue_timeout(
+                    request_queue.get(), timeout=remaining_time, uid=0, request_buffer={}
+                )
                 uids.append(uid)
             except Empty:
                 continue
 
         if uids:
             return uids
-
-    
 
     def consumer(self):
         print("Running consumer")
@@ -658,12 +662,11 @@ class LitServer:
             items = collate_requests(None, self.queue, {}, self.max_batch_size, self.batch_timeout)
             t1 = time.perf_counter()
             if items:
-                server_logger.info(f"aggregate_requests (ms), {(t1-t0)*1000}")
+                server_logger.info(f"aggregate_requests (ms), {(t1 - t0) * 1000}")
                 with Timing("put_request"):
                     for uid, data in items:
                         self.request_buffer[uid] = data
                         self.request_queue.put_nowait(uid)
-
 
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -678,8 +681,9 @@ class LitServer:
             read, write = self.new_pipe()
 
             if self.request_type == Request:
-                if (request.headers["Content-Type"] == "application/x-www-form-urlencoded" or
-                        request.headers["Content-Type"].startswith("multipart/form-data")):
+                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
+                    "Content-Type"
+                ].startswith("multipart/form-data"):
                     buffer_data = (await request.form(), write)
                 else:
                     buffer_data = (await request.json(), write)
