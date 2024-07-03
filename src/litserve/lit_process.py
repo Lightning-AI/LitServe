@@ -238,14 +238,3 @@ def cleanup_shared_memory(shm_name):
 def cleanup_shared_memory_list(shm_names):
     for name in shm_names:
         cleanup_shared_memory(name)
-
-def setup_signal_handlers(shm_names):
-    def handle_signal(signal_number, frame):
-        print(f"Received signal {signal_number}, cleaning up...")
-        cleanup_shared_memory_list(shm_names)
-        print("Cleanup complete. Exiting now.")
-        SystemExit(0)
-    
-    # Setup signal handlers
-    signal.signal(signal.SIGINT, handle_signal)  # Handle Ctrl-C
-    signal.signal(signal.SIGTERM, handle_signal)  # Handle kill or system shutdown signals

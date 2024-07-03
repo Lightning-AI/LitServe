@@ -53,7 +53,7 @@ from litserve.utils import (
     server_logger,
     wait_for_queue_timeout,
 )
-from litserve.lit_process import LitSMQ, LitDict, setup_signal_handlers, cleanup_shared_memory_list
+from litserve.lit_process import LitSMQ, LitDict, cleanup_shared_memory_list
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -503,6 +503,8 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
+        self.request_buffer = None
+        self.request_queue = None
         queue_name = "simple_lit"
         self.queue_lock, self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_100_000)
         metadata_shm_name, data_shm_name = self.sm_queue.get_shared_memory_names()
@@ -513,15 +515,6 @@ class LitServer:
         self.shared_dict = LitDict(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
         
-        shm_names = [queue_name, shared_dict_name]
-        setup_signal_handlers(shm_names)
-
-
-        # manager = Manager()
-        self.request_buffer = None  # manager.dict()
-        # ctx = mp.get_context("spawn")
-        self.request_queue = None  # ctx.Queue()
-
         try:
             pickle.dumps(self.lit_api)
             pickle.dumps(self.lit_spec)
@@ -548,8 +541,8 @@ class LitServer:
                     self.lit_spec,
                     device,
                     worker_id,
-                    self.request_queue,
-                    self.request_buffer,
+                    None,
+                    None,
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
@@ -573,7 +566,8 @@ class LitServer:
         t.start()
 
         yield
-
+        
+        shm_names = [queue_name + "_metadata", queue_name + "_data", shared_dict_name + "_hashmap", shared_dict_name+"_data"]
         cleanup_shared_memory_list(shm_names)
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
@@ -727,7 +721,7 @@ class LitServer:
             # with Timing("put request"):
             self.queue.put_nowait((uid, buffer_data))
 
-            background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
+            # background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
             if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
                 data = await wait_for_queue_timeout(
