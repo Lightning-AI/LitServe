@@ -1,5 +1,6 @@
 import multiprocessing
-from multiprocessing import shared_memory, Lock
+from multiprocessing import shared_memory, Lock, Manager
+from multiprocessing.sharedctypes import Value
 import pickle
 import time
 import signal
@@ -7,10 +8,10 @@ import sys
 
 
 class LitSMQ:
-    def __init__(self, name: str, metadata_shm: shared_memory.SharedMemory, data_shm: shared_memory.SharedMemory):
+    def __init__(self, name: str, metadata_shm: shared_memory.SharedMemory, data_shm: shared_memory.SharedMemory, lock:Lock):
         self.data_size = data_shm.size
         self.name = name
-        self.lock = Lock()
+        self.lock = lock
 
         self.metadata_shm = metadata_shm
         self.data_shm = data_shm
@@ -22,6 +23,8 @@ class LitSMQ:
 
     @staticmethod
     def create(name, data_size=10_000):
+        manager = Manager()
+        lock = manager.Lock()
         try:
             metadata_shm = shared_memory.SharedMemory(create=True, size=128, name=name + '_metadata')
             # Initialize head and tail to zero
@@ -34,14 +37,14 @@ class LitSMQ:
         except FileExistsError:
             data_shm = shared_memory.SharedMemory(name=name + '_data')
 
-        return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
+        return lock, LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm, lock=lock)
 
     @staticmethod
-    def attach(name):
+    def attach(name, lock):
         try:
             metadata_shm = shared_memory.SharedMemory(name=name + '_metadata')
             data_shm = shared_memory.SharedMemory(name=name + '_data')
-            return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm)
+            return LitSMQ(name, metadata_shm=metadata_shm, data_shm=data_shm, lock=lock)
         except FileNotFoundError as e:
             print(f"Error attaching shared memory: {e}")
             raise e
@@ -146,7 +149,7 @@ class LitDict:
         self.bucket_locks = [Lock() for _ in range(self.num_buckets)]
 
     def _hash_func(self, key):
-        return hash(key) % self.num_buckets
+        return key % self.num_buckets
 
     def put(self, key, value):
         index = self._hash_func(key)

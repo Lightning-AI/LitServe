@@ -93,16 +93,10 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
 
 # @log_time
 def collate_requests(
-    lit_api: LitAPI,
-    request_queue: mp.Queue,
-    request_buffer: Dict,
+    sm_queue: LitSMQ,
     max_batch_size: int,
     batch_timeout: float,
-    sl,
-    offset,
-    sm_queue,
 ) -> Optional[List]:
-    curr = sl[0]
     uids = []
     entered_at = time.time()
     end_time = entered_at + batch_timeout
@@ -116,7 +110,7 @@ def collate_requests(
             uids.append(item)
 
     if uids:
-        return offset, uids
+        return uids
 
     return None
 
@@ -191,34 +185,26 @@ def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: mp.Queue,
 def run_batched_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
-    request_queue: mp.Queue,
-    request_buffer: Dict,
     max_batch_size: int,
     batch_timeout: float,
-    sl: List,
-    result_sml: List,
     queue_name,
+    queue_lock,
     shared_dict_name
-):
-    queue = LitSMQ.attach(queue_name)
+):  
+    queue = LitSMQ.attach(queue_name, queue_lock)
     shared_dict = LitDict(name=shared_dict_name)
 
-    # shared_queue = SimpleSharedMemoryQueue.create(sm_queue)
-    offset = 0
     while True:
         t0 = time.time()
-        uids = collate_requests(
-            lit_api, request_queue, request_buffer, max_batch_size, batch_timeout, sl, offset, queue
-        )
+        items = collate_requests(queue, max_batch_size, batch_timeout)
         t1 = time.time()
-        if not uids:
+        if not items:
             continue
-        offset, items = uids
+
         batches = [e[1] for e in items]
         uids = [e[0] for e in items]
         print(uids)
         server_logger.info(f"batch_wait_time (ms), {(t1 - t0) * 1000}")
-        # batches = get_batch_from_uid(uids, lit_api, request_buffer)
         server_logger.info(f"batch_size, {len(batches)}")
 
         logger.debug(f"{len(batches)} batched requests received")
@@ -249,7 +235,6 @@ def run_batched_loop(
 
                 with contextlib.suppress(BrokenPipeError):
                     # pipe_send(pipe_s, (y_enc, LitAPIStatus.OK))
-                    result_sml[uid] = y_enc
                     shared_dict.put(uid, (y_enc, LitAPIStatus.OK))
 
         except Exception as e:
@@ -260,7 +245,6 @@ def run_batched_loop(
             err_pkl = pickle.dumps(e)
             with contextlib.suppress(BrokenPipeError):
                 for pipe_s in pipes:
-                    result_sml[uid] = -1
                     shared_dict.put(uid, (err_pkl, LitAPIStatus.ERROR))
 
 
@@ -381,11 +365,8 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
-    sl: List,
-    result_sml: List,
     queue_name,
-    metadata_shm_name,
-    data_shm_name,
+    queue_lock,
     shared_dict_name
 ):
     lit_api.setup(device)
@@ -406,13 +387,10 @@ def inference_worker(
         run_batched_loop(
             lit_api,
             lit_spec,
-            request_queue,
-            request_buffer,
             max_batch_size,
             batch_timeout,
-            sl,
-            result_sml,
             queue_name,
+            queue_lock,
             shared_dict_name
         )
     else:
@@ -526,7 +504,7 @@ class LitServer:
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         queue_name = "simple_lit"
-        self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_100_000)
+        self.queue_lock, self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_100_000)
         metadata_shm_name, data_shm_name = self.sm_queue.get_shared_memory_names()
 
         shared_dict_name = "shared_dict"
@@ -545,8 +523,6 @@ class LitServer:
         smm = SharedMemoryManager()
         smm.start()
         items = [0] + [pickle.dumps([0, None])] * BUFFER_SIZE
-        self.sl = smm.ShareableList(items)
-        self.result_sml = smm.ShareableList([0] * BUFFER_SIZE)
 
         # manager = Manager()
         self.request_buffer = None  # manager.dict()
@@ -584,12 +560,9 @@ class LitServer:
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
-                    self.sl,
-                    self.result_sml,
                     queue_name,
-                    metadata_shm_name,
-                    data_shm_name,
-                    shared_dict_name
+                    self.queue_lock,
+                    shared_dict_name,
                 ),
                 daemon=True,
             )
@@ -721,7 +694,6 @@ class LitServer:
         print("Running consumer")
         offset = 1
         while True:
-            offset = offset % BUFFER_SIZE
             t0 = time.perf_counter()
             items = consumer_collate(None, self.queue, {}, self.max_batch_size, self.batch_timeout)
             t1 = time.perf_counter()
@@ -732,10 +704,6 @@ class LitServer:
                     # data = (uid, write)
                     for uid, data in items:
                         self.sm_queue.put((uid, data[1]))
-                        item = pickle.dumps((uid, data[1]))
-                        self.sl[offset] = item
-                        self.sl[0] = offset
-                        offset += 1
 
     def setup_server(self):
         self.uid = 0
