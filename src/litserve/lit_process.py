@@ -107,24 +107,6 @@ class LitSMQ:
         return self.metadata_shm.name, self.data_shm.name
 
 
-def cleanup_shared_memory(metadata_shm_name, data_shm_name):
-    try:
-        metadata_shm = shared_memory.SharedMemory(name=metadata_shm_name)
-        metadata_shm.unlink()
-        metadata_shm.close()
-        print(f"Unlinked and closed shared memory: {metadata_shm_name}")
-    except FileNotFoundError:
-        print(f"Shared memory {metadata_shm_name} not found for cleanup.")
-
-    try:
-        data_shm = shared_memory.SharedMemory(name=data_shm_name)
-        data_shm.unlink()
-        data_shm.close()
-        print(f"Unlinked and closed shared memory: {data_shm_name}")
-    except FileNotFoundError:
-        print(f"Shared memory {data_shm_name} not found for cleanup.")
-
-
 
 class LitDict:
     def __init__(self, name: str, num_buckets: int = 128, data_size: int = 50_000):
@@ -242,3 +224,21 @@ class LitDict:
     def unlink(self):
         self.hashmap_shm.unlink()
         self.data_shm.unlink()
+
+
+def cleanup_shared_memory(metadata_shm_name, data_shm_name):
+    try:
+        metadata_shm = shared_memory.SharedMemory(name=metadata_shm_name)
+        metadata_shm.unlink()
+        metadata_shm.close()
+        print(f"Unlinked and closed shared memory: {metadata_shm_name}")
+    except FileNotFoundError:
+        print(f"Shared memory {metadata_shm_name} not found for cleanup.")
+
+    try:
+        data_shm = shared_memory.SharedMemory(name=data_shm_name)
+        data_shm.unlink()
+        data_shm.close()
+        print(f"Unlinked and closed shared memory: {data_shm_name}")
+    except FileNotFoundError:
+        print(f"Shared memory {data_shm_name} not found for cleanup.")
