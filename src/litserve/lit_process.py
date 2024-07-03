@@ -110,21 +110,19 @@ class LitSMQ:
 
 
 class LitDict:
-    def __init__(self, name: str, locks: List[Lock], hashmap_shm, data_shm, num_buckets, data_size):
+    def __init__(self, name: str, hashmap_shm, data_shm, num_buckets, data_size):
         self.name = name
         self.hashmap_shm = hashmap_shm
         self.data_shm = data_shm
 
         self.hashmap_buffer = self.hashmap_shm.buf
         self.data_buffer = self.data_shm.buf
-        self.bucket_locks = locks
+        self.bucket_locks = [Lock() for _ in range(num_buckets)]
         self.num_buckets=num_buckets
         self.data_size = data_size
 
     @staticmethod
     def create(name: str, num_buckets: int = 512, data_size: int = 50_000):
-        manager = Manager()
-        bucket_locks = [manager.Lock() for _ in range(num_buckets)]
         try:
             hashmap_shm = shared_memory.SharedMemory(create=True, size=num_buckets * 16, name=name + '_hashmap')
             data_shm = shared_memory.SharedMemory(create=True, size=data_size, name=name + '_data')
@@ -135,15 +133,15 @@ class LitDict:
             hashmap_shm = shared_memory.SharedMemory(name=name + '_hashmap')
             data_shm = shared_memory.SharedMemory(name=name + '_data')
 
-        return bucket_locks, LitDict(name, locks=bucket_locks, hashmap_shm=hashmap_shm, data_shm=data_shm, num_buckets=num_buckets, data_size=data_size)
+        return LitDict(name, hashmap_shm=hashmap_shm, data_shm=data_shm, num_buckets=num_buckets, data_size=data_size)
     
 
     @staticmethod
-    def attach(name, num_buckets, data_size, locks:List):
+    def attach(name, num_buckets, data_size):
         try:
             hashmap_shm = shared_memory.SharedMemory(name=name + '_hashmap')
             data_shm = shared_memory.SharedMemory(name=name + '_data')
-            return LitDict(name, hashmap_shm=hashmap_shm, data_shm=data_shm, locks=locks, num_buckets=num_buckets, data_size=data_size)
+            return LitDict(name, hashmap_shm=hashmap_shm, data_shm=data_shm, num_buckets=num_buckets, data_size=data_size)
         except FileNotFoundError as e:
             print(f"Error attaching shared memory: {e}")
             raise e
@@ -194,7 +192,6 @@ class LitDict:
             if bucket_size == 0:
                 return None
 
-            
             bucket_data = bytes(self.data_buffer[bucket_start:bucket_start + bucket_size])
             if not bucket_data.strip(b'\x00'):
                 return None

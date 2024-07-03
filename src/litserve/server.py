@@ -190,12 +190,11 @@ def run_batched_loop(
     queue_name,
     queue_lock,
     shared_dict_name,
-    shared_dict_locks,
     num_buckets,
     data_size
 ):  
     queue = LitSMQ.attach(queue_name, queue_lock)
-    shared_dict = LitDict.attach(name=shared_dict_name, locks=shared_dict_locks, num_buckets=num_buckets, data_size=data_size)
+    shared_dict = LitDict.attach(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
     while True:
         t0 = time.time()
@@ -246,8 +245,8 @@ def run_batched_loop(
                 "Please check the error trace for more details."
             )
             err_pkl = pickle.dumps(e)
-            with contextlib.suppress(BrokenPipeError):
-                for pipe_s in pipes:
+            with contextlib.suppress(pickle.UnpicklingError):
+                for uid in uids:
                     shared_dict.put(uid, (err_pkl, LitAPIStatus.ERROR))
 
 
@@ -371,7 +370,6 @@ def inference_worker(
     queue_name,
     queue_lock,
     shared_dict_name,
-    shared_dict_locks,
     num_buckets,
     data_size
 ):
@@ -398,7 +396,6 @@ def inference_worker(
             queue_name,
             queue_lock,
             shared_dict_name,
-            shared_dict_locks,
             num_buckets,
             data_size
         )
@@ -520,7 +517,7 @@ class LitServer:
         shared_dict_name = "shared_dict"
         num_buckets = 512
         data_size = 50_000
-        shared_dict_locks, self.shared_dict = LitDict.create(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
+        self.shared_dict = LitDict.create(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
         
         try:
@@ -557,7 +554,6 @@ class LitServer:
                     queue_name,
                     self.queue_lock,
                     shared_dict_name,
-                    shared_dict_locks,
                     num_buckets,
                     data_size
                 ),
