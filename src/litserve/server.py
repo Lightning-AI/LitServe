@@ -189,10 +189,13 @@ def run_batched_loop(
     batch_timeout: float,
     queue_name,
     queue_lock,
-    shared_dict_name
+    shared_dict_name,
+    shared_dict_locks,
+    num_buckets,
+    data_size
 ):  
     queue = LitSMQ.attach(queue_name, queue_lock)
-    shared_dict = LitDict(name=shared_dict_name)
+    shared_dict = LitDict.attach(name=shared_dict_name, locks=shared_dict_locks, num_buckets=num_buckets, data_size=data_size)
 
     while True:
         t0 = time.time()
@@ -367,7 +370,10 @@ def inference_worker(
     stream: bool,
     queue_name,
     queue_lock,
-    shared_dict_name
+    shared_dict_name,
+    shared_dict_locks,
+    num_buckets,
+    data_size
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -391,7 +397,10 @@ def inference_worker(
             batch_timeout,
             queue_name,
             queue_lock,
-            shared_dict_name
+            shared_dict_name,
+            shared_dict_locks,
+            num_buckets,
+            data_size
         )
     else:
         run_single_loop(
@@ -507,12 +516,11 @@ class LitServer:
         self.request_queue = None
         queue_name = "simple_lit"
         self.queue_lock, self.sm_queue = LitSMQ.create(name=queue_name, data_size=10_100_000)
-        metadata_shm_name, data_shm_name = self.sm_queue.get_shared_memory_names()
 
         shared_dict_name = "shared_dict"
-        num_buckets = 128
-        data_size = 10_000
-        self.shared_dict = LitDict(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
+        num_buckets = 512
+        data_size = 50_000
+        shared_dict_locks, self.shared_dict = LitDict.create(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
         
         try:
@@ -549,6 +557,9 @@ class LitServer:
                     queue_name,
                     self.queue_lock,
                     shared_dict_name,
+                    shared_dict_locks,
+                    num_buckets,
+                    data_size
                 ),
                 daemon=True,
             )

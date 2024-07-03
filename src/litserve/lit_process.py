@@ -1,3 +1,4 @@
+from typing import List
 import multiprocessing
 from multiprocessing import shared_memory, Lock, Manager
 from multiprocessing.sharedctypes import Value
@@ -109,26 +110,44 @@ class LitSMQ:
 
 
 class LitDict:
-    def __init__(self, name: str, num_buckets: int = 128, data_size: int = 50_000):
-        self.num_buckets = num_buckets
-        self.data_size = data_size
+    def __init__(self, name: str, locks: List[Lock], hashmap_shm, data_shm, num_buckets, data_size):
         self.name = name
-
-        try:
-            self.hashmap_shm = shared_memory.SharedMemory(create=True, size=self.num_buckets * 16, name=self.name + '_hashmap')
-            self.data_shm = shared_memory.SharedMemory(create=True, size=self.data_size, name=self.name + '_data')
-            # Initialize memory to zero
-            self.hashmap_shm.buf[0:self.num_buckets * 16] = b'\x00' * (self.num_buckets * 16)
-            self.data_shm.buf[0:self.data_size] = b'\x00' * self.data_size
-        except FileExistsError:
-            self.hashmap_shm = shared_memory.SharedMemory(name=self.name + '_hashmap')
-            self.data_shm = shared_memory.SharedMemory(name=self.name + '_data')
+        self.hashmap_shm = hashmap_shm
+        self.data_shm = data_shm
 
         self.hashmap_buffer = self.hashmap_shm.buf
         self.data_buffer = self.data_shm.buf
+        self.bucket_locks = locks
+        self.num_buckets=num_buckets
+        self.data_size = data_size
 
-        # Initialize a lock for each bucket
-        self.bucket_locks = [Lock() for _ in range(self.num_buckets)]
+    @staticmethod
+    def create(name: str, num_buckets: int = 512, data_size: int = 50_000):
+        manager = Manager()
+        bucket_locks = [manager.Lock() for _ in range(num_buckets)]
+        try:
+            hashmap_shm = shared_memory.SharedMemory(create=True, size=num_buckets * 16, name=name + '_hashmap')
+            data_shm = shared_memory.SharedMemory(create=True, size=data_size, name=name + '_data')
+            # Initialize memory to zero
+            hashmap_shm.buf[0:num_buckets * 16] = b'\x00' * (num_buckets * 16)
+            data_shm.buf[0:data_size] = b'\x00' * data_size
+        except FileExistsError:
+            hashmap_shm = shared_memory.SharedMemory(name=name + '_hashmap')
+            data_shm = shared_memory.SharedMemory(name=name + '_data')
+
+        return bucket_locks, LitDict(name, locks=bucket_locks, hashmap_shm=hashmap_shm, data_shm=data_shm, num_buckets=num_buckets, data_size=data_size)
+    
+
+    @staticmethod
+    def attach(name, num_buckets, data_size, locks:List):
+        try:
+            hashmap_shm = shared_memory.SharedMemory(name=name + '_hashmap')
+            data_shm = shared_memory.SharedMemory(name=name + '_data')
+            return LitDict(name, hashmap_shm=hashmap_shm, data_shm=data_shm, locks=locks, num_buckets=num_buckets, data_size=data_size)
+        except FileNotFoundError as e:
+            print(f"Error attaching shared memory: {e}")
+            raise e
+
 
     def _hash_func(self, key):
         return key % self.num_buckets
@@ -175,10 +194,12 @@ class LitDict:
             if bucket_size == 0:
                 return None
 
+            
             bucket_data = bytes(self.data_buffer[bucket_start:bucket_start + bucket_size])
             if not bucket_data.strip(b'\x00'):
                 return None
             bucket = pickle.loads(bucket_data)
+
             for k, v in bucket:
                 if k == key:
                     return v
