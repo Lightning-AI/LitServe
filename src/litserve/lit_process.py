@@ -226,19 +226,26 @@ class LitDict:
         self.data_shm.unlink()
 
 
-def cleanup_shared_memory(metadata_shm_name, data_shm_name):
+def cleanup_shared_memory(shm_name):
     try:
-        metadata_shm = shared_memory.SharedMemory(name=metadata_shm_name)
-        metadata_shm.unlink()
-        metadata_shm.close()
-        print(f"Unlinked and closed shared memory: {metadata_shm_name}")
+        shm = shared_memory.SharedMemory(name=shm_name)
+        shm.unlink()  # Remove the shared memory from the system
+        shm.close()   # Close the shared memory object
+        print(f"Unlinked and closed shared memory: {shm_name}")
     except FileNotFoundError:
-        print(f"Shared memory {metadata_shm_name} not found for cleanup.")
+        print(f"Shared memory {shm_name} not found for cleanup.")
 
-    try:
-        data_shm = shared_memory.SharedMemory(name=data_shm_name)
-        data_shm.unlink()
-        data_shm.close()
-        print(f"Unlinked and closed shared memory: {data_shm_name}")
-    except FileNotFoundError:
-        print(f"Shared memory {data_shm_name} not found for cleanup.")
+def cleanup_shared_memory_list(shm_names):
+    for name in shm_names:
+        cleanup_shared_memory(name)
+
+def setup_signal_handlers(shm_names):
+    def handle_signal(signal_number, frame):
+        print(f"Received signal {signal_number}, cleaning up...")
+        cleanup_shared_memory_list(shm_names)
+        print("Cleanup complete. Exiting now.")
+        SystemExit(0)
+    
+    # Setup signal handlers
+    signal.signal(signal.SIGINT, handle_signal)  # Handle Ctrl-C
+    signal.signal(signal.SIGTERM, handle_signal)  # Handle kill or system shutdown signals

@@ -53,7 +53,7 @@ from litserve.utils import (
     server_logger,
     wait_for_queue_timeout,
 )
-from litserve.lit_process import LitSMQ, cleanup_shared_memory, LitDict
+from litserve.lit_process import LitSMQ, LitDict, setup_signal_handlers, cleanup_shared_memory_list
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -512,17 +512,10 @@ class LitServer:
         data_size = 10_000
         self.shared_dict = LitDict(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
-        def signal_handler(sig, frame):
-            print("Signal received, cleaning up shared memory...")
-            cleanup_shared_memory(metadata_shm_name, data_shm_name)
-            sys.exit(0)
+        
+        shm_names = [queue_name, shared_dict_name]
+        setup_signal_handlers(shm_names)
 
-        # signal.signal(signal.SIGINT, signal_handler)
-        # signal.signal(signal.SIGTERM, signal_handler)
-
-        smm = SharedMemoryManager()
-        smm.start()
-        items = [0] + [pickle.dumps([0, None])] * BUFFER_SIZE
 
         # manager = Manager()
         self.request_buffer = None  # manager.dict()
@@ -581,10 +574,7 @@ class LitServer:
 
         yield
 
-        cleanup_shared_memory(shared_dict_name)
-        self.sm_queue.close()
-        self.sm_queue.unlink()
-        smm.shutdown()
+        cleanup_shared_memory_list(shm_names)
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
