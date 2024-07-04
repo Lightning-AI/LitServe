@@ -205,7 +205,6 @@ def run_batched_loop(
 
         batches = [e[1] for e in items]
         uids = [e[0] for e in items]
-        print(uids)
         server_logger.info(f"batch_wait_time (ms), {(t1 - t0) * 1000}")
         server_logger.info(f"batch_size, {len(batches)}")
 
