@@ -88,14 +88,10 @@ def collate_requests(
     return payloads
 
 
-def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, request_buffer: Dict):
+def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
     while True:
         try:
-            uid = request_queue.get(timeout=1.0)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
+            uid, x_enc = request_queue.get(timeout=1.0)
         except (Empty, ValueError):
             continue
         try:
@@ -117,17 +113,15 @@ def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, re
                 lit_api.encode_response,
                 y,
             )
-
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((y_enc, LitAPIStatus.OK))
+            response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the request uid=%s.\n"
                 "Please check the error trace for more details.",
                 uid,
             )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+            err_pkl = pickle.dumps(e)
+            response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
 def run_batched_loop(
