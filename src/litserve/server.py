@@ -495,7 +495,7 @@ class LitServer:
         return [f"{accelerator}:{device}"]
 
     
-    async def data_streamer_v2(self, q: asyncio.Queue, data_available:asyncio.Event, send_status: bool=False):
+    async def data_streamer(self, q: asyncio.Queue, data_available:asyncio.Event, send_status: bool=False):
         while True:
             await data_available.wait()
             while not q.empty():
