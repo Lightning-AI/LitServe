@@ -15,6 +15,7 @@ import asyncio
 import contextlib
 import copy
 import logging
+from collections import deque
 import pickle
 from contextlib import asynccontextmanager
 import inspect
@@ -186,15 +187,11 @@ def run_batched_loop(
                 response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, request_buffer: Dict):
+def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
     while True:
         try:
-            uid = request_queue.get(timeout=1.0)
+            uid, x_enc = request_queue.get(timeout=1.0)
             logger.debug("uid=%s", uid)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
         except (Empty, ValueError):
             continue
 
@@ -218,19 +215,16 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue,
                 y_gen,
             )
             for y_enc in y_enc_gen:
-                with contextlib.suppress(BrokenPipeError):
-                    y_enc = lit_api.format_encoded_response(y_enc)
-                    pipe_s.send((y_enc, LitAPIStatus.OK))
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+                y_enc = lit_api.format_encoded_response(y_enc)
+                response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
+            response_queue.put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming request uid=%s.\n"
                 "Please check the error trace for more details.",
                 uid,
             )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+            response_queue.put((uid, (pickle.dumps(e), LitAPIStatus.ERROR)))
 
 
 def run_batched_streaming_loop(
@@ -314,9 +308,9 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
         if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
+            run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queue, max_batch_size, batch_timeout)
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, request_buffer)
+            run_streaming_loop(lit_api, lit_spec, request_queue, response_queue)
         return
 
     if max_batch_size > 1:
@@ -326,7 +320,7 @@ def inference_worker(
             lit_api,
             lit_spec,
             request_queue,
-            request_buffer,
+            response_queue,
         )
 
 
@@ -347,15 +341,22 @@ def cleanup(request_buffer, uid):
         request_buffer.pop(uid)
 
 
-async def queue_to_buffer(queue, buffer):
+async def queue_to_buffer(response_queue, buffer, stream:bool):
+    print("stream=", stream)
     while True:
         try:
-            uid, payload = queue.get_nowait()
+            uid, payload = response_queue.get_nowait()
+        except Empty:
+            await asyncio.sleep(0.0001)
+            continue
+
+        if stream:
+            q = buffer[uid]
+            await q.put(payload)
+        else:
             event = buffer.pop(uid)
             buffer[uid] = payload
             event.set()
-        except Empty:
-            await asyncio.sleep(0.0001)
 
 
 class LitServer:
@@ -459,7 +460,7 @@ class LitServer:
             response_queue = manager.Queue()
             response_queues.append(response_queue)
 
-            task = loop.create_task(queue_to_buffer(response_queue, self.response_buffer))
+            task = loop.create_task(queue_to_buffer(response_queue, self.response_buffer, self.stream))
             tasks.append(task)
 
             ctx = mp.get_context("spawn")
@@ -588,9 +589,26 @@ class LitServer:
         finally:
             loop.remove_reader(read.fileno())
 
-    def cleanup_request(self, request_buffer, uid):
-        with contextlib.suppress(KeyError):
-            request_buffer.pop(uid)
+    
+    async def data_streamer_v2(self, q: asyncio.Queue, send_status: bool=False):
+        while True:
+            while not q.empty():
+                data, status =  await q.get()
+                if status==LitAPIStatus.FINISH_STREAMING:
+                    return
+
+                if status == LitAPIStatus.ERROR:
+                    if send_status:
+                        yield data, status
+                    return
+                if send_status:
+                    yield data, status
+                else:
+                    yield data
+
+                await asyncio.sleep(0.0001)
+            await asyncio.sleep(0.0001)
+
 
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -624,22 +642,16 @@ class LitServer:
 
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            q = asyncio.Queue()
+            self.response_buffer[uid] = q
             logger.debug(f"Received request uid={uid}")
 
-            read, write = self.new_pipe()
-
+            payload = request
             if self.request_type == Request:
-                self.request_buffer[uid] = (await request.json(), write)
-            else:
-                self.request_buffer[uid] = (request, write)
+                payload = await request.json()
+            self.request_queue.put((uid, payload))
 
-            self.request_queue.put(uid)
-            background_tasks.add_task(cleanup, self.request_buffer, uid)
-
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(self.win_data_streamer(read, write))
-
-            return StreamingResponse(self.data_streamer(read, write))
+            return StreamingResponse(self.data_streamer_v2(q))
 
         if not self._specs:
             stream = self.lit_api.stream
