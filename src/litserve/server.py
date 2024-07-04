@@ -480,6 +480,7 @@ class LitServer:
 
         yield
 
+        manager.shutdown()
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
@@ -551,7 +552,7 @@ class LitServer:
                 payload = await request.json()
             self.request_queue.put((uid, payload))
 
-            return StreamingResponse(self.data_streamer_v2(q, data_available=event))
+            return StreamingResponse(self.data_streamer(q, data_available=event))
 
         if not self._specs:
             stream = self.lit_api.stream
