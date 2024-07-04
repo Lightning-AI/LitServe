@@ -297,12 +297,8 @@ class OpenAISpec(LitSpec):
 
     async def get_from_pipes(self, uids, pipes) -> List[AsyncGenerator]:
         choice_pipes = []
-        for uid, (read, write) in zip(uids, pipes):
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = self._server.win_data_streamer(read, write, send_status=True)
-            else:
-                data = self._server.data_streamer(read, write, send_status=True)
-
+        for uid, q, event in zip(uids, self.queues, self.events):
+            data = self._server.data_streamer(q, event, send_status=True)
             choice_pipes.append(data)
         return choice_pipes
 
@@ -311,18 +307,20 @@ class OpenAISpec(LitSpec):
 
     async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
         logger.debug("Received chat completion request %s", request)
-        logger.info("request buffer %s", self._server.request_buffer)
 
         uids = [uuid.uuid4() for _ in range(request.n)]
         pipes = []
+        self.queues = []
+        self.events = []
         for uid in uids:
-            read, write = self._server.new_pipe()
             request_el = request.model_copy()
             request_el.n = 1
-            self._server.request_buffer[uid] = (request_el, write)
-            self._server.request_queue.put(uid)
-            background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
-            pipes.append((read, write))
+            q = asyncio.Queue()
+            event = asyncio.Event()
+            self._server.response_buffer[uid] = (q, event)
+            self._server.request_queue.put((uid, request_el))
+            self.queues.append(q)
+            self.events.append(event)
 
         responses = await self.get_from_pipes(uids, pipes)
 

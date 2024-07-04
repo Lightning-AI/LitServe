@@ -221,7 +221,7 @@ def run_batched_streaming_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    request_buffer: Dict,
+    response_queue: Queue,
     max_batch_size: int,
     batch_timeout: float,
 ):
@@ -229,14 +229,13 @@ def run_batched_streaming_loop(
         batches = collate_requests(
             lit_api,
             request_queue,
-            request_buffer,
             max_batch_size,
             batch_timeout,
         )
         if not batches:
             continue
 
-        inputs, pipes = zip(*batches)
+        uids, inputs = zip(*batches)
 
         try:
             contexts = [{}] * len(inputs)
@@ -259,22 +258,20 @@ def run_batched_streaming_loop(
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
-                for y_enc, pipe_s in zip(y_batch, pipes):
-                    with contextlib.suppress(BrokenPipeError):
-                        y_enc = lit_api.format_encoded_response(y_enc)
-                        pipe_s.send((y_enc, LitAPIStatus.OK))
+                for y_enc, uid in zip(y_batch, uids):
+                    y_enc = lit_api.format_encoded_response(y_enc)
+                    response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
 
-            with contextlib.suppress(BrokenPipeError):
-                for pipe_s in pipes:
-                    pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+            for uid in uids:
+                response_queue.put(("", LitAPIStatus.FINISH_STREAMING))
+                
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming batched request.\n"
                 "Please check the error trace for more details."
             )
-            err = pickle.dumps(e)
-            for pipe_s in pipes:
-                pipe_s.send((err, LitAPIStatus.ERROR))
+            err_pkl = pickle.dumps(e)
+            response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
 def inference_worker(
