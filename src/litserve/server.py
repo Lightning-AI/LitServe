@@ -15,14 +15,11 @@ import asyncio
 import contextlib
 import copy
 import logging
-from collections import deque
 import pickle
 from contextlib import asynccontextmanager
 import inspect
-import threading
 import multiprocessing as mp
-from multiprocessing import Manager, Queue, Pipe
-from multiprocessing.connection import Connection
+from multiprocessing import Manager, Queue
 from queue import Empty
 import uvicorn
 import time
@@ -33,7 +30,6 @@ import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
 from fastapi.security import APIKeyHeader
-import sys
 
 from fastapi.responses import StreamingResponse
 from starlette.middleware.gzip import GZipMiddleware
@@ -42,7 +38,7 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
+from litserve.utils import LitAPIStatus, load_and_raise
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +330,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         )
 
 
-async def response_queue_to_buffer(response_queue: mp.Queue, buffer: Dict, stream:bool):
+async def response_queue_to_buffer(response_queue: mp.Queue, buffer: Dict, stream: bool):
     while True:
         try:
             uid, payload = response_queue.get_nowait()
@@ -488,26 +484,24 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    
-    async def data_streamer(self, q: asyncio.Queue, data_available:asyncio.Event, send_status: bool=False):
+    async def data_streamer(self, q: asyncio.Queue, data_available: asyncio.Event, send_status: bool = False):
         while True:
             await data_available.wait()
             while not q.empty():
-                data, status =  await q.get()
-                if status==LitAPIStatus.FINISH_STREAMING:
+                data, status = await q.get()
+                if status == LitAPIStatus.FINISH_STREAMING:
                     return
 
                 if status == LitAPIStatus.ERROR:
                     logger.error(
-                            "Error occurred while streaming outputs from the inference worker. "
-                            "Please check the above traceback."
-                        )
+                        "Error occurred while streaming outputs from the inference worker. "
+                        "Please check the above traceback."
+                    )
                     if send_status:
                         yield data, status
                     return
