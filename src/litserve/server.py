@@ -358,11 +358,6 @@ async def queue_to_buffer(queue, buffer):
             await asyncio.sleep(0.0001)
 
 
-async def wait_for_result(uid, buffer, event):
-    await event.wait()
-    return buffer.pop(uid)
-
-
 class LitServer:
     def __init__(
         self,
@@ -620,9 +615,8 @@ class LitServer:
             self.request_queue.put((uid, payload))
             # background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
-            task = asyncio.create_task(wait_for_result(uid, self.response_buffer, event))
-            
-            response, status = await task
+            await event.wait()
+            response, status = self.response_buffer.pop(uid)
 
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
