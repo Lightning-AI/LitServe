@@ -263,7 +263,7 @@ def run_batched_streaming_loop(
                     response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
 
             for uid in uids:
-                response_queue.put(("", LitAPIStatus.FINISH_STREAMING))
+                response_queue.put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
                 
         except Exception as e:
             logger.exception(
@@ -485,7 +485,7 @@ class LitServer:
         while True:
             await data_available.wait()
             while not q.empty():
-                data, status = await q.get()
+                data, status = q.get_nowait()
                 if status == LitAPIStatus.FINISH_STREAMING:
                     return
 
@@ -501,6 +501,7 @@ class LitServer:
                     yield data, status
                 else:
                     yield data
+            data_available.clear()
 
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])

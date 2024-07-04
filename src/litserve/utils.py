@@ -49,7 +49,10 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
 
 def load_and_raise(response):
     try:
-        exception = pickle.loads(response)
+        if isinstance(response, bytes):
+            exception = pickle.loads(response)
+        else:
+            exception = response
         raise exception
     except pickle.PickleError:
         logger.exception(
