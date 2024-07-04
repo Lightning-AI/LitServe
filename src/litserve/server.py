@@ -191,8 +191,8 @@ def run_batched_loop(
     queue_lock,
     shared_dict_name,
     num_buckets,
-    data_size
-):  
+    data_size,
+):
     queue = LitSMQ.attach(queue_name, queue_lock)
     shared_dict = LitDict.attach(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
@@ -371,7 +371,7 @@ def inference_worker(
     queue_lock,
     shared_dict_name,
     num_buckets,
-    data_size
+    data_size,
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -397,7 +397,7 @@ def inference_worker(
             queue_lock,
             shared_dict_name,
             num_buckets,
-            data_size
+            data_size,
         )
     else:
         run_single_loop(
@@ -519,7 +519,6 @@ class LitServer:
         data_size = 50_000
         self.shared_dict = LitDict.create(name=shared_dict_name, num_buckets=num_buckets, data_size=data_size)
 
-        
         try:
             pickle.dumps(self.lit_api)
             pickle.dumps(self.lit_spec)
@@ -555,7 +554,7 @@ class LitServer:
                     self.queue_lock,
                     shared_dict_name,
                     num_buckets,
-                    data_size
+                    data_size,
                 ),
                 daemon=True,
             )
@@ -573,8 +572,13 @@ class LitServer:
         t.start()
 
         yield
-        
-        shm_names = [queue_name + "_metadata", queue_name + "_data", shared_dict_name + "_hashmap", shared_dict_name+"_data"]
+
+        shm_names = [
+            queue_name + "_metadata",
+            queue_name + "_data",
+            shared_dict_name + "_hashmap",
+            shared_dict_name + "_data",
+        ]
         cleanup_shared_memory_list(shm_names)
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
