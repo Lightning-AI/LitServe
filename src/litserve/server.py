@@ -341,8 +341,7 @@ def cleanup(request_buffer, uid):
         request_buffer.pop(uid)
 
 
-async def queue_to_buffer(response_queue, buffer, stream:bool):
-    print("stream=", stream)
+async def response_queue_to_buffer(response_queue: mp.Queue, buffer: Dict, stream:bool):
     while True:
         try:
             uid, payload = response_queue.get_nowait()
@@ -351,8 +350,9 @@ async def queue_to_buffer(response_queue, buffer, stream:bool):
             continue
 
         if stream:
-            q = buffer[uid]
+            q, event = buffer[uid]
             await q.put(payload)
+            event.set()
         else:
             event = buffer.pop(uid)
             buffer[uid] = payload
@@ -460,7 +460,7 @@ class LitServer:
             response_queue = manager.Queue()
             response_queues.append(response_queue)
 
-            task = loop.create_task(queue_to_buffer(response_queue, self.response_buffer, self.stream))
+            task = loop.create_task(response_queue_to_buffer(response_queue, self.response_buffer, self.stream))
             tasks.append(task)
 
             ctx = mp.get_context("spawn")
@@ -495,57 +495,11 @@ class LitServer:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
 
-    def new_pipe(self) -> tuple:
-        return Pipe()
-
-    def close_pipe(self, pipe_s, pipe_r):
-        pipe_s.close()
-        pipe_r.close()
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
-
-    def get_from_pipe(self, read):
-        while True:
-            if read.poll(LONG_TIMEOUT):
-                return read.recv()
-
-    async def data_reader(self, read):
-        data_available = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        loop.add_reader(read.fileno(), data_available.set)
-
-        if not read.poll():
-            await data_available.wait()
-        data_available.clear()
-        loop.remove_reader(read.fileno())
-        return read.recv()
-
-    async def win_data_streamer(self, read, write, send_status=False):
-        # this is a workaround for Windows since asyncio loop.add_reader is not supported.
-        # https://docs.python.org/3/library/asyncio-platforms.html
-        while True:
-            if read.poll(LONG_TIMEOUT):
-                response, status = read.recv()
-                if status == LitAPIStatus.FINISH_STREAMING:
-                    self.close_pipe(read, write)
-                    return
-                elif status == LitAPIStatus.ERROR:
-                    self.close_pipe(read, write)
-                    logger.error(
-                        "Error occurred while streaming outputs from the inference worker. "
-                        "Please check the above traceback."
-                    )
-                    yield response, status
-                    return
-                if send_status:
-                    yield response, status
-                else:
-                    yield response
-
-            await asyncio.sleep(0.0001)
 
     async def data_streamer(self, read: Connection, write: Connection, send_status=False):
         data_available = asyncio.Event()
@@ -590,14 +544,19 @@ class LitServer:
             loop.remove_reader(read.fileno())
 
     
-    async def data_streamer_v2(self, q: asyncio.Queue, send_status: bool=False):
+    async def data_streamer_v2(self, q: asyncio.Queue, data_available:asyncio.Event, send_status: bool=False):
         while True:
+            await data_available.wait()
             while not q.empty():
                 data, status =  await q.get()
                 if status==LitAPIStatus.FINISH_STREAMING:
                     return
 
                 if status == LitAPIStatus.ERROR:
+                    logger.error(
+                            "Error occurred while streaming outputs from the inference worker. "
+                            "Please check the above traceback."
+                        )
                     if send_status:
                         yield data, status
                     return
@@ -605,10 +564,6 @@ class LitServer:
                     yield data, status
                 else:
                     yield data
-
-                await asyncio.sleep(0.0001)
-            await asyncio.sleep(0.0001)
-
 
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -642,8 +597,9 @@ class LitServer:
 
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            event = asyncio.Event()
             q = asyncio.Queue()
-            self.response_buffer[uid] = q
+            self.response_buffer[uid] = (q, event)
             logger.debug(f"Received request uid={uid}")
 
             payload = request
@@ -651,7 +607,7 @@ class LitServer:
                 payload = await request.json()
             self.request_queue.put((uid, payload))
 
-            return StreamingResponse(self.data_streamer_v2(q))
+            return StreamingResponse(self.data_streamer_v2(q, data_available=event))
 
         if not self._specs:
             stream = self.lit_api.stream
