@@ -298,7 +298,6 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
 ):
-    request_buffer = {}
     lit_api.setup(device)
     lit_api.device = device
     message = f"Setup complete for worker {worker_id}."
@@ -333,12 +332,6 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         raise HTTPException(
             status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
         )
-
-
-def cleanup(request_buffer, uid):
-    logger.debug("Cleaning up request uid=%s", uid)
-    with contextlib.suppress(KeyError):
-        request_buffer.pop(uid)
 
 
 async def response_queue_to_buffer(response_queue: mp.Queue, buffer: Dict, stream:bool):
@@ -501,48 +494,6 @@ class LitServer:
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    async def data_streamer(self, read: Connection, write: Connection, send_status=False):
-        data_available = asyncio.Event()
-        queue = asyncio.Queue()
-        loop = asyncio.get_running_loop()
-
-        def reader():
-            try:
-                while read.poll():  # Check if there's data available to read
-                    response, status = read.recv()
-                    queue.put_nowait((response, status))
-                    data_available.set()
-            except Exception as e:
-                logger.error(f"Exception in reader: {e}")
-
-        loop.add_reader(read.fileno(), reader)
-
-        try:
-            while True:
-                await data_available.wait()
-                data_available.clear()
-
-                while not queue.empty():
-                    response, status = await queue.get()
-                    if status == LitAPIStatus.FINISH_STREAMING:
-                        loop.remove_reader(read.fileno())
-                        return
-                    if status == LitAPIStatus.ERROR:
-                        logger.error(
-                            "Error occurred while streaming outputs from the inference worker. "
-                            "Please check the above traceback."
-                        )
-                        loop.remove_reader(read.fileno())
-                        if send_status:
-                            yield response, status
-                        return
-                    if send_status:
-                        yield response, status
-                    else:
-                        yield response
-        finally:
-            loop.remove_reader(read.fileno())
-
     
     async def data_streamer_v2(self, q: asyncio.Queue, data_available:asyncio.Event, send_status: bool=False):
         while True:
@@ -586,7 +537,6 @@ class LitServer:
                     payload = await request.json()
 
             self.request_queue.put((uid, payload))
-            # background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
