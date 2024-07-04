@@ -351,16 +351,16 @@ async def queue_to_buffer(queue, buffer):
     while True:
         try:
             uid, payload = queue.get_nowait()
+            event = buffer.pop(uid)
+            event.set()
             buffer[uid] = payload
         except Empty:
             await asyncio.sleep(0.0001)
 
 
-async def wait_for_result(uid, buffer):
-    while True:
-        if uid in buffer:
-            return buffer[uid]
-        await asyncio.sleep(0.0001)
+async def wait_for_result(uid, buffer, event):
+    await event.wait()
+    return buffer.pop(uid)
 
 
 class LitServer:
@@ -604,6 +604,8 @@ class LitServer:
 
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            event = asyncio.Event()
+            self.response_buffer[uid] = event
             logger.debug(f"Received request uid={uid}")
 
             payload = request
@@ -618,7 +620,7 @@ class LitServer:
             self.request_queue.put((uid, payload))
             # background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
 
-            task = asyncio.create_task(wait_for_result(uid, self.response_buffer))
+            task = asyncio.create_task(wait_for_result(uid, self.response_buffer, event))
             
             response, status = await task
 
