@@ -352,8 +352,8 @@ async def queue_to_buffer(queue, buffer):
         try:
             uid, payload = queue.get_nowait()
             event = buffer.pop(uid)
-            event.set()
             buffer[uid] = payload
+            event.set()
         except Empty:
             await asyncio.sleep(0.0001)
 
