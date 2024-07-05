@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import contextlib
 import copy
 import logging
 import pickle
 from contextlib import asynccontextmanager
 import inspect
 import multiprocessing as mp
-from multiprocessing import Manager, Queue
-from queue import Empty
+from queue import Empty, Queue
 import uvicorn
 import time
 import os
 import shutil
-from typing import Sequence, Optional, Union, List, Dict
+from typing import Sequence, Optional, Union, List, Dict, Tuple
 import uuid
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
@@ -264,7 +262,7 @@ def run_batched_streaming_loop(
 
             for uid in uids:
                 response_queue.put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
-                
+
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming batched request.\n"
@@ -321,7 +319,9 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         )
 
 
-async def response_queue_to_buffer(response_queue: mp.Queue, buffer: Dict, stream: bool):
+async def response_queue_to_buffer(
+    response_queue: mp.Queue, buffer: Dict[str, Tuple[asyncio.Queue, asyncio.Event]], stream: bool
+):
     while True:
         try:
             uid, payload = response_queue.get_nowait()
@@ -410,7 +410,7 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
-        manager = Manager()
+        manager = mp.Manager()
         self.request_queue = manager.Queue()
         self.response_buffer = {}
 
