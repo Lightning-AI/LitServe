@@ -13,8 +13,8 @@
 # limitations under the License.
 import time
 
-from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
+from litserve.specs.openai import ChatMessage, OpenAISpec
 
 
 class TestAPI(ls.LitAPI):

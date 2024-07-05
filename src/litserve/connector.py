@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import sys
-from typing import List, Optional, Union
 import platform
 import subprocess
+import sys
 from functools import lru_cache
+from typing import List, Optional, Union
 
 
 class _Connector:

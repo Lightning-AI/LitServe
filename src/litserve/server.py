@@ -13,23 +13,22 @@
 # limitations under the License.
 import asyncio
 import copy
-import logging
-import pickle
-from contextlib import asynccontextmanager
 import inspect
+import logging
 import multiprocessing as mp
-from queue import Empty, Queue
-import uvicorn
-import time
 import os
+import pickle
 import shutil
-from typing import Sequence, Optional, Union, List, Dict, Tuple
+import time
 import uuid
+from contextlib import asynccontextmanager
+from queue import Empty, Queue
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
-from fastapi.security import APIKeyHeader
-
+import uvicorn
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
+from fastapi.security import APIKeyHeader
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI

@@ -19,13 +19,13 @@ import time
 import typing
 import uuid
 from enum import Enum
-from typing import AsyncGenerator, Dict, List, Literal, Optional, Union, Iterator
+from typing import AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..utils import azip, LitAPIStatus, load_and_raise
+from ..utils import LitAPIStatus, azip, load_and_raise
 from .base import LitSpec
 
 if typing.TYPE_CHECKING:
