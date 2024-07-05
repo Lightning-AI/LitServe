@@ -18,7 +18,7 @@ import re
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
 from fastapi import Request, Response, HTTPException
-
+import time
 import torch
 import torch.nn as nn
 from queue import Queue
@@ -45,7 +45,7 @@ def test_index(sync_testclient):
 
 
 @patch("litserve.server.LitServer.lifespan")
-def test_device_identifiers(lifespan_mock, simple_litapi):
+def test_device_identifiers(simple_litapi):
     server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
     assert server.device_identifiers("cpu", 1) == ["cpu:1"]
     assert server.device_identifiers("cpu", [1, 2]) == ["cpu:1", "cpu:2"]
@@ -75,10 +75,11 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
 @pytest.fixture()
 def loop_args():
     requests_queue = Queue()
-    requests_queue.put(("uuid-123", 1))  # uid, x_enc
-    requests_queue.put(("uuid-234", 2))
+    requests_queue.put(("uuid-123", time.monotonic(), 1))  # uid, timestamp, x_enc
+    requests_queue.put(("uuid-234", time.monotonic(), 2))
 
     lit_api_mock = MagicMock()
+    lit_api_mock.request_timeout = 1
     lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
     return lit_api_mock, requests_queue
 
@@ -156,13 +157,14 @@ def test_streaming_loop(loop_args):
             yield out["output"]
 
     fake_stream_api = MagicMock()
+    fake_stream_api.request_timeout = 1
     fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
     fake_stream_api.predict = MagicMock(side_effect=fake_predict)
     fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     requests_queue = Queue()
-    requests_queue.put(("UUID-1234", {"prompt": "Hello"}))
+    requests_queue.put(("UUID-1234", time.monotonic(), {"prompt": "Hello"}))
     response_queue = FakeStreamResponseQueue(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="exit loop"):
@@ -209,6 +211,7 @@ def test_batched_streaming_loop():
             yield [output["output"] for output in outputs]
 
     fake_stream_api = MagicMock()
+    fake_stream_api.request_timeout = 1
     fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
     fake_stream_api.batch = MagicMock(side_effect=lambda inputs: inputs)
     fake_stream_api.predict = MagicMock(side_effect=fake_predict)
@@ -217,8 +220,8 @@ def test_batched_streaming_loop():
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     requests_queue = Queue()
-    requests_queue.put(("UUID-001", {"prompt": "Hello"}))
-    requests_queue.put(("UUID-002", {"prompt": "World"}))
+    requests_queue.put(("UUID-001", time.monotonic(), {"prompt": "Hello"}))
+    requests_queue.put(("UUID-002", time.monotonic(), {"prompt": "World"}))
     response_queue = FakeBatchStreamResponseQueue(num_streamed_outputs)
 
     with pytest.raises(StopIteration, match="finish streaming"):

@@ -316,7 +316,7 @@ class OpenAISpec(LitSpec):
             q = asyncio.Queue()
             event = asyncio.Event()
             self._server.response_buffer[uid] = (q, event)
-            self._server.request_queue.put((uid, request_el))
+            self._server.request_queue.put((uid, time.monotonic(), request_el))
             self.queues.append(q)
             self.events.append(event)
 

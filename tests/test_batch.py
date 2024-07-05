@@ -14,7 +14,7 @@
 import asyncio
 from unittest.mock import MagicMock, patch
 from asgi_lifespan import LifespanManager
-
+import time
 from litserve.server import run_batched_loop
 from queue import Queue
 import pytest
@@ -127,10 +127,11 @@ class FakeResponseQueue:
 
 def test_batched_loop():
     requests_queue = Queue()
-    requests_queue.put(("uuid-1234", {"input": 4.0}))
-    requests_queue.put(("uuid-1235", {"input": 5.0}))
+    requests_queue.put(("uuid-1234", time.monotonic(), {"input": 4.0}))
+    requests_queue.put(("uuid-1235", time.monotonic(), {"input": 5.0}))
 
     lit_api_mock = MagicMock()
+    lit_api_mock.request_timeout = 2
     lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
     lit_api_mock.batch = MagicMock(side_effect=lambda x: x)
     lit_api_mock.predict = MagicMock(side_effect=lambda x: [16.0, 25.0])

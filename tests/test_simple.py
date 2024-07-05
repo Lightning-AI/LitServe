@@ -89,7 +89,7 @@ class SlowLitAPI(LitAPI):
 
 
 @pytest.mark.asyncio()
-async def disable_test_timeout():
+async def test_timeout():
     api = SlowLitAPI()  # takes 1 second for each prediction
     server = LitServer(api, accelerator="cpu", devices=1, timeout=0.9)  # windows CI need more time to process queue
 
@@ -121,6 +121,6 @@ def test_concurrent_requests():
 
     count = 0
     for i, response in enumerate(responses):
-        assert response.json() == {"output": i**2}
+        assert response.json() == {"output": i**2}, "Server returns square of the input number"
         count += 1
     assert count == n_requests

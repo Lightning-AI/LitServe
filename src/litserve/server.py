@@ -77,8 +77,8 @@ def collate_requests(
             break
 
         try:
-            uid, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
-            payloads.append((uid, x_enc))
+            uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
+            payloads.append((uid, timestamp, x_enc))
         except Empty:
             continue
 
@@ -88,8 +88,19 @@ def collate_requests(
 def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
     while True:
         try:
-            uid, x_enc = request_queue.get(timeout=1.0)
+            uid, timestamp, x_enc = request_queue.get(timeout=1.0)
         except (Empty, ValueError):
+            continue
+
+        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
+            time.monotonic() - timestamp > lit_api.request_timeout
+        ):
+            logger.error(
+                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                "has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
             continue
         try:
             context = {}
@@ -140,7 +151,25 @@ def run_batched_loop(
             continue
 
         logger.debug(f"{len(batches)} batched requests received")
-        uids, inputs = zip(*batches)
+        uids, timestamps, inputs = zip(*batches)
+
+        # Iterate in reverse order to safely remove items while iterating
+        for i in range(len(timestamps) - 1, -1, -1):
+            timestamp = timestamps[i]
+            if (
+                lit_api.request_timeout
+                and lit_api.request_timeout != -1
+                and time.monotonic() - timestamp > lit_api.request_timeout
+            ):
+                logger.error(
+                    f"Request {uids[i]} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                    "has been timed out. "
+                    "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+                )
+                response_queue.put((uids[i], (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+                del uids[i]
+                del inputs[i]
+                del timestamps[i]
 
         try:
             contexts = [{}] * len(inputs)
@@ -177,9 +206,20 @@ def run_batched_loop(
 def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
     while True:
         try:
-            uid, x_enc = request_queue.get(timeout=1.0)
+            uid, timestamp, x_enc = request_queue.get(timeout=1.0)
             logger.debug("uid=%s", uid)
         except (Empty, ValueError):
+            continue
+
+        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
+            time.monotonic() - timestamp > lit_api.request_timeout
+        ):
+            logger.error(
+                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                "has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
             continue
 
         try:
@@ -232,7 +272,24 @@ def run_batched_streaming_loop(
         if not batches:
             continue
 
-        uids, inputs = zip(*batches)
+        uids, timestamps, inputs = zip(*batches)
+        # Iterate in reverse order to safely remove items while iterating
+        for i in range(len(timestamps) - 1, -1, -1):
+            timestamp = timestamps[i]
+            if (
+                lit_api.request_timeout
+                and lit_api.request_timeout != -1
+                and time.monotonic() - timestamp > lit_api.request_timeout
+            ):
+                logger.error(
+                    f"Request {uids[i]} was waiting in the queue for too long ({lit_api.request_timeout} seconds) "
+                    "and has been timed out. "
+                    "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+                )
+                response_queue.put((uids[i], (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+                del uids[i]
+                del inputs[i]
+                del timestamps[i]
 
         try:
             contexts = [{}] * len(inputs)
@@ -367,6 +424,7 @@ class LitServer:
 
         self.api_path = api_path
         lit_api.stream = stream
+        lit_api.request_timeout = timeout
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
@@ -522,7 +580,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put((uid, payload))
+            self.request_queue.put((uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -541,7 +599,7 @@ class LitServer:
             payload = request
             if self.request_type == Request:
                 payload = await request.json()
-            self.request_queue.put((uid, payload))
+            self.request_queue.put((uid, time.monotonic(), payload))
 
             return StreamingResponse(self.data_streamer(q, data_available=event))
 
