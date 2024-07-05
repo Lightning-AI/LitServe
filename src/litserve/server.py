@@ -171,6 +171,8 @@ def run_batched_loop(
                 del inputs[i]
                 del timestamps[i]
 
+        if len(inputs) == 0:
+            continue
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
@@ -290,6 +292,9 @@ def run_batched_streaming_loop(
                 del uids[i]
                 del inputs[i]
                 del timestamps[i]
+
+        if len(inputs) == 0:
+            continue
 
         try:
             contexts = [{}] * len(inputs)
