@@ -294,7 +294,7 @@ class OpenAISpec(LitSpec):
             logger.debug(output)
             yield self._encode_response(output)
 
-    async def get_from_pipes(self, uids, pipes) -> List[AsyncGenerator]:
+    async def get_from_queues(self, uids) -> List[AsyncGenerator]:
         choice_pipes = []
         for uid, q, event in zip(uids, self.queues, self.events):
             data = self._server.data_streamer(q, event, send_status=True)
@@ -308,7 +308,6 @@ class OpenAISpec(LitSpec):
         logger.debug("Received chat completion request %s", request)
 
         uids = [uuid.uuid4() for _ in range(request.n)]
-        pipes = []
         self.queues = []
         self.events = []
         for uid in uids:
@@ -321,14 +320,9 @@ class OpenAISpec(LitSpec):
             self.queues.append(q)
             self.events.append(event)
 
-        responses = await self.get_from_pipes(uids, pipes)
-
-        def callback(_=None):
-            for read, write in pipes:
-                self._server.close_pipe(read, write)
+        responses = await self.get_from_queues(uids)
 
         if request.stream:
-            background_tasks.add_task(callback)
             return StreamingResponse(
                 self.streaming_completion(request, responses),
                 media_type="application/x-ndjson",
@@ -336,7 +330,6 @@ class OpenAISpec(LitSpec):
             )
 
         response_task = asyncio.create_task(self.non_streaming_completion(request, responses))
-        response_task.add_done_callback(lambda task: callback)
         return await response_task
 
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
