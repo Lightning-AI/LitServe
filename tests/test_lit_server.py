@@ -45,18 +45,18 @@ def test_index(sync_testclient):
 
 
 @patch("litserve.server.LitServer.lifespan")
-def test_device_identifiers(simple_litapi):
-    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+def test_device_identifiers(mock_lifespan):
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=10)
     assert server.device_identifiers("cpu", 1) == ["cpu:1"]
     assert server.device_identifiers("cpu", [1, 2]) == ["cpu:1", "cpu:2"]
 
-    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=10)
     assert server.devices == ["cpu"]
 
-    server = LitServer(simple_litapi, accelerator="cuda", devices=1, timeout=10)
+    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=1, timeout=10)
     assert server.devices == [["cuda:0"]]
 
-    server = LitServer(simple_litapi, accelerator="cuda", devices=[1, 2], timeout=10)
+    server = LitServer(SimpleLitAPI(), accelerator="cuda", devices=[1, 2], timeout=10)
     # [["cuda:1"], ["cuda:2"]]
     assert server.devices[0][0] == "cuda:1"
     assert server.devices[1][0] == "cuda:2"
