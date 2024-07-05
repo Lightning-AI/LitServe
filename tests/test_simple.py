@@ -117,10 +117,10 @@ def test_concurrent_requests():
     n_requests = 100
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
     with TestClient(server.app) as client, ThreadPoolExecutor(n_requests // 4 + 1) as executor:
-        responses = list(executor.map(lambda _: client.post("/predict", json={"input": 4.0}), range(n_requests)))
+        responses = list(executor.map(lambda i: client.post("/predict", json={"input": i}), range(n_requests)))
 
     count = 0
-    for response in responses:
-        assert response.json() == {"output": 16.0}
+    for i, response in enumerate(responses):
+        assert response.json() == {"output": i**2}
         count += 1
     assert count == n_requests
