@@ -97,12 +97,10 @@ class FakePipe:
 def test_single_loop(simple_litapi, loop_args):
     lit_api_mock, requests_queue, request_buffer = loop_args
     lit_api_mock.unbatch.side_effect = None
-    request_buffer = Manager().dict()
-    request_buffer[1] = {"input": 4.0}, FakePipe()
-    request_buffer[2] = {"input": 5.0}, FakePipe()
+    response_queue = Manager().Queue()
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, request_buffer)
+        run_single_loop(lit_api_mock, None, requests_queue, response_queue)
 
 
 @pytest.mark.asyncio()
