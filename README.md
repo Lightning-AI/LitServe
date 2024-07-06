@@ -3,7 +3,7 @@
 
 # LitServe
 
-**High-throughput serving engine for AI models, with a friendly interface and enterprise scale.**
+**High-throughput serving engine for AI models. Friendly interface. Enterprise scale.**
 
 <pre>
 ✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU   
