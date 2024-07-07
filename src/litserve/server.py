@@ -36,6 +36,7 @@ from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, load_and_raise
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -358,7 +359,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 
 async def response_queue_to_buffer(
-    response_queue: mp.Queue, buffer: Dict[str, Union[Tuple[asyncio.Queue, asyncio.Event], asyncio.Event]], stream: bool
+    response_queue: mp.Queue, buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]], stream: bool
 ):
     if stream:
         while True:
@@ -368,7 +369,7 @@ async def response_queue_to_buffer(
                 await asyncio.sleep(0.0001)
                 continue
             q, event = buffer[uid]
-            await q.put(payload)
+            q.append(payload)
             event.set()
 
     else:
@@ -526,11 +527,11 @@ class LitServer:
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    async def data_streamer(self, q: asyncio.Queue, data_available: asyncio.Event, send_status: bool = False):
+    async def data_streamer(self, q: deque, data_available: asyncio.Event, send_status: bool = False):
         while True:
             await data_available.wait()
-            while not q.empty():
-                data, status = q.get_nowait()
+            while len(q) > 0:
+                data, status = q.popleft()
                 if status == LitAPIStatus.FINISH_STREAMING:
                     return
 
@@ -580,7 +581,7 @@ class LitServer:
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
             event = asyncio.Event()
-            q = asyncio.Queue()
+            q = deque()
             self.response_buffer[uid] = (q, event)
             logger.debug(f"Received request uid={uid}")
 

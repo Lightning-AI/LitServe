@@ -18,6 +18,7 @@ import logging
 import time
 import typing
 import uuid
+from collections import deque
 from enum import Enum
 from typing import AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
 
@@ -313,7 +314,7 @@ class OpenAISpec(LitSpec):
         for uid in uids:
             request_el = request.model_copy()
             request_el.n = 1
-            q = asyncio.Queue()
+            q = deque()
             event = asyncio.Event()
             self._server.response_buffer[uid] = (q, event)
             self._server.request_queue.put((uid, time.monotonic(), request_el))
