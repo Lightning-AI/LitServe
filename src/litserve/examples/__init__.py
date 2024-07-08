@@ -1,3 +1,3 @@
-from .simple_example import SimpleLitAPI, SimpleBatchedAPI, SimpleTorchAPI
+from .simple_example import SimpleBatchedAPI, SimpleLitAPI, SimpleTorchAPI
 
 __all__ = ["SimpleLitAPI", "SimpleBatchedAPI", "SimpleTorchAPI"]

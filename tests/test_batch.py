@@ -14,9 +14,9 @@
 import asyncio
 from unittest.mock import MagicMock, patch
 from asgi_lifespan import LifespanManager
-
+import time
 from litserve.server import run_batched_loop
-
+from queue import Queue
 import pytest
 
 from fastapi import Request, Response
@@ -120,23 +120,18 @@ def test_max_batch_size():
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
 
 
-class FakePipe:
-    def send(self, *args):
+class FakeResponseQueue:
+    def put(self, *args):
         raise Exception("Exit loop")
 
 
 def test_batched_loop():
-    from multiprocessing import Manager, Queue
-
     requests_queue = Queue()
-    request_buffer = Manager().dict()
-    requests_queue.put(1)
-    requests_queue.put(2)
-
-    request_buffer[1] = {"input": 4.0}, FakePipe()
-    request_buffer[2] = {"input": 5.0}, FakePipe()
+    requests_queue.put(("uuid-1234", time.monotonic(), {"input": 4.0}))
+    requests_queue.put(("uuid-1235", time.monotonic(), {"input": 5.0}))
 
     lit_api_mock = MagicMock()
+    lit_api_mock.request_timeout = 2
     lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
     lit_api_mock.batch = MagicMock(side_effect=lambda x: x)
     lit_api_mock.predict = MagicMock(side_effect=lambda x: [16.0, 25.0])
@@ -144,7 +139,9 @@ def test_batched_loop():
     lit_api_mock.encode_response = MagicMock(side_effect=lambda x: {"output": x})
 
     with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
-        run_batched_loop(lit_api_mock, lit_api_mock, requests_queue, request_buffer, max_batch_size=2, batch_timeout=4)
+        run_batched_loop(
+            lit_api_mock, lit_api_mock, requests_queue, FakeResponseQueue(), max_batch_size=2, batch_timeout=4
+        )
 
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.batch.assert_called_once_with([4.0, 5.0])

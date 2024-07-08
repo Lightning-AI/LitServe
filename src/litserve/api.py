@@ -59,6 +59,7 @@ class LitAPI(ABC):
     _default_unbatch: callable = None
     _spec: LitSpec = None
     _device: Optional[str] = None
+    request_timeout: Optional[float] = None
 
     @abstractmethod
     def setup(self, devices):

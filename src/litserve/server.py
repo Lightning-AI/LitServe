@@ -12,35 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import contextlib
 import copy
-import logging
-import pickle
-from contextlib import asynccontextmanager
 import inspect
+import logging
 import multiprocessing as mp
-from multiprocessing import Manager, Queue, Pipe
-from multiprocessing.connection import Connection
-from queue import Empty
-import uvicorn
-import time
 import os
+import pickle
 import shutil
-from typing import Sequence, Optional, Union, List, Dict
+import time
 import uuid
+from contextlib import asynccontextmanager
+from queue import Empty, Queue
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Response
-from fastapi.security import APIKeyHeader
-import sys
-
+import uvicorn
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
+from fastapi.security import APIKeyHeader
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import wait_for_queue_timeout, LitAPIStatus, load_and_raise
+from litserve.utils import LitAPIStatus, load_and_raise
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -70,38 +66,46 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
 
 
 def collate_requests(
-    lit_api: LitAPI, request_queue: Queue, request_buffer: Dict, max_batch_size: int, batch_timeout: float
-) -> Optional[List]:
-    uids = []
-    entered_at = time.time()
+    lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float
+) -> Tuple[List, List]:
+    payloads = []
+    timed_out_uids = []
+    entered_at = time.monotonic()
     end_time = entered_at + batch_timeout
 
-    while time.time() < end_time and len(uids) < max_batch_size:
-        remaining_time = end_time - time.time()
+    while time.monotonic() < end_time and len(payloads) < max_batch_size:
+        remaining_time = end_time - time.monotonic()
         if remaining_time <= 0:
             break
 
         try:
-            uid = request_queue.get(timeout=min(remaining_time, 0.001))
-            uids.append(uid)
+            uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
+            if time.monotonic() - timestamp <= lit_api.request_timeout:
+                payloads.append((uid, timestamp, x_enc))
+            else:
+                timed_out_uids.append(uid)
         except Empty:
             continue
 
-    if uids:
-        return get_batch_from_uid(uids, lit_api, request_buffer)
-
-    return None
+    return payloads, timed_out_uids
 
 
-def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, request_buffer: Dict):
+def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
     while True:
         try:
-            uid = request_queue.get(timeout=1.0)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
+            uid, timestamp, x_enc = request_queue.get(timeout=1.0)
         except (Empty, ValueError):
+            continue
+
+        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
+            time.monotonic() - timestamp > lit_api.request_timeout
+        ):
+            logger.error(
+                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                "has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
             continue
         try:
             context = {}
@@ -122,41 +126,45 @@ def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, re
                 lit_api.encode_response,
                 y,
             )
-
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((y_enc, LitAPIStatus.OK))
+            response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the request uid=%s.\n"
                 "Please check the error trace for more details.",
                 uid,
             )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+            err_pkl = pickle.dumps(e)
+            response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
 def run_batched_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    request_buffer: Dict,
+    response_queue: Queue,
     max_batch_size: int,
     batch_timeout: float,
 ):
     while True:
-        batches = collate_requests(
+        batches, timed_out_uids = collate_requests(
             lit_api,
             request_queue,
-            request_buffer,
             max_batch_size,
             batch_timeout,
         )
+
+        for uid in timed_out_uids:
+            logger.error(
+                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                "has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+
         if not batches:
             continue
-
         logger.debug(f"{len(batches)} batched requests received")
-        inputs, pipes = zip(*batches)
-
+        uids, _, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
@@ -174,32 +182,38 @@ def run_batched_loop(
             x = lit_api.batch(x)
             y = _inject_context(contexts, lit_api.predict, x)
             outputs = lit_api.unbatch(y)
-            for y, pipe_s, context in zip(outputs, pipes, contexts):
+            for y, uid, context in zip(outputs, uids, contexts):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
 
-                with contextlib.suppress(BrokenPipeError):
-                    pipe_s.send((y_enc, LitAPIStatus.OK))
+                response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
+
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the batched request.\n"
                 "Please check the error trace for more details."
             )
             err_pkl = pickle.dumps(e)
-            with contextlib.suppress(BrokenPipeError):
-                for pipe_s in pipes:
-                    pipe_s.send((err_pkl, LitAPIStatus.ERROR))
+            for uid in uids:
+                response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, request_buffer: Dict):
+def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
     while True:
         try:
-            uid = request_queue.get(timeout=1.0)
+            uid, timestamp, x_enc = request_queue.get(timeout=1.0)
             logger.debug("uid=%s", uid)
-            try:
-                x_enc, pipe_s = request_buffer.pop(uid)
-            except KeyError:
-                continue
         except (Empty, ValueError):
+            continue
+
+        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
+            time.monotonic() - timestamp > lit_api.request_timeout
+        ):
+            logger.error(
+                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                "has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
             continue
 
         try:
@@ -222,42 +236,44 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue,
                 y_gen,
             )
             for y_enc in y_enc_gen:
-                with contextlib.suppress(BrokenPipeError):
-                    y_enc = lit_api.format_encoded_response(y_enc)
-                    pipe_s.send((y_enc, LitAPIStatus.OK))
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+                y_enc = lit_api.format_encoded_response(y_enc)
+                response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
+            response_queue.put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming request uid=%s.\n"
                 "Please check the error trace for more details.",
                 uid,
             )
-            with contextlib.suppress(BrokenPipeError):
-                pipe_s.send((pickle.dumps(e), LitAPIStatus.ERROR))
+            response_queue.put((uid, (pickle.dumps(e), LitAPIStatus.ERROR)))
 
 
 def run_batched_streaming_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    request_buffer: Dict,
+    response_queue: Queue,
     max_batch_size: int,
     batch_timeout: float,
 ):
     while True:
-        batches = collate_requests(
+        batches, timed_out_uids = collate_requests(
             lit_api,
             request_queue,
-            request_buffer,
             max_batch_size,
             batch_timeout,
         )
+        for uid in timed_out_uids:
+            logger.error(
+                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
+                "has been timed out. "
+                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
+            )
+            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+
         if not batches:
             continue
-
-        inputs, pipes = zip(*batches)
-
+        uids, _, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
@@ -279,22 +295,20 @@ def run_batched_streaming_loop(
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
-                for y_enc, pipe_s in zip(y_batch, pipes):
-                    with contextlib.suppress(BrokenPipeError):
-                        y_enc = lit_api.format_encoded_response(y_enc)
-                        pipe_s.send((y_enc, LitAPIStatus.OK))
+                for y_enc, uid in zip(y_batch, uids):
+                    y_enc = lit_api.format_encoded_response(y_enc)
+                    response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
 
-            with contextlib.suppress(BrokenPipeError):
-                for pipe_s in pipes:
-                    pipe_s.send(("", LitAPIStatus.FINISH_STREAMING))
+            for uid in uids:
+                response_queue.put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming batched request.\n"
                 "Please check the error trace for more details."
             )
-            err = pickle.dumps(e)
-            for pipe_s in pipes:
-                pipe_s.send((err, LitAPIStatus.ERROR))
+            err_pkl = pickle.dumps(e)
+            response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
 def inference_worker(
@@ -303,7 +317,7 @@ def inference_worker(
     device: str,
     worker_id: int,
     request_queue: Queue,
-    request_buffer: Dict,
+    response_queue: Queue,
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
@@ -317,19 +331,19 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
         if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
+            run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queue, max_batch_size, batch_timeout)
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, request_buffer)
+            run_streaming_loop(lit_api, lit_spec, request_queue, response_queue)
         return
 
     if max_batch_size > 1:
-        run_batched_loop(lit_api, lit_spec, request_queue, request_buffer, max_batch_size, batch_timeout)
+        run_batched_loop(lit_api, lit_spec, request_queue, response_queue, max_batch_size, batch_timeout)
     else:
         run_single_loop(
             lit_api,
             lit_spec,
             request_queue,
-            request_buffer,
+            response_queue,
         )
 
 
@@ -344,10 +358,30 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         )
 
 
-def cleanup(request_buffer, uid):
-    logger.debug("Cleaning up request uid=%s", uid)
-    with contextlib.suppress(KeyError):
-        request_buffer.pop(uid)
+async def response_queue_to_buffer(
+    response_queue: mp.Queue, buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]], stream: bool
+):
+    if stream:
+        while True:
+            try:
+                uid, payload = response_queue.get_nowait()
+            except Empty:
+                await asyncio.sleep(0.0001)
+                continue
+            q, event = buffer[uid]
+            q.append(payload)
+            event.set()
+
+    else:
+        while True:
+            try:
+                uid, payload = response_queue.get_nowait()
+            except Empty:
+                await asyncio.sleep(0.0001)
+                continue
+            event = buffer.pop(uid)
+            buffer[uid] = payload
+            event.set()
 
 
 class LitServer:
@@ -379,6 +413,7 @@ class LitServer:
 
         self.api_path = api_path
         lit_api.stream = stream
+        lit_api.request_timeout = timeout
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
@@ -421,9 +456,12 @@ class LitServer:
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
-        manager = Manager()
-        self.request_buffer = manager.dict()
+        manager = mp.Manager()
         self.request_queue = manager.Queue()
+        self.response_buffer = {}
+
+        response_queues = []
+        tasks = []
 
         try:
             pickle.dumps(self.lit_api)
@@ -437,11 +475,19 @@ class LitServer:
             )
             raise e
 
+        loop = asyncio.get_running_loop()
+
         process_list = []
         # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
                 device = device[0]
+
+            response_queue = manager.Queue()
+            response_queues.append(response_queue)
+
+            task = loop.create_task(response_queue_to_buffer(response_queue, self.response_buffer, self.stream))
+            tasks.append(task)
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
@@ -452,7 +498,7 @@ class LitServer:
                     device,
                     worker_id,
                     self.request_queue,
-                    self.request_buffer,
+                    response_queue,
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
@@ -471,107 +517,37 @@ class LitServer:
 
         yield
 
+        manager.shutdown()
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
-
-    def new_pipe(self) -> tuple:
-        return Pipe()
-
-    def close_pipe(self, pipe_s, pipe_r):
-        pipe_s.close()
-        pipe_r.close()
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    def get_from_pipe(self, read):
+    async def data_streamer(self, q: deque, data_available: asyncio.Event, send_status: bool = False):
         while True:
-            if read.poll(LONG_TIMEOUT):
-                return read.recv()
-
-    async def data_reader(self, read):
-        data_available = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        loop.add_reader(read.fileno(), data_available.set)
-
-        if not read.poll():
             await data_available.wait()
-        data_available.clear()
-        loop.remove_reader(read.fileno())
-        return read.recv()
-
-    async def win_data_streamer(self, read, write, send_status=False):
-        # this is a workaround for Windows since asyncio loop.add_reader is not supported.
-        # https://docs.python.org/3/library/asyncio-platforms.html
-        while True:
-            if read.poll(LONG_TIMEOUT):
-                response, status = read.recv()
+            while len(q) > 0:
+                data, status = q.popleft()
                 if status == LitAPIStatus.FINISH_STREAMING:
-                    self.close_pipe(read, write)
                     return
-                elif status == LitAPIStatus.ERROR:
-                    self.close_pipe(read, write)
+
+                if status == LitAPIStatus.ERROR:
                     logger.error(
                         "Error occurred while streaming outputs from the inference worker. "
                         "Please check the above traceback."
                     )
-                    yield response, status
+                    if send_status:
+                        yield data, status
                     return
                 if send_status:
-                    yield response, status
+                    yield data, status
                 else:
-                    yield response
-
-            await asyncio.sleep(0.0001)
-
-    async def data_streamer(self, read: Connection, write: Connection, send_status=False):
-        data_available = asyncio.Event()
-        queue = asyncio.Queue()
-        loop = asyncio.get_running_loop()
-
-        def reader():
-            try:
-                while read.poll():  # Check if there's data available to read
-                    response, status = read.recv()
-                    queue.put_nowait((response, status))
-                    data_available.set()
-            except Exception as e:
-                logger.error(f"Exception in reader: {e}")
-
-        loop.add_reader(read.fileno(), reader)
-
-        try:
-            while True:
-                await data_available.wait()
-                data_available.clear()
-
-                while not queue.empty():
-                    response, status = await queue.get()
-                    if status == LitAPIStatus.FINISH_STREAMING:
-                        loop.remove_reader(read.fileno())
-                        return
-                    if status == LitAPIStatus.ERROR:
-                        logger.error(
-                            "Error occurred while streaming outputs from the inference worker. "
-                            "Please check the above traceback."
-                        )
-                        loop.remove_reader(read.fileno())
-                        if send_status:
-                            yield response, status
-                        return
-                    if send_status:
-                        yield response, status
-                    else:
-                        yield response
-        finally:
-            loop.remove_reader(read.fileno())
-
-    def cleanup_request(self, request_buffer, uid):
-        with contextlib.suppress(KeyError):
-            request_buffer.pop(uid)
+                    yield data
+            data_available.clear()
 
     def setup_server(self):
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -580,54 +556,41 @@ class LitServer:
 
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            event = asyncio.Event()
+            self.response_buffer[uid] = event
             logger.debug(f"Received request uid={uid}")
 
-            read, write = self.new_pipe()
-
+            payload = request
             if self.request_type == Request:
                 if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
                     "Content-Type"
                 ].startswith("multipart/form-data"):
-                    self.request_buffer[uid] = (await request.form(), write)
+                    payload = await request.form()
                 else:
-                    self.request_buffer[uid] = (await request.json(), write)
-            else:
-                self.request_buffer[uid] = (request, write)
+                    payload = await request.json()
 
-            self.request_queue.put(uid)
-            background_tasks.add_task(self.cleanup_request, self.request_buffer, uid)
+            self.request_queue.put((uid, time.monotonic(), payload))
 
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = await wait_for_queue_timeout(
-                    asyncio.to_thread(self.get_from_pipe, read), self.timeout, uid, self.request_buffer
-                )
-            else:
-                data = await wait_for_queue_timeout(self.data_reader(read), self.timeout, uid, self.request_buffer)
-            self.close_pipe(read, write)
+            await event.wait()
+            response, status = self.response_buffer.pop(uid)
 
-            response, status = data
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
             return response
 
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
+            event = asyncio.Event()
+            q = deque()
+            self.response_buffer[uid] = (q, event)
             logger.debug(f"Received request uid={uid}")
 
-            read, write = self.new_pipe()
-
+            payload = request
             if self.request_type == Request:
-                self.request_buffer[uid] = (await request.json(), write)
-            else:
-                self.request_buffer[uid] = (request, write)
+                payload = await request.json()
+            self.request_queue.put((uid, time.monotonic(), payload))
 
-            self.request_queue.put(uid)
-            background_tasks.add_task(cleanup, self.request_buffer, uid)
-
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                return StreamingResponse(self.win_data_streamer(read, write))
-
-            return StreamingResponse(self.data_streamer(read, write))
+            return StreamingResponse(self.data_streamer(q, data_available=event))
 
         if not self._specs:
             stream = self.lit_api.stream

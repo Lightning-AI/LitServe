@@ -15,18 +15,18 @@ import asyncio
 import inspect
 import json
 import logging
-import sys
 import time
 import typing
 import uuid
+from collections import deque
 from enum import Enum
-from typing import AsyncGenerator, Dict, List, Literal, Optional, Union, Iterator
+from typing import AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..utils import azip, LitAPIStatus, load_and_raise
+from ..utils import LitAPIStatus, azip, load_and_raise
 from .base import LitSpec
 
 if typing.TYPE_CHECKING:
@@ -295,14 +295,10 @@ class OpenAISpec(LitSpec):
             logger.debug(output)
             yield self._encode_response(output)
 
-    async def get_from_pipes(self, uids, pipes) -> List[AsyncGenerator]:
+    async def get_from_queues(self, uids) -> List[AsyncGenerator]:
         choice_pipes = []
-        for uid, (read, write) in zip(uids, pipes):
-            if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith("win"):
-                data = self._server.win_data_streamer(read, write, send_status=True)
-            else:
-                data = self._server.data_streamer(read, write, send_status=True)
-
+        for uid, q, event in zip(uids, self.queues, self.events):
+            data = self._server.data_streamer(q, event, send_status=True)
             choice_pipes.append(data)
         return choice_pipes
 
@@ -311,27 +307,23 @@ class OpenAISpec(LitSpec):
 
     async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
         logger.debug("Received chat completion request %s", request)
-        logger.info("request buffer %s", self._server.request_buffer)
 
         uids = [uuid.uuid4() for _ in range(request.n)]
-        pipes = []
+        self.queues = []
+        self.events = []
         for uid in uids:
-            read, write = self._server.new_pipe()
             request_el = request.model_copy()
             request_el.n = 1
-            self._server.request_buffer[uid] = (request_el, write)
-            self._server.request_queue.put(uid)
-            background_tasks.add_task(self._server.cleanup_request, self._server.request_buffer, uid)
-            pipes.append((read, write))
+            q = deque()
+            event = asyncio.Event()
+            self._server.response_buffer[uid] = (q, event)
+            self._server.request_queue.put((uid, time.monotonic(), request_el))
+            self.queues.append(q)
+            self.events.append(event)
 
-        responses = await self.get_from_pipes(uids, pipes)
-
-        def callback(_=None):
-            for read, write in pipes:
-                self._server.close_pipe(read, write)
+        responses = await self.get_from_queues(uids)
 
         if request.stream:
-            background_tasks.add_task(callback)
             return StreamingResponse(
                 self.streaming_completion(request, responses),
                 media_type="application/x-ndjson",
@@ -339,7 +331,6 @@ class OpenAISpec(LitSpec):
             )
 
         response_task = asyncio.create_task(self.non_streaming_completion(request, responses))
-        response_task.add_done_callback(lambda task: callback)
         return await response_task
 
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):

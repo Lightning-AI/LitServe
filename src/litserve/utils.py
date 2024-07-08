@@ -14,11 +14,10 @@
 import asyncio
 import logging
 import pickle
-from typing import Coroutine, Optional
 import uuid
+from typing import Coroutine, Optional
 
 from fastapi import HTTPException
-
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid:
 
 def load_and_raise(response):
     try:
-        exception = pickle.loads(response)
+        exception = pickle.loads(response) if isinstance(response, bytes) else response
         raise exception
     except pickle.PickleError:
         logger.exception(

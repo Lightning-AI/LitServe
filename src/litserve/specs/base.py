@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import abstractmethod
-from typing import Callable, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Callable, List
 
 if TYPE_CHECKING:
     from litserve import LitServer
