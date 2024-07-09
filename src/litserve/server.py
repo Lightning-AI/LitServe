@@ -80,10 +80,11 @@ def collate_requests(
 
         try:
             uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
-            if time.monotonic() - timestamp <= lit_api.request_timeout:
+            if lit_api.request_timeout in [-1, False] or time.monotonic() - timestamp <= lit_api.request_timeout:
                 payloads.append((uid, timestamp, x_enc))
             else:
                 timed_out_uids.append(uid)
+
         except Empty:
             continue
 
