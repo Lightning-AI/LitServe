@@ -113,7 +113,7 @@ async def test_timeout():
         assert response2.status_code == 504, "Server takes longer than specified timeout and request should timeout"
 
     # Batched Server
-    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=0.9, max_batch_size=2, batch_timeout=0.1)
+    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=0.9, max_batch_size=2, batch_timeout=0.01)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         await asyncio.sleep(4)  # Give time to start inference workers
         response1 = ac.post("/predict", json={"input": 4.0})
