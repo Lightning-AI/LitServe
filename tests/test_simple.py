@@ -119,7 +119,7 @@ async def test_timeout():
         response1 = ac.post("/predict", json={"input": 4.0})
         response2 = ac.post("/predict", json={"input": 5.0})
         response3 = ac.post("/predict", json={"input": 6.0})
-        response1, response2 = await asyncio.gather(response1, response2)
+        response1, response2, response3 = await asyncio.gather(response1, response2, response3)
         assert (
             response1.status_code == 200
         ), "Batch: First request should complete since it's popped from the request queue."
@@ -127,12 +127,12 @@ async def test_timeout():
             response2.status_code == 200
         ), "Batch: Second request should complete since it's popped from the request queue."
 
+        assert response3.status_code == 504, "Batch: Third request was delayed and should fail"
+
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
-    server3 = LitServer(
-        SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=0.01
-    )
-    server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=0.01)
+    server3 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=1)
+    server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=1)
 
     with TestClient(server1.app) as client1, TestClient(server2.app) as client2, TestClient(
         server3.app
