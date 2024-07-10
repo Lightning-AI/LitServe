@@ -72,6 +72,7 @@ def collate_requests(
     timed_out_uids = []
     entered_at = time.monotonic()
     end_time = entered_at + batch_timeout
+    apply_timeout = lit_api.request_timeout not in (-1, False)
 
     while time.monotonic() < end_time and len(payloads) < max_batch_size:
         remaining_time = end_time - time.monotonic()
@@ -80,8 +81,8 @@ def collate_requests(
 
         try:
             uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
-            if lit_api.request_timeout in [-1, False] or time.monotonic() - timestamp <= lit_api.request_timeout:
-                payloads.append((uid, timestamp, x_enc))
+            if apply_timeout or time.monotonic() - timestamp <= lit_api.request_timeout:
+                payloads.append((uid, x_enc))
             else:
                 timed_out_uids.append(uid)
 
@@ -165,7 +166,7 @@ def run_batched_loop(
         if not batches:
             continue
         logger.debug(f"{len(batches)} batched requests received")
-        uids, _, inputs = zip(*batches)
+        uids, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
@@ -274,7 +275,7 @@ def run_batched_streaming_loop(
 
         if not batches:
             continue
-        uids, _, inputs = zip(*batches)
+        uids, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
