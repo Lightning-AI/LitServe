@@ -14,6 +14,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
@@ -81,20 +82,28 @@ class SlowLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-        time.sleep(1)
+        time.sleep(2)
         return self.model(x)
 
     def encode_response(self, output) -> Response:
         return {"output": output}
 
 
+class SlowBatchAPI(SlowLitAPI):
+    def batch(self, inputs):
+        return np.asarray(inputs)
+
+    def unbatch(self, output):
+        return list(output)
+
+
 @pytest.mark.asyncio()
 async def test_timeout():
-    api = SlowLitAPI()  # takes 1 second for each prediction
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=0.9)  # windows CI need more time to process queue
+    api = SlowLitAPI()  # takes 2 second for each prediction
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=1.9)
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        await asyncio.sleep(1)  # Give time to start inference workers
+        await asyncio.sleep(2)  # Give time to start inference workers
         response1 = ac.post("/predict", json={"input": 4.0})
         response2 = ac.post("/predict", json={"input": 5.0})
         response1, response2 = await asyncio.gather(response1, response2)
@@ -103,14 +112,42 @@ async def test_timeout():
         assert response1.status_code == 200, "First request should complete since it's popped from the request queue."
         assert response2.status_code == 504, "Server takes longer than specified timeout and request should timeout"
 
+    # Batched Server
+    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=1.9, max_batch_size=2, batch_timeout=0.01)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        await asyncio.sleep(2)  # Give time to start inference workers
+        response1 = ac.post("/predict", json={"input": 4.0})
+        response2 = ac.post("/predict", json={"input": 5.0})
+        response3 = ac.post("/predict", json={"input": 6.0})
+        response1, response2, response3 = await asyncio.gather(response1, response2, response3)
+        assert (
+            response1.status_code == 200
+        ), "Batch: First request should complete since it's popped from the request queue."
+        assert (
+            response2.status_code == 200
+        ), "Batch: Second request should complete since it's popped from the request queue."
+
+        assert response3.status_code == 504, "Batch: Third request was delayed and should fail"
+
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
+    server3 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=2)
+    server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=2)
 
-    with TestClient(server1.app) as client1, TestClient(server2.app) as client2:
+    with TestClient(server1.app) as client1, TestClient(server2.app) as client2, TestClient(
+        server3.app
+    ) as client3, TestClient(server4.app) as client4:
         response1 = client1.post("/predict", json={"input": 4.0})
         assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
+
         response2 = client2.post("/predict", json={"input": 4.0})
         assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
+
+        response3 = client3.post("/predict", json={"input": 4.0})
+        assert response3.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+
+        response4 = client4.post("/predict", json={"input": 4.0})
+        assert response4.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
 
 
 def test_concurrent_requests():
