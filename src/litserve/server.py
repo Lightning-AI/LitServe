@@ -19,6 +19,7 @@ import multiprocessing as mp
 import os
 import pickle
 import shutil
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -30,6 +31,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, R
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -45,6 +47,9 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 # timeout when we need to poll or wait indefinitely for a result in a loop.
 LONG_TIMEOUT = 100
+
+# FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
+MultiPartParser.max_file_size = sys.maxsize
 
 
 def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
