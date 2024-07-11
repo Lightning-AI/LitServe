@@ -82,7 +82,7 @@ class SlowLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-        time.sleep(1)
+        time.sleep(2)
         return self.model(x)
 
     def encode_response(self, output) -> Response:
@@ -99,8 +99,8 @@ class SlowBatchAPI(SlowLitAPI):
 
 @pytest.mark.asyncio()
 async def test_timeout():
-    api = SlowLitAPI()  # takes 1 second for each prediction
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=0.9)  # windows CI need more time to process queue
+    api = SlowLitAPI()  # takes 2 second for each prediction
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=1.9)
 
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         await asyncio.sleep(2)  # Give time to start inference workers
@@ -113,9 +113,9 @@ async def test_timeout():
         assert response2.status_code == 504, "Server takes longer than specified timeout and request should timeout"
 
     # Batched Server
-    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=0.9, max_batch_size=2, batch_timeout=0.01)
+    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=1.9, max_batch_size=2, batch_timeout=0.01)
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        await asyncio.sleep(4)  # Give time to start inference workers
+        await asyncio.sleep(2)  # Give time to start inference workers
         response1 = ac.post("/predict", json={"input": 4.0})
         response2 = ac.post("/predict", json={"input": 5.0})
         response3 = ac.post("/predict", json={"input": 6.0})
@@ -131,8 +131,8 @@ async def test_timeout():
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
-    server3 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=1)
-    server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=1)
+    server3 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=2)
+    server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=2)
 
     with TestClient(server1.app) as client1, TestClient(server2.app) as client2, TestClient(
         server3.app
