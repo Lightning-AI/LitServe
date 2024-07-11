@@ -61,9 +61,20 @@ class TextContent(BaseModel):
     text: str
 
 
+class ImageDetail(str, Enum):
+    auto: str = "auto"
+    low: str = "low"
+    high: str = "high"
+
+
+class ImageContentURL(BaseModel):
+    url: str
+    detail: ImageDetail = ImageDetail.auto
+
+
 class ImageContent(BaseModel):
     type: str
-    image_url: str
+    image_url: Union[str, ImageContentURL]
 
 
 class Function(BaseModel):
