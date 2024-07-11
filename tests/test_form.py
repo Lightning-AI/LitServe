@@ -23,7 +23,7 @@ class SimpleFileLitAPI(LitAPI):
         self.model = lambda x: x**2
 
     def decode_request(self, request: Request):
-        return float(request["input"].file.read().decode("utf-8"))
+        return len(request["input"].file.read().decode("utf-8"))
 
     def predict(self, x):
         return self.model(x)
@@ -32,13 +32,18 @@ class SimpleFileLitAPI(LitAPI):
         return {"output": output}
 
 
-def test_multipart_form_data():
+def test_multipart_form_data(tmp_path):
     server = LitServer(SimpleFileLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
 
     with TestClient(server.app) as client:
-        file = {"input": "4.0"}
-        response = client.post("/predict", files=file)
-        assert response.json() == {"output": 16.0}
+        file_path = f"{tmp_path}/big_file.txt"
+        file_length = 1024 * 1024 * 100
+        with open(file_path, "wb") as f:
+            f.write(bytearray([1] * file_length))
+        with open(file_path, "rb") as f:
+            file = {"input": f}
+            response = client.post("/predict", files=file)
+            assert response.json() == {"output": file_length**2}
 
 
 class SimpleFormLitAPI(LitAPI):
