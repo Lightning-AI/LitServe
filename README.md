@@ -58,7 +58,7 @@ Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch
 - ✅ **Auto GPU scaling:** Scale to multi-GPU with zero code changes.    
 - ✅ **Run anywhere:** Run yourself on any machine or fully managed on Lightning Studios.     
 
-**Examples:**
+**Featured examples:**
 | Model type         | Links                                                                                                                                       |
 |------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | **Toy example** | [Hello world](#define-a-server)                                                                                                              |
