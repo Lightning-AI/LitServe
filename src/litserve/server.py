@@ -32,6 +32,9 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.formparsers import MultiPartParser
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -404,6 +407,7 @@ class LitServer:
         api_path: str = "/predict",
         stream: bool = False,
         spec: Optional[LitSpec] = None,
+        max_payload_size=None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -426,6 +430,8 @@ class LitServer:
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not stream:
             self.app.add_middleware(GZipMiddleware, minimum_size=1000)
+        if max_payload_size is not None:
+            self.app.add_middleware(MaxSizeMiddleware, max_size=max_payload_size)
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
@@ -655,3 +661,32 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
+
+
+class MaxSizeMiddleware(BaseHTTPMiddleware):
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_size: int | None = None,
+    ) -> None:
+        self.app = app
+        self.max_size = max_size
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        total_size = 0
+
+        async def rcv() -> Message:
+            nonlocal total_size
+            message = await receive()
+            chunk_size = len(message.get("body", b""))
+            total_size += chunk_size
+            if self.max_size is not None and total_size > self.max_size:
+                raise HTTPException(413, "Payload too large")
+            return message
+
+        await self.app(scope, rcv, send)
