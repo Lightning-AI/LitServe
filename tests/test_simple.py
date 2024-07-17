@@ -100,34 +100,37 @@ class SlowBatchAPI(SlowLitAPI):
 @pytest.mark.asyncio()
 async def test_timeout():
     api = SlowLitAPI()  # takes 2 second for each prediction
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=1.9)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=1.5)
 
+    # case 1: first request completes, second request times out in queue
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         await asyncio.sleep(2)  # Give time to start inference workers
-        response1 = ac.post("/predict", json={"input": 4.0})
-        response2 = ac.post("/predict", json={"input": 5.0})
-        response1, response2 = await asyncio.gather(response1, response2)
-        # first request blocks the second request in queue
-        # request only times out if it is in queue
-        assert response1.status_code == 200, "First request should complete since it's popped from the request queue."
-        assert response2.status_code == 504, "Server takes longer than specified timeout and request should timeout"
-
-    # Batched Server
-    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=1.9, max_batch_size=2, batch_timeout=0.01)
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        await asyncio.sleep(2)  # Give time to start inference workers
-        response1 = ac.post("/predict", json={"input": 4.0})
-        response2 = ac.post("/predict", json={"input": 5.0})
-        response3 = ac.post("/predict", json={"input": 6.0})
-        response1, response2, response3 = await asyncio.gather(response1, response2, response3)
+        response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
+        response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
+        await asyncio.wait([response1, response2])
         assert (
-            response1.status_code == 200
+            response1.result().status_code == 200
+        ), "First request should complete since it's popped from the request queue."
+        assert (
+            response2.result().status_code == 504
+        ), "Server takes longer than specified timeout and request should timeout"
+
+    # Case 2: first 2 requests finish as a batch and third request times out in queue
+    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=1.5, max_batch_size=2, batch_timeout=0.01)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        await asyncio.sleep(2)  # Give time to start inference workers
+        response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
+        response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
+        response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
+        await asyncio.wait([response1, response2, response3])
+        assert (
+            response1.result().status_code == 200
         ), "Batch: First request should complete since it's popped from the request queue."
         assert (
-            response2.status_code == 200
+            response2.result().status_code == 200
         ), "Batch: Second request should complete since it's popped from the request queue."
 
-        assert response3.status_code == 504, "Batch: Third request was delayed and should fail"
+        assert response3.result().status_code == 504, "Batch: Third request was delayed and should fail"
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
