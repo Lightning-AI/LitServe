@@ -45,9 +45,9 @@ Friendly interface. Enterprise scale.**
 &nbsp;
 
 # Deploy AI models Lightning fast ⚡
-LitServe is a high-throughput serving engine designed to deploy AI models at scale. It creates an API endpoint for models, managing batching, streaming, and autoscaling across CPUs and GPUs and more.
+LitServe is a high-throughput serving engine designed to deploy AI models at scale. It's built on FastAPI and creates an API endpoint for models, managing batching, streaming, and autoscaling across CPUs and GPUs and more.
 
-Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for model serving but supports every framework like PyTorch, JAX, Tensorflow and more.
+You shouldn't have to build a brand new FastAPI server from scratch for every model. LitServe has already done this for you, with all the AI bells and whistles like batching, streaming, multi-GPU and more.
 
 **Key features:**
 - ✅ **Supports all models:** LLMs, vision, time-series, etc...
@@ -78,16 +78,6 @@ Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch
 &nbsp;
 
 # Quick start
-
-&nbsp;
-
-<div align="center">
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
-</a>
-</div>
-
-&nbsp;
 
 Install LitServe via pip (or [advanced installs](https://lightning.ai/docs/litserve/home/install)):
 
@@ -153,6 +143,14 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 # Deployment options    
 LitServe is developed by Lightning AI - An AI development platform which provides infrastructure for deploying AI models.    
 Self manage your own deployments or use Lightning Studios to deploy production-grade models without cloud headaches.    
+
+&nbsp;
+
+<div align="center">
+<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
+</a>
+</div>
 
 &nbsp;
 
