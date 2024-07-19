@@ -1,7 +1,9 @@
 <div align="center">
-<img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserveLogo.png" alt="LitGPT" height="90px"/>
 
-# LitServe
+<img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner.png" width="800px" style="max-width: 100%;">
+
+<br/>
+<br/>
 
 **High-throughput serving engine for AI models.    
 Friendly interface. Enterprise scale.**
