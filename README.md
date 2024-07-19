@@ -141,7 +141,7 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 &nbsp;
 
 # Deployment options    
-LitServe, developed by [Lightning AI](https://lightning.ai/), provides infrastructure for deploying AI models. Self-manage deployments or use [Lightning Studios](https://lightning.ai/) for production-grade deployments without cloud headaches, security and 99.95% uptime SLA.     
+LitServe is developed by [Lightning AI](https://lightning.ai/) which provides infrastructure for deploying AI models. Self-manage deployments or use [Lightning Studios](https://lightning.ai/) for production-grade deployments without cloud headaches, security and 99.95% uptime SLA.     
 
 &nbsp;
 
