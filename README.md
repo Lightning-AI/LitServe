@@ -79,16 +79,6 @@ You shouldn't have to build a brand new FastAPI server from scratch for every mo
 
 # Quick start
 
-&nbsp;
-
-<div align="center">
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
-</a>
-</div>
-
-&nbsp;
-
 Install LitServe via pip (or [advanced installs](https://lightning.ai/docs/litserve/home/install)):
 
 ```bash
@@ -153,6 +143,14 @@ response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
 # Deployment options    
 LitServe is developed by Lightning AI - An AI development platform which provides infrastructure for deploying AI models.    
 Self manage your own deployments or use Lightning Studios to deploy production-grade models without cloud headaches.    
+
+&nbsp;
+
+<div align="center">
+<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/deploy-on-studios.svg" alt="Open In Studio"/>
+</a>
+</div>
 
 &nbsp;
 
