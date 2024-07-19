@@ -668,7 +668,7 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
         self,
         app: ASGIApp,
         *,
-        max_size: int | None = None,
+        max_size: Optional[int] = None,
     ) -> None:
         self.app = app
         self.max_size = max_size
