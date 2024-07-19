@@ -49,6 +49,8 @@ LitServe is a high-throughput serving engine built on FastAPI, designed to deplo
 
 With LitServe, you don't need to build a new FastAPI server from scratch for each model; it is batteries included with AI-specific techniques out of the box.     
 
+***💡 TIP: Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for model serving.***   
+
 **Key features:**
 - ✅ **Supports all models:** LLMs, vision, time-series, etc...
 - ✅ **All ML frameworks:** Use PyTorch, Jax, SKLearn, etc...
