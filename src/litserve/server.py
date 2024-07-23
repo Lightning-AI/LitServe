@@ -22,6 +22,7 @@ import shutil
 import sys
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty, Queue
 from typing import Dict, List, Optional, Sequence, Tuple, Union
@@ -369,12 +370,16 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 
 async def response_queue_to_buffer(
-    response_queue: mp.Queue, buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]], stream: bool
+    response_queue: mp.Queue,
+    buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    stream: bool,
+    response_executor,
 ):
+    loop = asyncio.get_running_loop()
     if stream:
         while True:
             try:
-                uid, payload = response_queue.get_nowait()
+                uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
             except Empty:
                 await asyncio.sleep(0.0001)
                 continue
@@ -385,7 +390,7 @@ async def response_queue_to_buffer(
     else:
         while True:
             try:
-                uid, payload = response_queue.get_nowait()
+                uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
             except Empty:
                 await asyncio.sleep(0.0001)
                 continue
@@ -489,6 +494,7 @@ class LitServer:
             raise e
 
         loop = asyncio.get_running_loop()
+        response_executor = ThreadPoolExecutor(max_workers=self.devices * self.workers_per_device)
 
         process_list = []
         # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
@@ -499,7 +505,9 @@ class LitServer:
             response_queue = manager.Queue()
             response_queues.append(response_queue)
 
-            task = loop.create_task(response_queue_to_buffer(response_queue, self.response_buffer, self.stream))
+            task = loop.create_task(
+                response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
+            )
             tasks.append(task)
 
             ctx = mp.get_context("spawn")
