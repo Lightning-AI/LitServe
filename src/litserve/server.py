@@ -36,7 +36,6 @@ from starlette.formparsers import MultiPartParser
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
@@ -505,9 +504,8 @@ class LitServer:
             response_queue = manager.Queue()
             response_queues.append(response_queue)
 
-            task = loop.create_task(
-                response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
-            )
+            future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
+            task = loop.create_task(future, name=f"Response-reader-{worker_id}")
             tasks.append(task)
 
             ctx = mp.get_context("spawn")
@@ -540,11 +538,12 @@ class LitServer:
 
         for task in tasks:
             task.cancel()
-        response_executor.shutdown(wait=False)
-        manager.shutdown()
+        response_executor.shutdown(wait=False, cancel_futures=True)
+
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
+        manager.shutdown()
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
