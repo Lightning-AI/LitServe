@@ -56,10 +56,13 @@ Friendly interface. Enterprise scale.**
       With LitServe, you don't need to build a new FastAPI server from scratch for each model; it is batteries included with AI-specific techniques out of the box.
     </td>
     <td>
-      <video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" width="500" controls></video>
+      <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
+        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/video_thumbnail.png" alt="Video Thumbnail" style="width: auto; height: 400px;" />
+      </a>
     </td>
   </tr>
-</table>   
+</table>
+
 
 ***💡 TIP: Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for model serving.***   
 
