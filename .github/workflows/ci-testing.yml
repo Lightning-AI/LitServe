@@ -64,8 +64,7 @@ jobs:
 
       - name: Tests
         run: |
-          coverage run --source litserve -m pytest src tests -v
-          echo "Test completed!"
+          python -m pytest --cov=litserve src/ tests/ -v
 
       - name: Statistics
         if: success()
