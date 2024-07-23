@@ -1,6 +1,6 @@
 <div align='center'>
   
-# Deploy AI models Lightning fast ⚡    
+# LitServe: Deploy AI models Lightning fast ⚡    
 
 <div style="text-align: center;">
   <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
