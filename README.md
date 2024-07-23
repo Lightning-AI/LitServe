@@ -47,52 +47,60 @@ Friendly interface. Enterprise scale.**
 &nbsp;
 
 # Deploy AI models Lightning fast ⚡
-LitServe is a high-throughput serving engine built on FastAPI, designed to deploy AI models at scale by creating API endpoints and managing features like batching, streaming, autoscaling across CPUs and GPUs, and more. 
 
-With LitServe, you don't need to build a new FastAPI server from scratch for each model; it is batteries included with AI-specific techniques out of the box.     
+<table>
+  <tr>
+    <td>
+      LitServe is a high-throughput serving engine built on FastAPI, designed to deploy AI models at scale by creating API endpoints and managing features like batching, streaming, autoscaling across CPUs and GPUs, and more. 
+      <br><br>
+      With LitServe, you don't need to build a new FastAPI server from scratch for each model; it is batteries included with AI-specific techniques out of the box.
+    </td>
+    <td>
+      <video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" height="300px" controls></video>
+    </td>
+  </tr>
+</table>   
 
 ***💡 TIP: Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for model serving.***   
 
-&nbsp;
+&nbsp; 
 
-**Performance:**    
-LitServe is built on top of FastAPI but optimized for AI workloads (models, embedding models, LLM serving, etc...).    
-Here we show performance for Image and text classification ([Reproduce these results](https://lightning.ai/docs/litserve/home/benchmarks)).   
+### Performance  
+LitServe is *built on top of FastAPI* but optimized for *AI workloads* (models, embedding models, LLM serving, etc...).    
 <div align="center">
   <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserve-perf.png" width="1000px" style="max-width: 100%;">
 </div>
 
-**Note:** LitServe is not an alternative to Ollama or VLLM; it is designed to help you build your own VLLM-style server.   
+Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks). 
 
-&nbsp;
+***💡 LLM serving:*** Lightning's alternative to Ollama/VLLM is [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm), not LitServe. LitServe can be used a VLLM-style server.   
 
-**Key features:**
-- ✅ **Supports all models:** LLMs, vision, time-series, etc...
-- ✅ **All ML frameworks:** Use PyTorch, Jax, SKLearn, etc...
-- ✅ **Developer friendly:** Focus on AI deployment not infrastructure.    
-- ✅ **Minimal interface:** Zero-abstraction, hackable code-base.     
-- ✅ **Enterprise scale:** Designed to handle large models with low latency.
-- ✅ **Auto GPU scaling:** Scale to multi-GPU with zero code changes.    
-- ✅ **Run anywhere:** Run yourself on any machine or fully managed on Lightning Studios.     
+&nbsp; 
 
-&nbsp;
+### Featured examples    
 
-**Featured examples:**
-| Model type         | Links                                                                                                                                       |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| **Toy example** | [Hello world](#define-a-server)                                                                                                              |
-| **LLMs**        | [Llama 3 (8B)](https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server), [LLM Proxy server](https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model) |
-| **NLP models**  | [Any Hugging face model](https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly), [BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model) |
-| **Multimodal**  | [Open AI Clip](https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve)                                                   |
-| **Audio**       | [Open AI Whisper](https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model), [Meta AudioCraft](https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft), [Stable Audio](https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api) |
-| **Vision**      | [Stable diffusion 2](https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2)                                   |
-| **Speech**      | [Text-speech (XTTS V2)](https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model)                               |
-
-&nbsp;
-
-<div align="center" style="height: 200">
-<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" />
-</div>
+<table>
+  <tr>
+    <td style="vertical-align: top; padding-right: 20px;">
+      <strong>Toy example:</strong> <a href="#define-a-server">Hello world</a><br>
+      <strong>LLMs:</strong> <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a><br>
+      <strong>NLP models:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Any Hugging face model</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT model</a><br>
+      <strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">Open AI Clip</a><br>
+      <strong>Audio:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Open AI Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">Meta AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">Stable Audio</a><br>
+      <strong>Vision:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a><br>
+      <strong>Speech:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+    </td>
+    <td style="vertical-align: top;">
+      <strong>✅ Supports all models:</strong> LLMs, vision, time-series, etc...<br>
+      <strong>✅ All ML frameworks:</strong> Use PyTorch, Jax, SKLearn, etc...<br>
+      <strong>✅ Developer friendly:</strong> Focus on AI deployment not infrastructure.<br>
+      <strong>✅ Minimal interface:</strong> Zero-abstraction, hackable code-base.<br>
+      <strong>✅ Enterprise scale:</strong> Designed to handle large models with low latency.<br>
+      <strong>✅ Auto GPU scaling:</strong> Scale to multi-GPU with zero code changes.<br>
+      <strong>✅ Run anywhere:</strong> Run yourself or fully managed on Lightning Studios.
+    </td>
+  </tr>
+</table>
 
 &nbsp;
 
