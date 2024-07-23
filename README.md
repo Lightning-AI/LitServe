@@ -20,7 +20,7 @@
 
 <table>
   <tr>
-    <td>
+    <td width='400px'>
       <p align='center'>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/84fbb674-f016-45b4-99c0-a2e4138c93f7">
@@ -35,9 +35,7 @@ Friendly interface. Enterprise scale.
 LitServe is a FastAPI-based engine for scalable AI model deployment, featuring batching, streaming, and autoscaling across CPUs and GPUs. LitServe eliminates the need to build a new FastAPI server for each model.
     </td>
     <td>
-      <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
-        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_video_banner_4.png" alt="Video Thumbnail" style="width: 1500px; height: auto;" />
-      </a>
+      <video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" poster='https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_video_banner_4.png'/>
     </td>
   </tr>
 </table>
