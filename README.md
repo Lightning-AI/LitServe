@@ -1,4 +1,7 @@
 <div align='center'>
+  
+# Deploy AI models Lightning fast ⚡    
+
 <div style="text-align: center;">
   <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
   <a href="#quick-start" style="margin: 0 10px;">Quick start</a> •
@@ -11,9 +14,10 @@
 
 <p align="center">
 
-# Deploy AI models Lightning fast ⚡    
-
 </div>
+
+&nbsp;
+
 <table>
   <tr>
     <td>
