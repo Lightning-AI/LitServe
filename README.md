@@ -82,22 +82,24 @@ Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve
 <table>
   <tr>
     <td style="vertical-align: top; padding-right: 20px;">
-      <strong>Toy example:</strong> <a href="#define-a-server">Hello world</a><br>
-      <strong>LLMs:</strong> <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a><br>
-      <strong>NLP models:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Any Hugging face model</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT model</a><br>
-      <strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">Open AI Clip</a><br>
-      <strong>Audio:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Open AI Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">Meta AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">Stable Audio</a><br>
-      <strong>Vision:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a><br>
-      <strong>Speech:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+<pre>
+<strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
+<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
+<strong>NLP models:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Any Hugging face model</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT model</a>
+<strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">Open AI Clip</a>
+<strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Open AI Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">Meta AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">Stable Audio</a>
+<strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
+<strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+</pre>
     </td>
     <td style="vertical-align: top;">
       <strong>✅ Supports all models:</strong> LLMs, vision, time-series, etc...<br>
       <strong>✅ All ML frameworks:</strong> Use PyTorch, Jax, SKLearn, etc...<br>
-      <strong>✅ Developer friendly:</strong> Focus on AI deployment not infrastructure.<br>
+      <strong>✅ Developer friendly:</strong> Focus on models not infrastructure.<br>
       <strong>✅ Minimal interface:</strong> Zero-abstraction, hackable code-base.<br>
-      <strong>✅ Enterprise scale:</strong> Designed to handle large models with low latency.<br>
-      <strong>✅ Auto GPU scaling:</strong> Scale to multi-GPU with zero code changes.<br>
-      <strong>✅ Run anywhere:</strong> Run yourself or fully managed on Lightning Studios.
+      <strong>✅ Enterprise scale:</strong> Handle large models with low latency.<br>
+      <strong>✅ Auto GPU scaling:</strong> Scale to GPUs with zero code changes.<br>
+      <strong>✅ Run anywhere:</strong> Run yourself or on Lightning Studios.
     </td>
   </tr>
 </table>
