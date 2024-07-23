@@ -73,7 +73,7 @@ LitServe (built on FastAPI), is optimized for AI workloads like model serving, e
 These benchmarks are for image and text classification as examples.  Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks). 
 
     
-***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed for best LLM performance.
+***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
 
 &nbsp; 
 
