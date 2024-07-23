@@ -494,7 +494,7 @@ class LitServer:
             raise e
 
         loop = asyncio.get_running_loop()
-        response_executor = ThreadPoolExecutor(max_workers=self.devices * self.workers_per_device)
+        response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
 
         process_list = []
         # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
