@@ -25,10 +25,10 @@ Friendly interface. Enterprise scale.**
 <p align="center">
   <a href="https://lightning.ai/">Lightning AI</a> •
   <a href="#quick-start">Quick start</a> •
-  <a href="#deploy-AI-models-lightning-fast-">Examples</a> •
+  <a href="#featured-examples">Examples</a> •
   <a href="#deployment-options">Deploy</a> •
   <a href="#features">Features</a> •
-  <a href="https://lightning.ai/docs/litserve/home/benchmarks">Benchmarks</a> •
+  <a href="#performance">Benchmarks</a> •
   <a href="https://lightning.ai/docs/litserve">Docs</a>
 </p>
 
