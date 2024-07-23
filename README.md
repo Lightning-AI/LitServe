@@ -93,13 +93,13 @@ Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve
 </pre>
     </td>
     <td style="vertical-align: top;">
-      <strong>✅ Supports all models:</strong> LLMs, vision, time-series, etc...<br>
-      <strong>✅ All ML frameworks:</strong> Use PyTorch, Jax, SKLearn, etc...<br>
-      <strong>✅ Developer friendly:</strong> Focus on models not infrastructure.<br>
-      <strong>✅ Minimal interface:</strong> Zero-abstraction, hackable code-base.<br>
-      <strong>✅ Enterprise scale:</strong> Handle large models with low latency.<br>
-      <strong>✅ Auto GPU scaling:</strong> Scale to GPUs with zero code changes.<br>
-      <strong>✅ Run anywhere:</strong> Run yourself or on Lightning Studios.
+      ✅ <strong>Supports all models:</strong> LLMs, etc<br>
+      ✅ <strong>All ML frameworks:</strong> PyTorch, Jax, sklearn, ...<br>
+      ✅ <strong>Developer friendly:</strong> focus on AI, not infra<br>
+      ✅ <strong>Minimal interface:</strong> no abstractions<br>
+      ✅ <strong>Enterprise scale:</strong> Scale huge models<br>
+      ✅ <strong>Auto GPU scaling:</strong> Zero code changes<br>
+      ✅ <strong>Self host or run on Lightning Studios</strong><br>
     </td>
   </tr>
 </table>
