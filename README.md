@@ -57,7 +57,7 @@ LitServe provides a ready-to-use server with AI-specific techniques, eliminating
     </td>
     <td>
       <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
-        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_video_banner_3.png" alt="Video Thumbnail" style="width: 2500px; height: auto;" />
+        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_video_banner_4.png" alt="Video Thumbnail" style="width: 2500px; height: auto;" />
       </a>
     </td>
   </tr>
