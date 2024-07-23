@@ -1,6 +1,6 @@
 <div align="center">
 
-<img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner.png" width="800px" style="max-width: 100%;">
+<img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
 <br/>
 <br/>
@@ -25,10 +25,10 @@ Friendly interface. Enterprise scale.**
 <p align="center">
   <a href="https://lightning.ai/">Lightning AI</a> •
   <a href="#quick-start">Quick start</a> •
-  <a href="#deploy-AI-models-lightning-fast-">Examples</a> •
+  <a href="#featured-examples">Examples</a> •
   <a href="#deployment-options">Deploy</a> •
   <a href="#features">Features</a> •
-  <a href="https://lightning.ai/docs/litserve/home/benchmarks">Benchmarks</a> •
+  <a href="#performance">Benchmarks</a> •
   <a href="https://lightning.ai/docs/litserve">Docs</a>
 </p>
 
@@ -47,37 +47,71 @@ Friendly interface. Enterprise scale.**
 &nbsp;
 
 # Deploy AI models Lightning fast ⚡
-LitServe is a high-throughput serving engine built on FastAPI, designed to deploy AI models at scale by creating API endpoints and managing features like batching, streaming, autoscaling across CPUs and GPUs, and more. 
 
-With LitServe, you don't need to build a new FastAPI server from scratch for each model; it is batteries included with AI-specific techniques out of the box.     
+<table>
+  <tr>
+    <td>
+LitServe is a <strong>high-throughput serving engine</strong> built on FastAPI, designed to deploy AI models at scale with features like batching, streaming, and autoscaling across CPUs and GPUs.
+      <br><br>
+LitServe provides a ready-to-use server with AI-specific techniques, eliminating the need to build a new FastAPI server for each model.
+    </td>
+    <td>
+      <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
+        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_video_banner_4.png" alt="Video Thumbnail" style="width: 2500px; height: auto;" />
+      </a>
+    </td>
+  </tr>
+</table>
+
 
 ***💡 TIP: Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for model serving.***   
 
-**Key features:**
-- ✅ **Supports all models:** LLMs, vision, time-series, etc...
-- ✅ **All ML frameworks:** Use PyTorch, Jax, SKLearn, etc...
-- ✅ **Developer friendly:** Focus on AI deployment not infrastructure.    
-- ✅ **Minimal interface:** Zero-abstraction, hackable code-base.     
-- ✅ **Enterprise scale:** Designed to handle large models with low latency.
-- ✅ **Auto GPU scaling:** Scale to multi-GPU with zero code changes.    
-- ✅ **Run anywhere:** Run yourself on any machine or fully managed on Lightning Studios.     
+&nbsp; 
 
-**Featured examples:**
-| Model type         | Links                                                                                                                                       |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| **Toy example** | [Hello world](#define-a-server)                                                                                                              |
-| **LLMs**        | [Llama 3 (8B)](https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server), [LLM Proxy server](https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model) |
-| **NLP models**  | [Any Hugging face model](https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly), [BERT model](https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model) |
-| **Multimodal**  | [Open AI Clip](https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve)                                                   |
-| **Audio**       | [Open AI Whisper](https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model), [Meta AudioCraft](https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft), [Stable Audio](https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api) |
-| **Vision**      | [Stable diffusion 2](https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2)                                   |
-| **Speech**      | [Text-speech (XTTS V2)](https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model)                               |
+### Performance  
+LitServe (built on FastAPI), is optimized for AI workloads like model serving, embeddings, and LLM serving.
 
-&nbsp;
+<div align="center">
+  <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserve-perf-2.png" width="1000px" style="max-width: 100%;">
+</div>   
 
-<div align="center" style="height: 200">
-<video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" />
-</div>
+These benchmarks are for image and text classification as examples.  Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks). 
+
+    
+***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM, use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm)) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed for best LLM performance.
+
+&nbsp; 
+
+### Featured examples    
+
+<table>
+  <tr>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Key features</strong><br>
+✅ <strong>Serve all models:  </strong> LLMs, vision, etc
+✅ <strong>All ML frameworks: </strong> PyTorch/Jax/sklearn/...
+✅ <strong>Developer friendly:</strong> focus on AI, not infra
+✅ <strong>Minimal interface: </strong> no abstractions
+✅ <strong>Enterprise scale:  </strong> scale huge models
+✅ <strong>Auto GPU scaling:  </strong> zero code changes
+✅ <strong>Self host:         </strong> or run on Studios
+</pre>
+    </td>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Featured examples</strong><br>
+<strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
+<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
+<strong>NLP models:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Any Hugging face model</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT model</a>
+<strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
+<strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">OpenAI Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">Stable Audio</a>
+<strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
+<strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+</pre>
+    </td>
+  </tr>
+</table>
 
 &nbsp;
 
@@ -127,20 +161,42 @@ Now run the server via the command-line
 python server.py
 ```
 
-The `LitAPI` class gives you full control and hackability. The `LitServer` handles advanced optimizations like batching, streaming and auto-GPU scaling.   
+`LitAPI` class gives full control and hackability.    
+`LitServer` handles optimizations like batching, auto-GPU scaling, etc...      
     
 ### Query the server
-LitServe automatically generates a client when it starts. Use this client to test the server:
 
+Use the automatically generated LitServe client or write your own:
+
+<table>
+  <tr>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Option A - Use generated client:           </strong><br>
+  
 ```bash
 python client.py
 ```
+<br>
 
-Or query the server yourself directly
+</pre>
+    </td>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Option B - Custom client example:          </strong><br>
+
 ```python
 import requests
-response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
+response = requests.post(
+    "http://127.0.0.1:8000/predict",
+    json={"input": 4.0}
+)
 ```
+<br>
+</pre>
+    </td>
+  </tr>
+</table>
 
 &nbsp;
 
