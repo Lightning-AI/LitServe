@@ -538,6 +538,8 @@ class LitServer:
 
         yield
 
+        for task in tasks:
+            task.cancel()
         response_executor.shutdown(wait=False)
         manager.shutdown()
         for process, worker_id in process_list:
