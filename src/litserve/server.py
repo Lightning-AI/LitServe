@@ -373,7 +373,7 @@ async def response_queue_to_buffer(
     response_queue: mp.Queue,
     buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
-    response_executor,
+    response_executor: ThreadPoolExecutor,
 ):
     loop = asyncio.get_running_loop()
     if stream:
