@@ -156,7 +156,8 @@ Now run the server via the command-line
 python server.py
 ```
 
-The `LitAPI` class gives full control and hackability. `LitServer` handles optimizations like batching, auto-GPU scaling, etc...   
+`LitAPI` class gives full control and hackability.    
+`LitServer` handles optimizations like batching, auto-GPU scaling, etc...      
     
 ### Query the server
 
