@@ -173,7 +173,6 @@ Use the automatically generated LitServe client or write your own:
 python client.py
 ```
 <br>
-<br>
 
 </pre>
     </td>
