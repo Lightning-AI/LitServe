@@ -84,7 +84,7 @@ Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve
     <td style="vertical-align: top;">
 <pre>
 <strong>Key features</strong><br>
-✅ <strong>All models:        </strong> LLMs, etc
+✅ <strong>Serve all models:  </strong> LLMs, vision, etc
 ✅ <strong>All ML frameworks: </strong> PyTorch/Jax/sklearn/...
 ✅ <strong>Developer friendly:</strong> focus on AI, not infra
 ✅ <strong>Minimal interface: </strong> no abstractions
