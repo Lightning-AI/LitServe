@@ -156,20 +156,42 @@ Now run the server via the command-line
 python server.py
 ```
 
-The `LitAPI` class gives you full control and hackability. The `LitServer` handles advanced optimizations like batching, streaming and auto-GPU scaling.   
+The `LitAPI` class gives full control and hackability. `LitServer` handles optimizations like batching, auto-GPU scaling, etc...   
     
 ### Query the server
-LitServe automatically generates a client when it starts. Use this client to test the server:
 
+Use the automatically generated LitServe client or write your own:
+
+<table>
+  <tr>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Use generated client:                        </strong><br>
+  
 ```bash
 python client.py
 ```
+<br>
+<br>
 
-Or query the server yourself directly
+</pre>
+    </td>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Custom client example:                       </strong><br>
+
 ```python
 import requests
-response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
+response = requests.post(
+    "http://127.0.0.1:8000/predict",
+    json={"input": 4.0}
+)
 ```
+<br>
+</pre>
+    </td>
+  </tr>
+</table>
 
 &nbsp;
 
