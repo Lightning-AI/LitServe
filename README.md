@@ -51,9 +51,9 @@ Friendly interface. Enterprise scale.**
 <table>
   <tr>
     <td>
-      LitServe is a high-throughput serving engine <strong>built on FastAPI</strong>, designed to deploy AI models at scale by creating API endpoints and managing features like batching, streaming, autoscaling across CPUs and GPUs, and more. 
+LitServe is a <strong>high-throughput serving engine</strong> built on FastAPI, designed to deploy AI models at scale with features like batching, streaming, and autoscaling across CPUs and GPUs.
       <br><br>
-      With LitServe, you don't need to build a new FastAPI server from scratch for each model; it is batteries included with AI-specific techniques out of the box.
+LitServe provides a ready-to-use server with AI-specific techniques, eliminating the need to build a new FastAPI server for each model.
     </td>
     <td>
       <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
