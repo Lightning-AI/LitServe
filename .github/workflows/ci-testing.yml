@@ -64,7 +64,8 @@ jobs:
 
       - name: Tests
         run: |
-          python -m pytest --cov=litserve src/ tests/ -v
+          python -m pytest --cov=litserve src/ tests/ -v -s
+        timeout-minutes: 10
 
       - name: Statistics
         if: success()
