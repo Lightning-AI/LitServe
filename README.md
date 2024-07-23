@@ -167,7 +167,7 @@ Use the automatically generated LitServe client or write your own:
   <tr>
     <td style="vertical-align: top;">
 <pre>
-<strong>Use generated client:                        </strong><br>
+<strong>Use generated client:                  </strong><br>
   
 ```bash
 python client.py
@@ -178,7 +178,7 @@ python client.py
     </td>
     <td style="vertical-align: top;">
 <pre>
-<strong>Custom client example:                       </strong><br>
+<strong>Custom client example:                 </strong><br>
 
 ```python
 import requests
