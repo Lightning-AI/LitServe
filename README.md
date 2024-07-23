@@ -53,6 +53,19 @@ With LitServe, you don't need to build a new FastAPI server from scratch for eac
 
 ***💡 TIP: Think of LitServe as [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for model serving.***   
 
+&nbsp;
+
+**Performance:**    
+LitServe is built on top of FastAPI but optimized for AI workloads (models, embedding models, LLM serving, etc...).    
+Here we show performance for Image and text classification ([Reproduce these results](https://lightning.ai/docs/litserve/home/benchmarks)).   
+<div align="center">
+  <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserve-perf.png" width="1000px" style="max-width: 100%;">
+</div>
+
+**Note:** LitServe is not an alternative to Ollama or VLLM; it is designed to help you build your own VLLM-style server.   
+
+&nbsp;
+
 **Key features:**
 - ✅ **Supports all models:** LLMs, vision, time-series, etc...
 - ✅ **All ML frameworks:** Use PyTorch, Jax, SKLearn, etc...
@@ -61,6 +74,8 @@ With LitServe, you don't need to build a new FastAPI server from scratch for eac
 - ✅ **Enterprise scale:** Designed to handle large models with low latency.
 - ✅ **Auto GPU scaling:** Scale to multi-GPU with zero code changes.    
 - ✅ **Run anywhere:** Run yourself on any machine or fully managed on Lightning Studios.     
+
+&nbsp;
 
 **Featured examples:**
 | Model type         | Links                                                                                                                                       |
