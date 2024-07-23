@@ -362,6 +362,7 @@ def no_auth():
 
 
 def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
+    pass
     if x_api_key != LIT_SERVER_API_KEY:
         raise HTTPException(
             status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
