@@ -68,7 +68,7 @@ Friendly interface. Enterprise scale.**
 ### Performance  
 LitServe is *built on top of FastAPI* but optimized for *AI workloads* (models, embedding models, LLM serving, etc...).    
 <div align="center">
-  <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserve-perf.png" width="1000px" style="max-width: 100%;">
+  <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserve-perf-2.png" width="1000px" style="max-width: 100%;">
 </div>
 
 Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks). 
