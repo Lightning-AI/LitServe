@@ -538,6 +538,7 @@ class LitServer:
 
         yield
 
+        response_executor.shutdown(wait=False)
         manager.shutdown()
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
