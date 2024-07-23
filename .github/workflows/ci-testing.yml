@@ -63,7 +63,9 @@ jobs:
           pip list
 
       - name: Tests
-        run: coverage run --source litserve -m pytest src tests -v
+        run: |
+          coverage run --source litserve -m pytest src tests -v
+          echo "Test completed!"
 
       - name: Statistics
         if: success()
