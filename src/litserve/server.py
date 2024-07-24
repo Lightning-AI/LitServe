@@ -478,7 +478,12 @@ class LitServer:
         self.response_buffer = {}
 
         response_queues = []
-        tasks = []
+        tasks: List[asyncio.Task] = []
+
+        def close_tasks():
+            for task in tasks:
+                task.cancel()
+            response_executor.shutdown(wait=False, cancel_futures=True)
 
         try:
             pickle.dumps(self.lit_api)
@@ -532,14 +537,16 @@ class LitServer:
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app
-            spec.setup(server_copy)
+            try:
+                spec.setup(server_copy)
+            except Exception as e:
+                logging.exception(e)
+                close_tasks()
+                raise e
 
         yield
 
-        for task in tasks:
-            task.cancel()
-        response_executor.shutdown(wait=False, cancel_futures=True)
-
+        close_tasks()
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()

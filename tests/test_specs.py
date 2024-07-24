@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import pytest
+from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
+from httpx import AsyncClient
 from litserve.examples.openai_spec_example import (
     TestAPI,
     TestAPIWithCustomEncode,
@@ -24,15 +26,14 @@ from litserve.examples.openai_spec_example import (
 )
 from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
-from fastapi.testclient import TestClient
 
 
 @pytest.mark.asyncio()
 async def test_openai_spec(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPI(), spec=spec)
-    with TestClient(server.app) as client:
-        resp = client.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
 
         assert (
@@ -52,8 +53,8 @@ async def test_openai_spec(openai_request_data):
 )
 async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
     server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
-    with TestClient(server.app) as client:
-        resp = client.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
         result = resp.json()
         content = result["choices"][0]["message"]["content"]
@@ -62,7 +63,7 @@ async def test_openai_token_usage(api, batch_size, openai_request_data, openai_r
 
         # with streaming
         openai_request_data["stream"] = True
-        resp = client.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
         assert result["usage"] == openai_response_data["usage"]
 
@@ -71,9 +72,10 @@ async def test_openai_token_usage(api, batch_size, openai_request_data, openai_r
 async def test_openai_spec_with_image(openai_request_data_with_image):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPI(), spec=spec)
-    with TestClient(server.app) as client:
-        resp = client.post("/v1/chat/completions", json=openai_request_data_with_image, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_image, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
+
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
         ), "LitAPI predict response should match with the generated output"
@@ -83,9 +85,10 @@ async def test_openai_spec_with_image(openai_request_data_with_image):
 async def test_override_encode(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPIWithCustomEncode(), spec=spec)
-    with TestClient(server.app) as client:
-        resp = client.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
+
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output"
         ), "LitAPI predict response should match with the generated output"
@@ -95,8 +98,8 @@ async def test_override_encode(openai_request_data):
 async def test_openai_spec_with_tools(openai_request_data_with_tools):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPIWithToolCalls(), spec=spec)
-    with TestClient(server.app) as client:
-        resp = client.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
         assert resp.status_code == 200, "Status code should be 200"
         assert (
             resp.json()["choices"][0]["message"]["content"] == ""
@@ -126,14 +129,18 @@ class IncorrectAPI2(IncorrectAPI1):
         return ChatMessage(role="assistant", content="This is a generated output")
 
 
-async def disable_test_openai_spec_validation(openai_request_data):
-    server = ls.LitServer(IncorrectAPI1(), spec=OpenAISpec())
-    with pytest.raises(ValueError, match="predict is not a generator"), TestClient(server.app) as client:
-        assert client.post("/v1/chat/completions", json=openai_request_data, timeout=5).status_code == 200
+@pytest.mark.asyncio()
+async def test_openai_spec_validation(openai_request_data):
+    spec = OpenAISpec()
+    server = ls.LitServer(IncorrectAPI1(), spec=spec)
+    with pytest.raises(ValueError, match="predict is not a generator"):
+        async with LifespanManager(server.app) as manager:
+            await manager.shutdown()
 
-    server = ls.LitServer(IncorrectAPI2(), spec=OpenAISpec())
-    with pytest.raises(ValueError, match="encode_response is not a generator"), TestClient(server.app) as client:
-        assert client.post("/v1/chat/completions", json=openai_request_data, timeout=5).status_code == 200
+    server = ls.LitServer(IncorrectAPI2(), spec=spec)
+    with pytest.raises(ValueError, match="encode_response is not a generator"):
+        async with LifespanManager(server.app) as manager:
+            await manager.shutdown()
 
 
 class PrePopulatedAPI(ls.LitAPI):
@@ -152,8 +159,8 @@ async def test_oai_prepopulated_context(openai_request_data):
     openai_request_data["max_tokens"] = 3
     spec = OpenAISpec()
     server = ls.LitServer(PrePopulatedAPI(), spec=spec)
-    with TestClient(server.app) as client:
-        resp = client.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert (
             resp.json()["choices"][0]["message"]["content"] == "This is a"
         ), "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
@@ -171,7 +178,7 @@ class WrongLitAPI(ls.LitAPI):
 @pytest.mark.asyncio()
 async def test_fail_http(openai_request_data):
     server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
-    with TestClient(server.app) as client:
-        res = client.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
         assert res.status_code == 501, "Server raises 501 error"
         assert res.text == '{"detail":"test LitAPI.predict error"}'
