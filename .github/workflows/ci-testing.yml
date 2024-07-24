@@ -63,7 +63,9 @@ jobs:
           pip list
 
       - name: Tests
-        run: coverage run --source litserve -m pytest src tests -v
+        run: |
+          python -m pytest --cov=litserve src/ tests/ -v -s
+        timeout-minutes: 10
 
       - name: Statistics
         if: success()

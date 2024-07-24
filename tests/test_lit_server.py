@@ -400,9 +400,10 @@ async def test_inject_context(mocked_load_and_raise):
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     server = LitServer(PredictErrorAPI())
-    with pytest.raises(TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")):
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    with pytest.raises(TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")), TestClient(
+        server.app
+    ) as client:
+        client.post("/predict", json={"input": 5.0}, timeout=10)
 
 
 def test_custom_api_path():

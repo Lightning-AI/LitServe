@@ -22,6 +22,7 @@ import shutil
 import sys
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty, Queue
 from typing import Dict, List, Optional, Sequence, Tuple, Union
@@ -34,7 +35,6 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -369,12 +369,16 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 
 async def response_queue_to_buffer(
-    response_queue: mp.Queue, buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]], stream: bool
+    response_queue: mp.Queue,
+    buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    stream: bool,
+    response_executor: ThreadPoolExecutor,
 ):
+    loop = asyncio.get_running_loop()
     if stream:
         while True:
             try:
-                uid, payload = response_queue.get_nowait()
+                uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
             except Empty:
                 await asyncio.sleep(0.0001)
                 continue
@@ -385,7 +389,7 @@ async def response_queue_to_buffer(
     else:
         while True:
             try:
-                uid, payload = response_queue.get_nowait()
+                uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
             except Empty:
                 await asyncio.sleep(0.0001)
                 continue
@@ -474,7 +478,12 @@ class LitServer:
         self.response_buffer = {}
 
         response_queues = []
-        tasks = []
+        tasks: List[asyncio.Task] = []
+
+        def close_tasks():
+            for task in tasks:
+                task.cancel()
+            response_executor.shutdown(wait=False, cancel_futures=True)
 
         try:
             pickle.dumps(self.lit_api)
@@ -489,6 +498,7 @@ class LitServer:
             raise e
 
         loop = asyncio.get_running_loop()
+        response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
 
         process_list = []
         # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
@@ -499,7 +509,8 @@ class LitServer:
             response_queue = manager.Queue()
             response_queues.append(response_queue)
 
-            task = loop.create_task(response_queue_to_buffer(response_queue, self.response_buffer, self.stream))
+            future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
+            task = loop.create_task(future, name=f"Response-reader-{worker_id}")
             tasks.append(task)
 
             ctx = mp.get_context("spawn")
@@ -526,14 +537,19 @@ class LitServer:
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app
-            spec.setup(server_copy)
+            try:
+                spec.setup(server_copy)
+            except Exception as e:
+                close_tasks()
+                raise e
 
         yield
 
-        manager.shutdown()
+        close_tasks()
         for process, worker_id in process_list:
             logging.info(f"terminating worker worker_id={worker_id}")
             process.terminate()
+        manager.shutdown()
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
