@@ -540,7 +540,6 @@ class LitServer:
             try:
                 spec.setup(server_copy)
             except Exception as e:
-                logging.exception(e)
                 close_tasks()
                 raise e
 
