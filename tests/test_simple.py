@@ -106,6 +106,7 @@ async def test_timeout():
     async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
         await asyncio.sleep(2)  # Give time to start inference workers
         response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
+        await asyncio.sleep(0.0001)
         response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
         await asyncio.wait([response1, response2])
         assert (
@@ -121,6 +122,7 @@ async def test_timeout():
         await asyncio.sleep(2)  # Give time to start inference workers
         response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
         response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
+        await asyncio.sleep(0.0001)
         response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
         await asyncio.wait([response1, response2, response3])
         assert (
