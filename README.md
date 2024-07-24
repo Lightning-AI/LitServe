@@ -1,61 +1,50 @@
 <div align='center'>
-  
-# Deploy AI models Lightning fast ⚡    
 
-<div style="text-align: center;">
-  <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
-  <a href="#quick-start" style="margin: 0 10px;">Quick start</a> •
-  <a href="#featured-examples" style="margin: 0 10px;">Examples</a> •
-  <a href="#deployment-options" style="margin: 0 10px;">Deploy</a> •
-  <a href="#features" style="margin: 0 10px;">Features</a> •
-  <a href="#performance" style="margin: 0 10px;">Benchmarks</a> •
-  <a href="https://lightning.ai/docs/litserve" style="margin: 0 10px;">Docs</a>
-</div>
+# LitServe: Deploy AI models Lightning fast ⚡    
 
-<p align="center">
-
-</div>
+<img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
 &nbsp;
 
-<table>
-  <tr>
-    <td width='400px'>
-      <p align='center'>
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/84fbb674-f016-45b4-99c0-a2e4138c93f7">
-  <img height='60px' alt="Text changing depending on mode. Light: 'So light!' Dark: 'So dark!'" src="https://github.com/user-attachments/assets/64f8a92a-1516-499d-9896-6f6fdd096780">
-</picture>
-        <br>
-        <br>
-<strong>High-throughput serving engine for AI models.</strong><br>   
+<strong>High-throughput serving engine for AI models.</strong>    
 Friendly interface. Enterprise scale.
-        </p>
-      <br>
-LitServe is a FastAPI-based engine for scalable AI model deployment, featuring batching, streaming, and autoscaling across CPUs and GPUs. LitServe eliminates the need to build a new FastAPI server for each model.
-    </td>
-    <td>
-      <video src="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" poster='https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_video_banner_4.png'/>
-    </td>
-  </tr>
-</table>
+</div>
 
-&nbsp;
+----
 
-<div align="center">
+**LitServe** is a FastAPI-based engine for scalable AI model deployment. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server for each model.
 
-[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/litserve)
-![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg) [![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20Help%20on%20Discord)](https://discord.gg/VptPCZkGNa)
-
+<div align='center'>
+  
 <pre>
 ✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU   
 ✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control          
 ✅ Auth           ✅ Built on Fast API  ✅ Custom specs (Open AI)
 </pre>
 
-&nbsp; 
-  
+<div align='center'>
+
+[![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20help%20on%20Discord)](https://discord.gg/VptPCZkGNa)
+![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)
+
+</div>
+</div>
+<div align="center">
+  <div style="text-align: center;">
+    <a href="#quick-start" style="margin: 0 10px;">Quick start</a> •
+    <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
+    <a href="#featured-examples" style="margin: 0 10px;">Examples</a> •
+    <a href="#deployment-options" style="margin: 0 10px;">Deploy</a> •
+    <a href="#features" style="margin: 0 10px;">Features</a> •
+    <a href="#performance" style="margin: 0 10px;">Benchmarks</a> •
+    <a href="https://lightning.ai/docs/litserve" style="margin: 0 10px;">Docs</a>
+  </div>
+</div>
+
+&nbsp;
+
+<div align="center">
 <a target="_blank" href="https://lightning.ai/docs/litserve/home">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/get-started-badge.svg" height="36px" alt="Get started"/>
 </a>
@@ -70,10 +59,10 @@ LitServe (built on FastAPI), is optimized for AI workloads like model serving, e
   <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/litserve-perf-2.png" width="1000px" style="max-width: 100%;">
 </div>   
 
-These benchmarks are for image and text classification as examples.  Reproduce and read the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks). 
+These benchmarks are for image and text classification as examples.  Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks). 
 
     
-***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM, use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm)) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed for best LLM performance.
+***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
 
 &nbsp; 
 
