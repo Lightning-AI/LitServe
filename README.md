@@ -23,10 +23,11 @@ Friendly interface. Enterprise scale.
 </pre>
 
 <div align='center'>
-  
+
+[![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20help%20on%20Discord)](https://discord.gg/VptPCZkGNa)
+![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/litserve)
-![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg) [![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20Help%20on%20Discord)](https://discord.gg/VptPCZkGNa)
+
 </div>
 </div>
 <div align="center">
