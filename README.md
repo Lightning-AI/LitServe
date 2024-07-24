@@ -2,7 +2,6 @@
   
 # LitServe: Deploy AI models Lightning fast ⚡    
 
-
 <div style="text-align: center;">
   <a href="#quick-start" style="margin: 0 10px;">Quick start</a> •
   <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
@@ -36,7 +35,7 @@ Friendly interface. Enterprise scale.
 LitServe is a FastAPI-based engine for scalable AI model deployment. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server for each model.
     </td>
     <td>
-      <video src="https://github.com/user-attachments/assets/052e9398-fe84-46fe-a795-a0aa11ffc553"/>
+      <video src="https://github.com/user-attachments/assets/de427a98-4d4b-4e71-bdb8-5f37ad15b6bd"/>
     </td>
   </tr>
 </table>
