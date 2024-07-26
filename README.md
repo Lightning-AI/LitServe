@@ -12,7 +12,7 @@ Friendly interface. Enterprise scale.
 
 ----
 
-**LitServe** is a FastAPI-based engine for scalable AI model deployment. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server for each model.
+**LitServe** is an engine for scalable AI model deployment built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server for each model.
 
 <div align='center'>
   
