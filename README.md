@@ -69,6 +69,8 @@ These results are for image and text classification ML tasks. The performance re
 
 ## Featured examples    
 
+Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision, audio, multi-modal, etc).    
+
 <table>
   <tr>
    <td style="vertical-align: top;">
