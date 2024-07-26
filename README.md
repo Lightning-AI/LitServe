@@ -53,13 +53,15 @@ Friendly interface. Enterprise scale.
 &nbsp; 
 
 ## Performance  
-LitServe, built on FastAPI, is optimized for AI workloads like model serving, embeddings, and LLM serving. These benchmarks are for image and text classification as examples.     
+Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
 
 Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
 
 <div align="center">
   <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_key_results2.png" width="1000px" style="max-width: 100%;">
-</div>   
+</div> 
+
+These results are for image and text classification ML tasks. The performance relationships hold for other ML tasks (embedding, LLM serving, audio, segmentation, object detection, summarization etc...).   
     
 ***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
 
@@ -184,8 +186,9 @@ response = requests.post(
 &nbsp;
 
 # Deployment options   
-LitServe is developed by [Lightning AI](https://lightning.ai/) which provides infrastructure for deploying AI models.   
-Self-manage deployments or use [Lightning Studios](https://lightning.ai/) for production-grade deployments without cloud headaches, security and 99.95% uptime SLA.     
+Self-manage LitServe deployments (just run it on any machine!), or deploy with one click on [Lightning AI](https://lightning.ai/).    
+
+LitServe is developed by [Lightning AI](https://lightning.ai/) which provides infrastructure for deploying AI models.     
 
 &nbsp;
 
