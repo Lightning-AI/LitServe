@@ -331,9 +331,11 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
+    workers_setup_status: Dict[str, bool],
 ):
     lit_api.setup(device)
     lit_api.device = device
+    workers_setup_status[worker_id] = True
     message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
@@ -476,6 +478,7 @@ class LitServer:
         manager = mp.Manager()
         self.request_queue = manager.Queue()
         self.response_buffer = {}
+        self.workers_setup_status = manager.dict()
 
         response_queues = []
         tasks: List[asyncio.Task] = []
@@ -506,6 +509,7 @@ class LitServer:
             if len(device) == 1:
                 device = device[0]
 
+            self.workers_setup_status[worker_id] = False
             response_queue = manager.Queue()
             response_queues.append(response_queue)
 
@@ -526,6 +530,7 @@ class LitServer:
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
+                    self.workers_setup_status,
                 ),
                 daemon=True,
             )
@@ -582,6 +587,12 @@ class LitServer:
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
+
+        @self.app.get("/health", dependencies=[Depends(self.setup_auth())])
+        async def indexh(request: Request) -> Response:
+            if all(self.workers_setup_status.values()):
+                return Response(content="ok", status_code=200)
+            return Response(content="not ready", status_code=503)
 
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             uid = uuid.uuid4()
