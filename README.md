@@ -69,6 +69,18 @@ Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/ben
 
 <table>
   <tr>
+   <td style="vertical-align: top;">
+<pre>
+<strong>Featured examples</strong><br>
+<strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
+<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
+<strong>NLP:</strong>        <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>
+<strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
+<strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">Stable Audio</a>
+<strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
+<strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+</pre>
+    </td>
     <td style="vertical-align: top;">
 <pre>
 <strong>Key features</strong><br>
@@ -79,18 +91,6 @@ Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/ben
 ✅ <strong>Enterprise scale:  </strong> scale huge models
 ✅ <strong>Auto GPU scaling:  </strong> zero code changes
 ✅ <strong>Self host:         </strong> or run on Studios
-</pre>
-    </td>
-    <td style="vertical-align: top;">
-<pre>
-<strong>Featured examples</strong><br>
-<strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
-<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
-<strong>NLP models:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Any Hugging face model</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT model</a>
-<strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
-<strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">OpenAI Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">Stable Audio</a>
-<strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
-<strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
 </pre>
     </td>
   </tr>
