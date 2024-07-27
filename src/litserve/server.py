@@ -590,7 +590,7 @@ class LitServer:
             return Response(content="litserve running")
 
         @self.app.get("/health", dependencies=[Depends(self.setup_auth())])
-        async def indexh(request: Request) -> Response:
+        async def health(request: Request) -> Response:
             if all(self.workers_setup_status.values()):
                 return Response(content="ok", status_code=200)
             return Response(content="not ready", status_code=503)
