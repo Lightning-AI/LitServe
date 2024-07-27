@@ -597,6 +597,7 @@ class LitServer:
 
             if self.workers_ready:
                 return Response(content="ok", status_code=200)
+
             return Response(content="not ready", status_code=503)
 
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
