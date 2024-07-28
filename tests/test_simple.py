@@ -50,7 +50,7 @@ def test_simple():
 
 class SlowSetupLitAPI(SimpleLitAPI):
     def setup(self, device):
-        self.model = lambda x: x**3
+        self.model = lambda x: x**2
         time.sleep(2)
 
 
