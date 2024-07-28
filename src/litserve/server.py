@@ -442,7 +442,6 @@ class LitServer:
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
-        self.workers_ready = False
         self.max_batch_size = max_batch_size
         self.timeout = timeout
         self.batch_timeout = batch_timeout
@@ -586,16 +585,18 @@ class LitServer:
             data_available.clear()
 
     def setup_server(self):
+        workers_ready = False
+        
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
         @self.app.get("/health", dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
-            if not self.workers_ready:
-                self.workers_ready = all(self.workers_setup_status.values())
+            if not workers_ready:
+                workers_ready = all(self.workers_setup_status.values())
 
-            if self.workers_ready:
+            if workers_ready:
                 return Response(content="ok", status_code=200)
 
             return Response(content="not ready", status_code=503)
