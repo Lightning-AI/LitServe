@@ -331,12 +331,11 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
-    workers_setup_status: Dict[str, bool] = None,
+    workers_setup_status: Dict[str, bool],
 ):
     lit_api.setup(device)
     lit_api.device = device
-    if workers_setup_status:
-        workers_setup_status[worker_id] = True
+    workers_setup_status[worker_id] = True
     message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
