@@ -586,7 +586,7 @@ class LitServer:
 
     def setup_server(self):
         workers_ready = False
-        
+
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
