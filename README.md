@@ -58,7 +58,7 @@ Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous r
 Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
 
 <div align="center">
-  <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_key_results2.png" width="1000px" style="max-width: 100%;">
+  <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_benchmarks_1.png" width="1000px" style="max-width: 100%;">
 </div> 
 
 These results are for image and text classification ML tasks. The performance relationships hold for other ML tasks (embedding, LLM serving, audio, segmentation, object detection, summarization etc...).   
