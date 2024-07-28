@@ -592,6 +592,7 @@ class LitServer:
 
         @self.app.get("/health", dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
+            nonlocal workers_ready
             if not workers_ready:
                 workers_ready = all(self.workers_setup_status.values())
 
