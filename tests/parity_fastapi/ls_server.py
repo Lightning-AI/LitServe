@@ -53,7 +53,7 @@ def main(batch_size: int = 8, workers_per_device: int = 1):
     server = ls.LitServer(
         api,
         max_batch_size=batch_size,
-        batch_timeout=0.005,
+        batch_timeout=0.01,
         timeout=100,
         workers_per_device=workers_per_device,
     )
