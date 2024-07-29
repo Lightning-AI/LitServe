@@ -47,7 +47,7 @@ class ImageClassifierAPI(ls.LitAPI):
         return {"output": output}
 
 
-def main(batch_size: int = 8, devices: int = 1, workers_per_device: int = 8):
+def main(batch_size: int = 8, workers_per_device: int = 8):
     print(locals())
     api = ImageClassifierAPI()
     server = ls.LitServer(
@@ -55,7 +55,6 @@ def main(batch_size: int = 8, devices: int = 1, workers_per_device: int = 8):
         max_batch_size=batch_size,
         batch_timeout=0.01,
         timeout=100,
-        devices=devices,
         workers_per_device=workers_per_device,
     )
     server.run(port=8000, log_level="warning")
@@ -63,10 +62,10 @@ def main(batch_size: int = 8, devices: int = 1, workers_per_device: int = 8):
 
 if __name__ == "__main__":
     conf = {
-        "gpu": {"batch_size": 8, "workers_per_device": 2},
+        "cuda": {"batch_size": 8, "workers_per_device": 2},
         "cpu": {"batch_size": 8, "workers_per_device": 2},
         "mps": {"batch_size": 8, "workers_per_device": 2},
     }
-    device = "cpu" if torch.cuda.is_available() else "gpu"
+    device = "cpu" if torch.cuda.is_available() else "cuda"
     device = "mps" if torch.backends.mps.is_available() else device
     main(**conf[device])

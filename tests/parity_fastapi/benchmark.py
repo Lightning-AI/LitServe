@@ -8,7 +8,7 @@ import requests
 import torch
 from PIL import Image
 
-device = "cpu" if torch.cuda.is_available() else "gpu"
+device = "cpu" if torch.cuda.is_available() else "cuda"
 device = "mps" if torch.backends.mps.is_available() else device
 
 image = Image.new("RGB", (224, 224))
@@ -78,7 +78,7 @@ def run_bench(num_samples: int):
     conf = {
         "cpu": {"num_requests": 16},
         "mps": {"num_requests": 50},
-        "gpu": {"num_requests": 100},
+        "cuda": {"num_requests": 100},
     }
 
     num_requests = conf[device]["num_requests"]
