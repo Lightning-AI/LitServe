@@ -1,3 +1,5 @@
+import time
+
 import torch
 
 from tests.e2e.test_e2e import e2e_from_file
@@ -21,11 +23,13 @@ diff_factor = {
 
 @e2e_from_file("tests/parity_fastapi/fastapi_server.py")
 def run_fastapi_benchmark(num_samples):
+    time.sleep(10)
     return run_bench(conf, num_samples)
 
 
 @e2e_from_file("tests/parity_fastapi/ls_server.py")
 def run_litserve_benchmark(num_samples):
+    time.sleep(10)
     return run_bench(conf, num_samples)
 
 
