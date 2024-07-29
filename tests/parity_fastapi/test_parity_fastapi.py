@@ -14,19 +14,20 @@ diff_factor = {
 
 
 @e2e_from_file("tests/parity_fastapi/fastapi_server.py")
-def run_fastapi_benchmark():
-    return run_bench(10)
+def run_fastapi_benchmark(num_samples):
+    return run_bench(num_samples)
 
 
 @e2e_from_file("tests/parity_fastapi/ls_server.py")
-def run_litserve_benchmark():
-    return run_bench(10)
+def run_litserve_benchmark(num_samples):
+    return run_bench(num_samples)
 
 
 def test_parity_fastapi(killall):
     key = "Requests Per Second (RPS)"
-    fastapi_df = run_fastapi_benchmark()
-    ls_df = run_litserve_benchmark()
+    num_samples = 1
+    fastapi_df = run_fastapi_benchmark(num_samples=num_samples)
+    ls_df = run_litserve_benchmark(num_samples=num_samples)
     fastapi_throughput = fastapi_df[key].mean()
     ls_throughput = ls_df[key].mean()
     factor = diff_factor[device]

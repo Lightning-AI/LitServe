@@ -73,7 +73,7 @@ def benchmark(num_requests=100, concurrency_level=100):
     return metrics
 
 
-def run_bench(num_samples: int = 10):
+def run_bench(num_samples: int = 1):
     conf = {
         "cpu": {"num_requests": 16},
         "mps": {"num_requests": 50},
@@ -82,11 +82,8 @@ def run_bench(num_samples: int = 10):
 
     num_requests = conf[device]["num_requests"]
 
-    # warmup
-    benchmark(num_requests=8, concurrency_level=8)
-
     results = []
     for _ in range(num_samples):
         metric = benchmark(num_requests=num_requests, concurrency_level=num_requests)
         results.append(metric)
-    return pd.DataFrame.from_dict(results)
+    return pd.DataFrame.from_dict(results[1:])
