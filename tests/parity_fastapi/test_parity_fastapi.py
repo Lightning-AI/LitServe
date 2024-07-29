@@ -40,7 +40,3 @@ def test_parity_fastapi():
     factor = diff_factor[device]
     msg = f"LitServe should have larger throughput than FastAPI on {device}\n." f"{fastapi_metrics} vs {ls_metrics}"
     assert ls_throughput > fastapi_throughput * factor, msg
-
-
-if __name__ == "__main__":
-    test_parity_fastapi()
