@@ -22,9 +22,9 @@ class ImageData(BaseModel):
 class ImageClassifierAPI:
     def __init__(self, device):
         self.device = device
-        weights = torchvision.models.ResNet152_Weights.DEFAULT
+        weights = torchvision.models.ResNet18_Weights.DEFAULT
         self.image_processing = weights.transforms()
-        self.model = torchvision.models.resnet152(weights=weights).eval().to(device)
+        self.model = torchvision.models.resnet18(weights=weights).eval().to(device)
 
     def process_image(self, image_data):
         image = base64.b64decode(image_data)

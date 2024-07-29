@@ -17,9 +17,9 @@ if torch.cuda.is_available() and torch.cuda.get_device_capability() >= (8, 0):
 class ImageClassifierAPI(ls.LitAPI):
     def setup(self, device):
         print(device)
-        weights = torchvision.models.ResNet152_Weights.DEFAULT
+        weights = torchvision.models.ResNet18_Weights.DEFAULT
         self.image_processing = weights.transforms()
-        self.model = torchvision.models.resnet152(weights=weights).eval().to(device)
+        self.model = torchvision.models.resnet18(weights=weights).eval().to(device)
         self.pool = ThreadPoolExecutor(os.cpu_count())
 
     def decode_request(self, request):
