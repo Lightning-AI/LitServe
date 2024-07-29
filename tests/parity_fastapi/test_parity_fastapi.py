@@ -29,7 +29,7 @@ def mean(lst):
 
 def test_parity_fastapi():
     key = "Requests Per Second (RPS)"
-    num_samples = 1
+    num_samples = 4
     fastapi_metrics = run_fastapi_benchmark(num_samples=num_samples)
     ls_metrics = run_litserve_benchmark(num_samples=num_samples)
     print("fastapi_metrics", fastapi_metrics)
@@ -40,3 +40,7 @@ def test_parity_fastapi():
     factor = diff_factor[device]
     msg = f"LitServe should have larger throughput than FastAPI on {device}\n." f"{fastapi_metrics} vs {ls_metrics}"
     assert ls_throughput > fastapi_throughput * factor, msg
+
+
+if __name__ == "__main__":
+    test_parity_fastapi()
