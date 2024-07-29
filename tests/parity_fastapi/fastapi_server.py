@@ -46,7 +46,7 @@ api = ImageClassifierAPI(device)
 
 
 @app.post("/predict")
-def predict(image_data: ImageData):
+async def predict(image_data: ImageData):
     try:
         processed_image = api.process_image(image_data.image_data)
         prediction = api.predict(processed_image)
