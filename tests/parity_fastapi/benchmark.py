@@ -2,6 +2,7 @@ import base64
 import concurrent.futures
 import random
 import time
+
 import pandas as pd
 import requests
 import torch
@@ -73,7 +74,7 @@ def benchmark(num_requests=100, concurrency_level=100):
     return metrics
 
 
-def run_bench(num_samples: int = 1):
+def run_bench(num_samples: int):
     conf = {
         "cpu": {"num_requests": 16},
         "mps": {"num_requests": 50},

@@ -1,21 +1,12 @@
 import base64
 import io
-import logging
-import time
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+
 import PIL
 import torch
 import torchvision
+from fastapi import FastAPI, HTTPException
 from jsonargparse import CLI
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s,%(name)s,%(message)s",
-)
-
-logger = logging.getLogger("MODEL_LOG")
+from pydantic import BaseModel
 
 # Set float32 matrix multiplication precision if GPU is available and capable
 if torch.cuda.is_available() and torch.cuda.get_device_capability() >= (8, 0):
@@ -42,17 +33,10 @@ class ImageClassifierAPI:
         return processed_image.unsqueeze(0).to(self.device)  # Add batch dimension
 
     def predict(self, x):
-        start_time = time.time()
         with torch.inference_mode():
             outputs = self.model(x)
             _, predictions = torch.max(outputs, 1)
-            prediction = predictions.item()
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        end_time = time.time()
-        inference_time = (end_time - start_time) * 1000
-        logger.info(f"inference time (ms), {inference_time}")
-        return prediction
+        return predictions.item()
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
