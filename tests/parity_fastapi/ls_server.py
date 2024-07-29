@@ -71,8 +71,10 @@ def main(batch_size: int = 8, devices: int = 1, workers_per_device: int = 8):
 
 if __name__ == "__main__":
     conf = {
-        "gpu": {"batch_size": 8, "workers_per_device": 8},
-        "cpu": {"batch_size": 2, "workers_per_device": 8},
+        "gpu": {"batch_size": 8, "workers_per_device": 2},
+        "cpu": {"batch_size": 8, "workers_per_device": 2},
+        "mps": {"batch_size": 8, "workers_per_device": 2},
     }
     device = "cpu" if torch.cuda.is_available() else "gpu"
+    device = "mps" if torch.backends.mps.is_available() else device
     main(**conf[device])

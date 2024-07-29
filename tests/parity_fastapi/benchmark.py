@@ -10,16 +10,19 @@ import requests
 import torch
 from PIL import Image
 
+device = "cpu" if torch.cuda.is_available() else "gpu"
+device = "mps" if torch.backends.mps.is_available() else device
+
 image = Image.new("RGB", (224, 224))
-image.save("image.jpg")
-# Configuration
+image.save("image1.jpg")
+image.save("image2.jpg")
+
 SERVER_URL = "http://0.0.0.0:8000/predict"
-
 payloads = []
-
-with open("image.jpg", "rb") as image_file:
-    encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
-    payloads.append(encoded_string)
+for file in ["image1.jpg", "image2.jpg"]:
+    with open(file, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+        payloads.append(encoded_string)
 
 session = requests.Session()
 
@@ -89,9 +92,10 @@ def benchmark(num_requests=1000, concurrency_level=50):
 def run_bench(num_samples: int = 10):
     conf = {
         "cpu": {"num_requests": 16},
+        "mps": {"num_requests": 50},
         "gpu": {"num_requests": 100},
     }
-    device = "cpu" if torch.cuda.is_available() else "gpu"
+
     num_requests = conf[device]["num_requests"]
 
     # warmup
