@@ -19,7 +19,7 @@ class ImageClassifierAPI(ls.LitAPI):
         print(device)
         weights = torchvision.models.ResNet18_Weights.DEFAULT
         self.image_processing = weights.transforms()
-        self.model = torchvision.models.resnet18(weights=weights).eval().to(device)
+        self.model = torchvision.models.resnet18(weights=None).eval().to(device)
         self.pool = ThreadPoolExecutor(os.cpu_count())
 
     def decode_request(self, request):
@@ -47,24 +47,24 @@ class ImageClassifierAPI(ls.LitAPI):
         return {"output": output}
 
 
-def main(batch_size: int = 8, workers_per_device: int = 8):
+def main(batch_size: int = 8, workers_per_device: int = 1):
     print(locals())
     api = ImageClassifierAPI()
     server = ls.LitServer(
         api,
         max_batch_size=batch_size,
-        batch_timeout=0.01,
+        batch_timeout=0.005,
         timeout=100,
         workers_per_device=workers_per_device,
     )
-    server.run(port=8000, log_level="warning")
+    server.run(port=8000)
 
 
 if __name__ == "__main__":
     conf = {
-        "cuda": {"batch_size": 8, "workers_per_device": 2},
-        "cpu": {"batch_size": 8, "workers_per_device": 2},
-        "mps": {"batch_size": 8, "workers_per_device": 2},
+        "cuda": {"batch_size": 8, "workers_per_device": 1},
+        "cpu": {"batch_size": 8, "workers_per_device": 1},
+        "mps": {"batch_size": 8, "workers_per_device": 1},
     }
     device = "cpu" if torch.cuda.is_available() else "cuda"
     device = "mps" if torch.backends.mps.is_available() else device

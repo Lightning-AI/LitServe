@@ -16,11 +16,7 @@ Image.fromarray(rand_mat[0].astype("uint8")).convert("RGB").save("image1.jpg")
 Image.fromarray(rand_mat[1].astype("uint8")).convert("RGB").save("image2.jpg")
 
 SERVER_URL = "http://0.0.0.0:8000/predict"
-conf = {
-    "cpu": {"num_requests": 16},
-    "mps": {"num_requests": 16},
-    "cuda": {"num_requests": 50},
-}
+
 
 payloads = []
 for file in ["image1.jpg", "image2.jpg"]:
@@ -28,23 +24,23 @@ for file in ["image1.jpg", "image2.jpg"]:
         encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
         payloads.append(encoded_string)
 
-session = requests.Session()
 
-
-def send_request():
+def send_request(session):
     """Function to send a single request and measure the response time."""
     payload = {"image_data": random.choice(payloads)}
     start_time = time.time()
-    response = session.post(SERVER_URL, json=payload)
+    response = requests.post(SERVER_URL, json=payload)
     end_time = time.time()
     return end_time - start_time, response.status_code
 
 
 def benchmark(num_requests=100, concurrency_level=100):
     """Benchmark the ML server."""
+    session = requests.Session()
+
     start_benchmark_time = time.time()  # Start benchmark timing
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency_level) as executor:
-        futures = [executor.submit(send_request) for _ in range(num_requests)]
+        futures = [executor.submit(send_request, session) for _ in range(num_requests)]
         response_times = []
         status_codes = []
 
@@ -80,7 +76,7 @@ def benchmark(num_requests=100, concurrency_level=100):
     return metrics
 
 
-def run_bench(num_samples: int):
+def run_bench(conf: dict, num_samples: int):
     num_requests = conf[device]["num_requests"]
 
     results = []
