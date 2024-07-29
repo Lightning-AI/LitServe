@@ -2,10 +2,7 @@ import base64
 import concurrent.futures
 import random
 import time
-
-import gpustat
 import pandas as pd
-import psutil
 import requests
 import torch
 from PIL import Image
@@ -36,7 +33,7 @@ def send_request():
     return end_time - start_time, response.status_code
 
 
-def benchmark(num_requests=1000, concurrency_level=50):
+def benchmark(num_requests=100, concurrency_level=100):
     """Benchmark the ML server."""
     start_benchmark_time = time.time()  # Start benchmark timing
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency_level) as executor:
@@ -55,13 +52,8 @@ def benchmark(num_requests=1000, concurrency_level=50):
     # Analysis
     total_time = sum(response_times)  # Time in seconds
     avg_time = total_time / num_requests  # Time in seconds
-    avg_latency_per_request = (total_time / num_requests) * 1000  # Convert to milliseconds
     success_rate = status_codes.count(200) / num_requests * 100
     rps = num_requests / total_benchmark_time  # Requests per second
-
-    # Calculate throughput per concurrent user in requests per second
-    successful_requests = status_codes.count(200)
-    throughput_per_user = (successful_requests / total_benchmark_time) / concurrency_level  # Requests per second
 
     # Create a dictionary with the metrics
     metrics = {
@@ -71,15 +63,7 @@ def benchmark(num_requests=1000, concurrency_level=50):
         "Average Response Time (ms)": avg_time * 1000,
         "Success Rate (%)": success_rate,
         "Requests Per Second (RPS)": rps,
-        "Latency per Request (ms)": avg_latency_per_request,
-        "Throughput per Concurrent User (requests/second)": throughput_per_user,
     }
-    try:
-        gpu_stats = gpustat.GPUStatCollection.new_query()
-        metrics["GPU Utilization"] = sum([gpu.utilization for gpu in gpu_stats.gpus]) / len(gpu_stats.gpus)
-    except Exception:
-        metrics["GPU Utilization"] = 0
-    metrics["CPU Usage"] = psutil.cpu_percent(0.5)
 
     # Print the metrics
     for key, value in metrics.items():
