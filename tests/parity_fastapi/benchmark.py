@@ -3,7 +3,6 @@ import concurrent.futures
 import random
 import time
 
-import pandas as pd
 import requests
 import torch
 from PIL import Image
@@ -87,4 +86,4 @@ def run_bench(num_samples: int):
     for _ in range(num_samples):
         metric = benchmark(num_requests=num_requests, concurrency_level=num_requests)
         results.append(metric)
-    return pd.DataFrame.from_dict(results[1:])
+    return results
