@@ -48,6 +48,31 @@ def test_simple():
         assert response.json() == {"output": 16.0}
 
 
+class SlowSetupLitAPI(SimpleLitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+        time.sleep(2)
+
+
+def test_workers_health():
+    server = LitServer(SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2)
+
+    with TestClient(server.app) as client:
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(1)
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(3)
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
         for _ in range(100):
