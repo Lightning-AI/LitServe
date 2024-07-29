@@ -15,7 +15,7 @@ rand_mat = np.random.rand(2, 224, 224, 3) * 255
 Image.fromarray(rand_mat[0].astype("uint8")).convert("RGB").save("image1.jpg")
 Image.fromarray(rand_mat[1].astype("uint8")).convert("RGB").save("image2.jpg")
 
-SERVER_URL = "http://0.0.0.0:8000/predict"
+SERVER_URL = "http://127.0.0.1:8000/predict"
 
 
 payloads = []
@@ -25,7 +25,7 @@ for file in ["image1.jpg", "image2.jpg"]:
         payloads.append(encoded_string)
 
 
-def send_request(session):
+def send_request():
     """Function to send a single request and measure the response time."""
     payload = {"image_data": random.choice(payloads)}
     start_time = time.time()
@@ -36,11 +36,10 @@ def send_request(session):
 
 def benchmark(num_requests=100, concurrency_level=100):
     """Benchmark the ML server."""
-    session = requests.Session()
 
     start_benchmark_time = time.time()  # Start benchmark timing
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency_level) as executor:
-        futures = [executor.submit(send_request, session) for _ in range(num_requests)]
+        futures = [executor.submit(send_request) for _ in range(num_requests)]
         response_times = []
         status_codes = []
 
