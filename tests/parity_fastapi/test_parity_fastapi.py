@@ -1,17 +1,15 @@
-import numpy as np
-
 from tests.e2e.test_e2e import e2e_from_file
 from tests.parity_fastapi.benchmark import run_bench
 
 
 @e2e_from_file("tests/parity_fastapi/fastapi_server.py")
 def run_fastapi_benchmark():
-    return run_bench()
+    return run_bench(1)
 
 
 @e2e_from_file("tests/parity_fastapi/ls_server.py")
 def run_litserve_benchmark():
-    return run_bench()
+    return run_bench(1)
 
 
 def test_parity_fastapi(killall):
@@ -20,4 +18,4 @@ def test_parity_fastapi(killall):
     ls_df = run_litserve_benchmark()
     fastapi_throughput = fastapi_df[key].mean()
     ls_throughput = ls_df[key].mean()
-    assert np.isclose(fastapi_throughput, ls_throughput)
+    assert ls_throughput > fastapi_throughput

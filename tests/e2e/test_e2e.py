@@ -35,7 +35,7 @@ def e2e_from_file(filename):
             time.sleep(5)
 
             try:
-                test_fn(*args, **kwargs)
+                return test_fn(*args, **kwargs)
             except Exception:
                 raise
             finally:

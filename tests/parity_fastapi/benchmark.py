@@ -1,6 +1,5 @@
 import base64
 import concurrent.futures
-import os
 import random
 import time
 
@@ -11,16 +10,16 @@ import requests
 import torch
 from PIL import Image
 
+image = Image.new("RGB", (224, 224))
+image.save("image.jpg")
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"
 
 payloads = []
-for file in [
-    "image.jpg",
-]:
-    with open(file, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
-        payloads.append(encoded_string)
+
+with open("image.jpg", "rb") as image_file:
+    encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+    payloads.append(encoded_string)
 
 session = requests.Session()
 
@@ -88,23 +87,18 @@ def benchmark(num_requests=1000, concurrency_level=50):
 
 
 def run_bench(num_samples: int = 10):
-    try:
-        image = Image.new("RGB", (224, 224))
-        image.save("image.jpg")
-        conf = {
-            "cpu": {"num_requests": 16},
-            "gpu": {"num_requests": 100},
-        }
-        device = "cpu" if torch.cuda.is_available() else "gpu"
-        num_requests = conf[device]["num_requests"]
+    conf = {
+        "cpu": {"num_requests": 16},
+        "gpu": {"num_requests": 100},
+    }
+    device = "cpu" if torch.cuda.is_available() else "gpu"
+    num_requests = conf[device]["num_requests"]
 
-        # warmup
-        benchmark(num_requests=8, concurrency_level=8)
+    # warmup
+    benchmark(num_requests=8, concurrency_level=8)
 
-        results = []
-        for _ in range(num_samples):
-            metric = benchmark(num_requests=num_requests, concurrency_level=num_requests)
-            results.append(metric)
-        return pd.DataFrame.from_dict(results)
-    finally:
-        os.remove("image.jpg")
+    results = []
+    for _ in range(num_samples):
+        metric = benchmark(num_requests=num_requests, concurrency_level=num_requests)
+        results.append(metric)
+    return pd.DataFrame.from_dict(results)
