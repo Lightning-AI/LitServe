@@ -337,8 +337,6 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
-    server_run=None,
-    sockets=None
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -347,9 +345,14 @@ def inference_worker(
     message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
-    if server_run:
-        server_run(sockets=sockets)
-
+    
+    config = workers_setup_status["config"]
+    sockets = workers_setup_status["sockets"]
+    lit_server = create_server(lit_api, lit_spec, config, sockets)
+    lit_server.response_queue = response_queue
+    lit_server.request_queue = request_queue
+    lit_server.workers_setup_status = workers_setup_status
+    
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
@@ -412,6 +415,13 @@ async def response_queue_to_buffer(
             buffer[uid] = payload
             event.set()
 
+def create_server(lit_api, lit_spec, config, sockets):
+    lit_server = LitServer(lit_api=lit_api, spec=lit_spec)
+    config.app = lit_server.app
+    server = uvicorn.Server(config=config)
+    th = threading.Thread(target=server.run, args=(sockets,), daemon=True)
+    th.start()
+    return lit_server
 
 class LitServer:
     def __init__(
@@ -428,6 +438,7 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
     ):
+        self.litserve_locals = locals()
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
@@ -488,16 +499,16 @@ class LitServer:
         self.setup_server()
 
 
-
-    async def launch_inference_worker(self, config, sockets):
-        app = self.app
+    def launch_inference_worker(self, config, sockets):
         manager = mp.Manager()
-        app.manager = manager
         self.request_queue = manager.Queue()
         self.workers_setup_status = manager.dict()
-        self.response_buffer = {}        
         self.response_queues = []
         self.process_list = []
+
+        config = uvicorn.Config(app=None, port=8000, log_level="info")
+        self.workers_setup_status["config"] = config
+        self.workers_setup_status["sockets"] = sockets
 
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
@@ -507,10 +518,7 @@ class LitServer:
             response_queue = manager.Queue()
             self.response_queues.append(response_queue)
 
-            server = uvicorn.Server(config=config)
-
-            
-            ctx = mp.get_context("fork")
+            ctx = mp.get_context("spawn")
             process = ctx.Process(
                 target=inference_worker,
                 args=(
@@ -524,8 +532,6 @@ class LitServer:
                     self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
-                    server.run,
-                    sockets
                 ),
                 daemon=True,
             )
@@ -544,20 +550,20 @@ class LitServer:
     
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
+        self.response_buffer = {}
         loop = asyncio.get_running_loop()
         tasks = []
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
-        for i, response_queue in enumerate(self.response_queues):
-            future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
-            task = loop.create_task(future, name=f"Response-reader-{i}")
-            tasks.append(task)
+    
+        future = response_queue_to_buffer(self.response_queue, self.response_buffer, self.stream, response_executor)
+        task = loop.create_task(future, name=f"Response-reader")
+        tasks.append(task)
 
         print("All tasks started!")
         yield
 
         for task in tasks:
             task.cancel()
-
 
 
     def device_identifiers(self, accelerator, device):
@@ -691,12 +697,10 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        loop = asyncio.new_event_loop()
-    
         config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
         sockets = [config.bind_socket()]
-        server = uvicorn.Server(config=config)
-        loop.run_until_complete(self.launch_inference_worker(config, sockets))
+
+        self.launch_inference_worker(config, sockets)
         for p, worker_id in self.process_list:
             p.join()
 
