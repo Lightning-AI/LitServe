@@ -416,10 +416,10 @@ def create_server(lit_api, lit_spec, config, sockets, **kwargs):
     lit_server = LitServer(lit_api=lit_api, spec=lit_spec)
     config.app = lit_server.app
     server = uvicorn.Server(config=config)
-    # ctx = mp.get_context("fork")
-    # p = ctx.Process(target=server.run, args=(sockets,), daemon=True)
-    th = threading.Thread(target=server.run, args=(sockets,), daemon=True)
-    return lit_server, th
+    ctx = mp.get_context("fork")
+    w = ctx.Process(target=server.run, args=(sockets,), daemon=True)
+    # w = threading.Thread(target=server.run, args=(sockets,), daemon=True)
+    return lit_server, w
 
 class LitServer:
     def __init__(
