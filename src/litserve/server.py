@@ -556,6 +556,7 @@ class LitServer:
         yield
 
         task.cancel()
+        logger.debug("Shutting down response queue to buffer task")
 
 
     def device_identifiers(self, accelerator, device):
