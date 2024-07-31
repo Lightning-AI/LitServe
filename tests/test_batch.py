@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-from unittest.mock import MagicMock, patch
-from asgi_lifespan import LifespanManager
 import time
-from litserve.server import run_batched_loop
+import warnings
 from queue import Queue
+from unittest.mock import MagicMock, patch
+
 import pytest
-
-from fastapi import Request, Response
-from httpx import AsyncClient
-
-from litserve import LitAPI, LitServer
-
 import torch
 import torch.nn as nn
+from asgi_lifespan import LifespanManager
+from fastapi import Request, Response
+from httpx import AsyncClient
+from litserve import LitAPI, LitServer
+from litserve.server import run_batched_loop
 
 
 class Linear(nn.Module):
@@ -118,6 +117,15 @@ def test_max_batch_size():
 
     with pytest.raises(ValueError, match="must be"):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+
+
+def test_max_batch_size_warning():
+    with pytest.warns(UserWarning, match="max_batch_size"):
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2)
+
+    with warnings.catch_warnings(record=True) as w:
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2)
+        assert len(w) == 0
 
 
 class FakeResponseQueue:
