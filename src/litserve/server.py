@@ -43,6 +43,9 @@ from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, load_and_raise
 from collections import deque
+import uvloop
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger = logging.getLogger(__name__)
 
@@ -333,6 +336,7 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
+    server_callback=None
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -378,6 +382,7 @@ async def response_queue_to_buffer(
     stream: bool,
     response_executor: ThreadPoolExecutor,
 ):
+    print("running response consumer")
     loop = asyncio.get_running_loop()
     if stream:
         while True:
@@ -476,50 +481,27 @@ class LitServer:
         self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
-    @asynccontextmanager
-    async def lifespan(self, app: FastAPI):
+
+
+    async def launch_inference_worker(self):
+        app = self.app
         manager = mp.Manager()
+        app.manager = manager
         self.request_queue = manager.Queue()
-        self.response_buffer = {}
         self.workers_setup_status = manager.dict()
+        self.response_buffer = {}
+        loop = asyncio.get_running_loop()        
+        self.response_queues = []
 
-        response_queues = []
-        tasks: List[asyncio.Task] = []
-
-        def close_tasks():
-            for task in tasks:
-                task.cancel()
-            response_executor.shutdown(wait=False, cancel_futures=True)
-
-        try:
-            pickle.dumps(self.lit_api)
-            pickle.dumps(self.lit_spec)
-
-        except (pickle.PickleError, AttributeError) as e:
-            logging.error(
-                "The LitAPI instance provided to LitServer cannot be moved to a worker because "
-                "it cannot be pickled. Please ensure all heavy-weight operations, like model "
-                "creation, are defined in LitAPI's setup method."
-            )
-            raise e
-
-        loop = asyncio.get_running_loop()
-        response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
-
-        process_list = []
-        # NOTE: device: str | List[str], the latter in the case a model needs more than one device to run
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
                 device = device[0]
 
             self.workers_setup_status[worker_id] = False
             response_queue = manager.Queue()
-            response_queues.append(response_queue)
+            self.response_queues.append(response_queue)
 
-            future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
-            task = loop.create_task(future, name=f"Response-reader-{worker_id}")
-            tasks.append(task)
-
+            process_list = []
             ctx = mp.get_context("spawn")
             process = ctx.Process(
                 target=inference_worker,
@@ -550,14 +532,22 @@ class LitServer:
             except Exception as e:
                 close_tasks()
                 raise e
-
+    
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        loop = asyncio.get_running_loop()
+        tasks = []
+        response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
+        for i, response_queue in enumerate(self.response_queues):
+            future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
+            task = loop.create_task(future, name=f"Response-reader-{i}")
+            tasks.append(task)
         yield
 
-        close_tasks()
-        for process, worker_id in process_list:
-            logging.info(f"terminating worker worker_id={worker_id}")
-            process.terminate()
-        manager.shutdown()
+        for task in tasks:
+            task.cancel()
+
+
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
@@ -619,7 +609,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put((uid, time.monotonic(), payload))
+            self.request_queue.put_nowait((uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -690,7 +680,10 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        uvicorn.run(host="0.0.0.0", port=port, app=self.app, workers=4, log_level=log_level, **kwargs)
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(self.launch_inference_worker())
+
+        uvicorn.run(host="0.0.0.0", port=port, app=self.app, workers=1, log_level=log_level, **kwargs)
 
     def runv2(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
         if generate_client_file:
@@ -705,7 +698,7 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, port=8000)
+        config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
         
         sockets = [config.bind_socket()]
         def run(server, config, sockets: list | None = None) -> None:
