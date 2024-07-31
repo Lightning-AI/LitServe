@@ -338,12 +338,11 @@ def inference_worker(
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
 ):
+    
     lit_api.setup(device)
     lit_api.device = device
 
-    message = f"Setup complete for worker {worker_id}."
-    print(message)
-    logger.info(message)
+    print(f"Setup complete for worker {worker_id}.")
 
     config = workers_setup_status["config"]
     sockets = workers_setup_status["sockets"]
@@ -554,7 +553,6 @@ class LitServer:
         future = response_queue_to_buffer(self.response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
 
-        print("All tasks started!")
         yield
 
         task.cancel()
