@@ -45,6 +45,7 @@ from litserve.utils import LitAPIStatus, load_and_raise
 from collections import deque
 import uvloop
 
+mp.allow_connection_pickling()
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logger = logging.getLogger(__name__)
@@ -336,7 +337,8 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
-    server_callback=None
+    server_run=None,
+    sockets=None
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -345,6 +347,9 @@ def inference_worker(
     message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
+    if server_run:
+        server_run(sockets=sockets)
+
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
@@ -483,7 +488,7 @@ class LitServer:
 
 
 
-    async def launch_inference_worker(self):
+    async def launch_inference_worker(self, config, sockets):
         app = self.app
         manager = mp.Manager()
         app.manager = manager
@@ -501,6 +506,8 @@ class LitServer:
             response_queue = manager.Queue()
             self.response_queues.append(response_queue)
 
+            server = uvicorn.Server(config=config)
+
             process_list = []
             ctx = mp.get_context("spawn")
             process = ctx.Process(
@@ -516,6 +523,8 @@ class LitServer:
                     self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
+                    server.run,
+                    sockets
                 ),
                 daemon=True,
             )
@@ -681,11 +690,11 @@ class LitServer:
             raise ValueError(port_msg)
 
         loop = asyncio.new_event_loop()
-        loop.run_until_complete(self.launch_inference_worker())
-
+    
         config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
         sockets = [config.bind_socket()]
         server = uvicorn.Server(config=config)
+        loop.run_until_complete(self.launch_inference_worker(config, sockets))
         server.run(sockets=sockets)
 
     def runv2(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
