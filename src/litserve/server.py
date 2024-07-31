@@ -683,7 +683,10 @@ class LitServer:
         loop = asyncio.new_event_loop()
         loop.run_until_complete(self.launch_inference_worker())
 
-        uvicorn.run(host="0.0.0.0", port=port, app=self.app, workers=1, log_level=log_level, **kwargs)
+        config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
+        sockets = [config.bind_socket()]
+        server = uvicorn.Server(config=config)
+        server.run(sockets=sockets)
 
     def runv2(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
         if generate_client_file:
