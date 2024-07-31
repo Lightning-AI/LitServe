@@ -402,6 +402,7 @@ async def response_queue_to_buffer(
 
     else:
         while True:
+            print("running response consumer")
             try:
                 uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
             except Empty:
@@ -494,8 +495,7 @@ class LitServer:
         app.manager = manager
         self.request_queue = manager.Queue()
         self.workers_setup_status = manager.dict()
-        self.response_buffer = {}
-        loop = asyncio.get_running_loop()        
+        self.response_buffer = {}        
         self.response_queues = []
         self.process_list = []
 
@@ -540,7 +540,6 @@ class LitServer:
             try:
                 spec.setup(server_copy)
             except Exception as e:
-                close_tasks()
                 raise e
     
     @asynccontextmanager
@@ -552,6 +551,8 @@ class LitServer:
             future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
             task = loop.create_task(future, name=f"Response-reader-{i}")
             tasks.append(task)
+
+        print("All tasks started!")
         yield
 
         for task in tasks:
