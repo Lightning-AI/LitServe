@@ -350,6 +350,7 @@ def inference_worker(
     lit_server.response_queue = response_queue
     lit_server.request_queue = request_queue
     lit_server.workers_setup_status = workers_setup_status
+    lit_server.response_buffer = dict()
     th.start()
 
     if workers_setup_status:
@@ -547,7 +548,6 @@ class LitServer:
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
-        self.response_buffer = dict()
 
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
         future = response_queue_to_buffer(self.response_queue, self.response_buffer, self.stream, response_executor)
