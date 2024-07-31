@@ -22,6 +22,8 @@ import shutil
 import sys
 import time
 import uuid
+import warnings
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty, Queue
@@ -31,9 +33,9 @@ import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
-from starlette.middleware.gzip import GZipMiddleware
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from litserve import LitAPI
@@ -41,7 +43,6 @@ from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, load_and_raise
-from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -428,6 +429,10 @@ class LitServer:
                 "api_path must start with '/'. "
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
+
+        # TODO: discuss this condition and the warning message with the team
+        if "batch" in lit_api.__class__.__dict__ and "unbatch" in lit_api.__class__.__dict__ and max_batch_size == 1:
+            warnings.warn("LitServer has batch and unbatch methods implemented but max_batch_size is unset.")
 
         self.api_path = api_path
         lit_api.stream = stream
