@@ -497,6 +497,7 @@ class LitServer:
         self.response_buffer = {}
         loop = asyncio.get_running_loop()        
         self.response_queues = []
+        self.process_list = []
 
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
@@ -508,8 +509,8 @@ class LitServer:
 
             server = uvicorn.Server(config=config)
 
-            process_list = []
-            ctx = mp.get_context("spawn")
+            
+            ctx = mp.get_context("fork")
             process = ctx.Process(
                 target=inference_worker,
                 args=(
@@ -529,7 +530,7 @@ class LitServer:
                 daemon=True,
             )
             process.start()
-            process_list.append((process, worker_id))
+            self.process_list.append((process, worker_id))
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
@@ -607,7 +608,7 @@ class LitServer:
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
-            logger.debug(f"Received request uid={uid}")
+            logger.info(f"Received request uid={uid}")
 
             payload = request
             if self.request_type == Request:
@@ -695,7 +696,8 @@ class LitServer:
         sockets = [config.bind_socket()]
         server = uvicorn.Server(config=config)
         loop.run_until_complete(self.launch_inference_worker(config, sockets))
-        server.run(sockets=sockets)
+        for p, worker_id in self.process_list:
+            p.join()
 
     def runv2(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
         if generate_client_file:
