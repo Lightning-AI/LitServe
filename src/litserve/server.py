@@ -20,6 +20,7 @@ import os
 import pickle
 import shutil
 import sys
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -472,6 +473,7 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
+        self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
     @asynccontextmanager
@@ -688,7 +690,40 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        uvicorn.run(host="0.0.0.0", port=port, app=self.app, log_level=log_level, **kwargs)
+        uvicorn.run(host="0.0.0.0", port=port, app=self.app, workers=4, log_level=log_level, **kwargs)
+
+    def runv2(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
+        if generate_client_file:
+            self.generate_client_file()
+
+        port_msg = f"port must be a value from 1024 to 65535 but got {port}"
+        try:
+            port = int(port)
+        except ValueError:
+            raise ValueError(port_msg)
+
+        if not (1024 <= port <= 65535):
+            raise ValueError(port_msg)
+
+        config = uvicorn.Config(app=self.app, port=8000)
+        
+        sockets = [config.bind_socket()]
+        def run(server, config, sockets: list | None = None) -> None:
+            # self.config.setup_event_loop()
+            uvicorn.loops.uvloop.uvloop_setup(use_subprocess=False)
+            return asyncio.run(server.serve(sockets=sockets))
+
+        threads = []
+        for i in range(4):
+            server = uvicorn.Server(config=config)
+            th = threading.Thread(target=server.run, args=(sockets,))
+            th.start()
+            threads.append(th)
+        
+        for th in threads:
+            th.join()
+       
+
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
