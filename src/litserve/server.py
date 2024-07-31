@@ -340,20 +340,22 @@ def inference_worker(
 ):
     lit_api.setup(device)
     lit_api.device = device
-    if workers_setup_status:
-        workers_setup_status[worker_id] = True
+
     message = f"Setup complete for worker {worker_id}."
     print(message)
     logger.info(message)
 
     config = workers_setup_status["config"]
     sockets = workers_setup_status["sockets"]
-    lit_server, th = create_server(lit_api, lit_spec, config, sockets, )
+    lit_server, th = create_server(lit_api, lit_spec, config, sockets, )  # inits a new FastAPI instance for uvicorn
     lit_server.response_queue = response_queue
     lit_server.request_queue = request_queue
     lit_server.workers_setup_status = workers_setup_status
     lit_server.response_buffer = dict()
     th.start()
+
+    if workers_setup_status:
+        workers_setup_status[worker_id] = True
 
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
@@ -412,7 +414,7 @@ async def response_queue_to_buffer(
             event.set()
 
 def create_server(lit_api, lit_spec, config, sockets, **kwargs):
-    lit_server = LitServer(lit_api=lit_api, spec=lit_spec, max_batch_size=8, batch_timeout=0.01)
+    lit_server = LitServer(lit_api=lit_api, spec=lit_spec)
     config.app = lit_server.app
     server = uvicorn.Server(config=config)
     th = threading.Thread(target=server.run, args=(sockets,), daemon=True)
@@ -495,7 +497,6 @@ class LitServer:
 
 
     def launch_inference_worker(self, manager, config, sockets):
-        
         self.workers_setup_status = manager.dict()
         self.response_queues = []
         self.process_list = []
@@ -509,10 +510,9 @@ class LitServer:
             if len(device) == 1:
                 device = device[0]
 
+            self.workers_setup_status[worker_id] = False
             request_queue = manager.Queue()
             self.request_queues.append(request_queue)
-
-            self.workers_setup_status[worker_id] = False
             response_queue = manager.Queue()
             self.response_queues.append(response_queue)
 
@@ -694,46 +694,12 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
+        config = uvicorn.Config(app=self.app, port=port, log_level=log_level, loop="uvloop")
         sockets = [config.bind_socket()]
 
         self.launch_inference_worker(manager, config, sockets)
         for p, worker_id in self.process_list:
             p.join()
-
-
-    def runv2(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
-        if generate_client_file:
-            self.generate_client_file()
-
-        port_msg = f"port must be a value from 1024 to 65535 but got {port}"
-        try:
-            port = int(port)
-        except ValueError:
-            raise ValueError(port_msg)
-
-        if not (1024 <= port <= 65535):
-            raise ValueError(port_msg)
-
-        config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
-        
-        sockets = [config.bind_socket()]
-        def run(server, config, sockets: list | None = None) -> None:
-            # self.config.setup_event_loop()
-            uvicorn.loops.uvloop.uvloop_setup(use_subprocess=False)
-            return asyncio.run(server.serve(sockets=sockets))
-
-        threads = []
-        for i in range(4):
-            server = uvicorn.Server(config=config)
-            th = threading.Thread(target=server.run, args=(sockets,))
-            th.start()
-            threads.append(th)
-        
-        for th in threads:
-            th.join()
-       
-
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
