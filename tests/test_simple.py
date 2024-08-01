@@ -57,7 +57,7 @@ class SlowSetupLitAPI(SimpleLitAPI):
 def test_workers_health():
     server = LitServer(SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2)
 
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.get("/health")
         assert response.status_code == 503
         assert response.text == "not ready"
