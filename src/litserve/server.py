@@ -609,6 +609,7 @@ class LitServer:
             return response
 
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+            response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
             q = deque()
@@ -618,7 +619,7 @@ class LitServer:
             payload = request
             if self.request_type == Request:
                 payload = await request.json()
-            self.request_queue.put((uid, time.monotonic(), payload))
+            self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
             return StreamingResponse(self.data_streamer(q, data_available=event))
 
