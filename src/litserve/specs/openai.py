@@ -317,14 +317,8 @@ class OpenAISpec(LitSpec):
         return Response(status_code=200)
 
     async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
-        try:
-            response_queue_id = self.response_queue_id
-        except Exception as e:
-            print(e)
-            response_queue_id = None
-        print("response_queue_id", response_queue_id)
+        response_queue_id = self.response_queue_id
         logger.debug("Received chat completion request %s", request)
-
         uids = [uuid.uuid4() for _ in range(request.n)]
         self.queues = []
         self.events = []
