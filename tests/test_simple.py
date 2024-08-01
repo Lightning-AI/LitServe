@@ -25,6 +25,8 @@ from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
 
+from tests.conftest import wrap_litserve_start
+
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
@@ -40,10 +42,8 @@ class SimpleLitAPI(LitAPI):
         return {"output": output}
 
 
-def test_simple():
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=5)
-
-    with TestClient(server.app) as client:
+def test_simple(lit_server):
+    with TestClient(lit_server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
 
@@ -80,16 +80,13 @@ def make_load_request(server, outputs):
             outputs.append(response.json())
 
 
-def test_load():
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=25)
-
+def test_load(lit_server):
     from threading import Thread
 
     threads = []
-
     for _ in range(1):
         outputs = []
-        t = Thread(target=make_load_request, args=(server, outputs))
+        t = Thread(target=make_load_request, args=(lit_server, outputs))
         t.start()
         threads.append((t, outputs))
 
@@ -127,63 +124,67 @@ async def test_timeout():
     api = SlowLitAPI()  # takes 2 second for each prediction
     server = LitServer(api, accelerator="cpu", devices=1, timeout=1.5)
 
-    # case 1: first request completes, second request times out in queue
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        await asyncio.sleep(2)  # Give time to start inference workers
-        response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
-        await asyncio.sleep(0.0001)
-        response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
-        await asyncio.wait([response1, response2])
-        assert (
-            response1.result().status_code == 200
-        ), "First request should complete since it's popped from the request queue."
-        assert (
-            response2.result().status_code == 504
-        ), "Server takes longer than specified timeout and request should timeout"
+    with wrap_litserve_start(server) as server:
+        # case 1: first request completes, second request times out in queue
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            await asyncio.sleep(2)  # Give time to start inference workers
+            response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
+            await asyncio.sleep(0.0001)
+            response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
+            await asyncio.wait([response1, response2])
+            assert (
+                response1.result().status_code == 200
+            ), "First request should complete since it's popped from the request queue."
+            assert (
+                response2.result().status_code == 504
+            ), "Server takes longer than specified timeout and request should timeout"
 
     # Case 2: first 2 requests finish as a batch and third request times out in queue
     server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=1.5, max_batch_size=2, batch_timeout=0.01)
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        await asyncio.sleep(2)  # Give time to start inference workers
-        response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
-        response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
-        await asyncio.sleep(0.0001)
-        response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
-        await asyncio.wait([response1, response2, response3])
-        assert (
-            response1.result().status_code == 200
-        ), "Batch: First request should complete since it's popped from the request queue."
-        assert (
-            response2.result().status_code == 200
-        ), "Batch: Second request should complete since it's popped from the request queue."
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            await asyncio.sleep(2)  # Give time to start inference workers
+            response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
+            response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
+            await asyncio.sleep(0.0001)
+            response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
+            await asyncio.wait([response1, response2, response3])
+            assert (
+                response1.result().status_code == 200
+            ), "Batch: First request should complete since it's popped from the request queue."
+            assert (
+                response2.result().status_code == 200
+            ), "Batch: Second request should complete since it's popped from the request queue."
 
-        assert response3.result().status_code == 504, "Batch: Third request was delayed and should fail"
+            assert response3.result().status_code == 504, "Batch: Third request was delayed and should fail"
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
     server3 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=2)
     server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=2)
 
-    with TestClient(server1.app) as client1, TestClient(server2.app) as client2, TestClient(
-        server3.app
-    ) as client3, TestClient(server4.app) as client4:
-        response1 = client1.post("/predict", json={"input": 4.0})
-        assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
+    with wrap_litserve_start(server1) as server1, wrap_litserve_start(server2) as server2, wrap_litserve_start(
+        server3
+    ) as server3, wrap_litserve_start(server4) as server4:
+        with TestClient(server1.app) as client1, TestClient(server2.app) as client2, TestClient(
+            server3.app
+        ) as client3, TestClient(server4.app) as client4:
+            response1 = client1.post("/predict", json={"input": 4.0})
+            assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
-        response2 = client2.post("/predict", json={"input": 4.0})
-        assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
+            response2 = client2.post("/predict", json={"input": 4.0})
+            assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
-        response3 = client3.post("/predict", json={"input": 4.0})
-        assert response3.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+            response3 = client3.post("/predict", json={"input": 4.0})
+            assert response3.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
 
-        response4 = client4.post("/predict", json={"input": 4.0})
-        assert response4.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+            response4 = client4.post("/predict", json={"input": 4.0})
+            assert response4.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
 
 
-def test_concurrent_requests():
+def test_concurrent_requests(lit_server):
     n_requests = 100
-    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
-    with TestClient(server.app) as client, ThreadPoolExecutor(n_requests // 4 + 1) as executor:
+    with TestClient(lit_server.app) as client, ThreadPoolExecutor(n_requests // 4 + 1) as executor:
         responses = list(executor.map(lambda i: client.post("/predict", json={"input": i}), range(n_requests)))
 
     count = 0

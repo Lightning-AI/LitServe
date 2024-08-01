@@ -479,9 +479,15 @@ class LitServer:
         self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
-    def launch_inference_worker(self, manager):
+    def launch_inference_worker(self, num_uvicorn_servers: int):
+        manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
+
+        self.response_queues = []
+        for _ in range(num_uvicorn_servers):
+            response_queue = manager.Queue()
+            self.response_queues.append(response_queue)
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
@@ -518,7 +524,7 @@ class LitServer:
             )
             process.start()
             process_list.append(process)
-        return process_list
+        return manager, process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -666,8 +672,6 @@ class LitServer:
         if generate_client_file:
             self.generate_client_file()
 
-        manager = mp.Manager()
-
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
             port = int(port)
@@ -683,12 +687,19 @@ class LitServer:
         if num_uvicorn_servers is None:
             num_uvicorn_servers = len(self.workers)
 
-        self.response_queues = []
-        for response_queue_id in range(num_uvicorn_servers):
-            response_queue = manager.Queue()
-            self.response_queues.append(response_queue)
+        manager, litserve_workers = self.launch_inference_worker(num_uvicorn_servers)
 
-        litserve_workers = self.launch_inference_worker(manager)
+        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets)
+
+        for s in servers:
+            s.join()
+
+        for w in litserve_workers:
+            w.terminate()
+            w.join()
+        manager.shutdown()
+
+    def _start_server(self, port, num_uvicorn_servers, log_level, sockets):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
@@ -699,12 +710,7 @@ class LitServer:
             w = ctx.Process(target=server.run, args=(sockets,))
             w.start()
             servers.append(w)
-
-        for s in servers:
-            s.join()
-
-        for w in litserve_workers:
-            w.join()
+        return servers
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):

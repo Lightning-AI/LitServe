@@ -14,6 +14,7 @@
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
+from tests.conftest import wrap_litserve_start
 
 from litserve import LitAPI, LitServer
 
@@ -39,14 +40,15 @@ def test_multipart_form_data(tmp_path):
         SimpleFileLitAPI(), accelerator="cpu", devices=1, workers_per_device=1, max_payload_size=(file_length * 2)
     )
 
-    with TestClient(server.app) as client:
-        file_path = f"{tmp_path}/big_file.txt"
-        with open(file_path, "wb") as f:
-            f.write(bytearray([1] * file_length))
-        with open(file_path, "rb") as f:
-            file = {"input": f}
-            response = client.post("/predict", files=file)
-            assert response.json() == {"output": file_length**2}
+    with wrap_litserve_start(server) as server:
+        with TestClient(server.app) as client:
+            file_path = f"{tmp_path}/big_file.txt"
+            with open(file_path, "wb") as f:
+                f.write(bytearray([1] * file_length))
+            with open(file_path, "rb") as f:
+                file = {"input": f}
+                response = client.post("/predict", files=file)
+                assert response.json() == {"output": file_length**2}
 
 
 def test_file_too_big(tmp_path):
@@ -56,18 +58,19 @@ def test_file_too_big(tmp_path):
         SimpleFileLitAPI(), accelerator="cpu", devices=1, workers_per_device=1, max_payload_size=(file_length / 2)
     )
 
-    with TestClient(server.app) as client:
-        file_path = f"{tmp_path}/big_file.txt"
-        with open(file_path, "wb") as f:
-            f.write(bytearray([1] * file_length))
-        with open(file_path, "rb") as f:
-            file = {"input": f}
-            response = client.post("/predict", files=file)
-            assert response.status_code == 413
+    with wrap_litserve_start(server) as server:
+        with TestClient(server.app) as client:
+            file_path = f"{tmp_path}/big_file.txt"
+            with open(file_path, "wb") as f:
+                f.write(bytearray([1] * file_length))
+            with open(file_path, "rb") as f:
+                file = {"input": f}
+                response = client.post("/predict", files=file)
+                assert response.status_code == 413
 
-            # spoof content-length size
-            response = client.post("/predict", files=file, headers={"content-length": "1024"})
-            assert response.status_code == 413
+                # spoof content-length size
+                response = client.post("/predict", files=file, headers={"content-length": "1024"})
+                assert response.status_code == 413
 
 
 class SimpleFormLitAPI(LitAPI):
@@ -86,8 +89,8 @@ class SimpleFormLitAPI(LitAPI):
 
 def test_urlencoded_form_data():
     server = LitServer(SimpleFormLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
-
-    with TestClient(server.app) as client:
-        file = {"input": "4.0"}
-        response = client.post("/predict", data=file)
-        assert response.json() == {"output": 16.0}
+    with wrap_litserve_start(server) as server:
+        with TestClient(server.app) as client:
+            file = {"input": "4.0"}
+            response = client.post("/predict", data=file)
+            assert response.json() == {"output": 16.0}
