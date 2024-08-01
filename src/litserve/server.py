@@ -432,7 +432,7 @@ class LitServer:
 
         # TODO: discuss this condition and the warning message with the team
         if "batch" in lit_api.__class__.__dict__ and "unbatch" in lit_api.__class__.__dict__ and max_batch_size == 1:
-            warnings.warn("LitServer has batch and unbatch methods implemented but max_batch_size is unset.")
+            warnings.warn("The LitServer has both batch and unbatch methods implemented, but the max_batch_size parameter was not set.")
 
         self.api_path = api_path
         lit_api.stream = stream
