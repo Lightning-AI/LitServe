@@ -682,7 +682,14 @@ class LitServer:
         except Exception as e:
             print(f"Error copying file: {e}")
 
-    def run(self, port: Union[str, int] = 8000, log_level: str = "info", generate_client_file: bool = True, **kwargs):
+    def run(
+        self,
+        port: Union[str, int] = 8000,
+        num_uvicorn_servers: Optional[int] = None,
+        log_level: str = "info",
+        generate_client_file: bool = True,
+        **kwargs,
+    ):
         if generate_client_file:
             self.generate_client_file()
 
@@ -700,8 +707,8 @@ class LitServer:
         config = uvicorn.Config(app=self.app, port=port, log_level=log_level, loop="uvloop")
         sockets = [config.bind_socket()]
 
-        devices = [self.devices * self.workers_per_device]
-        num_uvicorn_servers = 8
+        if num_uvicorn_servers is None:
+            num_uvicorn_servers = len(self.devices * self.workers_per_device)
 
         self.response_queues = []
         for response_queue_id in range(num_uvicorn_servers):
