@@ -462,7 +462,7 @@ class LitServer:
         lit_api.request_timeout = timeout
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
-        self.app.worker_id = None
+        self.app.response_queue_id = None
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not stream:
             self.app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -506,7 +506,6 @@ class LitServer:
 
     def launch_inference_worker(self, manager, config, sockets):
         self.workers_setup_status = manager.dict()
-        self.response_queues = []
         self.process_list = []
         self.request_queue = manager.Queue()
 
@@ -523,10 +522,6 @@ class LitServer:
                 spec.setup(server_copy)
             except Exception as e:
                 raise e
-
-        for worker_id, device in enumerate(self.devices * self.workers_per_device):
-            response_queue = manager.Queue()
-            self.response_queues.append(response_queue)
 
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
@@ -558,7 +553,7 @@ class LitServer:
         loop = asyncio.get_running_loop()
         self.response_buffer = {}
 
-        response_queue = self.response_queues[app.worker_id]
+        response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
@@ -614,7 +609,7 @@ class LitServer:
             return Response(content="not ready", status_code=503)
 
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
-            worker_id = self.app.worker_id
+            response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
@@ -629,7 +624,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put_nowait((worker_id, uid, time.monotonic(), payload))
+            self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -705,11 +700,19 @@ class LitServer:
         config = uvicorn.Config(app=self.app, port=port, log_level=log_level, loop="uvloop")
         sockets = [config.bind_socket()]
 
+        devices = [self.devices * self.workers_per_device]
+        num_uvicorn_servers = 8
+
+        self.response_queues = []
+        for response_queue_id in range(num_uvicorn_servers):
+            response_queue = manager.Queue()
+            self.response_queues.append(response_queue)
+
         self.launch_inference_worker(manager, config, sockets)
 
         servers = []
-        for worker_id, device in enumerate(self.devices * self.workers_per_device):
-            self.app.worker_id = worker_id
+        for response_queue_id in range(num_uvicorn_servers):
+            self.app.response_queue_id = response_queue_id
             app = copy.copy(self.app)
             config = uvicorn.Config(app=app, port=port, log_level=log_level, loop="uvloop")
             server = uvicorn.Server(config=config)
