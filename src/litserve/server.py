@@ -78,25 +78,21 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
     return batches
 
 
+
 def collate_requests(
     lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float
 ) -> Tuple[List, List]:
-    apply_timeout = lit_api.request_timeout not in (-1, False)
     payloads = []
     timed_out_uids = []
-
-    uid, timestamp, x_enc = request_queue.get(block=True)
     entered_at = time.monotonic()
     end_time = entered_at + batch_timeout
-    if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
-        timed_out_uids.append(uid)
-    else:
-        payloads.append((uid, x_enc))
+    apply_timeout = lit_api.request_timeout not in (-1, False)
 
     while time.monotonic() < end_time and len(payloads) < max_batch_size:
         remaining_time = end_time - time.monotonic()
         if remaining_time <= 0:
             break
+
         try:
             uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
@@ -421,9 +417,9 @@ def create_server(lit_api, lit_spec, config, sockets, **kwargs):
     lit_server = LitServer(lit_api=lit_api, spec=lit_spec)
     config.app = lit_server.app
     server = uvicorn.Server(config=config)
-    # ctx = mp.get_context("fork")
-    # w = ctx.Process(target=server.run, args=(sockets,), daemon=True)
-    w = threading.Thread(target=server.run, args=(sockets,), daemon=True)
+    ctx = mp.get_context("fork")
+    w = ctx.Process(target=server.run, args=(sockets,), daemon=True)
+    # w = threading.Thread(target=server.run, args=(sockets,), daemon=True)
     return lit_server, w
 
 class LitServer:
