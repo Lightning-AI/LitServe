@@ -714,7 +714,7 @@ class LitServer:
                 self.lit_spec.response_queue_id = response_queue_id
             app = copy.copy(self.app)
 
-            config = uvicorn.Config(app=app, port=port, log_level=log_level, loop="uvloop")
+            config = uvicorn.Config(app=app, port=port, log_level=log_level)
             server = uvicorn.Server(config=config)
             ctx = mp.get_context("fork")
             w = ctx.Process(target=server.run, args=(sockets,))
