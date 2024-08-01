@@ -479,14 +479,9 @@ class LitServer:
         self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
-    def launch_inference_worker(self, manager, config, sockets):
+    def launch_inference_worker(self, manager):
         self.workers_setup_status = manager.dict()
-        self.process_list = []
         self.request_queue = manager.Queue()
-
-        config = uvicorn.Config(app=None, port=8000, log_level="info")
-        self.workers_setup_status["config"] = config
-        self.workers_setup_status["sockets"] = sockets
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
@@ -498,6 +493,7 @@ class LitServer:
             except Exception as e:
                 raise e
 
+        process_list = []
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
                 device = device[0]
@@ -521,7 +517,8 @@ class LitServer:
                 ),
             )
             process.start()
-            self.process_list.append((process, worker_id))
+            process_list.append(process)
+        return process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -691,8 +688,7 @@ class LitServer:
             response_queue = manager.Queue()
             self.response_queues.append(response_queue)
 
-        self.launch_inference_worker(manager, config, sockets)
-
+        litserve_workers = self.launch_inference_worker(manager)
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
@@ -707,8 +703,8 @@ class LitServer:
         for s in servers:
             s.join()
 
-        for p, _ in self.process_list:
-            p.join()
+        for w in litserve_workers:
+            w.join()
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
