@@ -287,7 +287,7 @@ def run_batched_streaming_loop(
 
         if not batches:
             continue
-        uids, inputs = zip(*batches)
+        response_queue_ids, uids, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
@@ -309,11 +309,11 @@ def run_batched_streaming_loop(
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
-                for y_enc, uid in zip(y_batch, uids):
+                for response_queue_id, y_enc, uid in zip(response_queue_ids, y_batch, uids):
                     y_enc = lit_api.format_encoded_response(y_enc)
                     response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
-            for uid in uids:
+            for response_queue_id, uid in zip(response_queue_ids, uids):
                 response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
 
         except Exception as e:
@@ -438,6 +438,8 @@ class LitServer:
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
+        self.response_queue_id = None
+        self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not stream:
             self.app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -529,7 +531,6 @@ class LitServer:
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
-        self.response_buffer = {}
 
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
@@ -703,7 +704,10 @@ class LitServer:
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
+            if self.lit_spec:
+                self.lit_spec.response_queue_id = response_queue_id
             app = copy.copy(self.app)
+
             config = uvicorn.Config(app=app, port=port, log_level=log_level, loop="uvloop")
             server = uvicorn.Server(config=config)
             ctx = mp.get_context("fork")
