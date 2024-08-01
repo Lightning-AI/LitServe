@@ -42,10 +42,16 @@ from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, load_and_raise
 from collections import deque
-import uvloop
 
 mp.allow_connection_pickling()
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+try:
+    import uvloop
+
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+except ImportError:
+    print("uvloop is not installed. Falling back to the default asyncio event loop.")
 
 logger = logging.getLogger(__name__)
 
