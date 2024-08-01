@@ -92,11 +92,11 @@ def collate_requests(
             break
 
         try:
-            uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
+            worker_id, uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
-                timed_out_uids.append(uid)
+                timed_out_uids.append((worker_id, uid))
             else:
-                payloads.append((uid, x_enc))
+                payloads.append((worker_id, uid, x_enc))
 
         except Empty:
             continue
@@ -155,7 +155,7 @@ def run_batched_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    response_queue: Queue,
+    response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout: float,
 ):
@@ -167,18 +167,18 @@ def run_batched_loop(
             batch_timeout,
         )
 
-        for uid in timed_out_uids:
+        for worker_id, uid in timed_out_uids:
             logger.error(
                 f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
                 "has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
-            response_queue.put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            response_queues[worker_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
 
         if not batches:
             continue
         logger.debug(f"{len(batches)} batched requests received")
-        uids, inputs = zip(*batches)
+        worker_ids, uids, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
@@ -196,10 +196,10 @@ def run_batched_loop(
             x = lit_api.batch(x)
             y = _inject_context(contexts, lit_api.predict, x)
             outputs = lit_api.unbatch(y)
-            for y, uid, context in zip(outputs, uids, contexts):
+            for worker_id, y, uid, context in zip(worker_ids, outputs, uids, contexts):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
 
-                response_queue.put((uid, (y_enc, LitAPIStatus.OK)))
+                response_queues[worker_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
         except Exception as e:
             logger.exception(
@@ -207,8 +207,8 @@ def run_batched_loop(
                 "Please check the error trace for more details."
             )
             err_pkl = pickle.dumps(e)
-            for uid in uids:
-                response_queue.put((uid, (err_pkl, LitAPIStatus.ERROR)))
+            for worker_id, uid in zip(worker_ids, uids):
+                response_queues[worker_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
 def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queue: Queue):
@@ -344,17 +344,19 @@ def inference_worker(
 
     config = workers_setup_status["config"]
     sockets = workers_setup_status["sockets"]
-    lit_server, th = create_server(
-        lit_api,
-        lit_spec,
-        config,
-        sockets,
-    )  # inits a new FastAPI instance for uvicorn
-    lit_server.response_queue = response_queue
-    lit_server.request_queue = request_queue
-    lit_server.workers_setup_status = workers_setup_status
-    lit_server.response_buffer = {}
-    th.start()
+    # lit_server, th = create_server(
+    #     lit_api,
+    #     lit_spec,
+    #     config,
+    #     sockets,
+    # )  # inits a new FastAPI instance for uvicorn
+    # lit_server.response_queue = response_queue
+    # lit_server.request_queue = request_queue
+    # lit_server.workers_setup_status = workers_setup_status
+    # lit_server.response_buffer = {}
+    # th.start()
+
+    lit_api.worker_id = worker_id
 
     if workers_setup_status:
         workers_setup_status[worker_id] = True
@@ -460,6 +462,7 @@ class LitServer:
         lit_api.request_timeout = timeout
         lit_api.sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
+        self.app.worker_id = None
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not stream:
             self.app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -505,7 +508,7 @@ class LitServer:
         self.workers_setup_status = manager.dict()
         self.response_queues = []
         self.process_list = []
-        self.request_queues = []
+        self.request_queue = manager.Queue()
 
         config = uvicorn.Config(app=None, port=8000, log_level="info")
         self.workers_setup_status["config"] = config
@@ -522,14 +525,14 @@ class LitServer:
                 raise e
 
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
+            response_queue = manager.Queue()
+            self.response_queues.append(response_queue)
+
+        for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
                 device = device[0]
 
             self.workers_setup_status[worker_id] = False
-            request_queue = manager.Queue()
-            self.request_queues.append(request_queue)
-            response_queue = manager.Queue()
-            self.response_queues.append(response_queue)
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
@@ -539,8 +542,8 @@ class LitServer:
                     self.lit_spec,
                     device,
                     worker_id,
-                    request_queue,
-                    response_queue,
+                    self.request_queue,
+                    self.response_queues,
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
@@ -553,9 +556,11 @@ class LitServer:
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
+        self.response_buffer = {}
 
+        response_queue = self.response_queues[app.worker_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
-        future = response_queue_to_buffer(self.response_queue, self.response_buffer, self.stream, response_executor)
+        future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
 
         yield
@@ -609,6 +614,7 @@ class LitServer:
             return Response(content="not ready", status_code=503)
 
         async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+            worker_id = self.app.worker_id
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
@@ -623,7 +629,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put_nowait((uid, time.monotonic(), payload))
+            self.request_queue.put_nowait((worker_id, uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -700,6 +706,21 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         self.launch_inference_worker(manager, config, sockets)
+
+        servers = []
+        for worker_id, device in enumerate(self.devices * self.workers_per_device):
+            self.app.worker_id = worker_id
+            app = copy.copy(self.app)
+            config = uvicorn.Config(app=app, port=port, log_level=log_level, loop="uvloop")
+            server = uvicorn.Server(config=config)
+            ctx = mp.get_context("fork")
+            w = ctx.Process(target=server.run, args=(sockets,))
+            w.start()
+            servers.append(w)
+
+        for s in servers:
+            s.join()
+
         for p, worker_id in self.process_list:
             p.join()
 
