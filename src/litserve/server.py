@@ -688,7 +688,7 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
+        config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level)
         sockets = [config.bind_socket()]
 
         if num_uvicorn_servers is None:
@@ -714,7 +714,7 @@ class LitServer:
                 self.lit_spec.response_queue_id = response_queue_id
             app = copy.copy(self.app)
 
-            config = uvicorn.Config(app=app, port=port, log_level=log_level)
+            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level)
             server = uvicorn.Server(config=config)
             ctx = mp.get_context("fork")
             w = ctx.Process(target=server.run, args=(sockets,))
