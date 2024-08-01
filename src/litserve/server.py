@@ -20,6 +20,7 @@ import os
 import pickle
 import shutil
 import sys
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -674,6 +675,7 @@ class LitServer:
         num_uvicorn_servers: Optional[int] = None,
         log_level: str = "info",
         generate_client_file: bool = True,
+        uvicorn_worker_type: Optional[str] = None,
         **kwargs,
     ):
         if generate_client_file:
@@ -688,7 +690,7 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level)
+        config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
 
         if num_uvicorn_servers is None:
@@ -696,7 +698,12 @@ class LitServer:
 
         manager, litserve_workers = self.launch_inference_worker(num_uvicorn_servers)
 
-        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets)
+        if sys.platform == "win32":
+            uvicorn_worker_type = "thread"
+        elif uvicorn_worker_type is None:
+            uvicorn_worker_type = "process"
+
+        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type)
 
         for s in servers:
             s.join()
@@ -706,7 +713,7 @@ class LitServer:
             w.join()
         manager.shutdown()
 
-    def _start_server(self, port, num_uvicorn_servers, log_level, sockets):
+    def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
@@ -716,8 +723,13 @@ class LitServer:
 
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level)
             server = uvicorn.Server(config=config)
-            ctx = mp.get_context("fork")
-            w = ctx.Process(target=server.run, args=(sockets,))
+            if uvicorn_worker_type == "process":
+                ctx = mp.get_context("fork")
+                w = ctx.Process(target=server.run, args=(sockets,))
+            elif uvicorn_worker_type == "thread":
+                w = threading.Thread(target=server.run, args=(sockets,))
+            else:
+                raise ValueError("Invalid value for uvicorn_worker_type. Must be 'process' or 'thread'")
             w.start()
             servers.append(w)
         return servers
