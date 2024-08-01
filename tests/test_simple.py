@@ -140,7 +140,13 @@ async def test_timeout():
             ), "Server takes longer than specified timeout and request should timeout"
 
     # Case 2: first 2 requests finish as a batch and third request times out in queue
-    server = LitServer(SlowBatchAPI(), accelerator="cpu", timeout=1.5, max_batch_size=2, batch_timeout=0.01)
+    server = LitServer(
+        SlowBatchAPI(),
+        accelerator="cpu",
+        timeout=1.5,
+        max_batch_size=2,
+        batch_timeout=0.01,
+    )
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             await asyncio.sleep(2)  # Give time to start inference workers
@@ -160,26 +166,39 @@ async def test_timeout():
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
     server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
-    server3 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=False, max_batch_size=2, batch_timeout=2)
-    server4 = LitServer(SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=2)
+    server3 = LitServer(
+        SlowBatchAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=False,
+        max_batch_size=2,
+        batch_timeout=2,
+    )
+    server4 = LitServer(
+        SlowBatchAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=-1,
+        max_batch_size=2,
+        batch_timeout=2,
+    )
 
     with wrap_litserve_start(server1) as server1, wrap_litserve_start(server2) as server2, wrap_litserve_start(
         server3
-    ) as server3, wrap_litserve_start(server4) as server4:
-        with TestClient(server1.app) as client1, TestClient(server2.app) as client2, TestClient(
-            server3.app
-        ) as client3, TestClient(server4.app) as client4:
-            response1 = client1.post("/predict", json={"input": 4.0})
-            assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
+    ) as server3, wrap_litserve_start(server4) as server4, TestClient(server1.app) as client1, TestClient(
+        server2.app
+    ) as client2, TestClient(server3.app) as client3, TestClient(server4.app) as client4:
+        response1 = client1.post("/predict", json={"input": 4.0})
+        assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
-            response2 = client2.post("/predict", json={"input": 4.0})
-            assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
+        response2 = client2.post("/predict", json={"input": 4.0})
+        assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
-            response3 = client3.post("/predict", json={"input": 4.0})
-            assert response3.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+        response3 = client3.post("/predict", json={"input": 4.0})
+        assert response3.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
 
-            response4 = client4.post("/predict", json={"input": 4.0})
-            assert response4.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+        response4 = client4.post("/predict", json={"input": 4.0})
+        assert response4.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
 
 
 def test_concurrent_requests(lit_server):
