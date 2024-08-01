@@ -20,7 +20,6 @@ import os
 import pickle
 import shutil
 import sys
-import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -76,7 +75,6 @@ def get_batch_from_uid(uids, lit_api, request_buffer):
             continue
         batches.append((x_enc, pipe_s))
     return batches
-
 
 
 def collate_requests(
@@ -339,7 +337,6 @@ def inference_worker(
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
 ):
-    
     lit_api.setup(device)
     lit_api.device = device
 
@@ -347,11 +344,16 @@ def inference_worker(
 
     config = workers_setup_status["config"]
     sockets = workers_setup_status["sockets"]
-    lit_server, th = create_server(lit_api, lit_spec, config, sockets, )  # inits a new FastAPI instance for uvicorn
+    lit_server, th = create_server(
+        lit_api,
+        lit_spec,
+        config,
+        sockets,
+    )  # inits a new FastAPI instance for uvicorn
     lit_server.response_queue = response_queue
     lit_server.request_queue = request_queue
     lit_server.workers_setup_status = workers_setup_status
-    lit_server.response_buffer = dict()
+    lit_server.response_buffer = {}
     th.start()
 
     if workers_setup_status:
@@ -413,6 +415,7 @@ async def response_queue_to_buffer(
             buffer[uid] = payload
             event.set()
 
+
 def create_server(lit_api, lit_spec, config, sockets, **kwargs):
     lit_server = LitServer(lit_api=lit_api, spec=lit_spec)
     config.app = lit_server.app
@@ -421,6 +424,7 @@ def create_server(lit_api, lit_spec, config, sockets, **kwargs):
     w = ctx.Process(target=server.run, args=(sockets,), daemon=True)
     # w = threading.Thread(target=server.run, args=(sockets,), daemon=True)
     return lit_server, w
+
 
 class LitServer:
     def __init__(
@@ -497,7 +501,6 @@ class LitServer:
         self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
-
     def launch_inference_worker(self, manager, config, sockets):
         self.workers_setup_status = manager.dict()
         self.response_queues = []
@@ -546,7 +549,7 @@ class LitServer:
                 spec.setup(server_copy)
             except Exception as e:
                 raise e
-    
+
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
@@ -559,7 +562,6 @@ class LitServer:
 
         task.cancel()
         logger.debug("Shutting down response queue to buffer task")
-
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
