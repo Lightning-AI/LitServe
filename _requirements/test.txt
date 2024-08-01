@@ -11,3 +11,4 @@ lightning >2.0.0
 torch >2.0.0
 transformers
 openai>=1.12.0
+uvloop
