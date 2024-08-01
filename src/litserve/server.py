@@ -342,20 +342,6 @@ def inference_worker(
 
     print(f"Setup complete for worker {worker_id}.")
 
-    config = workers_setup_status["config"]
-    sockets = workers_setup_status["sockets"]
-    # lit_server, th = create_server(
-    #     lit_api,
-    #     lit_spec,
-    #     config,
-    #     sockets,
-    # )  # inits a new FastAPI instance for uvicorn
-    # lit_server.response_queue = response_queue
-    # lit_server.request_queue = request_queue
-    # lit_server.workers_setup_status = workers_setup_status
-    # lit_server.response_buffer = {}
-    # th.start()
-
     lit_api.worker_id = worker_id
 
     if workers_setup_status:
@@ -416,16 +402,6 @@ async def response_queue_to_buffer(
             event = buffer.pop(uid)
             buffer[uid] = payload
             event.set()
-
-
-def create_server(lit_api, lit_spec, config, sockets, **kwargs):
-    lit_server = LitServer(lit_api=lit_api, spec=lit_spec)
-    config.app = lit_server.app
-    server = uvicorn.Server(config=config)
-    ctx = mp.get_context("fork")
-    w = ctx.Process(target=server.run, args=(sockets,), daemon=True)
-    # w = threading.Thread(target=server.run, args=(sockets,), daemon=True)
-    return lit_server, w
 
 
 class LitServer:
