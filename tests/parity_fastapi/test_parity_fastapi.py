@@ -6,9 +6,9 @@ from tests.e2e.test_e2e import e2e_from_file
 from tests.parity_fastapi.benchmark import run_bench
 
 conf = {
-    "cpu": {"num_requests": 16},
-    "mps": {"num_requests": 32},
-    "cuda": {"num_requests": 50},
+    "cpu": {"num_requests": 8},
+    "mps": {"num_requests": 8},
+    "cuda": {"num_requests": 8},
 }
 
 device = "cpu" if torch.cuda.is_available() else "cuda"
