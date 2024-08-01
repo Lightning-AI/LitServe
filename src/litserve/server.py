@@ -688,7 +688,7 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, port=port, log_level=log_level, loop="uvloop")
+        config = uvicorn.Config(app=self.app, port=port, log_level=log_level)
         sockets = [config.bind_socket()]
 
         if num_uvicorn_servers is None:
