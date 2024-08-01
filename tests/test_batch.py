@@ -120,7 +120,7 @@ def test_max_batch_size():
 
 
 def test_max_batch_size_warning():
-    with pytest.warns(UserWarning, match="max_batch_size"):
+    with pytest.warns(UserWarning, match="both batch and unbatch methods implemented, but the max_batch_size parameter was not set."):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2)
 
     with warnings.catch_warnings(record=True) as w:
