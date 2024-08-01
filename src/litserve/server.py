@@ -511,6 +511,16 @@ class LitServer:
         self.workers_setup_status["config"] = config
         self.workers_setup_status["sockets"] = sockets
 
+        for spec in self._specs:
+            # Objects of Server class are referenced (not copied)
+            logging.debug(f"shallow copy for Server is created for for spec {spec}")
+            server_copy = copy.copy(self)
+            del server_copy.app
+            try:
+                spec.setup(server_copy)
+            except Exception as e:
+                raise e
+
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
             if len(device) == 1:
                 device = device[0]
@@ -539,16 +549,6 @@ class LitServer:
             )
             process.start()
             self.process_list.append((process, worker_id))
-
-        for spec in self._specs:
-            # Objects of Server class are referenced (not copied)
-            logging.debug(f"shallow copy for Server is created for for spec {spec}")
-            server_copy = copy.copy(self)
-            del server_copy.app
-            try:
-                spec.setup(server_copy)
-            except Exception as e:
-                raise e
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
