@@ -120,18 +120,26 @@ def test_max_batch_size():
 
 
 def test_max_batch_size_warning():
+    warning = "both batch and unbatch methods implemented, but the max_batch_size parameter was not set."
     with pytest.warns(
-        UserWarning, match="both batch and unbatch methods implemented, but the max_batch_size parameter was not set."
+        UserWarning,
+        match=warning,
     ):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2)
 
-    with warnings.catch_warnings(record=True) as w:
+    # Test no warnings are raised when max_batch_size is set
+    with pytest.raises(pytest.fail.Exception), pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2)
-        assert len(w) == 0
 
-    with warnings.catch_warnings(record=True) as w:
+    # Test no max_batch_size warnings are raised with a different API
+    with pytest.raises(pytest.fail.Exception), pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
         LitServer(SimpleLitAPI2(), accelerator="cpu", devices=1, timeout=2)
-        assert len(w) == 0
 
 
 class FakeResponseQueue:
