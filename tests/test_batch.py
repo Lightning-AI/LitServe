@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-from unittest.mock import MagicMock, patch
-from asgi_lifespan import LifespanManager
 import time
-from litserve.server import run_batched_loop
 from queue import Queue
+from unittest.mock import MagicMock, patch
+
 import pytest
-
-from fastapi import Request, Response
-from httpx import AsyncClient
-
-from litserve import LitAPI, LitServer
-from tests.conftest import wrap_litserve_start
 import torch
 import torch.nn as nn
+from asgi_lifespan import LifespanManager
+from fastapi import Request, Response
+from httpx import AsyncClient
+from litserve import LitAPI, LitServer
+from tests.conftest import wrap_litserve_start
+from litserve.server import run_batched_loop
 
 
 class Linear(nn.Module):
@@ -119,6 +118,29 @@ def test_max_batch_size():
 
     with pytest.raises(ValueError, match="must be"):
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+
+
+def test_max_batch_size_warning():
+    warning = "both batch and unbatch methods implemented, but the max_batch_size parameter was not set."
+    with pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2)
+
+    # Test no warnings are raised when max_batch_size is set
+    with pytest.raises(pytest.fail.Exception), pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
+        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2)
+
+    # Test no max_batch_size warnings are raised with a different API
+    with pytest.raises(pytest.fail.Exception), pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
+        LitServer(SimpleLitAPI2(), accelerator="cpu", devices=1, timeout=2)
 
 
 class FakeResponseQueue:
