@@ -64,7 +64,7 @@ class SimpleBatchLitAPI(LitAPI):
         return {"output": float(output)}
 
 
-class SimpleLitAPI2(LitAPI):
+class SimpleTorchAPI(LitAPI):
     def setup(self, device):
         self.model = Linear().to(device)
         self.device = device
@@ -98,7 +98,7 @@ async def test_batched():
 
 @pytest.mark.asyncio()
 async def test_unbatched():
-    api = SimpleLitAPI2()
+    api = SimpleTorchAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
@@ -119,6 +119,29 @@ def test_max_batch_size():
 
     with pytest.raises(ValueError, match="must be"):
         LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+
+
+def test_max_batch_size_warning():
+    warning = "both batch and unbatch methods implemented, but the max_batch_size parameter was not set."
+    with pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
+        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2)
+
+    # Test no warnings are raised when max_batch_size is set and max_batch_size is not set
+    with pytest.raises(pytest.fail.Exception), pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
+        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2)
+
+    # Test no warning is set when LitAPI doesn't implement batch and unbatch
+    with pytest.raises(pytest.fail.Exception), pytest.warns(
+        UserWarning,
+        match=warning,
+    ):
+        LitServer(SimpleTorchAPI(), accelerator="cpu", devices=1, timeout=2)
 
 
 class FakeResponseQueue:
