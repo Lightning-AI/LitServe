@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from litserve import LitAPI, LitServer
 import litserve.server
+from tests.conftest import wrap_litserve_start
 
 
 class SimpleAuthedLitAPI(LitAPI):
@@ -40,8 +41,7 @@ class SimpleAuthedLitAPI(LitAPI):
 
 def test_authorized_custom():
     server = LitServer(SimpleAuthedLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
-
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         input = {"input": 4.0}
         response = client.post("/predict", headers={"Authorization": "Bearer 1234"}, json=input)
         assert response.status_code == 200
@@ -49,8 +49,7 @@ def test_authorized_custom():
 
 def test_not_authorized_custom():
     server = LitServer(SimpleAuthedLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
-
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         input = {"input": 4.0}
         response = client.post("/predict", headers={"Authorization": "Bearer wrong"}, json=input)
         assert response.status_code == 401
@@ -74,7 +73,7 @@ def test_authorized_api_key():
     litserve.server.LIT_SERVER_API_KEY = "abcd"
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
 
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         input = {"input": 4.0}
         response = client.post("/predict", headers={"X-API-Key": "abcd"}, json=input)
         assert response.status_code == 200
@@ -86,7 +85,7 @@ def test_not_authorized_api_key():
     litserve.server.LIT_SERVER_API_KEY = "abcd"
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
 
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         input = {"input": 4.0}
         response = client.post("/predict", headers={"X-API-Key": "wrong"}, json=input)
         assert response.status_code == 401
