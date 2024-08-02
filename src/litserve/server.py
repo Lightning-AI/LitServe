@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 import uuid
+import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -40,7 +41,7 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, load_and_raise, MaxSizeMiddleware
+from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
 
 mp.allow_connection_pickling()
 
@@ -433,6 +434,16 @@ class LitServer:
             raise ValueError(
                 "api_path must start with '/'. "
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
+            )
+
+        # Check if the batch and unbatch methods are overridden in the lit_api instance
+        batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
+        unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
+
+        if batch_overridden and unbatch_overridden and max_batch_size == 1:
+            warnings.warn(
+                "The LitServer has both batch and unbatch methods implemented, "
+                "but the max_batch_size parameter was not set."
             )
 
         self.api_path = api_path
