@@ -430,10 +430,14 @@ class LitServer:
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
 
-        # TODO: discuss this condition and the warning message with the team
-        if "batch" in lit_api.__class__.__dict__ and "unbatch" in lit_api.__class__.__dict__ and max_batch_size == 1:
+        # Check if the batch and unbatch methods are overridden in the lit_api instance
+        batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
+        unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
+
+        if batch_overridden and unbatch_overridden and max_batch_size == 1:
             warnings.warn(
-                "The LitServer has both batch and unbatch methods implemented, but the max_batch_size parameter was not set."
+                "The LitServer has both batch and unbatch methods implemented, "
+                "but the max_batch_size parameter was not set."
             )
 
         self.api_path = api_path
