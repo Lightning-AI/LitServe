@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-from unittest.mock import MagicMock, patch
-from asgi_lifespan import LifespanManager
 import time
-from litserve.server import run_batched_loop
 from queue import Queue
-import pytest
+from unittest.mock import MagicMock, patch
 
+import pytest
+import torch
+import torch.nn as nn
+from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
+from litserve.server import run_batched_loop
 from tests.conftest import wrap_litserve_start
-import torch
-import torch.nn as nn
 
 
 class Linear(nn.Module):
@@ -39,7 +39,7 @@ class Linear(nn.Module):
         return self.linear(x)
 
 
-class SimpleLitAPI(LitAPI):
+class SimpleBatchLitAPI(LitAPI):
     def setup(self, device):
         self.model = Linear().to(device)
         self.device = device
@@ -83,7 +83,7 @@ class SimpleLitAPI2(LitAPI):
 
 @pytest.mark.asyncio()
 async def test_batched():
-    api = SimpleLitAPI()
+    api = SimpleBatchLitAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
     with wrap_litserve_start(server) as server:
@@ -112,13 +112,13 @@ async def test_unbatched():
 
 def test_max_batch_size():
     with pytest.raises(ValueError, match="must be"):
-        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=0)
+        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=0)
 
     with pytest.raises(ValueError, match="must be"):
-        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=-1)
+        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=-1)
 
     with pytest.raises(ValueError, match="must be"):
-        LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
 
 
 class FakeResponseQueue:
