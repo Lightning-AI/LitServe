@@ -23,6 +23,7 @@ import torch
 import torch.nn as nn
 from queue import Queue
 from httpx import AsyncClient
+from tests.conftest import wrap_litserve_start
 
 from unittest.mock import patch, MagicMock
 import pytest
@@ -75,8 +76,8 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
 @pytest.fixture()
 def loop_args():
     requests_queue = Queue()
-    requests_queue.put(("uuid-123", time.monotonic(), 1))  # uid, timestamp, x_enc
-    requests_queue.put(("uuid-234", time.monotonic(), 2))
+    requests_queue.put((0, "uuid-123", time.monotonic(), 1))  # response_queue_id, uid, timestamp, x_enc
+    requests_queue.put((1, "uuid-234", time.monotonic(), 2))
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 1
@@ -92,10 +93,10 @@ class FakeResponseQueue:
 def test_single_loop(loop_args):
     lit_api_mock, requests_queue = loop_args
     lit_api_mock.unbatch.side_effect = None
-    response_queue = FakeResponseQueue()
+    response_queues = [FakeResponseQueue()]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, response_queue)
+        run_single_loop(lit_api_mock, None, requests_queue, response_queues)
 
 
 @pytest.mark.asyncio()
@@ -104,14 +105,19 @@ async def test_stream(simple_stream_api):
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
-        resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
-        resp1, resp2 = await asyncio.gather(resp1, resp2)
-        assert resp1.status_code == 200, "Check if server is running and the request format is valid."
-        assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
-        assert resp2.status_code == 200, "Check if server is running and the request format is valid."
-        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
+            resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
+            resp1, resp2 = await asyncio.gather(resp1, resp2)
+            assert resp1.status_code == 200, "Check if server is running and the request format is valid."
+            assert (
+                resp1.text == expected_output1
+            ), "Server returns input prompt and generated output which didn't match."
+            assert resp2.status_code == 200, "Check if server is running and the request format is valid."
+            assert (
+                resp2.text == expected_output2
+            ), "Server returns input prompt and generated output which didn't match."
 
 
 @pytest.mark.asyncio()
@@ -120,14 +126,19 @@ async def test_batched_stream_server(simple_batched_stream_api):
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
-        resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
-        resp1, resp2 = await asyncio.gather(resp1, resp2)
-        assert resp1.status_code == 200, "Check if server is running and the request format is valid."
-        assert resp2.status_code == 200, "Check if server is running and the request format is valid."
-        assert resp1.text == expected_output1, "Server returns input prompt and generated output which didn't match."
-        assert resp2.text == expected_output2, "Server returns input prompt and generated output which didn't match."
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
+            resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
+            resp1, resp2 = await asyncio.gather(resp1, resp2)
+            assert resp1.status_code == 200, "Check if server is running and the request format is valid."
+            assert resp2.status_code == 200, "Check if server is running and the request format is valid."
+            assert (
+                resp1.text == expected_output1
+            ), "Server returns input prompt and generated output which didn't match."
+            assert (
+                resp2.text == expected_output2
+            ), "Server returns input prompt and generated output which didn't match."
 
 
 class FakeStreamResponseQueue:
@@ -144,7 +155,7 @@ class FakeStreamResponseQueue:
         self.count += 1
 
 
-def test_streaming_loop(loop_args):
+def test_streaming_loop():
     num_streamed_outputs = 10
 
     def fake_predict(inputs: str):
@@ -164,11 +175,11 @@ def test_streaming_loop(loop_args):
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     requests_queue = Queue()
-    requests_queue.put(("UUID-1234", time.monotonic(), {"prompt": "Hello"}))
-    response_queue = FakeStreamResponseQueue(num_streamed_outputs)
+    requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}))
+    response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queue)
+        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
@@ -220,13 +231,13 @@ def test_batched_streaming_loop():
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     requests_queue = Queue()
-    requests_queue.put(("UUID-001", time.monotonic(), {"prompt": "Hello"}))
-    requests_queue.put(("UUID-002", time.monotonic(), {"prompt": "World"}))
-    response_queue = FakeBatchStreamResponseQueue(num_streamed_outputs)
+    requests_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
+    requests_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}))
+    response_queues = [FakeBatchStreamResponseQueue(num_streamed_outputs)]
 
     with pytest.raises(StopIteration, match="finish streaming"):
         run_batched_streaming_loop(
-            fake_stream_api, fake_stream_api, requests_queue, response_queue, max_batch_size=2, batch_timeout=2
+            fake_stream_api, fake_stream_api, requests_queue, response_queues, max_batch_size=2, batch_timeout=2
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
@@ -324,10 +335,10 @@ def test_server_run(mock_uvicorn):
         server.run(port=65536)
 
     server.run(port=8000)
-    mock_uvicorn.run.assert_called()
+    mock_uvicorn.Config.assert_called()
     mock_uvicorn.reset_mock()
     server.run(port="8001")
-    mock_uvicorn.run.assert_called()
+    mock_uvicorn.Config.assert_called()
 
 
 class IndentityAPI(ls.examples.SimpleLitAPI):
@@ -383,26 +394,29 @@ async def test_inject_context(mocked_load_and_raise):
     # Test context injection with single loop
     api = IndentityAPI()
     server = LitServer(api)
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
     server = LitServer(IndentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
     server = LitServer(IndentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     server = LitServer(PredictErrorAPI())
-    with pytest.raises(TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")), TestClient(
-        server.app
-    ) as client:
+    with wrap_litserve_start(server) as server, pytest.raises(
+        TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")
+    ), TestClient(server.app) as client:
         client.post("/predict", json={"input": 5.0}, timeout=10)
 
 
@@ -412,7 +426,7 @@ def test_custom_api_path():
 
     server = LitServer(ls.examples.SimpleLitAPI(), api_path="/v1/custom_predict")
     url = server.api_path
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
 
@@ -424,7 +438,7 @@ class TestHTTPExceptionAPI(ls.examples.SimpleLitAPI):
 
 def test_http_exception():
     server = LitServer(TestHTTPExceptionAPI())
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
