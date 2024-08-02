@@ -129,6 +129,10 @@ def test_max_batch_size_warning():
         LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2)
         assert len(w) == 0
 
+    with warnings.catch_warnings(record=True) as w:
+        LitServer(SimpleLitAPI2(), accelerator="cpu", devices=1, timeout=2)
+        assert len(w) == 0
+
 
 class FakeResponseQueue:
     def put(self, *args):
