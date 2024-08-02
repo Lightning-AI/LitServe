@@ -23,6 +23,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from httpx import AsyncClient
 from litserve import LitAPI, LitServer
+from tests.conftest import wrap_litserve_start
 from litserve.server import run_batched_loop
 
 
@@ -84,10 +85,11 @@ async def test_batched():
     api = SimpleLitAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        response1 = ac.post("/predict", json={"input": 4.0})
-        response2 = ac.post("/predict", json={"input": 5.0})
-        response1, response2 = await asyncio.gather(response1, response2)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            response1 = ac.post("/predict", json={"input": 4.0})
+            response2 = ac.post("/predict", json={"input": 5.0})
+            response1, response2 = await asyncio.gather(response1, response2)
 
     assert response1.json() == {"output": 9.0}
     assert response2.json() == {"output": 11.0}
@@ -97,11 +99,11 @@ async def test_batched():
 async def test_unbatched():
     api = SimpleLitAPI2()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
-
-    async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-        response1 = ac.post("/predict", json={"input": 4.0})
-        response2 = ac.post("/predict", json={"input": 5.0})
-        response1, response2 = await asyncio.gather(response1, response2)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            response1 = ac.post("/predict", json={"input": 4.0})
+            response2 = ac.post("/predict", json={"input": 5.0})
+            response1, response2 = await asyncio.gather(response1, response2)
 
     assert response1.json() == {"output": 9.0}
     assert response2.json() == {"output": 11.0}
@@ -148,8 +150,9 @@ class FakeResponseQueue:
 
 def test_batched_loop():
     requests_queue = Queue()
-    requests_queue.put(("uuid-1234", time.monotonic(), {"input": 4.0}))
-    requests_queue.put(("uuid-1235", time.monotonic(), {"input": 5.0}))
+    response_queue_id = 0
+    requests_queue.put((response_queue_id, "uuid-1234", time.monotonic(), {"input": 4.0}))
+    requests_queue.put((response_queue_id, "uuid-1235", time.monotonic(), {"input": 5.0}))
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 2
