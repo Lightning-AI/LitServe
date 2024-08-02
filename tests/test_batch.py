@@ -13,7 +13,6 @@
 # limitations under the License.
 import asyncio
 import time
-import warnings
 from queue import Queue
 from unittest.mock import MagicMock, patch
 
