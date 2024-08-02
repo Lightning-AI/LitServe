@@ -349,7 +349,6 @@ def inference_worker(
 
     print(f"Setup complete for worker {worker_id}.")
 
-    # lit_api.worker_id = worker_id
 
     if workers_setup_status:
         workers_setup_status[worker_id] = True
