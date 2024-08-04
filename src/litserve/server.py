@@ -35,15 +35,13 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, R
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, load_and_raise
+from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
 
 mp.allow_connection_pickling()
 
@@ -749,32 +747,3 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
-
-
-class MaxSizeMiddleware(BaseHTTPMiddleware):
-    def __init__(
-        self,
-        app: ASGIApp,
-        *,
-        max_size: Optional[int] = None,
-    ) -> None:
-        self.app = app
-        self.max_size = max_size
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        total_size = 0
-
-        async def rcv() -> Message:
-            nonlocal total_size
-            message = await receive()
-            chunk_size = len(message.get("body", b""))
-            total_size += chunk_size
-            if self.max_size is not None and total_size > self.max_size:
-                raise HTTPException(413, "Payload too large")
-            return message
-
-        await self.app(scope, rcv, send)
