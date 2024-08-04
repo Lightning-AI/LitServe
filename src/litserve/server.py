@@ -549,7 +549,9 @@ class LitServer:
         loop = asyncio.get_running_loop()
 
         if not hasattr(self, "response_queues") or not self.response_queues:
-            raise RuntimeError("Response queues have not been initialized, please ensure that LitServer.launch_inference_worker was called!")
+            raise RuntimeError(
+                "Response queues have not been initialized, please ensure that LitServer.launch_inference_worker was called!"
+            )
 
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
