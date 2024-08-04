@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from contextlib import contextmanager
 import time
 import psutil
 from typing import Generator
@@ -97,9 +98,23 @@ def simple_batched_stream_api():
     return SimpleBatchedStreamAPI()
 
 
+@contextmanager
+def wrap_litserve_start(server: LitServer):
+    server.app.response_queue_id = 0
+    if server.lit_spec:
+        server.lit_spec.response_queue_id = 0
+    manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
+    yield server
+    for p in processes:
+        p.terminate()
+    manager.shutdown()
+
+
 @pytest.fixture()
 def lit_server(simple_litapi):
-    return LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+    with wrap_litserve_start(server) as s:
+        yield s
 
 
 @pytest.fixture()

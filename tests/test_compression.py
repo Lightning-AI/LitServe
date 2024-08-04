@@ -14,7 +14,7 @@
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-
+from tests.conftest import wrap_litserve_start
 from litserve import LitAPI, LitServer
 
 # trivially compressible content
@@ -38,8 +38,8 @@ class LargeOutputLitAPI(LitAPI):
 def test_compression():
     server = LitServer(LargeOutputLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
 
-    # compressed
-    with TestClient(server.app) as client:
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # compressed
         response = client.post("/predict", headers={"Accept-Encoding": "gzip"}, json={})
         assert response.status_code == 200
         assert response.headers["Content-Encoding"] == "gzip"
@@ -47,8 +47,7 @@ def test_compression():
         assert 0 < content_length < 100000
         assert response.json() == test_output
 
-    # uncompressed
-    with TestClient(server.app) as client:
+        # uncompressed
         response = client.post("/predict", headers={"Accept-Encoding": ""}, json={})
         assert response.status_code == 200
         assert "Content-Encoding" not in response.headers
