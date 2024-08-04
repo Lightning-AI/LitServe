@@ -546,6 +546,13 @@ class LitServer:
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
 
+        if not hasattr(self, "response_queues") or not self.response_queues:
+            raise RuntimeError(
+                "Response queues have not been initialized. "
+                "Please make sure to call the 'launch_inference_worker' method of "
+                "the LitServer class to initialize the response queues."
+            )
+
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
