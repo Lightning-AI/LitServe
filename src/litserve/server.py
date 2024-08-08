@@ -717,15 +717,16 @@ class LitServer:
         elif uvicorn_worker_type is None:
             uvicorn_worker_type = "process"
 
-        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs)
-
-        for s in servers:
-            s.join()
-
-        for w in litserve_workers:
-            w.terminate()
-            w.join()
-        manager.shutdown()
+        try:
+            servers = self._start_server(port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs)
+            for s in servers:
+                s.join()
+        finally:
+            print("Shutting down LitServe")
+            for w in litserve_workers:
+                w.terminate()
+                w.join()
+            manager.shutdown()
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
