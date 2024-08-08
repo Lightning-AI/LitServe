@@ -717,7 +717,7 @@ class LitServer:
         elif uvicorn_worker_type is None:
             uvicorn_worker_type = "process"
 
-        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type)
+        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs)
 
         for s in servers:
             s.join()
@@ -727,7 +727,7 @@ class LitServer:
             w.join()
         manager.shutdown()
 
-    def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type):
+    def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
@@ -735,7 +735,7 @@ class LitServer:
                 self.lit_spec.response_queue_id = response_queue_id
             app = copy.copy(self.app)
 
-            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level)
+            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             server = uvicorn.Server(config=config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
