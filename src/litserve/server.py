@@ -686,10 +686,10 @@ class LitServer:
     def run(
         self,
         port: Union[str, int] = 8000,
-        num_uvicorn_servers: Optional[int] = None,
+        num_api_servers: Optional[int] = None,
         log_level: str = "info",
         generate_client_file: bool = True,
-        uvicorn_worker_type: Optional[str] = None,
+        api_server_worker_type: Optional[str] = None,
         **kwargs,
     ):
         if generate_client_file:
@@ -707,17 +707,17 @@ class LitServer:
         config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
 
-        if num_uvicorn_servers is None:
-            num_uvicorn_servers = len(self.workers)
+        if num_api_servers is None:
+            num_api_servers = len(self.workers)
 
-        manager, litserve_workers = self.launch_inference_worker(num_uvicorn_servers)
+        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
         if sys.platform == "win32":
-            uvicorn_worker_type = "thread"
-        elif uvicorn_worker_type is None:
-            uvicorn_worker_type = "process"
+            api_server_worker_type = "thread"
+        elif api_server_worker_type is None:
+            api_server_worker_type = "process"
 
-        servers = self._start_server(port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type)
+        servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type)
 
         for s in servers:
             s.join()
