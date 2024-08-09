@@ -12,21 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import litserve as ls
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
 from httpx import AsyncClient
 from litserve.examples.openai_spec_example import (
+    OpenAIBatchingWithUsage,
+    OpenAIWithUsage,
+    OpenAIWithUsageEncodeResponse,
     TestAPI,
     TestAPIWithCustomEncode,
+    TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
-    OpenAIWithUsage,
-    OpenAIBatchingWithUsage,
-    OpenAIWithUsageEncodeResponse,
 )
+from litserve.specs.openai import ChatMessage, OpenAISpec
+
 from tests.conftest import wrap_litserve_start
-from litserve.specs.openai import OpenAISpec, ChatMessage
-import litserve as ls
 
 
 @pytest.mark.asyncio()
@@ -115,6 +117,20 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
                     "function": {"name": "function_1", "arguments": '{"arg_1": "arg_1_value"}'},
                 }
             ], "LitAPI predict response should match with the generated output"
+
+
+@pytest.mark.asyncio()
+async def test_openai_spec_with_response_format(openai_request_data_with_response_format):
+    spec = OpenAISpec()
+    server = ls.LitServer(TestAPIWithStructuredOutput(), spec=spec)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_response_format, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            assert (
+                resp.json()["choices"][0]["message"]["content"]
+                == '{"name": "Science Fair", "date": "Friday", "participants": ["Alice", "Bob"]}'
+            ), "LitAPI predict response should match with the generated output"
 
 
 class IncorrectAPI1(ls.LitAPI):

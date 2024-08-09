@@ -244,3 +244,54 @@ def test_e2e_openai_with_batching(openai_request_data):
     assert response.choices[0].message.content == (
         "Hi! It's nice to meet you. Is there something I can " "help you with or would you like to chat? "
     ), f"Server didn't return expected output OpenAI client output: {response}"
+
+
+@e2e_from_file("tests/e2e/default_openaispec_response_format.py")
+def test_openai_parity_with_response_format():
+    client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="lit")
+    messages = [
+        {
+            "role": "system",
+            "content": "Extract the event information.",
+        },
+        {"role": "user", "content": "Alice and Bob are going to a science fair on Friday."},
+    ]
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "calendar_event",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "date": {"type": "string"},
+                    "participants": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["name", "date", "participants"],
+                "additionalProperties": "false",
+            },
+            "strict": "true",
+        },
+    }
+    output = '{"name": "Science Fair", "date": "Friday", "participants": ["Alice", "Bob"]}'
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+        response_format=response_format,
+    )
+    assert response.choices[0].message.content == output, (
+        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+    )
+
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+        response_format=response_format,
+        stream=True,
+    )
+
+    expected_outputs = [output, None]
+    for r, expected_out in zip(response, expected_outputs):
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+        )

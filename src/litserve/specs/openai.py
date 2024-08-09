@@ -20,7 +20,7 @@ import typing
 import uuid
 from collections import deque
 from enum import Enum
-from typing import AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
+from typing import Annotated, AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
@@ -105,6 +105,31 @@ class ToolCall(BaseModel):
     function: FunctionCall
 
 
+class ResponseFormatText(BaseModel):
+    type: Literal["text"]
+
+
+class ResponseFormatJSONObject(BaseModel):
+    type: Literal["json_object"]
+
+
+class JSONSchema(BaseModel):
+    name: str
+    description: Optional[str] = None
+    schema: Optional[Dict[str, object]] = None
+    strict: Optional[bool] = False
+
+
+class ResponseFormatJSONSchema(BaseModel):
+    json_schema: JSONSchema
+    type: Literal["json_schema"]
+
+
+ResponseFormat = Annotated[
+    Union[ResponseFormatText, ResponseFormatJSONObject, ResponseFormatJSONSchema], "ResponseFormat"
+]
+
+
 class ChatMessage(BaseModel):
     role: str
     content: Union[str, List[Union[TextContent, ImageContent]]]
@@ -138,6 +163,7 @@ class ChatCompletionRequest(BaseModel):
     user: Optional[str] = None
     tools: Optional[List[Tool]] = None
     tool_choice: Optional[ToolChoice] = ToolChoice.auto
+    response_format: Optional[ResponseFormat] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):

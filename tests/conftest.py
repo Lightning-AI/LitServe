@@ -236,3 +236,43 @@ def openai_request_data_with_tools():
         "frequency_penalty": 0,
         "user": "string",
     }
+
+
+@pytest.fixture()
+def openai_request_data_with_response_format():
+    return {
+        "model": "lit",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Extract the event information.",
+            },
+            {"role": "user", "content": "Alice and Bob are going to a science fair on Friday."},
+        ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "calendar_event",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "date": {"type": "string"},
+                        "participants": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["name", "date", "participants"],
+                    "additionalProperties": "false",
+                },
+                "strict": "true",
+            },
+        },
+        "temperature": 0.7,
+        "top_p": 1,
+        "n": 1,
+        "max_tokens": 0,
+        "stop": "string",
+        "stream": False,
+        "presence_penalty": 0,
+        "frequency_penalty": 0,
+        "user": "string",
+    }
