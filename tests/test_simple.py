@@ -121,12 +121,12 @@ class SlowBatchAPI(SlowLitAPI):
 
 @pytest.mark.asyncio()
 async def test_timeout():
+    # Scenario: first request completes, second request times out in queue
     api = SlowLitAPI()  # takes 2 seconds for each prediction
     server = LitServer(api, accelerator="cpu", devices=1, timeout=2)
-
     with wrap_litserve_start(server) as server:
-        # Poll until the server is ready
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            # Poll until the server is ready
             for _ in range(10):  # retry 10 times
                 try:
                     await ac.get("/health")
@@ -145,6 +145,10 @@ async def test_timeout():
                 "Server takes longer than specified timeout and " "request should timeout"
             )
 
+
+@pytest.mark.asyncio()
+async def test_batch_timeout():
+    # Scenario: first 2 requests finish as a batch and third request times out in queue
     server = LitServer(
         SlowBatchAPI(),
         accelerator="cpu",
