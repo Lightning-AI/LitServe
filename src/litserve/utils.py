@@ -70,6 +70,7 @@ async def azip(*async_iterables):
             break
         yield tuple(results)
 
+
 @contextmanager
 def wrap_litserve_start(server: LitServer):
     server.app.response_queue_id = 0
@@ -80,6 +81,7 @@ def wrap_litserve_start(server: LitServer):
     for p in processes:
         p.terminate()
     manager.shutdown()
+
 
 class MaxSizeMiddleware(BaseHTTPMiddleware):
     def __init__(
