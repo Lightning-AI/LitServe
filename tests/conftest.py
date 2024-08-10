@@ -19,6 +19,7 @@ from typing import Generator
 from litserve.server import LitServer
 import pytest
 from litserve.api import LitAPI
+from litserve.utils import wrap_litserve_start
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
@@ -96,18 +97,6 @@ def simple_stream_api():
 @pytest.fixture()
 def simple_batched_stream_api():
     return SimpleBatchedStreamAPI()
-
-
-@contextmanager
-def wrap_litserve_start(server: LitServer):
-    server.app.response_queue_id = 0
-    if server.lit_spec:
-        server.lit_spec.response_queue_id = 0
-    manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
-    yield server
-    for p in processes:
-        p.terminate()
-    manager.shutdown()
 
 
 @pytest.fixture()

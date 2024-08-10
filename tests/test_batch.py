@@ -25,7 +25,7 @@ from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
 from litserve.server import run_batched_loop
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 
 
 class Linear(nn.Module):
