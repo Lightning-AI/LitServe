@@ -25,7 +25,7 @@ from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
 
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):

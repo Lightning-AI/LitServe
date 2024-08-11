@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 from queue import Queue
 from httpx import AsyncClient
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 
 from unittest.mock import patch, MagicMock
 import pytest
