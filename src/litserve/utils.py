@@ -17,11 +17,16 @@ import pickle
 import uuid
 from typing import Coroutine, Optional
 from contextlib import contextmanager
-from litserve.server import LitServer
+from typing import TYPE_CHECKING  
+
+
 
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+if TYPE_CHECKING:  
+    from litserve.server import LitServer  
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +77,7 @@ async def azip(*async_iterables):
 
 
 @contextmanager
-def wrap_litserve_start(server: LitServer):
+def wrap_litserve_start(server: "LitServer"):
     server.app.response_queue_id = 0
     if server.lit_spec:
         server.lit_spec.response_queue_id = 0
