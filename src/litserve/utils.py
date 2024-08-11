@@ -17,16 +17,16 @@ import pickle
 import uuid
 from typing import Coroutine, Optional
 from contextlib import contextmanager
-from typing import TYPE_CHECKING  
-
+from typing import TYPE_CHECKING
 
 
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-if TYPE_CHECKING:  
-    from litserve.server import LitServer  
+
+if TYPE_CHECKING:
+    from litserve.server import LitServer
 
 logger = logging.getLogger(__name__)
 
