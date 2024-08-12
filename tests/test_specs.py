@@ -28,7 +28,6 @@ from litserve.examples.openai_spec_example import (
 )
 from litserve.utils import wrap_litserve_start
 from litserve.specs.openai import OpenAISpec, ChatMessage
-import litserve as ls
 
 
 @pytest.mark.asyncio()
