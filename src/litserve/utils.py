@@ -14,11 +14,9 @@
 import asyncio
 import logging
 import pickle
-import uuid
-from typing import Coroutine, Optional
+from typing import Optional
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
-
 
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -35,24 +33,6 @@ class LitAPIStatus:
     OK = "OK"
     ERROR = "ERROR"
     FINISH_STREAMING = "FINISH_STREAMING"
-
-
-async def wait_for_queue_timeout(coro: Coroutine, timeout: Optional[float], uid: uuid.UUID, request_buffer: dict):
-    if timeout == -1 or timeout is False:
-        return await coro
-
-    task = asyncio.create_task(coro)
-    shield = asyncio.shield(task)
-    try:
-        return await asyncio.wait_for(shield, timeout)
-    except asyncio.TimeoutError:
-        if uid in request_buffer:
-            logger.error(
-                f"Request was waiting in the queue for too long ({timeout} seconds) and has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            raise HTTPException(504, "Request timed out")
-        return await task
 
 
 def load_and_raise(response):
