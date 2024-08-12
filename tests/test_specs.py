@@ -26,9 +26,9 @@ from litserve.examples.openai_spec_example import (
     TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
 )
-from litserve.specs.openai import ChatMessage, OpenAISpec
-
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
+from litserve.specs.openai import OpenAISpec, ChatMessage
+import litserve as ls
 
 
 @pytest.mark.asyncio()

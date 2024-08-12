@@ -1,7 +1,7 @@
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 import litserve as ls
 
 
