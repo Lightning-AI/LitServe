@@ -14,7 +14,7 @@
 from fastapi.testclient import TestClient
 
 from pydantic import BaseModel
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 from litserve import LitAPI, LitServer
 
 

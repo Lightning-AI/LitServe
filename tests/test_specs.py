@@ -24,7 +24,7 @@ from litserve.examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsageEncodeResponse,
 )
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 from litserve.specs.openai import OpenAISpec, ChatMessage
 import litserve as ls
 

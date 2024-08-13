@@ -15,7 +15,7 @@ from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
 from litserve import LitAPI, LitServer
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 
 import torch
 import torch.nn as nn

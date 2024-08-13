@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 from queue import Queue
 from httpx import AsyncClient
-from tests.conftest import wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 
 from unittest.mock import patch, MagicMock
 import pytest
@@ -339,6 +339,21 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.reset_mock()
     server.run(port="8001")
     mock_uvicorn.Config.assert_called()
+
+
+def test_server_terminate():
+    server = LitServer(SimpleLitAPI())
+    mock_manager = MagicMock()
+
+    with patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start, patch(
+        "litserve.server.LitServer.launch_inference_worker", return_value=[mock_manager, [MagicMock()]]
+    ) as mock_launch:
+        with pytest.raises(Exception, match="mocked error"):
+            server.run(port=8001)
+
+        mock_launch.assert_called()
+        mock_start.assert_called()
+        mock_manager.shutdown.assert_called()
 
 
 class IndentityAPI(ls.examples.SimpleLitAPI):
