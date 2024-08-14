@@ -15,7 +15,7 @@ rand_mat = np.random.rand(2, 224, 224, 3) * 255
 Image.fromarray(rand_mat[0].astype("uint8")).convert("RGB").save("image1.jpg")
 Image.fromarray(rand_mat[1].astype("uint8")).convert("RGB").save("image2.jpg")
 
-SERVER_URL = "http://0.0.0.0:8000/predict"
+SERVER_URL = "http://127.0.0.1:8000/predict"
 
 payloads = []
 for file in ["image1.jpg", "image2.jpg"]:

@@ -14,10 +14,8 @@ def run_python_script(filename):
         def wrapper(*args, **kwargs):
             process = subprocess.Popen(
                 ["python", filename],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.DEVNULL,
             )
+            print("Waiting for server to start...")
             time.sleep(5)
 
             try:
@@ -25,6 +23,7 @@ def run_python_script(filename):
             except Exception:
                 raise
             finally:
+                print("Killing the server")
                 parent = psutil.Process(process.pid)
                 for child in parent.children(recursive=True):
                     child.kill()
@@ -53,13 +52,11 @@ diff_factor = {
 
 @run_python_script("tests/parity_fastapi/fastapi_server.py")
 def run_fastapi_benchmark(num_samples):
-    time.sleep(10)
     return run_bench(conf, num_samples)
 
 
 @run_python_script("tests/parity_fastapi/ls_server.py")
 def run_litserve_benchmark(num_samples):
-    time.sleep(10)
     return run_bench(conf, num_samples)
 
 
