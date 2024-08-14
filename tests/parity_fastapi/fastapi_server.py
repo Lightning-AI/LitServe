@@ -45,6 +45,11 @@ if torch.backends.mps.is_available():
 api = ImageClassifierAPI(device)
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/predict")
 async def predict(image_data: ImageData):
     try:

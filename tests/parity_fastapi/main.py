@@ -16,7 +16,7 @@ def run_python_script(filename):
                 ["python", filename],
             )
             print("Waiting for server to start...")
-            time.sleep(5)
+            time.sleep(10)
 
             try:
                 return test_fn(*args, **kwargs)
@@ -50,13 +50,27 @@ diff_factor = {
 }
 
 
+def try_health():
+    for i in range(10):
+        try:
+            import requests
+
+            response = requests.get("http://127.0.0.1:8000/health")
+            if response.status_code == 200:
+                return
+        except Exception:
+            pass
+
+
 @run_python_script("tests/parity_fastapi/fastapi_server.py")
 def run_fastapi_benchmark(num_samples):
+    try_health()
     return run_bench(conf, num_samples)
 
 
 @run_python_script("tests/parity_fastapi/ls_server.py")
 def run_litserve_benchmark(num_samples):
+    try_health()
     return run_bench(conf, num_samples)
 
 
