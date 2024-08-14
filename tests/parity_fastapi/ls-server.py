@@ -13,10 +13,10 @@ import litserve as ls
 device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device
 conf = {
-        "cuda": {"batch_size": 8, "workers_per_device": 1},
-        "cpu": {"batch_size": 4, "workers_per_device": 1},
-        "mps": {"batch_size": 4, "workers_per_device": 1},
-    }
+    "cuda": {"batch_size": 8, "workers_per_device": 1},
+    "cpu": {"batch_size": 4, "workers_per_device": 1},
+    "mps": {"batch_size": 4, "workers_per_device": 1},
+}
 
 # Set float32 matrix multiplication precision if GPU is available and capable
 if torch.cuda.is_available() and torch.cuda.get_device_capability() >= (8, 0):
@@ -70,5 +70,4 @@ def main(batch_size: int = 8, workers_per_device: int = 1):
 
 
 if __name__ == "__main__":
-    
     main(**conf[device])
