@@ -45,6 +45,14 @@ class TestAPIWithToolCalls(TestAPI):
         )
 
 
+class TestAPIWithStructuredOutput(TestAPI):
+    def encode_response(self, output):
+        yield ChatMessage(
+            role="assistant",
+            content='{"name": "Science Fair", "date": "Friday", "participants": ["Alice", "Bob"]}',
+        )
+
+
 class OpenAIBatchContext(ls.LitAPI):
     def setup(self, device: str) -> None:
         self.model = None
