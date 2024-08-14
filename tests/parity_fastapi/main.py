@@ -1,9 +1,39 @@
-import time
-
 import torch
 
-from litserve.utils import run_python_script
-from tests.parity_fastapi.benchmark import run_bench
+from benchmark import run_bench
+import psutil
+import subprocess
+import time
+
+from functools import wraps
+
+
+def run_python_script(filename):
+    def decorator(test_fn):
+        @wraps(test_fn)
+        def wrapper(*args, **kwargs):
+            process = subprocess.Popen(
+                ["python", filename],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+            time.sleep(5)
+
+            try:
+                return test_fn(*args, **kwargs)
+            except Exception:
+                raise
+            finally:
+                parent = psutil.Process(process.pid)
+                for child in parent.children(recursive=True):
+                    child.kill()
+                process.kill()
+
+        return wrapper
+
+    return decorator
+
 
 conf = {
     "cpu": {"num_requests": 8},

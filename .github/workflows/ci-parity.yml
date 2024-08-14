@@ -31,4 +31,4 @@ jobs:
           pip list
 
       - name: Tests
-        run: export PYTHONPATH=$PWD && python tests/parity_fastapi/run_parity_test.py
+        run: export PYTHONPATH=$PWD && python tests/parity_fastapi/main.py
