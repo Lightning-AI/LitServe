@@ -18,7 +18,7 @@ device = "mps" if torch.backends.mps.is_available() else device
 
 diff_factor = {
     "cpu": 1,
-    "gpu": 2,
+    "cuda": 2,
     "mps": 1,
 }
 
