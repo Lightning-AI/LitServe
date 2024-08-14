@@ -1,4 +1,5 @@
 import torch
+import requests
 
 from benchmark import run_bench
 import psutil
@@ -10,7 +11,7 @@ from functools import wraps
 conf = {
     "cpu": {"num_requests": 8},
     "mps": {"num_requests": 8},
-    "cuda": {"num_requests": 8},
+    "cuda": {"num_requests": 16},
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -49,12 +50,10 @@ def run_python_script(filename):
     return decorator
 
 
-def try_health():
+def try_health(port=8000):
     for i in range(10):
         try:
-            import requests
-
-            response = requests.get("http://127.0.0.1:8000/health")
+            response = requests.get(f"http://127.0.0.1:{port}/health")
             if response.status_code == 200:
                 return
         except Exception:
@@ -63,14 +62,14 @@ def try_health():
 
 @run_python_script("tests/parity_fastapi/fastapi-server.py")
 def run_fastapi_benchmark(num_samples):
-    try_health()
-    return run_bench(conf, num_samples)
+    try_health(8001)
+    return run_bench(conf, num_samples, 8001)
 
 
 @run_python_script("tests/parity_fastapi/ls-server.py")
 def run_litserve_benchmark(num_samples):
-    try_health()
-    return run_bench(conf, num_samples)
+    try_health(8000)
+    return run_bench(conf, num_samples, 8000)
 
 
 def mean(lst):

@@ -54,7 +54,7 @@ def main(batch_size: int = 8, workers_per_device: int = 1):
         api,
         max_batch_size=batch_size,
         batch_timeout=0.01,
-        timeout=100,
+        timeout=10,
         workers_per_device=workers_per_device,
     )
     server.run(port=8000)
@@ -62,7 +62,7 @@ def main(batch_size: int = 8, workers_per_device: int = 1):
 
 if __name__ == "__main__":
     conf = {
-        "cuda": {"batch_size": 4, "workers_per_device": 1},
+        "cuda": {"batch_size": 8, "workers_per_device": 1},
         "cpu": {"batch_size": 4, "workers_per_device": 1},
         "mps": {"batch_size": 4, "workers_per_device": 1},
     }
