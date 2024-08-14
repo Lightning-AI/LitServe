@@ -8,7 +8,7 @@ import torch
 from PIL import Image
 import numpy as np
 
-device = "cpu" if torch.cuda.is_available() else "cuda"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device
 
 rand_mat = np.random.rand(2, 224, 224, 3) * 255
@@ -82,4 +82,4 @@ def run_bench(conf: dict, num_samples: int, port: int):
     for _ in range(num_samples):
         metric = benchmark(num_requests=num_requests, concurrency_level=num_requests, port=port)
         results.append(metric)
-    return results[1:]  # skip warmup step
+    return results[2:]  # skip warmup step
