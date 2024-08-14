@@ -61,13 +61,13 @@ def try_health():
             pass
 
 
-@run_python_script("tests/parity_fastapi/fastapi_server.py")
+@run_python_script("tests/parity_fastapi/fastapi-server.py")
 def run_fastapi_benchmark(num_samples):
     try_health()
     return run_bench(conf, num_samples)
 
 
-@run_python_script("tests/parity_fastapi/ls_server.py")
+@run_python_script("tests/parity_fastapi/ls-server.py")
 def run_litserve_benchmark(num_samples):
     try_health()
     return run_bench(conf, num_samples)
