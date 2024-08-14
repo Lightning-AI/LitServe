@@ -7,6 +7,21 @@ import time
 
 from functools import wraps
 
+conf = {
+    "cpu": {"num_requests": 8},
+    "mps": {"num_requests": 8},
+    "cuda": {"num_requests": 8},
+}
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "mps" if torch.backends.mps.is_available() else device
+
+diff_factor = {
+    "cpu": 1,
+    "gpu": 2,
+    "mps": 1,
+}
+
 
 def run_python_script(filename):
     def decorator(test_fn):
@@ -32,22 +47,6 @@ def run_python_script(filename):
         return wrapper
 
     return decorator
-
-
-conf = {
-    "cpu": {"num_requests": 8},
-    "mps": {"num_requests": 8},
-    "cuda": {"num_requests": 8},
-}
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "mps" if torch.backends.mps.is_available() else device
-
-diff_factor = {
-    "cpu": 1,
-    "gpu": 2,
-    "mps": 1,
-}
 
 
 def try_health():
@@ -86,7 +85,7 @@ def main():
     fastapi_throughput = mean([e[key] for e in fastapi_metrics])
     ls_throughput = mean([e[key] for e in ls_metrics])
     factor = diff_factor[device]
-    msg = f"LitServe should have higher throughput than FastAPI on {device}. {fastapi_throughput} vs {ls_throughput}"
+    msg = f"LitServe should have higher throughput than FastAPI on {device}. {ls_throughput} vs {fastapi_throughput}"
     assert ls_throughput > fastapi_throughput * factor, msg
 
 
