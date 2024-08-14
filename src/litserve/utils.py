@@ -23,6 +23,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+
+import psutil
+import subprocess
+import time
+
+from functools import wraps
+
+
 if TYPE_CHECKING:
     from litserve.server import LitServer
 
@@ -95,3 +103,30 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
             return message
 
         await self.app(scope, rcv, send)
+
+
+def run_python_script(filename):
+    def decorator(test_fn):
+        @wraps(test_fn)
+        def wrapper(*args, **kwargs):
+            process = subprocess.Popen(
+                ["python", filename],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+            )
+            time.sleep(5)
+
+            try:
+                return test_fn(*args, **kwargs)
+            except Exception:
+                raise
+            finally:
+                parent = psutil.Process(process.pid)
+                for child in parent.children(recursive=True):
+                    child.kill()
+                process.kill()
+
+        return wrapper
+
+    return decorator

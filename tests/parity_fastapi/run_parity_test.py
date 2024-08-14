@@ -2,7 +2,7 @@ import time
 
 import torch
 
-from tests.e2e.test_e2e import e2e_from_file
+from litserve.utils import run_python_script
 from tests.parity_fastapi.benchmark import run_bench
 
 conf = {
@@ -21,13 +21,13 @@ diff_factor = {
 }
 
 
-@e2e_from_file("tests/parity_fastapi/fastapi_server.py")
+@run_python_script("tests/parity_fastapi/fastapi_server.py")
 def run_fastapi_benchmark(num_samples):
     time.sleep(10)
     return run_bench(conf, num_samples)
 
 
-@e2e_from_file("tests/parity_fastapi/ls_server.py")
+@run_python_script("tests/parity_fastapi/ls_server.py")
 def run_litserve_benchmark(num_samples):
     time.sleep(10)
     return run_bench(conf, num_samples)
@@ -37,7 +37,7 @@ def mean(lst):
     return sum(lst) / len(lst)
 
 
-def test_parity_fastapi():
+def main():
     key = "Requests Per Second (RPS)"
     num_samples = 5
     fastapi_metrics = run_fastapi_benchmark(num_samples=num_samples)
@@ -50,4 +50,4 @@ def test_parity_fastapi():
 
 
 if __name__ == "__main__":
-    test_parity_fastapi()
+    main()

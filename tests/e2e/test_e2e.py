@@ -13,43 +13,15 @@
 # limitations under the License.
 import json
 import os
-import psutil
 import requests
 import subprocess
-import time
 
 from openai import OpenAI
-from functools import wraps
+
+from litserve.utils import run_python_script
 
 
-def e2e_from_file(filename):
-    def decorator(test_fn):
-        @wraps(test_fn)
-        def wrapper(*args, **kwargs):
-            process = subprocess.Popen(
-                ["python", filename],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-            )
-            time.sleep(5)
-
-            try:
-                return test_fn(*args, **kwargs)
-            except Exception:
-                raise
-            finally:
-                parent = psutil.Process(process.pid)
-                for child in parent.children(recursive=True):
-                    child.kill()
-                process.kill()
-
-        return wrapper
-
-    return decorator
-
-
-@e2e_from_file("tests/simple_server.py")
+@run_python_script("tests/simple_server.py")
 def test_run():
     assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
@@ -57,14 +29,14 @@ def test_run():
     os.remove("client.py")
 
 
-@e2e_from_file("tests/e2e/default_api.py")
+@run_python_script("tests/e2e/default_api.py")
 def test_e2e_default_api():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
 
 
-@e2e_from_file("tests/e2e/default_spec.py")
+@run_python_script("tests/e2e/default_spec.py")
 def test_e2e_default_spec(openai_request_data):
     resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
@@ -73,14 +45,14 @@ def test_e2e_default_spec(openai_request_data):
     assert output == expected, "tests/default_spec.py didn't return expected output"
 
 
-@e2e_from_file("tests/e2e/default_batching.py")
+@run_python_script("tests/e2e/default_batching.py")
 def test_e2e_default_batching():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
 
 
-@e2e_from_file("tests/e2e/default_batched_streaming.py")
+@run_python_script("tests/e2e/default_batched_streaming.py")
 def test_e2e_batched_streaming():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
@@ -94,7 +66,7 @@ def test_e2e_batched_streaming():
     assert {"output": 16.0} in outputs, "server didn't return expected output"
 
 
-@e2e_from_file("tests/e2e/default_openaispec.py")
+@run_python_script("tests/e2e/default_openaispec.py")
 def test_openai_parity():
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
@@ -127,7 +99,7 @@ def test_openai_parity():
         )
 
 
-@e2e_from_file("tests/e2e/default_openaispec.py")
+@run_python_script("tests/e2e/default_openaispec.py")
 def test_openai_parity_with_image_input():
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
@@ -170,7 +142,7 @@ def test_openai_parity_with_image_input():
         )
 
 
-@e2e_from_file("tests/e2e/default_openaispec_tools.py")
+@run_python_script("tests/e2e/default_openaispec_tools.py")
 def test_openai_parity_with_tools():
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
@@ -228,7 +200,7 @@ def test_openai_parity_with_tools():
             )
 
 
-@e2e_from_file("tests/e2e/default_openai_with_batching.py")
+@run_python_script("tests/e2e/default_openai_with_batching.py")
 def test_e2e_openai_with_batching(openai_request_data):
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",

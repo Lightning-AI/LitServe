@@ -17,7 +17,6 @@ Image.fromarray(rand_mat[1].astype("uint8")).convert("RGB").save("image2.jpg")
 
 SERVER_URL = "http://0.0.0.0:8000/predict"
 
-
 payloads = []
 for file in ["image1.jpg", "image2.jpg"]:
     with open(file, "rb") as image_file:
