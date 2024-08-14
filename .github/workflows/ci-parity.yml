@@ -28,7 +28,7 @@ jobs:
           pip --version
           pip install .  -U -q
           pip install -r _requirements/test.txt -U -q
-          pip install torchvision
+          pip install torchvision jsonargparse -q
           pip list
 
       - name: Tests
