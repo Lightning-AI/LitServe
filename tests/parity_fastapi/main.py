@@ -50,7 +50,7 @@ def run_python_script(filename):
     return decorator
 
 
-def try_health(port=8000):
+def try_health(port):
     for i in range(10):
         try:
             response = requests.get(f"http://127.0.0.1:{port}/health")
@@ -62,14 +62,16 @@ def try_health(port=8000):
 
 @run_python_script("tests/parity_fastapi/fastapi-server.py")
 def run_fastapi_benchmark(num_samples):
-    try_health(8001)
-    return run_bench(conf, num_samples, 8001)
+    port = 8001
+    try_health(port)
+    return run_bench(conf, num_samples, port)
 
 
 @run_python_script("tests/parity_fastapi/ls-server.py")
 def run_litserve_benchmark(num_samples):
-    try_health(8000)
-    return run_bench(conf, num_samples, 8000)
+    port = 8000
+    try_health(port)
+    return run_bench(conf, num_samples, port)
 
 
 def mean(lst):
