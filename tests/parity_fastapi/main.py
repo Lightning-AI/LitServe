@@ -8,7 +8,7 @@ import time
 
 from functools import wraps
 
-conf = {
+CONF = {
     "cpu": {"num_requests": 8},
     "mps": {"num_requests": 8},
     "cuda": {"num_requests": 16},
@@ -17,7 +17,7 @@ conf = {
 device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device
 
-diff_factor = {
+DIFF_FACTOR = {
     "cpu": 1,
     "cuda": 1.2,
     "mps": 1,
@@ -64,14 +64,14 @@ def try_health(port):
 def run_fastapi_benchmark(num_samples):
     port = 8001
     try_health(port)
-    return run_bench(conf, num_samples, port)
+    return run_bench(CONF, num_samples, port)
 
 
 @run_python_script("tests/parity_fastapi/ls-server.py")
 def run_litserve_benchmark(num_samples):
     port = 8000
     try_health(port)
-    return run_bench(conf, num_samples, port)
+    return run_bench(CONF, num_samples, port)
 
 
 def mean(lst):
@@ -85,7 +85,7 @@ def main():
     ls_metrics = run_litserve_benchmark(num_samples=num_samples)
     fastapi_throughput = mean([e[key] for e in fastapi_metrics])
     ls_throughput = mean([e[key] for e in ls_metrics])
-    factor = diff_factor[device]
+    factor = DIFF_FACTOR[device]
     msg = f"LitServe should have higher throughput than FastAPI on {device}. {ls_throughput} vs {fastapi_throughput}"
     assert ls_throughput > fastapi_throughput * factor, msg
 
