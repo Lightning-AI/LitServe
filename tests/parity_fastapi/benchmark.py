@@ -8,14 +8,14 @@ import torch
 from PIL import Image
 import numpy as np
 
-device = "cpu" if torch.cuda.is_available() else "cuda"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device
 
 rand_mat = np.random.rand(2, 224, 224, 3) * 255
 Image.fromarray(rand_mat[0].astype("uint8")).convert("RGB").save("image1.jpg")
 Image.fromarray(rand_mat[1].astype("uint8")).convert("RGB").save("image2.jpg")
 
-SERVER_URL = "http://127.0.0.1:8000/predict"
+SERVER_URL = "http://127.0.0.1:{}/predict"
 
 payloads = []
 for file in ["image1.jpg", "image2.jpg"]:
@@ -24,21 +24,22 @@ for file in ["image1.jpg", "image2.jpg"]:
         payloads.append(encoded_string)
 
 
-def send_request():
+def send_request(port):
     """Function to send a single request and measure the response time."""
+    url = SERVER_URL.format(port)
     payload = {"image_data": random.choice(payloads)}
     start_time = time.time()
-    response = requests.post(SERVER_URL, json=payload)
+    response = requests.post(url, json=payload)
     end_time = time.time()
     return end_time - start_time, response.status_code
 
 
-def benchmark(num_requests=100, concurrency_level=100):
+def benchmark(num_requests=100, concurrency_level=100, port=8000):
     """Benchmark the ML server."""
 
     start_benchmark_time = time.time()  # Start benchmark timing
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency_level) as executor:
-        futures = [executor.submit(send_request) for _ in range(num_requests)]
+        futures = [executor.submit(send_request, port) for _ in range(num_requests)]
         response_times = []
         status_codes = []
 
@@ -74,11 +75,11 @@ def benchmark(num_requests=100, concurrency_level=100):
     return metrics
 
 
-def run_bench(conf: dict, num_samples: int):
+def run_bench(conf: dict, num_samples: int, port: int):
     num_requests = conf[device]["num_requests"]
 
     results = []
     for _ in range(num_samples):
-        metric = benchmark(num_requests=num_requests, concurrency_level=num_requests)
+        metric = benchmark(num_requests=num_requests, concurrency_level=num_requests, port=port)
         results.append(metric)
     return results[1:]  # skip warmup step
