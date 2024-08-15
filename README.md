@@ -17,9 +17,9 @@ Friendly interface. Enterprise scale.
 <div align='center'>
   
 <pre>
-✅ Batching       ✅ Streaming          ✅ Auto-GPU, multi-GPU   
-✅ Multi-modal    ✅ PyTorch/JAX/TF     ✅ Full control          
-✅ Auth           ✅ Built on Fast API  ✅ Custom specs (Open AI)
+✅ 8x faster serving   ✅ Streaming          ✅ Auto-GPU, multi-GPU   
+✅ Multi-modal         ✅ PyTorch/JAX/TF     ✅ Full control          
+✅ Batching            ✅ Built on Fast API  ✅ Custom specs (Open AI)
 </pre>
 
 <div align='center'>
@@ -33,11 +33,11 @@ Friendly interface. Enterprise scale.
 <div align="center">
   <div style="text-align: center;">
     <a href="#quick-start" style="margin: 0 10px;">Quick start</a> •
-    <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
     <a href="#featured-examples" style="margin: 0 10px;">Examples</a> •
+    <a href="#performance" style="margin: 0 10px;">Performance</a> •
     <a href="#deployment-options" style="margin: 0 10px;">Deploy</a> •
     <a href="#features" style="margin: 0 10px;">Features</a> •
-    <a href="#performance" style="margin: 0 10px;">Benchmarks</a> •
+    <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
     <a href="https://lightning.ai/docs/litserve" style="margin: 0 10px;">Docs</a>
   </div>
 </div>
@@ -51,56 +51,6 @@ Friendly interface. Enterprise scale.
 </div>
 
 &nbsp; 
-
-## Performance  
-Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
-
-Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
-
-<div align="center">
-  <img alt="LitServe" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_charts_v6.png" width="1000px" style="max-width: 100%;">
-</div> 
-
-These results are for image and text classification ML tasks. The performance relationships hold for other ML tasks (embedding, LLM serving, audio, segmentation, object detection, summarization etc...).   
-    
-***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
-
-&nbsp; 
-
-## Featured examples    
-
-Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision, audio, multi-modal, etc).    
-
-<table>
-  <tr>
-   <td style="vertical-align: top;">
-<pre>
-<strong>Featured examples</strong><br>
-<strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
-<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
-<strong>NLP:</strong>        <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>
-<strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
-<strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>
-<strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
-<strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
-</pre>
-    </td>
-    <td style="vertical-align: top;">
-<pre>
-<strong>Key features</strong><br>
-✅ <strong>Serve all models:</strong> LLMs, vision, etc
-✅ <strong>All frameworks:  </strong> PyTorch/Jax/sklearn/..
-✅ <strong>Dev friendly:    </strong> build AI, not infra
-✅ <strong>Easy interface:  </strong> no abstractions
-✅ <strong>Enterprise scale:</strong> scale huge models
-✅ <strong>Auto GPU scaling:</strong> zero code changes
-✅ <strong>Self host:       </strong> or run on Studios
-</pre>
-    </td>
-  </tr>
-</table>
-
-&nbsp;
 
 # Quick start
 
@@ -153,24 +103,14 @@ python server.py
     
 ### Query the server
 
-Use the automatically generated LitServe client or write your own:
+Use the automatically generated LitServe client:
 
-<table>
-  <tr>
-    <td style="vertical-align: top;">
-<pre>
-<strong>Option A - Use generated client:           </strong><br>
-  
 ```bash
 python client.py
 ```
-<br>
 
-</pre>
-    </td>
-    <td style="vertical-align: top;">
-<pre>
-<strong>Option B - Custom client example:          </strong><br>
+<details>
+  <summary>Write a custom client</summary>
 
 ```python
 import requests
@@ -179,13 +119,60 @@ response = requests.post(
     json={"input": 4.0}
 )
 ```
-<br>
+</details>
+
+&nbsp;
+
+
+## Featured examples    
+
+Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision, audio, multi-modal, etc).    
+
+<table>
+  <tr>
+   <td style="vertical-align: top;">
+<pre>
+<strong>Featured examples</strong><br>
+<strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
+<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
+<strong>NLP:</strong>        <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>
+<strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
+<strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>
+<strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
+<strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+</pre>
+    </td>
+    <td style="vertical-align: top;">
+<pre>
+<strong>Key features</strong><br>
+✅ <strong>Serve all models:</strong> LLMs, vision, etc
+✅ <strong>All frameworks:  </strong> PyTorch/Jax/sklearn/..
+✅ <strong>Dev friendly:    </strong> build AI, not infra
+✅ <strong>Easy interface:  </strong> no abstractions
+✅ <strong>Enterprise scale:</strong> scale huge models
+✅ <strong>Auto GPU scaling:</strong> zero code changes
+✅ <strong>Self host:       </strong> or run on Studios
 </pre>
     </td>
   </tr>
 </table>
 
 &nbsp;
+
+## Performance  
+Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
+
+Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
+
+<div align="center">
+  <img alt="LitServe" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_charts_v6.png" width="1000px" style="max-width: 100%;">
+</div> 
+
+These results are for image and text classification ML tasks. The performance relationships hold for other ML tasks (embedding, LLM serving, audio, segmentation, object detection, summarization etc...).   
+    
+***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/VLLM), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) or build your custom VLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
+
+&nbsp; 
 
 # Deployment options   
 Self-manage LitServe deployments (just run it on any machine!), or deploy with one click on [Lightning AI](https://lightning.ai/).    
