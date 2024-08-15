@@ -80,7 +80,7 @@ def mean(lst):
 
 def main():
     key = "Requests Per Second (RPS)"
-    num_samples = 7
+    num_samples = 6
     fastapi_metrics = run_fastapi_benchmark(num_samples=num_samples)
     ls_metrics = run_litserve_benchmark(num_samples=num_samples)
     fastapi_throughput = mean([e[key] for e in fastapi_metrics])
