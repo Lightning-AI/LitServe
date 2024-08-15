@@ -19,7 +19,7 @@ device = "mps" if torch.backends.mps.is_available() else device
 
 diff_factor = {
     "cpu": 1,
-    "cuda": 100,
+    "cuda": 1.2,
     "mps": 1,
 }
 
@@ -87,7 +87,7 @@ def main():
     ls_throughput = mean([e[key] for e in ls_metrics])
     factor = diff_factor[device]
     msg = f"LitServe should have higher throughput than FastAPI on {device}. {ls_throughput} vs {fastapi_throughput}"
-    assert ls_throughput > fastapi_throughput + factor, msg
+    assert ls_throughput > fastapi_throughput * factor, msg
 
 
 if __name__ == "__main__":
