@@ -134,13 +134,13 @@ Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision
 <pre>
 <strong>Featured examples</strong><br>
 <strong>Toy model:</strong>  <a href="#define-a-server">Hello world</a>
-<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">LLM Proxy server</a>
+<strong>LLMs:</strong>       <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>
 <strong>NLP:</strong>        <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>
 <strong>Multimodal:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
 <strong>Audio:</strong>      <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>
 <strong>Vision:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
 <strong>Speech:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
-<strong>Classic ML:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
+<strong>Classical ML:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
 </pre>
     </td>
     <td style="vertical-align: top;">
