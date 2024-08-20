@@ -12,7 +12,7 @@ Friendly interface. Enterprise scale.
 
 ----
 
-**LitServe** is a flexible serving engine for AI models built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model. LitServe is at least 2x faster than plain FastAPI. 
+**LitServe** is a flexible serving engine for AI models built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI for each model and is at least 2x faster than plain FastAPI.
 
 <div align='center'>
   
