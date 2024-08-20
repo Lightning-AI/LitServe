@@ -54,7 +54,7 @@ Friendly interface. Enterprise scale.
 
 # Quick start
 
-Install LitServe via pip (or [advanced installs](https://lightning.ai/docs/litserve/home/install)):
+Install LitServe via pip ([other install options](https://lightning.ai/docs/litserve/home/install)):
 
 ```bash
 pip install litserve
