@@ -66,10 +66,10 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
 @patch("litserve.server.run_batched_loop")
 @patch("litserve.server.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 6, max_batch_size=2, batch_timeout=0, stream=False)
+    inference_worker(*[MagicMock()] * 7, max_batch_size=2, batch_timeout=0, stream=False)
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
+    inference_worker(*[MagicMock()] * 7, max_batch_size=1, batch_timeout=0, stream=False)
     mock_single_loop.assert_called_once()
 
 
@@ -175,11 +175,12 @@ def test_streaming_loop():
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     requests_queue = Queue()
+    request_evicted_status = {}
     requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}))
     response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues)
+        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues, request_evicted_status)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
