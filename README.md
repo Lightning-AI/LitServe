@@ -126,7 +126,7 @@ response = requests.post(
 
 
 # Featured examples    
-Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision, audio, multi-modal, etc).   
+Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding servers, LLMs, vision, audio, multi-modal systems, etc...)       
 
 <table>
   <tr>
