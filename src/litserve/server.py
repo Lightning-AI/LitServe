@@ -217,7 +217,13 @@ def run_batched_loop(
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
+def run_streaming_loop(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    response_queues: List[Queue],
+    request_evicted_status: Dict[str, bool],
+):
     while True:
         try:
             response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -256,6 +262,8 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue,
                 y_gen,
             )
             for y_enc in y_enc_gen:
+                if request_evicted_status.get(uid):
+                    break
                 y_enc = lit_api.format_encoded_response(y_enc)
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
             response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
@@ -338,6 +346,7 @@ def inference_worker(
     worker_id: int,
     request_queue: Queue,
     response_queues: List[Queue],
+    request_evicted_status: Dict[str, bool],
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
@@ -357,7 +366,7 @@ def inference_worker(
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues)
+            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, request_evicted_status)
         return
 
     if max_batch_size > 1:
@@ -397,7 +406,7 @@ async def response_queue_to_buffer(
                 await asyncio.sleep(0.0001)
                 continue
             q, event = buffer[uid]
-            q.append(payload)
+            q.append((uid, payload))
             event.set()
 
     else:
@@ -499,6 +508,7 @@ class LitServer:
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
+        self.request_evicted_status = manager.dict()
 
         self.response_queues = []
         for _ in range(num_uvicorn_servers):
@@ -532,6 +542,7 @@ class LitServer:
                     worker_id,
                     self.request_queue,
                     self.response_queues,
+                    self.request_evicted_status,
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
@@ -570,25 +581,34 @@ class LitServer:
 
     async def data_streamer(self, q: deque, data_available: asyncio.Event, send_status: bool = False):
         while True:
-            await data_available.wait()
-            while len(q) > 0:
-                data, status = q.popleft()
-                if status == LitAPIStatus.FINISH_STREAMING:
-                    return
+            try:
+                await data_available.wait()
+                while len(q) > 0:
+                    uid, (data, status) = q.popleft()
+                    if status == LitAPIStatus.FINISH_STREAMING:
+                        return
 
-                if status == LitAPIStatus.ERROR:
-                    logger.error(
-                        "Error occurred while streaming outputs from the inference worker. "
-                        "Please check the above traceback."
-                    )
+                    if status == LitAPIStatus.ERROR:
+                        logger.error(
+                            "Error occurred while streaming outputs from the inference worker. "
+                            "Please check the above traceback."
+                        )
+                        if send_status:
+                            yield data, status
+                        return
                     if send_status:
                         yield data, status
-                    return
-                if send_status:
-                    yield data, status
-                else:
-                    yield data
-            data_available.clear()
+                    else:
+                        yield data
+                data_available.clear()
+            except asyncio.CancelledError:
+                self.request_evicted_status[uid] = True
+                logger.error("Request evicted for the uid=%s", uid)
+                break
+            except Exception as e:
+                # Handle other exceptions that might occur
+                logger.error(f"Exception occurred during streaming: {e}")
+                break
 
     def setup_server(self):
         workers_ready = False
@@ -635,6 +655,7 @@ class LitServer:
 
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             response_queue_id = self.app.response_queue_id
+            print("response_queue_id=", response_queue_id)
             uid = uuid.uuid4()
             event = asyncio.Event()
             q = deque()
