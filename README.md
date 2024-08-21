@@ -176,9 +176,9 @@ These results are for image and text classification ML tasks. The performance re
 &nbsp; 
 
 # Deployment options   
-Self-manage LitServe deployments (just run it on any machine!), or deploy with one click on [Lightning AI](https://lightning.ai/).    
-
-LitServe is developed by [Lightning AI](https://lightning.ai/) which provides infrastructure for deploying AI models.     
+LitServe can be deployed independently on your own machines—perfect for hackers, students and developers who prefer a DIY approach.     
+    
+For enterprise developers or those seeking a more managed solution, [Lightning Studios](https://lightning.ai/) provides optional support with automated deployments, scaling, release management, and more, offering a robust path to low-effort, fully-managed enterprise-grade solutions.    
 
 &nbsp;
 
