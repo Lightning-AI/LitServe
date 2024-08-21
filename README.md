@@ -147,7 +147,7 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 <!--       <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
         <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/video_thumbnail.png" alt="Video Thumbnail" style="width: 500px; height: auto;" />
       </a> -->
-      <video src="https://github.com/user-attachments/assets/faa431ac-8d98-4ad4-bc96-7fa871976c7f" width="500px" controls></video>
+      <video src="https://github.com/user-attachments/assets/56655727-f5d7-4109-b60d-efc816e148c9" width="500px" controls></video>
     </td>
   </tr>
 </table>
