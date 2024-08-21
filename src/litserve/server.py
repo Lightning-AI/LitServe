@@ -449,7 +449,7 @@ class LitServer:
         self.api_path = api_path
         lit_api.stream = stream
         lit_api.request_timeout = timeout
-        lit_api.sanitize(max_batch_size, spec=spec)
+        lit_api._sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None
@@ -463,7 +463,6 @@ class LitServer:
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
         self.max_batch_size = max_batch_size
-        self.timeout = timeout
         self.batch_timeout = batch_timeout
         self.stream = stream
         self._connector = _Connector(accelerator=accelerator, devices=devices)
