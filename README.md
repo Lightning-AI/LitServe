@@ -6,8 +6,8 @@
 
 &nbsp;
 
-<strong>High-throughput serving engine for AI models.</strong>    
-Flexible. Friendly interface. Enterprise scale.
+<strong>Flexible, high-throughput serving engine for AI models.</strong>    
+Friendly interface. Enterprise scale.
 </div>
 
 ----
