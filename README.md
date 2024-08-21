@@ -14,14 +14,14 @@ Friendly interface. Enterprise scale.
 
 **LitServe** is a flexible serving engine for AI models built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model.  
 
-LitServe is at least (2x)+ faster than plain FastAPI.
+LitServe is at least [2x faster](#performance) than plain FastAPI.
 
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving   ✅ Streaming          ✅ Auto-GPU, multi-GPU   
-✅ Multi-modal            ✅ PyTorch/JAX/TF     ✅ Full control          
-✅ Batching               ✅ Built on Fast API  ✅ Custom specs (Open AI)
+✅ (2x)+ faster serving   ✅ Self-host or fully managed  ✅ Auto-GPU, multi-GPU   
+✅ Multi-modal            ✅ PyTorch/JAX/TF              ✅ Full control          
+✅ Batching               ✅ Built on Fast API           ✅ Streaming             
 </pre>
 
 <div align='center'>
@@ -36,10 +36,9 @@ LitServe is at least (2x)+ faster than plain FastAPI.
   <div style="text-align: center;">
     <a href="#quick-start" style="margin: 0 10px;">Quick start</a> •
     <a href="#featured-examples" style="margin: 0 10px;">Examples</a> •
-    <a href="#performance" style="margin: 0 10px;">Performance</a> •
-    <a href="#deployment-options" style="margin: 0 10px;">Deploy</a> •
     <a href="#features" style="margin: 0 10px;">Features</a> •
-    <a href="https://lightning.ai/" style="margin: 0 10px;">Lightning AI</a> •
+    <a href="#performance" style="margin: 0 10px;">Performance</a> •
+    <a href="#hosting-options" style="margin: 0 10px;">Hosting</a> •
     <a href="https://lightning.ai/docs/litserve" style="margin: 0 10px;">Docs</a>
   </div>
 </div>
@@ -63,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-Here's a hello world example ([explore real examples](https://lightning.ai/docs/litserve/examples)):
+Here's a hello world example ([explore real examples](#featured-examples)):
 
 ```python
 # server.py
@@ -126,13 +125,9 @@ response = requests.post(
 &nbsp;
 
 
-## Featured examples    
+# Featured examples    
+Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision, audio, multi-modal, etc).   
 
-Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision, audio, multi-modal, etc).    
-
-<table>
-  <tr>
-   <td style="vertical-align: top;">
 <pre>
 <strong>Featured examples</strong><br>
 <strong>Toy model:</strong>    <a href="#define-a-server">Hello world</a>
@@ -144,25 +139,33 @@ Use LitServe to deploy any type of model or AI service (embeddings, LLMs, vision
 <strong>Speech:</strong>       <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
 <strong>Classical ML:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
 </pre>
-    </td>
-    <td style="vertical-align: top;">
-<pre>
-<strong>Key features</strong><br>
-✅ <strong>Serve all models:</strong> LLMs, vision, etc
-✅ <strong>All frameworks:  </strong> PyTorch/Jax/sklearn/..
-✅ <strong>Dev friendly:    </strong> build AI, not infra
-✅ <strong>Easy interface:  </strong> no abstractions
-✅ <strong>Enterprise scale:</strong> scale huge models
-✅ <strong>Auto GPU scaling:</strong> zero code changes
-✅ <strong>Self host:       </strong> or run on Studios
-</pre>
-    </td>
-  </tr>
-</table>
 
 &nbsp;
 
-## Performance  
+# Features
+LitServe supports multiple advanced state-of-the-art features.
+
+✅ [(2x)+ faster serving than plain FastAPI](#performance)          
+✅ [Self host on your own machines](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-your-own)    
+✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
+✅ [Serve all models: LLMs, vision, time series, etc...](https://lightning.ai/docs/litserve/examples)        
+✅ [Auto-GPU scaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
+✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
+✅ [Autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
+✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
+✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
+✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
+✅ [All ML frameworks: PyTorch, Jax, Tensorflow, Hugging Face...](https://lightning.ai/docs/litserve/features/full-control)        
+✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
+
+[10+ features...](https://lightning.ai/docs/litserve/features)    
+
+**Note:** Our goal is not to jump on every hype train, but instead support features that scale
+under the most demanding enterprise deployments.
+
+&nbsp;
+
+# Performance  
 Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
 
 Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
@@ -177,8 +180,8 @@ These results are for image and text classification ML tasks. The performance re
 
 &nbsp; 
 
-# Deployment options   
-LitServe can be deployed independently on your own machines—perfect for hackers, students and developers who prefer a DIY approach.     
+# Hosting options   
+LitServe can be hosted independently on your own machines—perfect for hackers, students and developers who prefer a DIY approach.     
     
 For enterprise developers or those seeking a more managed solution, [Lightning Studios](https://lightning.ai/) provides optional support with automated deployments, scaling, release management, and more, offering a robust path to low-effort, fully-managed enterprise-grade solutions.    
 
@@ -207,25 +210,6 @@ For enterprise developers or those seeking a more managed solution, [Lightning S
 | Use your own cloud commits       | ❌                                | ✅                                  |
 
 </div>
-
-&nbsp;
-
-# Features
-LitServe supports multiple advanced state-of-the-art features.
-
-✅ [All model types: LLMs, vision, time series, etc...](https://lightning.ai/docs/litserve/examples)        
-✅ [Auto-GPU scaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
-✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
-✅ [Autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
-✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
-✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [All ML frameworks: PyTorch, Jax, Tensorflow, Hugging Face...](https://lightning.ai/docs/litserve/features/full-control)        
-✅ [Open AI spec](https://lightning.ai/docs/litserve/features/open-ai-spec)    
-
-[10+ features...](https://lightning.ai/docs/litserve/features)    
-
-**Note:** Our goal is not to jump on every hype train, but instead support features that scale
-under the most demanding enterprise deployments.
 
 &nbsp;
 
