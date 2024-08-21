@@ -580,6 +580,7 @@ class LitServer:
         return [f"{accelerator}:{device}"]
 
     async def data_streamer(self, q: deque, data_available: asyncio.Event, send_status: bool = False):
+        uid = None
         while True:
             try:
                 await data_available.wait()
@@ -602,8 +603,9 @@ class LitServer:
                         yield data
                 data_available.clear()
             except asyncio.CancelledError:
-                self.request_evicted_status[uid] = True
-                logger.error("Request evicted for the uid=%s", uid)
+                if uid is not None:
+                    self.request_evicted_status[uid] = True
+                    logger.error("Request evicted for the uid=%s", uid)
                 break
             except Exception as e:
                 # Handle other exceptions that might occur
