@@ -180,9 +180,9 @@ under the most demanding enterprise deployments.
 &nbsp;
 
 # Performance  
-LitServe is purpose-built for AI workloads, with specialized multi-worker handling that delivers a minimum 2x speedup over FastAPI.    
+LitServe is purpose-built for AI workloads, with specialized multi-worker handling that delivers a minimum **2x speedup over FastAPI**.    
 
-Additional features like batching and GPU support can drive performance well beyond 2x, scaling efficiently to handle more simultaneous requests than FastAPI and TorchServe.
+Additional features like batching and GPU autoscaling can drive performance well beyond 2x, scaling efficiently to handle more simultaneous requests than FastAPI and TorchServe.
     
 Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks) (higher is better).  
 
