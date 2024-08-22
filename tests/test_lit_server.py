@@ -13,33 +13,33 @@
 # limitations under the License.
 import asyncio
 import inspect
+import logging
 import pickle
 import re
-import logging
-from asgi_lifespan import LifespanManager
-from litserve import LitAPI
-from fastapi import Request, Response, HTTPException
 import time
+from queue import Queue
+from unittest.mock import MagicMock, patch
+
+import pytest
 import torch
 import torch.nn as nn
-from queue import Queue
+from asgi_lifespan import LifespanManager
+from fastapi import HTTPException, Request, Response
+from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from litserve.utils import wrap_litserve_start
 
-from unittest.mock import patch, MagicMock
-import pytest
-
+import litserve as ls
+from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import (
+    LitAPIStatus,
+    LitServer,
     inference_worker,
+    run_batched_streaming_loop,
     run_single_loop,
     run_streaming_loop,
-    LitAPIStatus,
-    run_batched_streaming_loop,
 )
-from litserve.server import LitServer
-import litserve as ls
-from fastapi.testclient import TestClient
+from litserve.utils import wrap_litserve_start
 
 
 def test_index(sync_testclient):
