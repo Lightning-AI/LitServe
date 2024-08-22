@@ -15,6 +15,7 @@ import asyncio
 import inspect
 import pickle
 import re
+import logging
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
 from fastapi import Request, Response, HTTPException
@@ -118,6 +119,24 @@ async def test_stream(simple_stream_api):
             assert (
                 resp2.text == expected_output2
             ), "Server returns input prompt and generated output which didn't match."
+
+
+@pytest.mark.asyncio
+async def test_stream_client_disconnection(simple_stream_api, caplog):
+    server = LitServer(simple_stream_api, stream=True, timeout=10)
+
+    with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?" * 2}, timeout=10))
+            await asyncio.sleep(0.4)
+
+            # Simulate client disconnection by canceling the request
+            task.cancel()
+
+            # Allow some time for the server to handle the cancellation
+            await asyncio.sleep(0.5)
+
+            assert "Request evicted for the uid=" in caplog.text, "Server should log client disconnection"
 
 
 @pytest.mark.asyncio()
