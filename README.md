@@ -134,9 +134,10 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 
 <div align='center'>
   <div width='200px'>
-        <video src="https://github.com/user-attachments/assets/e3103550-ef2a-4299-b73c-c5562d8b4eb4" width='200px' controls></video>    
+        <video src="https://github.com/user-attachments/assets/5e73549a-bc0f-47a9-9d9c-5b54389be5de" width='200px' controls></video>    
   </div>
 </div>
+
 
 <pre>
 <strong>Featured examples</strong><br>
