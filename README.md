@@ -128,6 +128,12 @@ response = requests.post(
 # Featured examples    
 Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding servers, LLMs, vision, audio, multi-modal systems, etc...)       
 
+<div align='center'>
+  <div width='200px'>
+        <video src="https://github.com/user-attachments/assets/56655727-f5d7-4109-b60d-efc816e148c9" width='200px' controls></video>    
+  </div>
+</div>
+
   <table>
   <tr>
    <td style="vertical-align: top;">
@@ -147,7 +153,6 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 <!--       <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
         <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/video_thumbnail.png" alt="Video Thumbnail" style="width: 500px; height: auto;" />
       </a> -->
-      <video align="right" src="https://github.com/user-attachments/assets/56655727-f5d7-4109-b60d-efc816e148c9" width=500 controls></video>
     </td>
   </tr>
 </table>
