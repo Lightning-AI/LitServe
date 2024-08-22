@@ -134,7 +134,7 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 
 <div align='center'>
   <div width='200px'>
-        <video src="https://github.com/user-attachments/assets/c2a7e106-3fb2-4d25-a2e6-8a09441b6efc" width='200px' controls></video>    
+        <video src="https://github.com/user-attachments/assets/e3103550-ef2a-4299-b73c-c5562d8b4eb4" width='200px' controls></video>    
   </div>
 </div>
 
