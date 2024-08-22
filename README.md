@@ -19,9 +19,9 @@ LitServe is at least [2x faster](#performance) than plain FastAPI.
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving   ✅ Self-host or fully managed  ✅ Auto-GPU, multi-GPU   
-✅ Multi-modal            ✅ PyTorch/JAX/TF              ✅ Full control          
-✅ Batching               ✅ Built on Fast API           ✅ Streaming             
+✅ (2x)+ faster serving   ✅ Self-host or fully managed  ✅ GPU autoscaling  
+✅ Multi-modal            ✅ PyTorch/JAX/TF              ✅ OpenAPI compliant
+✅ Batching               ✅ Built on Fast API           ✅ Streaming        
 </pre>
 
 <div align='center'>
@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-Here's a hello world example ([explore real examples](#featured-examples)):
+Here's a toy example with 2 models that highlights the flexibility ([explore real examples](#featured-examples)):
 
 ```python
 # server.py
@@ -71,7 +71,7 @@ import litserve as ls
 # STEP 1: DEFINE A MODEL API
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
-        # setup is called once at startup. Setup 1 or more models, DB connections, load data, etc...
+        # setup is called once at startup. Build a compound AI system (1+ models), connect DBs, load data, etc...
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
@@ -169,6 +169,7 @@ LitServe supports multiple advanced state-of-the-art features.
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [All ML frameworks: PyTorch, Jax, Tensorflow, Hugging Face...](https://lightning.ai/docs/litserve/features/full-control)        
+✅ [OpenAPI compliant](https://www.openapis.org/)          
 ✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
 
 [10+ features...](https://lightning.ai/docs/litserve/features)    
