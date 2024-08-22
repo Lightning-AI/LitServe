@@ -658,7 +658,6 @@ class LitServer:
 
         async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
             response_queue_id = self.app.response_queue_id
-            print("response_queue_id=", response_queue_id)
             uid = uuid.uuid4()
             event = asyncio.Event()
             q = deque()
