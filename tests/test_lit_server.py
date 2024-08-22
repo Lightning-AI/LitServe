@@ -74,7 +74,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     mock_single_loop.assert_called_once()
 
 
-@pytest.fixture
+@pytest.fixture()
 def loop_args():
     requests_queue = Queue()
     requests_queue.put((0, "uuid-123", time.monotonic(), 1))  # response_queue_id, uid, timestamp, x_enc
@@ -100,7 +100,7 @@ def test_single_loop(loop_args):
         run_single_loop(lit_api_mock, None, requests_queue, response_queues)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, stream=True, timeout=10)
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
@@ -121,7 +121,7 @@ async def test_stream(simple_stream_api):
             ), "Server returns input prompt and generated output which didn't match."
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_stream_client_disconnection(simple_stream_api, caplog):
     server = LitServer(simple_stream_api, stream=True, timeout=10)
 
@@ -140,7 +140,7 @@ async def test_stream_client_disconnection(simple_stream_api, caplog):
             # TODO: also chec if the task actually stopped in the server
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_batched_stream_server(simple_batched_stream_api):
     server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
@@ -419,7 +419,7 @@ class PredictErrorAPI(ls.examples.SimpleLitAPI):
         return {"output": input}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @patch("litserve.server.load_and_raise")
 async def test_inject_context(mocked_load_and_raise):
     def dummy_load_and_raise(resp):
