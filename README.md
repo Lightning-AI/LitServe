@@ -180,7 +180,7 @@ under the most demanding enterprise deployments.
 &nbsp;
 
 # Performance  
-LitServe is purpose-built for AI workloads, with specialized multi-worker handling that delivers a minimum **2x speedup over FastAPI**.    
+LitServe is designed for AI workloads. Specialized multi-worker handling delivers a minimum **2x speedup over FastAPI**.    
 
 Additional features like batching and GPU autoscaling can drive performance well beyond 2x, scaling efficiently to handle more simultaneous requests than FastAPI and TorchServe.
     
