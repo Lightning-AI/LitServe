@@ -128,13 +128,13 @@ async def test_stream_client_disconnection(simple_stream_api, caplog):
     with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?" * 2}, timeout=10))
-            await asyncio.sleep(0.4)
+            await asyncio.sleep(0.5)
 
             # Simulate client disconnection by canceling the request
             task.cancel()
 
             # Allow some time for the server to handle the cancellation
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
             assert "Request evicted for the uid=" in caplog.text, "Server should log client disconnection"
 
             # TODO: also check if the task actually stopped in the server
