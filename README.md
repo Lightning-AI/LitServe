@@ -179,7 +179,7 @@ under the most demanding enterprise deployments.
 &nbsp;
 
 # Performance  
-Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
+LitServe is highly optimized for parallel execution with native features optimized to scale AI workloads. Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
 
 Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
 
