@@ -190,9 +190,9 @@ These results are for image and text classification ML tasks. The performance re
 &nbsp; 
 
 # Hosting options   
-LitServe can be hosted independently on your own machines—perfect for hackers, students and developers who prefer a DIY approach.     
-    
-For enterprise developers or those seeking a more managed solution, [Lightning Studios](https://lightning.ai/) provides optional support with automated deployments, scaling, release management, and more, offering a robust path to low-effort, fully-managed enterprise-grade solutions.    
+LitServe can be hosted independently on your own machines or fully managed via Lightning Studios.
+
+Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
 
 &nbsp;
 
