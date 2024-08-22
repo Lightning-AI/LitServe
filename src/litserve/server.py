@@ -263,6 +263,7 @@ def run_streaming_loop(
             )
             for y_enc in y_enc_gen:
                 if request_evicted_status.get(uid):
+                    request_evicted_status.pop(uid)
                     break
                 y_enc = lit_api.format_encoded_response(y_enc)
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
