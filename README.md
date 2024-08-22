@@ -134,9 +134,6 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
   </div>
 </div>
 
-  <table>
-  <tr>
-   <td style="vertical-align: top;">
 <pre>
 <strong>Featured examples</strong><br>
 <strong>Toy model:</strong>     <a href="#define-a-server">Hello world</a>
@@ -148,14 +145,6 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 <strong>Speech:</strong>        <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
 <strong>Classical ML:</strong>  <a href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
 </pre>
-    </td>
-    <td style="vertical-align: top" width=800>
-<!--       <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
-        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/video_thumbnail.png" alt="Video Thumbnail" style="width: 500px; height: auto;" />
-      </a> -->
-    </td>
-  </tr>
-</table>
 
 &nbsp;
 
