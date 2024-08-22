@@ -137,7 +137,7 @@ async def test_stream_client_disconnection(simple_stream_api, caplog):
             await asyncio.sleep(0.5)
             assert "Request evicted for the uid=" in caplog.text, "Server should log client disconnection"
 
-            # TODO: also chec if the task actually stopped in the server
+            # TODO: also check if the task actually stopped in the server
 
 
 @pytest.mark.asyncio()
