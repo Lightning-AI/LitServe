@@ -127,7 +127,7 @@ async def test_stream_client_disconnection(simple_stream_api, caplog):
 
     with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?" * 10}, timeout=10))
+            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?" * 20}, timeout=10))
             await asyncio.sleep(1)
 
             # Simulate client disconnection by canceling the request
