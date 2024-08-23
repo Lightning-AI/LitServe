@@ -6,8 +6,8 @@
 
 &nbsp;
 
-<strong>Flexible, high-throughput serving engine for AI models.</strong>    
-Friendly interface. Enterprise scale.
+<strong>High-throughput serving engine for AI models.</strong>    
+Flexible. Friendly interface. Enterprise scale.
 </div>
 
 ----
@@ -19,9 +19,9 @@ LitServe is at least [2x faster](#performance) than plain FastAPI.
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving   ✅ Self-host or fully managed  ✅ Auto-GPU, multi-GPU   
-✅ Multi-modal            ✅ PyTorch/JAX/TF              ✅ Full control          
-✅ Batching               ✅ Built on Fast API           ✅ Streaming             
+✅ (2x)+ faster serving   ✅ Self-host or fully managed  ✅ GPU autoscaling  
+✅ Multi-modal            ✅ PyTorch/JAX/TF              ✅ OpenAPI compliant
+✅ Batching               ✅ Built on Fast API           ✅ Streaming        
 </pre>
 
 <div align='center'>
@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-Here's a hello world example ([explore real examples](#featured-examples)):
+Here's a toy example with 2 models that highlights the flexibility ([explore real examples](#featured-examples)):
 
 ```python
 # server.py
@@ -70,20 +70,24 @@ import litserve as ls
 
 # STEP 1: DEFINE A MODEL API
 class SimpleLitAPI(ls.LitAPI):
-    # Called once at startup. Setup models, DB connections, etc...
     def setup(self, device):
-        self.model = lambda x: x**2  
+        # setup is called once at startup. Build a compound AI system (1+ models), connect DBs, load data, etc...
+        self.model1 = lambda x: x**2
+        self.model2 = lambda x: x**3
 
-    # Convert the request payload to model input.
     def decode_request(self, request):
+        # Convert the request payload to model input.
         return request["input"] 
 
-    # Run inference on the the model, return the output.
     def predict(self, x):
-        return self.model(x) 
+        # Run inference on the the AI system, return the output.
+        squared = self.model1(x)
+        cubed = self.model2(x)
+        output = squared + cubed
+        return {"output": output}
 
-    # Convert the model output to a response payload.
     def encode_response(self, output):
+        # Convert the model output to a response payload.
         return {"output": output} 
 
 # STEP 2: START THE SERVER
@@ -128,29 +132,27 @@ response = requests.post(
 # Featured examples    
 Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding servers, LLMs, vision, audio, multi-modal systems, etc...)       
 
-<table>
-  <tr>
-   <td style="vertical-align: top;">
+<div align='center'>
+  <div width='200px'>
+        <video src="https://github.com/user-attachments/assets/5e73549a-bc0f-47a9-9d9c-5b54389be5de" width='200px' controls></video>    
+  </div>
+</div>
+
+
 <pre>
 <strong>Featured examples</strong><br>
-<strong>Toy model:</strong>    <a href="#define-a-server">Hello world</a>
-<strong>LLMs:</strong>         <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>
-<strong>NLP:</strong>          <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>
-<strong>Multimodal:</strong>   <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>
-<strong>Audio:</strong>        <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>
-<strong>Vision:</strong>       <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>
-<strong>Speech:</strong>       <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
-<strong>Classical ML:</strong> <a href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
+<strong>Toy model:</strong>      <a href="#define-a-server">Hello world</a>
+<strong>LLMs:</strong>           <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>
+<strong>NLP:</strong>            <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-text-embedding-api-with-litserve">Text embedding API</a>
+<strong>Multimodal:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm">MiniCPM</a>, <a href="https://lightning.ai/lightning-ai/studios/run-meta-s-chameleon-30b">Chameleon 30B</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve">Phi-3.5 Vision Instruct</a>
+<strong>Audio:</strong>          <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-noise-cancellation-api-with-deepfilternet">Noise cancellation (DeepFilterNet)</a>
+<strong>Vision:</strong>         <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-auraflow">AuraFlow</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-flux">Flux</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-super-resolution-image-api-with-aura-sr">Image super resolution (Aura SR)</a>
+<strong>Speech:</strong>         <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
+<strong>Classical ML:</strong>   <a href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
+<strong>Miscellaneous:</strong>  <a href="https://lightning.ai/lightning-ai/studios/deploy-an-media-conversion-api-with-ffmpeg">Media conversion API (ffmpeg)</a>
 </pre>
-    </td>
-    <td style="vertical-align: top;">
-<!--       <a href="https://github.com/Lightning-AI/LitServe/assets/3640001/883b54bd-e54e-497a-8a29-0431abd77695" target="_blank">
-        <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/video_thumbnail.png" alt="Video Thumbnail" style="width: 500px; height: auto;" />
-      </a> -->
-      <video src="https://github.com/user-attachments/assets/56655727-f5d7-4109-b60d-efc816e148c9" width="500px" controls></video>
-    </td>
-  </tr>
-</table>
+
+[Browse 100s of community-built templates](https://lightning.ai/studios?section=serving).
 
 &nbsp;
 
@@ -168,6 +170,7 @@ LitServe supports multiple advanced state-of-the-art features.
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [All ML frameworks: PyTorch, Jax, Tensorflow, Hugging Face...](https://lightning.ai/docs/litserve/features/full-control)        
+✅ [OpenAPI compliant](https://www.openapis.org/)          
 ✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
 
 [10+ features...](https://lightning.ai/docs/litserve/features)    
@@ -178,9 +181,11 @@ under the most demanding enterprise deployments.
 &nbsp;
 
 # Performance  
-Our benchmarks show that LitServe (built on FastAPI) handles more simultaneous requests than FastAPI and TorchServe (higher is better).     
+LitServe is designed for AI workloads. Specialized multi-worker handling delivers a minimum **2x speedup over FastAPI**.    
 
-Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks).  
+Additional features like batching and GPU autoscaling can drive performance well beyond 2x, scaling efficiently to handle more simultaneous requests than FastAPI and TorchServe.
+    
+Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks) (higher is better).  
 
 <div align="center">
   <img alt="LitServe" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_charts_v6.png" width="1000px" style="max-width: 100%;">
@@ -193,9 +198,9 @@ These results are for image and text classification ML tasks. The performance re
 &nbsp; 
 
 # Hosting options   
-LitServe can be hosted independently on your own machines—perfect for hackers, students and developers who prefer a DIY approach.     
-    
-For enterprise developers or those seeking a more managed solution, [Lightning Studios](https://lightning.ai/) provides optional support with automated deployments, scaling, release management, and more, offering a robust path to low-effort, fully-managed enterprise-grade solutions.    
+LitServe can be hosted independently on your own machines or fully managed via Lightning Studios.
+
+Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
 
 &nbsp;
 
