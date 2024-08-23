@@ -1,6 +1,6 @@
 <div align='center'>
 
-# LitServe: Easily serve AI models Lightning fast ⚡    
+# Easily serve AI models Lightning fast ⚡    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
