@@ -168,7 +168,7 @@ State-of-the-art features:
 ✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
 ✅ [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)        
 ✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [All ML frameworks: (PyTorch, Jax, TF, ...)](https://lightning.ai/docs/litserve/features/full-control)        
+✅ [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control)        
 ✅ [OpenAPI compliant](https://www.openapis.org/)          
 ✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
 ✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
