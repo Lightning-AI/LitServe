@@ -7,7 +7,7 @@
 &nbsp;
 
 <strong>High-throughput serving engine for AI models.</strong>    
-Flexible. Friendly interface. Enterprise scale.
+Easy to use. Flexible. Enterprise scale.
 </div>
 
 ----
@@ -19,9 +19,9 @@ LitServe is at least [2x faster](#performance) than plain FastAPI.
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving   ✅ Self-host or fully managed  ✅ GPU autoscaling  
-✅ Multi-modal            ✅ PyTorch/JAX/TF              ✅ OpenAPI compliant
-✅ Batching               ✅ Built on Fast API           ✅ Streaming        
+✅ (2x)+ faster serving   ✅ Use custom models  ✅ GPU autoscaling           
+✅ Streaming              ✅ Multi-modal        ✅ OpenAPI compliant         
+✅ Batching               ✅ PyTorch/JAX/TF     ✅ Self-host or fully managed
 </pre>
 
 <div align='center'>
