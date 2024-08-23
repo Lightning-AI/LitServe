@@ -9,9 +9,9 @@ import time
 from functools import wraps
 
 CONF = {
-    "cpu": {"num_requests": 8},
-    "mps": {"num_requests": 8},
-    "cuda": {"num_requests": 16},
+    "cpu": {"num_requests": 50},
+    "mps": {"num_requests": 50},
+    "cuda": {"num_requests": 100},
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -80,14 +80,18 @@ def mean(lst):
 
 def main():
     key = "Requests Per Second (RPS)"
-    num_samples = 6
+    num_samples = 12
+    print("Running FastAPI benchmark")
     fastapi_metrics = run_fastapi_benchmark(num_samples=num_samples)
+    print("\n\n" + "=" * 50 + "\n\n")
+    print("Running LitServe benchmark")
     ls_metrics = run_litserve_benchmark(num_samples=num_samples)
     fastapi_throughput = mean([e[key] for e in fastapi_metrics])
     ls_throughput = mean([e[key] for e in ls_metrics])
     factor = DIFF_FACTOR[device]
     msg = f"LitServe should have higher throughput than FastAPI on {device}. {ls_throughput} vs {fastapi_throughput}"
     assert ls_throughput > fastapi_throughput * factor, msg
+    print(f"{ls_throughput} vs {fastapi_throughput}")
 
 
 if __name__ == "__main__":

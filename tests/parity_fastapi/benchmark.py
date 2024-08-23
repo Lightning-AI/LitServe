@@ -82,4 +82,4 @@ def run_bench(conf: dict, num_samples: int, port: int):
     for _ in range(num_samples):
         metric = benchmark(num_requests=num_requests, concurrency_level=num_requests, port=port)
         results.append(metric)
-    return results[1:]  # skip warmup step
+    return results[2:]  # skip warmup step
