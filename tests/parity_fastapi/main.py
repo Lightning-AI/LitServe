@@ -83,7 +83,7 @@ def main():
     num_samples = 12
     print("Running FastAPI benchmark")
     fastapi_metrics = run_fastapi_benchmark(num_samples=num_samples)
-    print("\n\n" + "="*50 + "\n\n")
+    print("\n\n" + "=" * 50 + "\n\n")
     print("Running LitServe benchmark")
     ls_metrics = run_litserve_benchmark(num_samples=num_samples)
     fastapi_throughput = mean([e[key] for e in fastapi_metrics])

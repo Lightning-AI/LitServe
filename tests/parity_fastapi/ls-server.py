@@ -56,7 +56,7 @@ class ImageClassifierAPI(ls.LitAPI):
         return {"output": output}
 
 
-def main(batch_size:int, workers_per_device:int):
+def main(batch_size: int, workers_per_device: int):
     print(locals())
     api = ImageClassifierAPI()
     server = ls.LitServer(
