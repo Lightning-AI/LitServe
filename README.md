@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models (AI compound system) highlights the flexibility ([explore real examples](#featured-examples)):
+This toy example with 2 models ([AI compound system](https://lightning.ai/docs/litserve/features/compound-ai-systems)) highlights the flexibility ([explore real examples](#featured-examples)):
 
 ```python
 # server.py
@@ -160,7 +160,8 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 State-of-the-art features:
 
 ✅ [(2x)+ faster than plain FastAPI](#performance)      
-✅ [Auto-GPU scaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
+✅ [Build compound AI systems](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
+✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [Autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
