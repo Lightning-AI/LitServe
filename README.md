@@ -62,13 +62,13 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models highlights the flexibility ([explore real examples](#featured-examples)):
+This toy example with 2 models (AI compound system) highlights the flexibility ([explore real examples](#featured-examples)):
 
 ```python
 # server.py
 import litserve as ls
 
-# STEP 1: DEFINE A MODEL API
+# (STEP 1) - DEFINE THE API (compound AI system)
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
         # setup is called once at startup. Build a compound AI system (1+ models), connect DBs, load data, etc...
@@ -90,10 +90,10 @@ class SimpleLitAPI(ls.LitAPI):
         # Convert the model output to a response payload.
         return {"output": output} 
 
-# STEP 2: START THE SERVER
+# (STEP 2) - START THE SERVER
 if __name__ == "__main__":
-    api = SimpleLitAPI()
-    server = ls.LitServer(api, accelerator="auto")
+    # serve with advanced features (GPUs, etc...)
+    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", max_batch_size=1, workers_per_device=1)
     server.run(port=8000)
 ```
 
