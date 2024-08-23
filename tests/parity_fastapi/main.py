@@ -80,7 +80,7 @@ def mean(lst):
 
 def main():
     key = "Requests Per Second (RPS)"
-    num_samples = 6
+    num_samples = 11
     fastapi_metrics = run_fastapi_benchmark(num_samples=num_samples)
     ls_metrics = run_litserve_benchmark(num_samples=num_samples)
     fastapi_throughput = mean([e[key] for e in fastapi_metrics])
@@ -88,6 +88,7 @@ def main():
     factor = DIFF_FACTOR[device]
     msg = f"LitServe should have higher throughput than FastAPI on {device}. {ls_throughput} vs {fastapi_throughput}"
     assert ls_throughput > fastapi_throughput * factor, msg
+    print(f"{ls_throughput} vs {fastapi_throughput}")
 
 
 if __name__ == "__main__":
