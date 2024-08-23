@@ -20,7 +20,7 @@ LitServe is at least [2x faster](#performance) than plain FastAPI.
   
 <pre>
 ✅ (2x)+ faster serving  ✅ Use custom models   ✅ Batching, Streaming       
-✅ Easy to use           ✅ Multi-modal         ✅ OpenAPI compliant         
+✅ Easy to use           ✅ Multi-modal         ✅ Built on FastAPI          
 ✅ GPU autoscaling       ✅ PyTorch/JAX/TF/...  ✅ Self-host or fully managed
 </pre>
 
@@ -164,7 +164,7 @@ State-of-the-art features:
 ✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [Autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
+✅ [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
 ✅ [Self-host on your machines](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-your-own)    
 ✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
 ✅ [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)        
