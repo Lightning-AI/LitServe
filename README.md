@@ -160,7 +160,7 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 State-of-the-art features:
 
 ✅ [(2x)+ faster than plain FastAPI](#performance)      
-✅ [Build compound AI systems (1+ models)](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
+✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
 ✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
