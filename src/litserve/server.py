@@ -110,7 +110,13 @@ def collate_requests(
     return payloads, timed_out_uids
 
 
-def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
+def run_single_loop(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    response_queues: List[Queue],
+    request_evicted_status: Dict[str, bool],
+):
     while True:
         try:
             response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -146,6 +152,8 @@ def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, re
                 lit_api.encode_response,
                 y,
             )
+            # TODO: Cancel the task if the client disconnects
+
             response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
         except Exception as e:
             logger.exception(
@@ -378,6 +386,7 @@ def inference_worker(
             lit_spec,
             request_queue,
             response_queues,
+            request_evicted_status,
         )
 
 
@@ -648,8 +657,22 @@ class LitServer:
 
             self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
 
-            await event.wait()
-            response, status = self.response_buffer.pop(uid)
+            async def wait_for_response():
+                await event.wait()
+                return self.response_buffer.pop(uid)
+
+            task = asyncio.create_task(wait_for_response())
+            response, status = None, None
+            try:
+                while not task.done():
+                    await asyncio.sleep(0.1)
+                    if await request.is_disconnected():
+                        task.cancel()
+                        break
+                response, status = await task
+            except asyncio.CancelledError:
+                logger.error("Client disconnected for the request uid=%s", uid)
+                self.request_evicted_status[uid] = True
 
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
