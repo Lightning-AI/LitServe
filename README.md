@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models ([AI compound system](https://lightning.ai/docs/litserve/features/compound-ai-systems)) highlights the flexibility ([explore real examples](#featured-examples)):
+This 2-model toy example (AI compound system) shows LitServe's flexibility ([see real examples](#featured-examples)):    
 
 ```python
 # server.py
