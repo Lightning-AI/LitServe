@@ -80,7 +80,7 @@ class SimpleLitAPI(ls.LitAPI):
         return request["input"] 
 
     def predict(self, x):
-        # Run inference on the the AI system, return the output.
+        # Run inference on the AI system, return the output.
         squared = self.model1(x)
         cubed = self.model2(x)
         output = squared + cubed
