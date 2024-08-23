@@ -670,15 +670,23 @@ class LitServer:
             response_task = asyncio.create_task(wait_for_response())
             disconnection_task = asyncio.create_task(check_disconnection())
 
-            done, pending = await asyncio.wait([response_task, disconnection_task], return_when=asyncio.FIRST_COMPLETED)
-
-            if response_task in done:
-                response, status = await response_task
-                disconnection_task.cancel()
-            else:
+            try:
+                # Use asyncio.wait to handle both response and disconnection checks
+                done, pending = await asyncio.wait(
+                    [response_task, disconnection_task], return_when=asyncio.FIRST_COMPLETED
+                )
+                if response_task in done:
+                    response, status = await response_task
+                    disconnection_task.cancel()
+                else:
+                    response_task.cancel()
+                    logger.error(f"Client disconnected for the request uid={uid}")
+                    self.request_evicted_status[uid] = True
+                    raise HTTPException(status_code=499, detail="Client closed request")
+            except asyncio.CancelledError:
                 response_task.cancel()
+                disconnection_task.cancel()
                 logger.error(f"Client disconnected for the request uid={uid}")
-                self.request_evicted_status[uid] = True
                 raise HTTPException(status_code=499, detail="Client closed request")
 
             if status == LitAPIStatus.ERROR:
