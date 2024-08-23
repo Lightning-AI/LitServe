@@ -37,6 +37,12 @@ class SimpleLitAPI(LitAPI):
         return {"output": output}
 
 
+class SimpleDelayedLitAPI(SimpleLitAPI):
+    def predict(self, x):
+        time.sleep(0.5)
+        return self.model(x)
+
+
 class SimpleStreamAPI(LitAPI):
     def setup(self, device) -> None:
         self.sentence = "LitServe is streaming output"
@@ -50,6 +56,14 @@ class SimpleStreamAPI(LitAPI):
 
     def encode_response(self, output: Generator) -> Generator:
         delay = 0.01  # delay for testing timeouts
+        for out in output:
+            time.sleep(delay)
+            yield out.lower()
+
+
+class SimpleDelayedStreamAPI(SimpleStreamAPI):
+    def encode_response(self, output: Generator) -> Generator:
+        delay = 0.2
         for out in output:
             time.sleep(delay)
             yield out.lower()
@@ -89,8 +103,18 @@ def simple_litapi():
 
 
 @pytest.fixture()
+def simple_delayed_litapi():
+    return SimpleDelayedLitAPI()
+
+
+@pytest.fixture()
 def simple_stream_api():
     return SimpleStreamAPI()
+
+
+@pytest.fixture()
+def simple_delayed_stream_api():
+    return SimpleDelayedStreamAPI()
 
 
 @pytest.fixture()
