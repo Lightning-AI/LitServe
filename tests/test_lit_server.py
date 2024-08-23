@@ -95,9 +95,9 @@ def test_single_loop(loop_args):
     lit_api_mock, requests_queue = loop_args
     lit_api_mock.unbatch.side_effect = None
     response_queues = [FakeResponseQueue()]
-
+    request_evicted_status = {}
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, response_queues)
+        run_single_loop(lit_api_mock, None, requests_queue, response_queues, request_evicted_status)
 
 
 @pytest.mark.asyncio()
@@ -122,22 +122,41 @@ async def test_stream(simple_stream_api):
 
 
 @pytest.mark.asyncio()
-async def test_stream_client_disconnection(simple_stream_api, caplog):
-    server = LitServer(simple_stream_api, stream=True, timeout=10)
+async def test_client_disconnection(simple_delayed_litapi, caplog):
+    server = LitServer(simple_delayed_litapi, timeout=10)
 
     with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?" * 20}, timeout=10))
-            await asyncio.sleep(1)
-
-            # Simulate client disconnection by canceling the request
+            task = asyncio.create_task(ac.post("/predict", json={"input": 1.0}, timeout=10))
+            await asyncio.sleep(0.2)
             task.cancel()
-
-            # Allow some time for the server to handle the cancellation
             await asyncio.sleep(1)
-            assert "Request evicted for the uid=" in caplog.text, "Server should log client disconnection"
-
+            assert "Client disconnected for the request uid" in caplog.text
             # TODO: also check if the task actually stopped in the server
+
+            caplog.clear()
+            task = asyncio.create_task(ac.post("/predict", json={"input": 1.0}, timeout=10))
+            await task
+            assert "Client disconnected for the request uid" not in caplog.text
+
+
+@pytest.mark.asyncio()
+async def test_stream_client_disconnection(simple_delayed_stream_api, caplog):
+    server = LitServer(simple_delayed_stream_api, stream=True, timeout=10)
+
+    with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?" * 5}, timeout=10))
+            await asyncio.sleep(1)
+            task.cancel()  # simulate client disconnection
+            await asyncio.sleep(1)  # wait for the task to stop
+            assert "Request evicted for the uid=" in caplog.text
+            # TODO: also check if the task actually stopped in the server
+
+            caplog.clear()
+            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
+            await task
+            assert "Request evicted for the uid=" not in caplog.text
 
 
 @pytest.mark.asyncio()
