@@ -19,9 +19,9 @@ LitServe is at least [2x faster](#performance) than plain FastAPI.
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving   ✅ Use custom models   ✅ GPU autoscaling           
-✅ Streaming              ✅ Multi-modal         ✅ OpenAPI compliant         
-✅ Batching               ✅ PyTorch/JAX/TF/...  ✅ Self-host or fully managed
+✅ (2x)+ faster serving  ✅ Use custom models   ✅ Batching, Streaming       
+✅ Easy to use           ✅ Multi-modal         ✅ OpenAPI compliant         
+✅ GPU autoscaling       ✅ PyTorch/JAX/TF/...  ✅ Self-host or fully managed
 </pre>
 
 <div align='center'>
@@ -80,7 +80,7 @@ class SimpleLitAPI(ls.LitAPI):
         return request["input"] 
 
     def predict(self, x):
-        # LitServe easily handles compound systems. Run inference and return the output.
+        # Easily build compound systems. Run inference and return the output.
         squared = self.model1(x)
         cubed = self.model2(x)
         output = squared + cubed
