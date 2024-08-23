@@ -14,8 +14,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device
 conf = {
     "cuda": {"batch_size": 8, "workers_per_device": 1},
-    "cpu": {"batch_size": 4, "workers_per_device": 1},
-    "mps": {"batch_size": 4, "workers_per_device": 1},
+    "cpu": {"batch_size": 8, "workers_per_device": 1},
+    "mps": {"batch_size": 8, "workers_per_device": 1},
 }
 
 # Set float32 matrix multiplication precision if GPU is available and capable
@@ -56,17 +56,17 @@ class ImageClassifierAPI(ls.LitAPI):
         return {"output": output}
 
 
-def main(batch_size: int = 8, workers_per_device: int = 1):
+def main(batch_size:int, workers_per_device:int):
     print(locals())
     api = ImageClassifierAPI()
     server = ls.LitServer(
         api,
         max_batch_size=batch_size,
-        batch_timeout=0.001,
+        batch_timeout=0.01,
         timeout=10,
         workers_per_device=workers_per_device,
     )
-    server.run(port=8000)
+    server.run(port=8000, log_level="warning")
 
 
 if __name__ == "__main__":

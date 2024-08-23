@@ -26,7 +26,7 @@ jobs:
       - name: Install LitServe
         run: |
           pip --version
-          pip install . "torchvision" "jsonargparse" -U -q -r _requirements/test.txt -U -q
+          pip install . "torchvision" "jsonargparse uvloop" -U -q -r _requirements/test.txt -U -q
           pip list
 
       - name: Tests
