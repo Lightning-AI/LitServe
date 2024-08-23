@@ -665,7 +665,7 @@ class LitServer:
             response, status = None, None
             try:
                 while not task.done():
-                    if await request.is_disconnected():
+                    if hasattr(request, "is_disconnected") and await request.is_disconnected():
                         task.cancel()
                         break
                 response, status = await task
