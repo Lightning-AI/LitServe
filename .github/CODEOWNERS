@@ -11,3 +11,5 @@
 
 # devel requirements
 /_requirements/ @borda @lantiga
+
+/README.md                           @williamfalcon @lantiga

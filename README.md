@@ -62,13 +62,13 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models highlights the flexibility ([explore real examples](#featured-examples)):
+This 2-model toy example (AI compound system) shows LitServe's flexibility ([see real examples](#featured-examples)):    
 
 ```python
 # server.py
 import litserve as ls
 
-# STEP 1: DEFINE A MODEL API
+# (STEP 1) - DEFINE THE API (compound AI system)
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
         # setup is called once at startup. Build a compound AI system (1+ models), connect DBs, load data, etc...
@@ -90,10 +90,10 @@ class SimpleLitAPI(ls.LitAPI):
         # Convert the model output to a response payload.
         return {"output": output} 
 
-# STEP 2: START THE SERVER
+# (STEP 2) - START THE SERVER
 if __name__ == "__main__":
-    api = SimpleLitAPI()
-    server = ls.LitServer(api, accelerator="auto")
+    # serve with advanced features (GPUs, etc...)
+    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", max_batch_size=1)
     server.run(port=8000)
 ```
 
@@ -160,7 +160,8 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 State-of-the-art features:
 
 ✅ [(2x)+ faster than plain FastAPI](#performance)      
-✅ [Auto-GPU scaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
+✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
+✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [Autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
@@ -168,7 +169,7 @@ State-of-the-art features:
 ✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
 ✅ [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)        
 ✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [All ML frameworks: (PyTorch, Jax, TF, ...)](https://lightning.ai/docs/litserve/features/full-control)        
+✅ [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control)        
 ✅ [OpenAPI compliant](https://www.openapis.org/)          
 ✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
 ✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
