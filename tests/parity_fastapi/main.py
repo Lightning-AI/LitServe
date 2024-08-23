@@ -9,9 +9,9 @@ import time
 from functools import wraps
 
 CONF = {
-    "cpu": {"num_requests": 8},
-    "mps": {"num_requests": 8},
-    "cuda": {"num_requests": 16},
+    "cpu": {"num_requests": 50},
+    "mps": {"num_requests": 50},
+    "cuda": {"num_requests": 100},
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
