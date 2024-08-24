@@ -85,11 +85,7 @@ class LitAPI(ABC):
 
             return numpy.stack(inputs)
 
-        if self.stream:
-            message = no_batch_unbatch_message_stream(self, inputs)
-        else:
-            message = no_batch_unbatch_message_no_stream(self, inputs)
-        raise NotImplementedError(message)
+        return inputs
 
     @abstractmethod
     def predict(self, x, **kwargs):
@@ -97,18 +93,11 @@ class LitAPI(ABC):
         pass
 
     def _unbatch_no_stream(self, output):
-        if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
-            return list(output)
-        message = no_batch_unbatch_message_no_stream(self, output)
-        raise NotImplementedError(message)
+        return list(output)
 
     def _unbatch_stream(self, output_stream):
         for output in output_stream:
-            if hasattr(output, "__torch_function__") or output.__class__.__name__ == "ndarray":
-                yield list(output)
-            else:
-                message = no_batch_unbatch_message_no_stream(self, output)
-                raise NotImplementedError(message)
+            yield list(output)
 
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
