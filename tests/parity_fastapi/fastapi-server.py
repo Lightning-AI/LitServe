@@ -63,7 +63,7 @@ async def predict(image_data: ImageData):
 def main():
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="warning")
 
 
 if __name__ == "__main__":
