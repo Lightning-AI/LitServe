@@ -7,7 +7,7 @@
 &nbsp;
 
 <strong>Lightning-fast AI serving engine.</strong>    
-Easy. Flexible. Enterprise-grade.    
+Easy. Flexible. Enterprise-scale.    
 </div>
 
 ----
