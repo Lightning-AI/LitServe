@@ -6,7 +6,7 @@
 
 &nbsp;
 
-<strong>Lightning-fast AI serving engine.</strong>    
+<strong>Lightning-fast serving engine for AI models.</strong>    
 Easy. Flexible. Enterprise-scale.    
 </div>
 
