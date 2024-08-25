@@ -6,22 +6,22 @@
 
 &nbsp;
 
-<strong>High-throughput serving engine for AI models.</strong>    
-Easy to use. Flexible. Enterprise scale.
+<strong>Lightning-fast AI serving engine.</strong>    
+Easy. Flexible. Enterprise-scale.    
 </div>
 
 ----
 
-**LitServe** is a flexible serving engine for AI models built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model.  
+**LitServe** is an easy-to-use, flexible serving engine for AI models built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model.  
 
 LitServe is at least [2x faster](#performance) than plain FastAPI.
 
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving  ✅ Use custom models   ✅ Batching, Streaming       
-✅ Easy to use           ✅ Multi-modal         ✅ Built on FastAPI          
-✅ GPU autoscaling       ✅ PyTorch/JAX/TF/...  ✅ Self-host or fully managed
+✅ (2x)+ faster serving  ✅ Easy to use        ✅ Batching, Streaming       
+✅ Bring your own model  ✅ PyTorch/JAX/TF/... ✅ Built on FastAPI          
+✅ GPU autoscaling       ✅ Multi-modal        ✅ Self-host or fully managed
 </pre>
 
 <div align='center'>
@@ -144,7 +144,7 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 <strong>Toy model:</strong>      <a href="#define-a-server">Hello world</a>
 <strong>LLMs:</strong>           <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>
 <strong>NLP:</strong>            <a href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-text-embedding-api-with-litserve">Text embedding API</a>
-<strong>Multimodal:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm">MiniCPM</a>, <a href="https://lightning.ai/lightning-ai/studios/run-meta-s-chameleon-30b">Chameleon 30B</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve">Phi-3.5 Vision Instruct</a>
+<strong>Multimodal:</strong>     <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm">MiniCPM</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve">Phi-3.5 Vision Instruct</a>
 <strong>Audio:</strong>          <a href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-noise-cancellation-api-with-deepfilternet">Noise cancellation (DeepFilterNet)</a>
 <strong>Vision:</strong>         <a href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-auraflow">AuraFlow</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-flux">Flux</a>, <a href="https://lightning.ai/lightning-ai/studios/deploy-a-super-resolution-image-api-with-aura-sr">Image super resolution (Aura SR)</a>
 <strong>Speech:</strong>         <a href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>
@@ -160,6 +160,7 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 State-of-the-art features:
 
 ✅ [(2x)+ faster than plain FastAPI](#performance)      
+✅ [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)    
 ✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
 ✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
