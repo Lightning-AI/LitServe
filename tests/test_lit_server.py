@@ -379,7 +379,7 @@ def test_server_terminate():
         mock_manager.shutdown.assert_called()
 
 
-class IndentityAPI(ls.examples.SimpleLitAPI):
+class IdentityAPI(ls.examples.SimpleLitAPI):
     def predict(self, x, context):
         context["input"] = x
         return self.model(x)
@@ -389,7 +389,7 @@ class IndentityAPI(ls.examples.SimpleLitAPI):
         return {"output": input}
 
 
-class IndentityBatchedAPI(ls.examples.SimpleBatchedAPI):
+class IdentityBatchedAPI(ls.examples.SimpleBatchedAPI):
     def predict(self, x_batch, context):
         for c, x in zip(context, x_batch):
             c["input"] = x
@@ -400,7 +400,7 @@ class IndentityBatchedAPI(ls.examples.SimpleBatchedAPI):
         return {"output": input}
 
 
-class IndentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
+class IdentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
     def predict(self, x_batch, context):
         for c, x in zip(context, x_batch):
             c["input"] = x
@@ -430,7 +430,7 @@ async def test_inject_context(mocked_load_and_raise):
     mocked_load_and_raise.side_effect = dummy_load_and_raise
 
     # Test context injection with single loop
-    api = IndentityAPI()
+    api = IdentityAPI()
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
@@ -438,14 +438,14 @@ async def test_inject_context(mocked_load_and_raise):
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
-    server = LitServer(IndentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
+    server = LitServer(IdentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
-    server = LitServer(IndentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
+    server = LitServer(IdentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
