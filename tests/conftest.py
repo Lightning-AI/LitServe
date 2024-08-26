@@ -55,6 +55,14 @@ class SimpleStreamAPI(LitAPI):
             yield out.lower()
 
 
+class SimpleDelayedStreamAPI(SimpleStreamAPI):
+    def encode_response(self, output: Generator) -> Generator:
+        delay = 0.2
+        for out in output:
+            time.sleep(delay)
+            yield out.lower()
+
+
 class SimpleBatchedStreamAPI(LitAPI):
     def setup(self, device) -> None:
         self.sentence = "LitServe is streaming output"
@@ -96,6 +104,11 @@ def simple_stream_api():
 @pytest.fixture()
 def simple_batched_stream_api():
     return SimpleBatchedStreamAPI()
+
+
+@pytest.fixture()
+def simple_delayed_stream_api():
+    return SimpleDelayedStreamAPI()
 
 
 @pytest.fixture()
