@@ -606,7 +606,7 @@ class LitServer:
                 if uid is not None:
                     self.request_evicted_status[uid] = True
                     logger.exception("Streaming request cancelled for the uid=%s", uid)
-                break
+                return
 
     def setup_server(self):
         workers_ready = False
