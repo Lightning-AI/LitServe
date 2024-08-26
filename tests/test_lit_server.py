@@ -133,13 +133,13 @@ async def test_stream_client_disconnection(simple_delayed_stream_api, caplog):
             await asyncio.sleep(1)  # wait for the task to stop
             with pytest.raises(asyncio.CancelledError):
                 await task
-            assert "Request evicted for the uid=" in caplog.text
+            assert "Streaming request cancelled for the uid=" in caplog.text
             # TODO: also check if the task actually stopped in the server
 
             caplog.clear()
             task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
             await task
-            assert "Request evicted for the uid=" not in caplog.text
+            assert "Streaming request cancelled for the uid=" not in caplog.text
 
 
 @pytest.mark.asyncio()
