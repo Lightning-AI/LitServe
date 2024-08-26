@@ -605,7 +605,7 @@ class LitServer:
             except asyncio.CancelledError:
                 if uid is not None:
                     self.request_evicted_status[uid] = True
-                    logger.error("Request evicted for the uid=%s", uid)
+                    logger.exception("Streaming request cancelled for the uid=%s", uid)
                 break
 
     def setup_server(self):
