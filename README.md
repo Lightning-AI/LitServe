@@ -14,7 +14,7 @@ Easy. Flexible. Enterprise-scale.
 
 **LitServe** is an easy-to-use, flexible serving engine for AI models built on FastAPI. Features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model.  
 
-LitServe is at least [2x faster](#performance) than plain FastAPI.
+LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
 <div align='center'>
   
@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-This 2-model toy example (AI compound system) shows LitServe's flexibility ([see real examples](#featured-examples)):    
+This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#featured-examples)):    
 
 ```python
 # server.py
@@ -92,7 +92,7 @@ class SimpleLitAPI(ls.LitAPI):
 
 # (STEP 2) - START THE SERVER
 if __name__ == "__main__":
-    # serve with advanced features (GPUs, etc...)
+    # scale with advanced features (batching, GPUs, etc...)
     server = ls.LitServer(SimpleLitAPI(), accelerator="auto", max_batch_size=1)
     server.run(port=8000)
 ```
@@ -126,8 +126,9 @@ response = requests.post(
 ```
 </details>
 
-&nbsp;
+[Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
 
+&nbsp;
 
 # Featured examples    
 Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding servers, LLMs, vision, audio, multi-modal systems, etc...)       
@@ -142,7 +143,7 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
 <pre>
 <strong>Featured examples</strong><br>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
-<strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>
+<strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use">Agent with tool use</a>
 <strong>NLP:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-text-embedding-api-with-litserve">Text embedding API</a>
 <strong>Multimodal:</strong>     <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm">MiniCPM</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve">Phi-3.5 Vision Instruct</a>
 <strong>Audio:</strong>          <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-noise-cancellation-api-with-deepfilternet">Noise cancellation (DeepFilterNet)</a>
