@@ -120,6 +120,7 @@ async def test_stream(simple_stream_api):
                 resp2.text == expected_output2
             ), "Server returns input prompt and generated output which didn't match."
 
+
 @pytest.mark.asyncio()
 async def test_stream_client_disconnection(simple_delayed_stream_api, caplog):
     server = LitServer(simple_delayed_stream_api, stream=True, timeout=10)
@@ -137,6 +138,7 @@ async def test_stream_client_disconnection(simple_delayed_stream_api, caplog):
             task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
             await task
             assert "Request evicted for the uid=" not in caplog.text
+
 
 @pytest.mark.asyncio()
 async def test_batched_stream_server(simple_batched_stream_api):
@@ -195,9 +197,10 @@ def test_streaming_loop():
     requests_queue = Queue()
     requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}))
     response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
+    request_evicted_status = {}
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues)
+        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues, request_evicted_status)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
