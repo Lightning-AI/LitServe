@@ -126,8 +126,9 @@ response = requests.post(
 ```
 </details>
 
-&nbsp;
+[Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
 
+&nbsp;
 
 # Featured examples    
 Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding servers, LLMs, vision, audio, multi-modal systems, etc...)       
