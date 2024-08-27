@@ -49,9 +49,7 @@ def load_and_raise(response: Union[bytes, Exception]) -> None:
         )
         raise
     except Exception as e:
-        logger.exception(
-            f"Unexpected error while processing the response: {e}"
-        )
+        logger.exception(f"Unexpected error while processing the response: {e}")
         raise
 
 
