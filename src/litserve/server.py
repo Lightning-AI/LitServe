@@ -384,27 +384,27 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 async def response_queue_to_buffer(
     response_queue: mp.Queue,
-    buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
-    response_executor: ThreadPoolExecutor,
+    threadpool: ThreadPoolExecutor,
 ):
     loop = asyncio.get_running_loop()
     if stream:
         while True:
             try:
-                uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
+                uid, response = await loop.run_in_executor(threadpool, response_queue.get)
             except Empty:
                 await asyncio.sleep(0.0001)
                 continue
-            q, event = buffer[uid]
-            q.append(payload)
+            stream_response_buffer, event = response_buffer[uid]
+            stream_response_buffer.append(response)
             event.set()
 
     else:
         while True:
-            uid, payload = await loop.run_in_executor(response_executor, response_queue.get)
-            event = buffer.pop(uid)
-            buffer[uid] = payload
+            uid, response = await loop.run_in_executor(threadpool, response_queue.get)
+            event = response_buffer.pop(uid)
+            response_buffer[uid] = response
             event.set()
 
 
