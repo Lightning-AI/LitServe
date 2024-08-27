@@ -11,16 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import asyncio
 import logging
 import pickle
-from typing import Optional
+from typing import Optional, Union
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 if TYPE_CHECKING:
@@ -35,14 +35,22 @@ class LitAPIStatus:
     FINISH_STREAMING = "FINISH_STREAMING"
 
 
-def load_and_raise(response):
+def load_and_raise(response: Union[bytes, Exception]) -> None:
     try:
-        exception = pickle.loads(response) if isinstance(response, bytes) else response
+        if isinstance(response, bytes):
+            exception = pickle.loads(response)
+        else:
+            exception = response
         raise exception
     except pickle.PickleError:
         logger.exception(
-            f"main process failed to load the exception from the parallel worker process. "
+            f"Main process failed to load the exception from the parallel worker process. "
             f"{response} couldn't be unpickled."
+        )
+        raise
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error while processing the response: {e}"
         )
         raise
 
@@ -62,10 +70,13 @@ def wrap_litserve_start(server: "LitServer"):
     if server.lit_spec:
         server.lit_spec.response_queue_id = 0
     manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
-    yield server
-    for p in processes:
-        p.terminate()
-    manager.shutdown()
+    try:
+        yield server
+    finally:
+        for p in processes:
+            p.terminate()
+            p.join()  # Ensure the process has fully exited
+        manager.shutdown()
 
 
 class MaxSizeMiddleware(BaseHTTPMiddleware):
@@ -87,10 +98,15 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
 
         async def rcv() -> Message:
             nonlocal total_size
-            message = await receive()
+            try:
+                message = await receive()
+            except Exception as e:
+                raise HTTPException(500, f"Error receiving message: {str(e)}")
+
             chunk_size = len(message.get("body", b""))
             total_size += chunk_size
             if self.max_size is not None and total_size > self.max_size:
+                logger.warning(f"Payload size exceeded: {total_size} bytes (max allowed: {self.max_size} bytes)")
                 raise HTTPException(413, "Payload too large")
             return message
 
