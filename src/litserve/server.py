@@ -718,6 +718,7 @@ class LitServer:
 
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+            print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
             for s in servers:
                 s.join()
         finally:
