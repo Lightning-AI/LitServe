@@ -51,7 +51,15 @@ try:
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 except ImportError:
-    print("uvloop is not installed. Falling back to the default asyncio event loop.")
+    if platform.system() != "Windows":
+        print("uvloop is not installed. Falling back to the default asyncio event loop.")
+    else:
+        try:
+            import winloop
+
+            winloop.install()
+        except ImportError:
+            print("winloop is not installed. Falling back to the default asyncio event loop.")
 
 logger = logging.getLogger(__name__)
 
