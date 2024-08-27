@@ -417,7 +417,7 @@ class LitServer:
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
-        batch_timeout: float = 0.001,
+        batch_timeout: float = 0.0,
         api_path: str = "/predict",
         stream: bool = False,
         spec: Optional[LitSpec] = None,
