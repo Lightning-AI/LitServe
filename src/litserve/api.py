@@ -21,39 +21,6 @@ from pydantic import BaseModel
 from litserve.specs.base import LitSpec
 
 
-def no_batch_unbatch_message_no_stream(obj, data):
-    return f"""
-        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
-        PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
-        Please implement these two methods in {obj.__class__.__name__}.
-
-        Example:
-
-        def batch(self, inputs):
-            return np.stack(inputs)
-
-        def unbatch(self, output):
-            return list(output)
-    """
-
-
-def no_batch_unbatch_message_stream(obj, data):
-    return f"""
-        You set `max_batch_size > 1`, but the default implementation for batch() and unbatch() only supports
-        PyTorch tensors or NumPy ndarrays, while we found {type(data)}.
-        Please implement these two methods in {obj.__class__.__name__}.
-
-        Example:
-
-        def batch(self, inputs):
-            return np.stack(inputs)
-
-        def unbatch(self, output):
-            for out in output:
-                yield list(out)
-    """
-
-
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: callable = None
