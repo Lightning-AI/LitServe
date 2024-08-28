@@ -178,19 +178,20 @@ def test_batched_loop():
     ("batch_timeout", "batch_size"),
     [
         pytest.param(0, 2),
+        pytest.param(0, 10000),
         pytest.param(0.01, 2),
         pytest.param(10000, 2),
-        pytest.param(0.01, 1000),
+        pytest.param(0.01, 10000),
     ],
 )
 def test_collate_requests(batch_timeout, batch_size):
     api = ls.examples.SimpleBatchedAPI()
-    api.request_timeout = 10
+    api.request_timeout = 1
     request_queue = Queue()
-    request_queue.put((0, "uuid-123", time.monotonic(), 1))  # response_queue_id, uid, timestamp, x_enc
-    request_queue.put((1, "uuid-234", time.monotonic(), 2))
+    for i in range(batch_size):
+        request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i))  # response_queue_id, uid, timestamp, x_enc
     payloads, timed_out_uids = collate_requests(
         api, request_queue, max_batch_size=batch_size, batch_timeout=batch_timeout
     )
-    assert len(payloads) == 2, f"Should have 2 payloads, got {len(payloads)}"
+    assert len(payloads) == batch_size, f"Should have 2 payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
