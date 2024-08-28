@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#featured-examples)):    
+This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#examples)):    
 
 ```python
 # server.py
@@ -142,9 +142,8 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
   </div>
 </div>
 
-
+## Examples    
 <pre>
-<strong>Featured examples</strong><br>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
 <strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use">Agent with tool use</a>
 <strong>RAG:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-1-rag-api">RAG API (LlamaIndex)</a>
