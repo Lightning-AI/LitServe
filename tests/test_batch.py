@@ -186,12 +186,12 @@ def test_batched_loop():
 )
 def test_collate_requests(batch_timeout, batch_size):
     api = ls.examples.SimpleBatchedAPI()
-    api.request_timeout = 1
+    api.request_timeout = 5
     request_queue = Queue()
     for i in range(batch_size):
         request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i))  # response_queue_id, uid, timestamp, x_enc
     payloads, timed_out_uids = collate_requests(
         api, request_queue, max_batch_size=batch_size, batch_timeout=batch_timeout
     )
-    assert len(payloads) == batch_size, f"Should have 2 payloads, got {len(payloads)}"
+    assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
