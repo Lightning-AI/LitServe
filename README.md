@@ -127,7 +127,7 @@ response = requests.post(
 - LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
 - Use the setup method for one-time tasks like connecting models, DBs, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
 - LitServer handles optimizations like batching, GPU autoscaling, streaming, etc... ([docs](https://lightning.ai/docs/litserve/api-reference/litserver)).
-- LitServer is 2x faster than a plain FastAPI server due to our specialized multi-worker handling for AI workloads ([learn more](#performance)).
+- LitServer is 2x faster than a plain FastAPI server with specialized multi-worker handling for AI workloads ([learn more](#performance)).
 - Self host on your own machines or use Lightning Studios for a fully managed deployment ([learn more](#hosting-options)).         
 
 [Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
