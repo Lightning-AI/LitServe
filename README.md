@@ -103,17 +103,13 @@ Now run the server via the command-line
 python server.py
 ```
     
-### Query the server
+### Test the server
 
-Run this command on your CLI to query the server:
+Run this command on your terminal to test the server:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
-
-### Summary
-[LitAPI](https://lightning.ai/docs/litserve/api-reference/litapi) gives full control to build scalable compound AI systems (1 or more models).        
-[LitServer](https://lightning.ai/docs/litserve/api-reference/litserver) handles optimizations like batching, auto-GPU scaling, etc...      
 
 <details>
   <summary>Example of a custom Python client</summary>
@@ -126,6 +122,13 @@ response = requests.post(
 )
 ```
 </details>
+
+### Summary
+- LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
+- Use the setup method for one-time tasks and business logic like connecting models, databases, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
+- LitServer handles optimizations like batching, GPU autoscaling, streaming, etc... ([docs](https://lightning.ai/docs/litserve/api-reference/litserver)).
+- LitServer is 2x faster than a plain FastAPI server due to our specialized multi-worker handling for AI workloads ([learn more](#performance)).
+- Self host on your own machines or use Lightning Studios for a fully managed deployment ([learn more](#hosting-options)).         
 
 [Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
 
