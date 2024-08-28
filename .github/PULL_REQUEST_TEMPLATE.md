@@ -8,8 +8,8 @@
 
 </details>
 
-## How does this PR impact the user?
-Describe (in plain English, not technical Jargon) how this improves the user experience. If you can't tie it back to a real tangible, user goal or describe it in plain english, it's a hint that this is likely not needed and is probably and "engineering nit". 
+## ⚠️ How does this PR impact the user? ⚠️
+Describe (in plain English, not technical Jargon) how this improves the user experience. If you can't tie it back to a real tangible, user goal or describe it in plain english, it's a hint that this is likely not needed and is probably an "engineering nit". 
 
 ### GOOD:
 "As a user, I need to serve models faster. This PR focuses on enabling speed gains by using GPUs"
