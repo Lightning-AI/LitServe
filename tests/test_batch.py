@@ -24,8 +24,9 @@ from fastapi import Request, Response
 from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.server import run_batched_loop
+from litserve.server import run_batched_loop, collate_requests
 from litserve.utils import wrap_litserve_start
+import litserve as ls
 
 
 class Linear(nn.Module):
@@ -171,3 +172,26 @@ def test_batched_loop():
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.batch.assert_called_once_with([4.0, 5.0])
     lit_api_mock.unbatch.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("batch_timeout", "batch_size"),
+    [
+        pytest.param(0, 2),
+        pytest.param(0, 1000),
+        pytest.param(0.01, 2),
+        pytest.param(1000, 2),
+        pytest.param(0.01, 1000),
+    ],
+)
+def test_collate_requests(batch_timeout, batch_size):
+    api = ls.examples.SimpleBatchedAPI()
+    api.request_timeout = 5
+    request_queue = Queue()
+    for i in range(batch_size):
+        request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i))  # response_queue_id, uid, timestamp, x_enc
+    payloads, timed_out_uids = collate_requests(
+        api, request_queue, max_batch_size=batch_size, batch_timeout=batch_timeout
+    )
+    assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
+    assert len(timed_out_uids) == 0, "No timed out uids"

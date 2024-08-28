@@ -92,6 +92,18 @@ def collate_requests(
     end_time = entered_at + batch_timeout
     apply_timeout = lit_api.request_timeout not in (-1, False)
 
+    if batch_timeout == 0:
+        while len(payloads) < max_batch_size:
+            try:
+                response_queue_id, uid, timestamp, x_enc = request_queue.get_nowait()
+                if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
+                    timed_out_uids.append((response_queue_id, uid))
+                else:
+                    payloads.append((response_queue_id, uid, x_enc))
+            except Empty:
+                break
+        return payloads, timed_out_uids
+
     while time.monotonic() < end_time and len(payloads) < max_batch_size:
         remaining_time = end_time - time.monotonic()
         if remaining_time <= 0:
@@ -737,6 +749,7 @@ class LitServer:
 
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+            print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
             for s in servers:
                 s.join()
         finally:
