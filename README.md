@@ -62,7 +62,7 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#featured-examples)):    
+This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#examples)):    
 
 ```python
 # server.py
@@ -102,20 +102,17 @@ Now run the server via the command-line
 ```bash
 python server.py
 ```
-
-- [LitAPI](https://lightning.ai/docs/litserve/api-reference/litapi) gives full control to build scalable compound AI systems (1 or more models).        
-- [LitServer](https://lightning.ai/docs/litserve/api-reference/litserver) handles optimizations like batching, auto-GPU scaling, etc...      
     
-### Query the server
+### Test the server
 
-Use the auto-generated LitServe client:
+Run this command on your terminal to test the server:
 
 ```bash
-python client.py
+curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
 
 <details>
-  <summary>Write a custom client</summary>
+  <summary>Example of a custom Python client</summary>
 
 ```python
 import requests
@@ -125,6 +122,12 @@ response = requests.post(
 )
 ```
 </details>
+
+### Summary
+- LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
+- Use the setup method for one-time tasks like connecting models, DBs, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
+- LitServer handles optimizations like batching, GPU autoscaling, streaming, etc... ([docs](https://lightning.ai/docs/litserve/api-reference/litserver)).
+- Self host on your own machines or use Lightning Studios for a fully managed deployment ([learn more](#hosting-options)).         
 
 [Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
 
@@ -139,12 +142,11 @@ Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding
   </div>
 </div>
 
-
+## Examples    
 <pre>
-<strong>Featured examples</strong><br>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
 <strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-8b-api">Llama 3 (8B)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use">Agent with tool use</a>
-<strong>RAG:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-1-rag-api">RAG API</a>
+<strong>RAG:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-1-rag-api">RAG API (LlamaIndex)</a>
 <strong>NLP:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-text-embedding-api-with-litserve">Text embedding API</a>
 <strong>Multimodal:</strong>     <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm">MiniCPM</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve">Phi-3.5 Vision Instruct</a>
 <strong>Audio:</strong>          <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-noise-cancellation-api-with-deepfilternet">Noise cancellation (DeepFilterNet)</a>
