@@ -6,6 +6,18 @@ labels: enhancement, help wanted
 assignees: ''
 ---
 
+### ⚠️ BEFORE SUBMITTING, READ:
+
+We're excited for your request! However, here are things we are not interested in:
+
+- Decorators.
+- Doing the same thing in multiple ways.    
+- Adding more layers of abstraction... tree-depth should be 1 at most.
+- Features that over-engineer or complicate the code internals.    
+- Linters, and crud that complicates projects.    
+
+----
+
 ## 🚀 Feature
 
 <!-- A clear and concise description of the feature proposal -->
