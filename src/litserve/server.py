@@ -36,6 +36,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.middleware import _MiddlewareClass, P
+from starlette.types import ExceptionHandler
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -422,6 +424,8 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        middlewares: Optional[list[tuple[type[_MiddlewareClass[P]]], dict]] = None,
+        exc_handlers: Optional[list[tuple[int | type[Exception], ExceptionHandler]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -454,17 +458,15 @@ class LitServer:
         self.app.response_queue_id = None
         self.response_queue_id = None
         self.response_buffer = {}
-        # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
-        if not stream:
-            self.app.add_middleware(GZipMiddleware, minimum_size=1000)
-        if max_payload_size is not None:
-            self.app.add_middleware(MaxSizeMiddleware, max_size=max_payload_size)
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.stream = stream
+        self.max_payload_size = max_payload_size
+        self.middlewares = middlewares
+        self.exc_handlers = exc_handlers
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         specs = spec if spec is not None else []
@@ -668,7 +670,20 @@ class LitServer:
                     path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
                 )
 
-    def generate_client_file(self):
+        # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
+        if not self.stream:
+            self.app.add_middleware(GZipMiddleware, minimum_size=1000)
+        if self.max_payload_size is not None:
+            self.app.add_middleware(MaxSizeMiddleware, max_size=self.max_payload_size)
+        if self.middlewares is not None:
+            for middleware, kwargs in self.middlewares:
+                self.app.add_middleware(middleware, **kwargs)
+        if self.exc_handlers is not None:
+            for status_code, exc_handler in self.exc_handlers:
+                self.app.add_exception_handler(status_code, exc_handler)
+
+    @staticmethod
+    def generate_client_file():
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
         dest_path = os.path.join(os.getcwd(), "client.py")
 
