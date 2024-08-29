@@ -308,19 +308,20 @@ class OpenAISpec(LitSpec):
         logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
+
+        elif self.validate_chat_message(output):
+            message = output
         elif isinstance(output, dict) and "content" in output:
             message = output.copy()
             message.update(role="assistant")
-        elif self.validate_chat_message(output):
-            message = output
         elif isinstance(output, list) and output and self.validate_chat_message(output[-1]):
             message = output[-1]
         else:
             error = (
-                "Malformed output from LitAPI.predict: expected"
+                "Malformed output from LitAPI.predict: expected "
                 f"string or {{'role': '...', 'content': '...'}}, got '{output}'."
             )
-            logger.exception(error)
+            logger.error(error)
             raise HTTPException(500, error)
         usage_info = self.extract_usage_info(message)
         return {**message, **usage_info}
