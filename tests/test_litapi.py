@@ -84,25 +84,27 @@ def test_batch_unbatch_stream():
 
 
 def test_decode_request():
-    # Without spec
     request = {"input": 4.0}
     api = ls.examples.SimpleLitAPI()
     assert api.decode_request(request) == 4.0, "Decode request should return the input 4.0"
 
-    # case: Use OpenAISpec implementation
+
+def test_decode_request_with_openai_spec():
     api = ls.examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     request = ChatCompletionRequest(messages=[{"role": "system", "content": "Hello"}])
-    assert api.decode_request(request)[0]["content"] == "Hello", "Decode request should return the input message"
+    decoded_request = api.decode_request(request)
+    assert decoded_request[0]["content"] == "Hello", "Decode request should return the input message"
 
-    # case: Use OpenAISpec implementation with wrong request
+
+def test_decode_request_with_openai_spec_wrong_request():
     api = ls.examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     with pytest.raises(AttributeError, match="object has no attribute 'messages'"):
         api.decode_request({"input": "Hello"})
 
 
-def test_encode_response_without_spec():
+def test_encode_response():
     response = 4.0
     api = ls.examples.SimpleLitAPI()
     assert api.encode_response(response) == {"output": 4.0}, 'Encode response returns encoded output {"output": 4.0}'
