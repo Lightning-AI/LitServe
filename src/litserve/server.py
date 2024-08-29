@@ -72,17 +72,6 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-def get_batch_from_uid(uids, lit_api, request_buffer):
-    batches = []
-    for uid in uids:
-        try:
-            x_enc, pipe_s = request_buffer.pop(uid)
-        except KeyError:
-            continue
-        batches.append((x_enc, pipe_s))
-    return batches
-
-
 def collate_requests(
     lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float
 ) -> Tuple[List, List]:
