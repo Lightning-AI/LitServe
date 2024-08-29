@@ -14,8 +14,9 @@
 import numpy as np
 import pytest
 
-import litserve as ls
+from fastapi import HTTPException
 from litserve.specs.openai import ChatCompletionRequest
+import litserve as ls
 
 
 class TestDefaultBatchedAPI(ls.LitAPI):
@@ -134,19 +135,17 @@ def test_encode_response_with_openai_spec():
 
 
 def test_encode_response_with_openai_spec_dict_token_usage():
-    class SimpleLitAPI(ls.LitAPI):
-        def setup(self, device):
-            self.model = None
+    prompt = "This is a LLM generated text"
 
-        def predict(self, prompt):
-            for token in prompt.split():
-                yield {"content": token, "prompt_tokens": 4, "completion_tokens": 4, "total_tokens": 8}
+    def predict():
+        for token in prompt.split():
+            yield {"content": token, "prompt_tokens": 4, "completion_tokens": 4, "total_tokens": 8}
 
     generated_tokens = []
-    api = SimpleLitAPI()
+    api = ls.examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
-    prompt = "This is a LLM generated text"
-    for output in api.encode_response(api.predict(prompt)):
+
+    for output in api.encode_response(predict()):
         generated_tokens.append(output["content"])
     assert generated_tokens == prompt.split(), f"Encode response should return the generated tokens {prompt.split()}"
 
@@ -172,3 +171,13 @@ def test_encode_response_with_openai_spec_invalid_input():
     response = 10
     with pytest.raises(TypeError, match="object is not iterable"):
         next(api.encode_response(response))
+
+
+def test_encode_response_with_openai_spec_invalid_predict_output():
+    def predict():
+        yield {"hello": "world"}
+
+    api = ls.examples.TestAPI()
+    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    with pytest.raises(HTTPException, match="500: Malformed output from LitAPI.predict"):
+        next(api.encode_response(predict()))

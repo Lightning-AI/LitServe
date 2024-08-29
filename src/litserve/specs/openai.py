@@ -315,7 +315,7 @@ class OpenAISpec(LitSpec):
             message = output[-1]
         else:
             error = (
-                "Malformed output from LitAPI.predict: expected"
+                "Malformed output from LitAPI.predict: expected "
                 f"string or {{'role': '...', 'content': '...'}}, got '{output}'."
             )
             logger.error(error)
