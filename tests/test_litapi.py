@@ -179,5 +179,5 @@ def test_encode_response_with_openai_spec_invalid_predict_output():
 
     api = ls.examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
-    with pytest.raises(HTTPException, match=r"500: Malformed output from LitAPI.predict"):
+    with pytest.raises(HTTPException, match=r"Malformed output from LitAPI.predict"):
         next(api.encode_response(predict()))
