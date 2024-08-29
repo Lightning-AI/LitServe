@@ -431,6 +431,8 @@ class LitServer:
             raise ValueError("max_batch_size must be greater than 0")
         if isinstance(spec, OpenAISpec):
             stream = True
+        if middlewares is None:
+            middlewares = []
 
         if not api_path.startswith("/"):
             raise ValueError(
@@ -456,6 +458,12 @@ class LitServer:
         self.app.response_queue_id = None
         self.response_queue_id = None
         self.response_buffer = {}
+        # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
+        if not stream:
+            middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
+        if max_payload_size is not None:
+            middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
+        self.middlewares = middlewares
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
@@ -463,7 +471,6 @@ class LitServer:
         self.batch_timeout = batch_timeout
         self.stream = stream
         self.max_payload_size = max_payload_size
-        self.middlewares = middlewares
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         specs = spec if spec is not None else []
@@ -667,14 +674,8 @@ class LitServer:
                     path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
                 )
 
-        # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
-        if not self.stream:
-            self.app.add_middleware(GZipMiddleware, minimum_size=1000)
-        if self.max_payload_size is not None:
-            self.app.add_middleware(MaxSizeMiddleware, max_size=self.max_payload_size)
-        if self.middlewares is not None:
-            for middleware, kwargs in self.middlewares:
-                self.app.add_middleware(middleware, **kwargs)
+        for middleware, kwargs in self.middlewares:
+            self.app.add_middleware(middleware, **kwargs)
 
     @staticmethod
     def generate_client_file():
