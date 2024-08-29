@@ -125,7 +125,7 @@ response = requests.post(
 
 ### LLM serving
 LitServe isn’t a vLLM or Ollama alternative, it's designed to serve ANY AI model (beyond LLMs).    
-LitServe offers full control over the inference internals so experts can build high-performance LLM servers ([learn more](https://lightning.ai/docs/litserve/features/serve-llms)).      
+LitServe offers full control over the inference internals so you can build custom LLM servers ([learn more](https://lightning.ai/docs/litserve/features/serve-llms)).      
     
 For easy LLM serving, use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) (built on LitServe). 
 
