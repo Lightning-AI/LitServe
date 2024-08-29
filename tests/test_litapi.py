@@ -146,6 +146,7 @@ def test_encode_response_with_openai_spec_dict_token_usage():
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
 
     for output in api.encode_response(predict()):
+        assert output["role"] == "assistant", "Role should be assistant"
         generated_tokens.append(output["content"])
     assert generated_tokens == prompt.split(), f"Encode response should return the generated tokens {prompt.split()}"
 
