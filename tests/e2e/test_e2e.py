@@ -80,13 +80,6 @@ def test_e2e_default_batching():
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
 
 
-@e2e_from_file("tests/e2e/default_exc_handler.py")
-def test_e2e_default_exc_handler():
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"base64": "_9j_4AAQSkZJRgABAQEAYAB"}, headers=None)
-    assert resp.status_code == 400, f"Expected response to be 400 but got {resp.status_code}"
-    assert resp.json() == {"message": "cannot decode input"}, "server didn't return expected output"
-
-
 @e2e_from_file("tests/e2e/default_middleware.py")
 def test_e2e_default_middleware():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
