@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import litserve as ls
 from litserve.specs.openai import ChatCompletionRequest
@@ -94,6 +95,12 @@ def test_decode_request():
     request = ChatCompletionRequest(messages=[{"role": "system", "content": "Hello"}])
     assert api.decode_request(request)[0]["content"] == "Hello", "Decode request should return the input message"
 
+    # case: Use OpenAISpec implementation with wrong request
+    api = ls.examples.TestAPI()
+    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    with pytest.raises(AttributeError, match="object has no attribute 'messages'"):
+        api.decode_request({"input": "Hello"})
+
 
 def test_encode_response():
     # Without spec
@@ -109,3 +116,24 @@ def test_encode_response():
     for output in api.encode_response(response):
         generated_tokens.append(output["content"])
     assert generated_tokens == response, f"Encode response should return the generated tokens {response}"
+
+    # case: Use LitAPI encode_response implementation
+    class CustomSpecAPI(ls.examples.TestAPI):
+        def encode_response(self, output_stream):
+            for output in output_stream:
+                yield {"content": output}
+
+    api = ls.examples.TestAPI()
+    api._sanitize(max_batch_size=1, spec=CustomSpecAPI())
+    response = "This is a LLM generated text".split()
+    generated_tokens = []
+    for output in api.encode_response(response):
+        generated_tokens.append(output["content"])
+    assert generated_tokens == response, f"Encode response should return the generated tokens {response}"
+
+    # case: Use OpenAISpec and predict not generator
+    api = ls.examples.TestAPI()
+    api._sanitize(max_batch_size=1, spec=CustomSpecAPI())
+    response = 10
+    with pytest.raises(TypeError, match="object is not iterable"):
+        next(api.encode_response(response))
