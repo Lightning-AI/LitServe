@@ -102,13 +102,13 @@ def test_decode_request():
         api.decode_request({"input": "Hello"})
 
 
-def test_encode_response():
-    # Without spec
+def test_encode_response_without_spec():
     response = 4.0
     api = ls.examples.SimpleLitAPI()
     assert api.encode_response(response) == {"output": 4.0}, 'Encode response returns encoded output {"output": 4.0}'
 
-    # case: Use OpenAISpec implementation
+
+def test_encode_response_with_openai_spec():
     api = ls.examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     response = "This is a LLM generated text".split()
@@ -117,7 +117,26 @@ def test_encode_response():
         generated_tokens.append(output["content"])
     assert generated_tokens == response, f"Encode response should return the generated tokens {response}"
 
-    # case: Use LitAPI encode_response implementation
+
+def test_encode_response_with_openai_spec_dict_token_usage():
+    class SimpleLitAPI(ls.LitAPI):
+        def setup(self, device):
+            self.model = None
+
+        def predict(self, prompt):
+            for token in prompt.split():
+                yield {"content": token, "prompt_tokens": 4, "completion_tokens": 4, "total_tokens": 8}
+
+    generated_tokens = []
+    api = SimpleLitAPI()
+    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    prompt = "This is a LLM generated text"
+    for output in api.encode_response(api.predict(prompt)):
+        generated_tokens.append(output["content"])
+    assert generated_tokens == prompt.split(), f"Encode response should return the generated tokens {prompt.split()}"
+
+
+def test_encode_response_with_custom_spec_api():
     class CustomSpecAPI(ls.examples.TestAPI):
         def encode_response(self, output_stream):
             for output in output_stream:
@@ -131,9 +150,10 @@ def test_encode_response():
         generated_tokens.append(output["content"])
     assert generated_tokens == response, f"Encode response should return the generated tokens {response}"
 
-    # case: Use OpenAISpec and predict not generator
+
+def test_encode_response_with_openai_spec_invalid_input():
     api = ls.examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=CustomSpecAPI())
+    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     response = 10
     with pytest.raises(TypeError, match="object is not iterable"):
         next(api.encode_response(response))
