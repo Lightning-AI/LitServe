@@ -123,6 +123,16 @@ response = requests.post(
 ```
 </details>
 
+### LLM serving
+LitServe isn’t a vLLM or Ollama alternative, it's designed to serve ANY AI model (beyond LLMs).    
+Unlike those tools, LitServe offers full control over the inference internals.      
+    
+For easy LLM serving, use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) (built on LitServe). 
+
+```python
+litgpt serve microsoft/phi-2
+```
+
 ### Summary
 - LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
 - Use the setup method for one-time tasks like connecting models, DBs, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
