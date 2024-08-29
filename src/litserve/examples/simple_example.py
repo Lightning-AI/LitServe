@@ -100,27 +100,3 @@ class SimpleStreamAPI(ls.LitAPI):
     def encode_response(self, output_stream):
         for output in output_stream:
             yield {"output": output}
-
-
-class SimpleExceptionAPI(ls.LitAPI):
-    def __init__(self, decode_request_exc: Exception):
-        self.decode_request_exc = decode_request_exc
-        super().__init__()
-
-    def setup(self, device):
-        # Set up the model, so it can be called in `predict`.
-        self.model = lambda x: x**2
-
-    def decode_request(self, request):
-        req_input = request.get("input", None)
-        if req_input is None:
-            raise self.decode_request_exc
-        return req_input
-
-    def predict(self, x):
-        # Run the model on the input and return the output.
-        return self.model(x)
-
-    def encode_response(self, output):
-        # Convert the model output to a response payload.
-        return {"output": output}
