@@ -16,7 +16,7 @@ Describe (in plain English, not technical Jargon) how this improves the user exp
 
 ### BAD:
 "This PR enables GPUs". 
-This is bad becuase the *user problem* is not clear... instead it just jumps to the solution without any context. 
+This is bad because the *user problem* is not clear... instead it just jumps to the solution without any context. 
 
 PRs without this will not be merged.
 
