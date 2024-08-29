@@ -1,6 +1,7 @@
 import numpy as np
 
 import litserve as ls
+from litserve.specs.openai import ChatCompletionRequest
 
 
 class TestDefaultBatchedAPI(ls.LitAPI):
@@ -79,3 +80,32 @@ def test_batch_unbatch_stream():
         count += 1
 
     assert count == 4, "Should have 4 responses"
+
+
+def test_decode_request():
+    # Without spec
+    request = {"input": 4.0}
+    api = ls.examples.SimpleLitAPI()
+    assert api.decode_request(request) == 4.0, "Decode request should return the input 4.0"
+
+    # case: Use OpenAISpec implementation
+    api = ls.examples.TestAPI()
+    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    request = ChatCompletionRequest(messages=[{"role": "system", "content": "Hello"}])
+    assert api.decode_request(request)[0]["content"] == "Hello", "Decode request should return the input message"
+
+
+def test_encode_response():
+    # Without spec
+    response = 4.0
+    api = ls.examples.SimpleLitAPI()
+    assert api.encode_response(response) == {"output": 4.0}, 'Encode response returns encoded output {"output": 4.0}'
+
+    # case: Use OpenAISpec implementation
+    api = ls.examples.TestAPI()
+    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    response = "This is a LLM generated text".split()
+    generated_tokens = []
+    for output in api.encode_response(response):
+        generated_tokens.append(output["content"])
+    assert generated_tokens == response, f"Encode response should return the generated tokens {response}"
