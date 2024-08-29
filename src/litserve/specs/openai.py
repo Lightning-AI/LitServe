@@ -308,6 +308,9 @@ class OpenAISpec(LitSpec):
         logger.debug(output)
         if isinstance(output, str):
             message = {"role": "assistant", "content": output}
+
+        elif self.validate_chat_message(output):
+            message = output
         elif isinstance(output, dict) and "content" in output:
             message = output.copy()
             message.update(role="assistant")
