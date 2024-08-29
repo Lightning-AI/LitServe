@@ -127,7 +127,7 @@ response = requests.post(
 LitServe isn’t *just* for LLMs like vLLM or Ollama; it serves any AI model with full control over internals ([learn more](https://lightning.ai/docs/litserve/features/serve-llms)).    
 For easy LLM serving, use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) (built on LitServe). 
 
-```python
+```
 litgpt serve microsoft/phi-2
 ```
 
