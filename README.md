@@ -104,24 +104,15 @@ python server.py
 ```
     
 ### Test the server
+LitServe auto-generates a test client for the server:    
+```bash
+python client.py    
+```
 
-Run this command on your terminal to test the server:
-
+Or test the server with this terminal command:
 ```bash
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
-
-<details>
-  <summary>Example of a custom Python client</summary>
-
-```python
-import requests
-response = requests.post(
-    "http://127.0.0.1:8000/predict",
-    json={"input": 4.0}
-)
-```
-</details>
 
 ### LLM serving
 LitServe isn’t *just* for LLMs like vLLM or Ollama; it serves any AI model with full control over internals ([learn more](https://lightning.ai/docs/litserve/features/serve-llms)).    
