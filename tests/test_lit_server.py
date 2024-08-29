@@ -39,6 +39,8 @@ from litserve.server import (
 from litserve.server import LitServer
 import litserve as ls
 from fastapi.testclient import TestClient
+from starlette.types import ASGIApp
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 def test_index(sync_testclient):
@@ -457,3 +459,24 @@ def test_http_exception():
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, length: int) -> None:
+        self.app = app
+        self.length = length
+        super().__init__(app)
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = "0" * self.length
+        return response
+
+
+def test_custom_middleware():
+    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=[(RequestIdMiddleware, {"length": 5})])
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
+        assert response.json() == {"output": 16.0}, "server didn't return expected output"
+        assert response.headers["X-Request-Id"] == "00000"
