@@ -1,10 +1,9 @@
 from litserve import LitServer, LitAPI
-import time
-import numpy as np
+
 
 class SimpleStreamingAPI(LitAPI):
     def setup(self, device) -> None:
-        self.model = lambda x,y: x*y
+        self.model = lambda x, y: x * y
 
     def decode_request(self, request):
         return request["input"]

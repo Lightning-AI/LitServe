@@ -297,7 +297,6 @@ def test_openai_parity_with_response_format():
         )
 
 
-
 @e2e_from_file("tests/e2e/default_single_streaming.py")
 def test_e2e_single_streaming():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
@@ -306,7 +305,7 @@ def test_e2e_single_streaming():
     outputs = []
     for line in resp.iter_lines():
         if line:
-            outputs.append(json.loads(line.decode('utf-8')))
+            outputs.append(json.loads(line.decode("utf-8")))
 
     assert len(outputs) == 3, "Expected 3 streamed outputs"
     assert outputs[-1] == {"output": 12.0}, "Final output doesn't match expected value"
