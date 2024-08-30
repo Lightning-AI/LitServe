@@ -308,12 +308,9 @@ def test_e2e_single_streaming():
         if line:
             outputs.append(json.loads(line.decode('utf-8')))
 
-    assert len(outputs) > 1, "Expected multiple streamed outputs"
     assert len(outputs) == 3, "Expected 3 streamed outputs"
     assert outputs[-1] == {"output": 12.0}, "Final output doesn't match expected value"
 
-    # Check that the outputs are incrementally building up to the final result
-    for i, output in enumerate(outputs[:-1]):
-        assert 0 < output["output"] <= 12.0, f"Intermediate output {i} is not within expected range"
-        if i > 0:
-            assert output["output"] >= outputs[i-1]["output"], "Outputs are not monotonically increasing"
+    expected_values = [4.0, 8.0, 12.0]
+    for i, output in enumerate(outputs):
+        assert output["output"] == expected_values[i], f"Intermediate output {i} is not expected value"
