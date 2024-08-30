@@ -1,3 +1,5 @@
+import torch
+
 import litserve as ls
 
 
@@ -54,8 +56,6 @@ class SimpleTorchAPI(ls.LitAPI):
         self.model = Linear().to(device)
 
     def decode_request(self, request):
-        import torch
-
         # get the input and create a 1D tensor on the correct device
         content = request["input"]
         return torch.tensor([content], device=self.device)
@@ -95,7 +95,7 @@ class SimpleStreamAPI(ls.LitAPI):
 
     def predict(self, x):
         for i in range(3):
-            yield self.model(i, x.encode("utf-8").decode())
+            yield self.model(i, x)
 
     def encode_response(self, output_stream):
         for output in output_stream:
