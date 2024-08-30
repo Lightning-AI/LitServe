@@ -128,7 +128,7 @@ class LitServer:
             _msg = (
                 "middlewares must be a list of tuples"
                 " where each tuple contains a middleware and its arguments. For example:\n"
-                "server = ls.LitServer(ls.examples.SimpleLitAPI(), "
+                "server = ls.LitServer(ls.test_examples.SimpleLitAPI(), "
                 'middlewares=[(RequestIdMiddleware, {"length": 5})])'
             )
             raise ValueError(_msg)
