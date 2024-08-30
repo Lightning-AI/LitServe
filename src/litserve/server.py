@@ -710,6 +710,9 @@ class LitServer:
         if num_api_servers is None:
             num_api_servers = len(self.workers)
 
+        if num_api_servers < 1:
+            raise ValueError("num_api_servers must be greater than 0")
+
         if sys.platform == "win32":
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:

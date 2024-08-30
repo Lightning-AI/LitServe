@@ -476,21 +476,30 @@ def test_litserver_run(mock_uvicorn):
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
 
+    with pytest.raises(ValueError, match=r"must be greater than 0"):
+        server.run(num_api_servers=0)
+
     server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
     server._start_server = MagicMock()
 
     # Running the method to test
     server.run(api_server_worker_type=None)
+    server.launch_inference_worker.assert_called_with(1)
     actual = server._start_server.call_args
     assert actual[0][4] == "process", "Server should run in process mode"
 
     server.run(api_server_worker_type="thread")
+    server.launch_inference_worker.assert_called_with(1)
     actual = server._start_server.call_args
     assert actual[0][4] == "thread", "Server should run in thread mode"
 
     server.run(api_server_worker_type="process")
+    server.launch_inference_worker.assert_called_with(1)
     actual = server._start_server.call_args
     assert actual[0][4] == "process", "Server should run in process mode"
+
+    server.run(api_server_worker_type="process", num_api_servers=10)
+    server.launch_inference_worker.assert_called_with(10)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
