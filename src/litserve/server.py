@@ -30,7 +30,7 @@ from queue import Empty
 from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
@@ -57,9 +57,6 @@ logger = logging.getLogger(__name__)
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-
-# timeout when we need to poll or wait indefinitely for a result in a loop.
-LONG_TIMEOUT = 100
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
@@ -306,7 +303,7 @@ class LitServer:
 
             return Response(content="not ready", status_code=503)
 
-        async def predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+        async def predict(request: self.request_type) -> self.response_type:
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
@@ -331,7 +328,7 @@ class LitServer:
                 load_and_raise(response)
             return response
 
-        async def stream_predict(request: self.request_type, background_tasks: BackgroundTasks) -> self.response_type:
+        async def stream_predict(request: self.request_type) -> self.response_type:
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
