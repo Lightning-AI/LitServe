@@ -473,7 +473,7 @@ def test_litserver_run_with_spec(openai_request_data):
 @patch("litserve.server.uvicorn")
 def test_litserver_run(mock_uvicorn):
     api = ls.examples.SimpleLitAPI()
-    server = ls.LitServer(api)
+    server = ls.LitServer(api, devices=1)
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
 
