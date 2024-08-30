@@ -27,7 +27,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
@@ -116,6 +116,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        middlewares: Optional[list[tuple[Callable, dict]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -123,6 +124,8 @@ class LitServer:
             raise ValueError("max_batch_size must be greater than 0")
         if isinstance(spec, OpenAISpec):
             stream = True
+        if middlewares is None:
+            middlewares = []
 
         if not api_path.startswith("/"):
             raise ValueError(
@@ -150,15 +153,17 @@ class LitServer:
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not stream:
-            self.app.add_middleware(GZipMiddleware, minimum_size=1000)
+            middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
-            self.app.add_middleware(MaxSizeMiddleware, max_size=max_payload_size)
+            middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
+        self.middlewares = middlewares
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.stream = stream
+        self.max_payload_size = max_payload_size
         self._connector = _Connector(accelerator=accelerator, devices=devices)
 
         specs = spec if spec is not None else []
@@ -362,7 +367,11 @@ class LitServer:
                     path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
                 )
 
-    def generate_client_file(self):
+        for middleware, kwargs in self.middlewares:
+            self.app.add_middleware(middleware, **kwargs)
+
+    @staticmethod
+    def generate_client_file():
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
         dest_path = os.path.join(os.getcwd(), "client.py")
 
