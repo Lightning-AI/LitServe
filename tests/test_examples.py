@@ -7,6 +7,7 @@ from litserve.examples.openai_spec_example import (
     OpenAIWithUsage,
     OpenAIWithUsageEncodeResponse,
     OpenAIBatchingWithUsage,
+    OpenAIBatchContext,
 )
 from litserve.examples.simple_example import SimpleStreamAPI
 from litserve.utils import wrap_litserve_start
@@ -118,8 +119,10 @@ async def test_openai_batching_with_usage():
     api = OpenAIBatchingWithUsage()
     api.setup(None)
     inputs = ["10 + 6", "10 + 6"]
+    assert api.batch(inputs) == inputs, "Batched inputs should match expected output"
     batched_response = list(api.predict(inputs))
     assert batched_response == [["10 + 6 is equal to 16."] * 2], "Batched response should match expected output"
+    assert api.unbatch(batched_response) == batched_response, "Unbatched response should match batched response"
     encoded_response = list(api.encode_response(batched_response, [{"temperature": 1.0}, {"temperature": 1.0}]))
     assert encoded_response == [
         [
@@ -131,3 +134,74 @@ async def test_openai_batching_with_usage():
             {"role": "assistant", "content": "", "prompt_tokens": 25, "completion_tokens": 10, "total_tokens": 35},
         ],
     ], "Encoded batched response should match expected output"
+
+
+@pytest.mark.asyncio()
+async def test_openai_batch_context():
+    api = OpenAIBatchContext()
+    api.setup(None)
+    inputs = ["Hello", "How are you?"]
+    context = [{"temperature": 0.5}, {"temperature": 0.5}]
+
+    # Test batch method
+    assert api.batch(inputs) == inputs, "Batched inputs should match expected output"
+
+    # Test predict method
+    predicted_output = list(api.predict(inputs, context))
+    expected_output = [
+        ["Hi! "] * 2,
+        ["It's "] * 2,
+        ["nice "] * 2,
+        ["to "] * 2,
+        ["meet "] * 2,
+        ["you. "] * 2,
+        ["Is "] * 2,
+        ["there "] * 2,
+        ["something "] * 2,
+        ["I "] * 2,
+        ["can "] * 2,
+        ["help "] * 2,
+        ["you "] * 2,
+        ["with "] * 2,
+        ["or "] * 2,
+        ["would "] * 2,
+        ["you "] * 2,
+        ["like "] * 2,
+        ["to "] * 2,
+        ["chat? "] * 2,
+    ]
+    assert predicted_output == expected_output, "Predicted output should match expected output"
+
+    # Test unbatch method
+    unbatched_output = api.unbatch(predicted_output)
+    assert unbatched_output == predicted_output, "Unbatched output should match predicted output"
+
+    # Test encode_response method
+    encoded_response = list(api.encode_response(predicted_output, context))
+    expected_encoded_response = [
+        [{"role": "assistant", "content": "Hi! "}, {"role": "assistant", "content": "Hi! "}],
+        [{"role": "assistant", "content": "It's "}, {"role": "assistant", "content": "It's "}],
+        [{"role": "assistant", "content": "nice "}, {"role": "assistant", "content": "nice "}],
+        [{"role": "assistant", "content": "to "}, {"role": "assistant", "content": "to "}],
+        [{"role": "assistant", "content": "meet "}, {"role": "assistant", "content": "meet "}],
+        [{"role": "assistant", "content": "you. "}, {"role": "assistant", "content": "you. "}],
+        [{"role": "assistant", "content": "Is "}, {"role": "assistant", "content": "Is "}],
+        [{"role": "assistant", "content": "there "}, {"role": "assistant", "content": "there "}],
+        [{"role": "assistant", "content": "something "}, {"role": "assistant", "content": "something "}],
+        [{"role": "assistant", "content": "I "}, {"role": "assistant", "content": "I "}],
+        [{"role": "assistant", "content": "can "}, {"role": "assistant", "content": "can "}],
+        [{"role": "assistant", "content": "help "}, {"role": "assistant", "content": "help "}],
+        [{"role": "assistant", "content": "you "}, {"role": "assistant", "content": "you "}],
+        [{"role": "assistant", "content": "with "}, {"role": "assistant", "content": "with "}],
+        [{"role": "assistant", "content": "or "}, {"role": "assistant", "content": "or "}],
+        [{"role": "assistant", "content": "would "}, {"role": "assistant", "content": "would "}],
+        [{"role": "assistant", "content": "you "}, {"role": "assistant", "content": "you "}],
+        [{"role": "assistant", "content": "like "}, {"role": "assistant", "content": "like "}],
+        [{"role": "assistant", "content": "to "}, {"role": "assistant", "content": "to "}],
+        [{"role": "assistant", "content": "chat? "}, {"role": "assistant", "content": "chat? "}],
+    ]
+    assert encoded_response == expected_encoded_response, "Encoded response should match expected output"
+
+    # Ensure context temperatures are set to 1.0
+    for ctx in context:
+        assert ctx["temperature"] == 1.0, f"context {ctx} is not 1.0"

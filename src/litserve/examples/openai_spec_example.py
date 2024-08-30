@@ -14,7 +14,7 @@
 import time
 
 import litserve as ls
-from litserve.specs.openai import ChatMessage, OpenAISpec
+from litserve.specs.openai import ChatMessage
 
 
 class TestAPI(ls.LitAPI):
@@ -130,8 +130,3 @@ class OpenAIBatchingWithUsage(OpenAIWithUsage):
 
     def unbatch(self, output):
         return output
-
-
-if __name__ == "__main__":
-    server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
-    server.run(port=8000)
