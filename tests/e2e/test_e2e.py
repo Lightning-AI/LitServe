@@ -295,3 +295,25 @@ def test_openai_parity_with_response_format():
         assert r.choices[0].delta.content == expected_out, (
             f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
         )
+
+
+
+@e2e_from_file("tests/e2e/default_single_streaming.py")
+def test_e2e_single_streaming():
+    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+
+    outputs = []
+    for line in resp.iter_lines():
+        if line:
+            outputs.append(json.loads(line.decode('utf-8')))
+
+    assert len(outputs) > 1, "Expected multiple streamed outputs"
+    assert len(outputs) == 3, "Expected 3 streamed outputs"
+    assert outputs[-1] == {"output": 12.0}, "Final output doesn't match expected value"
+
+    # Check that the outputs are incrementally building up to the final result
+    for i, output in enumerate(outputs[:-1]):
+        assert 0 < output["output"] <= 12.0, f"Intermediate output {i} is not within expected range"
+        if i > 0:
+            assert output["output"] >= outputs[i-1]["output"], "Outputs are not monotonically increasing"
