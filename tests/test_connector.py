@@ -33,6 +33,12 @@ def test_check_cuda_with_nvidia_smi():
             marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
         ),
         pytest.param(
+            "gpu",
+            "cuda",
+            torch.cuda.device_count(),
+            marks=pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU"),
+        ),
+        pytest.param(
             None,
             "cuda",
             torch.cuda.device_count(),
@@ -46,6 +52,12 @@ def test_check_cuda_with_nvidia_smi():
         ),
         pytest.param(
             "auto",
+            "mps",
+            1,
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
+        ),
+        pytest.param(
+            "gpu",
             "mps",
             1,
             marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="Only tested on Apple MPS"),
