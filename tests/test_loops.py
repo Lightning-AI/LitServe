@@ -16,13 +16,14 @@ import inspect
 import time
 from queue import Queue
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import pytest
 
 from litserve.loops import (
     run_single_loop,
     run_streaming_loop,
     run_batched_streaming_loop,
+    inference_worker,
 )
 from litserve.utils import LitAPIStatus
 
@@ -153,3 +154,13 @@ def test_batched_streaming_loop():
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
+
+
+@patch("litserve.loops.run_batched_loop")
+@patch("litserve.loops.run_single_loop")
+def test_inference_worker(mock_single_loop, mock_batched_loop):
+    inference_worker(*[MagicMock()] * 6, max_batch_size=2, batch_timeout=0, stream=False)
+    mock_batched_loop.assert_called_once()
+
+    inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
+    mock_single_loop.assert_called_once()

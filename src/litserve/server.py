@@ -26,8 +26,8 @@ import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from queue import Empty, Queue
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from queue import Empty
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
@@ -38,7 +38,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.loops import run_batched_streaming_loop, run_streaming_loop, run_batched_loop, run_single_loop
+from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
@@ -63,46 +63,6 @@ LONG_TIMEOUT = 100
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
-
-
-def inference_worker(
-    lit_api: LitAPI,
-    lit_spec: Optional[LitSpec],
-    device: str,
-    worker_id: int,
-    request_queue: Queue,
-    response_queues: List[Queue],
-    max_batch_size: int,
-    batch_timeout: float,
-    stream: bool,
-    workers_setup_status: Dict[str, bool] = None,
-):
-    lit_api.setup(device)
-    lit_api.device = device
-
-    print(f"Setup complete for worker {worker_id}.")
-
-    if workers_setup_status:
-        workers_setup_status[worker_id] = True
-
-    if lit_spec:
-        logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
-    if stream:
-        if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
-        else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues)
-        return
-
-    if max_batch_size > 1:
-        run_batched_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
-    else:
-        run_single_loop(
-            lit_api,
-            lit_spec,
-            request_queue,
-            response_queues,
-        )
 
 
 def no_auth():
