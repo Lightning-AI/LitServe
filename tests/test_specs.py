@@ -17,7 +17,7 @@ import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
 from httpx import AsyncClient
-from litserve.examples.openai_spec_example import (
+from litserve.test_examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsage,
     OpenAIWithUsageEncodeResponse,
