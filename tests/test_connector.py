@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest.mock import patch
 
 from litserve.connector import _Connector, check_cuda_with_nvidia_smi
 import pytest
@@ -20,6 +21,14 @@ import torch
 @pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")
 def test_check_cuda_with_nvidia_smi():
     assert check_cuda_with_nvidia_smi() == torch.cuda.device_count()
+
+
+@patch(
+    "litserve.connector.subprocess.check_output",
+    return_value=b"GPU 0: NVIDIA GeForce RTX 4090 (UUID: GPU-rb438fre-0ar-9702-de35-ref4rjn34omk3 )",
+)
+def test_check_cuda_with_nvidia_smi_mock_gpu(mock_subprocess):
+    assert check_cuda_with_nvidia_smi() == 1
 
 
 @pytest.mark.parametrize(
