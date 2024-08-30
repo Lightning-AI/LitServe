@@ -343,14 +343,16 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.Config.assert_called()
 
 
-def test_litserver_run_with_spec(openai_request_data):
-    api = ls.examples.TestAPI()
-    server = ls.LitServer(api, spec=ls.OpenAISpec())
-    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post("/v1/chat/completions", json=openai_request_data)
-        assert response.status_code == 200, "Server response should be 200 (OK)"
+@patch("litserve.server.uvicorn")
+def test_start_server(mock_uvicon):
+    server = LitServer(ls.examples.TestAPI(), spec=ls.OpenAISpec())
+    sockets = MagicMock()
+    server._start_server(8000, 1, "info", sockets, "process")
+    mock_uvicon.Server.assert_called()
+    assert server.lit_spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
 def test_server_run_with_api_server_worker_type(mock_uvicorn):
     api = ls.examples.SimpleLitAPI()
