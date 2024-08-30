@@ -88,6 +88,7 @@ def test_check_cuda_with_nvidia_smi_mock_gpu(mock_subprocess):
     ],
 )
 def test_connector(input_accelerator, expected_accelerator, expected_devices):
+    check_cuda_with_nvidia_smi.cache_clear()
     connector = _Connector(accelerator=input_accelerator)
     assert (
         connector.accelerator == expected_accelerator
