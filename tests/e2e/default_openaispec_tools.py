@@ -1,6 +1,6 @@
 import litserve as ls
 from litserve import OpenAISpec
-from litserve.test_examples.openai_spec_example import TestAPI
+from litserve.examples.openai_spec_example import TestAPI
 from litserve.specs.openai import ChatMessage
 
 

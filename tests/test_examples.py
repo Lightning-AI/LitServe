@@ -3,12 +3,12 @@ import torch.nn
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
 
-from litserve.test_examples.openai_spec_example import (
+from litserve.examples.openai_spec_example import (
     OpenAIWithUsage,
     OpenAIWithUsageEncodeResponse,
     OpenAIBatchingWithUsage,
 )
-from litserve.test_examples.simple_example import SimpleStreamAPI
+from litserve.examples.simple_example import SimpleStreamAPI
 from litserve.utils import wrap_litserve_start
 import litserve as ls
 
