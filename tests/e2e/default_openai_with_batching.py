@@ -1,4 +1,4 @@
-from litserve.examples.openai_spec_example import OpenAIBatchContext
+from litserve.test_examples.openai_spec_example import OpenAIBatchContext
 
 import litserve as ls
 

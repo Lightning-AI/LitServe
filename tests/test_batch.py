@@ -185,7 +185,7 @@ def test_batched_loop():
     ],
 )
 def test_collate_requests(batch_timeout, batch_size):
-    api = ls.examples.SimpleBatchedAPI()
+    api = ls.test_examples.SimpleBatchedAPI()
     api.request_timeout = 5
     request_queue = Queue()
     for i in range(batch_size):

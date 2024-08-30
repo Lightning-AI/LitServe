@@ -203,7 +203,7 @@ def test_server_run(mock_uvicorn):
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
 def test_start_server(mock_uvicon):
-    server = LitServer(ls.examples.TestAPI(), spec=ls.OpenAISpec())
+    server = LitServer(ls.test_examples.TestAPI(), spec=ls.OpenAISpec())
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
     mock_uvicon.Server.assert_called()
@@ -213,7 +213,7 @@ def test_start_server(mock_uvicon):
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
 def test_server_run_with_api_server_worker_type(mock_uvicorn):
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api, devices=1)
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
@@ -247,7 +247,7 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn):
 @pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
 @patch("litserve.server.uvicorn")
 def test_server_run_windows(mock_uvicorn):
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
     server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
     server._start_server = MagicMock()
@@ -273,7 +273,7 @@ def test_server_terminate():
         mock_manager.shutdown.assert_called()
 
 
-class IdentityAPI(ls.examples.SimpleLitAPI):
+class IdentityAPI(ls.test_examples.SimpleLitAPI):
     def predict(self, x, context):
         context["input"] = x
         return self.model(x)
@@ -283,7 +283,7 @@ class IdentityAPI(ls.examples.SimpleLitAPI):
         return {"output": input}
 
 
-class IdentityBatchedAPI(ls.examples.SimpleBatchedAPI):
+class IdentityBatchedAPI(ls.test_examples.SimpleBatchedAPI):
     def predict(self, x_batch, context):
         for c, x in zip(context, x_batch):
             c["input"] = x
@@ -294,7 +294,7 @@ class IdentityBatchedAPI(ls.examples.SimpleBatchedAPI):
         return {"output": input}
 
 
-class IdentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
+class IdentityBatchedStreamingAPI(ls.test_examples.SimpleBatchedAPI):
     def predict(self, x_batch, context):
         for c, x in zip(context, x_batch):
             c["input"] = x
@@ -305,7 +305,7 @@ class IdentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
             yield [{"output": ctx["input"]} for ctx in context]
 
 
-class PredictErrorAPI(ls.examples.SimpleLitAPI):
+class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
     def predict(self, x, y, context):
         context["input"] = x
         return self.model(x)
@@ -354,16 +354,16 @@ async def test_inject_context(mocked_load_and_raise):
 
 def test_custom_api_path():
     with pytest.raises(ValueError, match="api_path must start with '/'. "):
-        LitServer(ls.examples.SimpleLitAPI(), api_path="predict")
+        LitServer(ls.test_examples.SimpleLitAPI(), api_path="predict")
 
-    server = LitServer(ls.examples.SimpleLitAPI(), api_path="/v1/custom_predict")
+    server = LitServer(ls.test_examples.SimpleLitAPI(), api_path="/v1/custom_predict")
     url = server.api_path
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
 
 
-class TestHTTPExceptionAPI(ls.examples.SimpleLitAPI):
+class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
     def decode_request(self, request):
         raise HTTPException(501, "decode request is bad")
 
@@ -389,7 +389,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 def test_custom_middleware():
-    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=[(RequestIdMiddleware, {"length": 5})])
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=[(RequestIdMiddleware, {"length": 5})])
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
@@ -407,7 +407,7 @@ def test_starlette_middlewares():
         ),
         HTTPSRedirectMiddleware,
     ]
-    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=middlewares)
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=middlewares)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0}, headers={"Host": "localhost"})
         assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
@@ -421,11 +421,11 @@ def test_middlewares_inputs():
     server = ls.LitServer(SimpleLitAPI(), middlewares=[])
     assert len(server.middlewares) == 1, "Default middleware should be present"
 
-    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=[], max_payload_size=1000)
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=[], max_payload_size=1000)
     assert len(server.middlewares) == 2, "Default middleware should be present"
 
-    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=None)
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=None)
     assert len(server.middlewares) == 1, "Default middleware should be present"
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
-        ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+        ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
