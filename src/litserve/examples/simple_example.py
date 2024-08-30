@@ -1,5 +1,3 @@
-import torch
-
 import litserve as ls
 
 
@@ -56,6 +54,8 @@ class SimpleTorchAPI(ls.LitAPI):
         self.model = Linear().to(device)
 
     def decode_request(self, request):
+        import torch
+
         # get the input and create a 1D tensor on the correct device
         content = request["input"]
         return torch.tensor([content], device=self.device)
