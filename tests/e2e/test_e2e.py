@@ -295,3 +295,21 @@ def test_openai_parity_with_response_format():
         assert r.choices[0].delta.content == expected_out, (
             f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
         )
+
+
+@e2e_from_file("tests/e2e/default_single_streaming.py")
+def test_e2e_single_streaming():
+    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+
+    outputs = []
+    for line in resp.iter_lines():
+        if line:
+            outputs.append(json.loads(line.decode("utf-8")))
+
+    assert len(outputs) == 3, "Expected 3 streamed outputs"
+    assert outputs[-1] == {"output": 12.0}, "Final output doesn't match expected value"
+
+    expected_values = [4.0, 8.0, 12.0]
+    for i, output in enumerate(outputs):
+        assert output["output"] == expected_values[i], f"Intermediate output {i} is not expected value"

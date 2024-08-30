@@ -103,7 +103,7 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
-    def _sanitize(self, max_batch_size: int, spec: LitSpec):
+    def _sanitize(self, max_batch_size: int, spec: Optional[LitSpec]):
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
