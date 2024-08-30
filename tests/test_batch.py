@@ -24,7 +24,7 @@ from fastapi import Request, Response
 from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.server import run_batched_loop, collate_requests
+from litserve.loops import run_batched_loop, collate_requests
 from litserve.utils import wrap_litserve_start
 import litserve as ls
 
