@@ -407,6 +407,7 @@ class LitServer:
             raise ValueError("num_api_servers must be greater than 0")
 
         if sys.platform == "win32":
+            print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
@@ -441,7 +442,7 @@ class LitServer:
             elif uvicorn_worker_type == "thread":
                 w = threading.Thread(target=server.run, args=(sockets,))
             else:
-                raise ValueError("Invalid value for uvicorn_worker_type. Must be 'process' or 'thread'")
+                raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
             servers.append(w)
         return servers
