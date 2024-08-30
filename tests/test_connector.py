@@ -23,6 +23,7 @@ def test_check_cuda_with_nvidia_smi():
     assert check_cuda_with_nvidia_smi() == torch.cuda.device_count()
 
 
+@pytest.mark.skipif(torch.cuda.device_count() > 0, reason="Non Nvidia GPU only")
 @patch(
     "litserve.connector.subprocess.check_output",
     return_value=b"GPU 0: NVIDIA GeForce RTX 4090 (UUID: GPU-rb438fre-0ar-9702-de35-ref4rjn34omk3 )",
