@@ -179,9 +179,9 @@ def test_batched_loop():
     [
         pytest.param(0, 2),
         pytest.param(0, 1000),
-        pytest.param(0.01, 2),
+        pytest.param(0.1, 2),
         pytest.param(1000, 2),
-        pytest.param(0.01, 1000),
+        pytest.param(0.1, 1000),
     ],
 )
 def test_collate_requests(batch_timeout, batch_size):
