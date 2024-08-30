@@ -196,6 +196,7 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.Config.assert_called()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
 def test_start_server(mock_uvicon):
     server = LitServer(ls.examples.TestAPI(), spec=ls.OpenAISpec())
