@@ -113,7 +113,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
-        middlewares: Optional[list[tuple[Callable, dict]]] = None,
+        middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -121,8 +121,17 @@ class LitServer:
             raise ValueError("max_batch_size must be greater than 0")
         if isinstance(spec, OpenAISpec):
             stream = True
+
         if middlewares is None:
             middlewares = []
+        if not isinstance(middlewares, list):
+            _msg = (
+                "middlewares must be a list of tuples"
+                " where each tuple contains a middleware and its arguments. For example:\n"
+                "server = ls.LitServer(ls.examples.SimpleLitAPI(), "
+                'middlewares=[(RequestIdMiddleware, {"length": 5})])'
+            )
+            raise ValueError(_msg)
 
         if not api_path.startswith("/"):
             raise ValueError(
@@ -364,8 +373,12 @@ class LitServer:
                     path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
                 )
 
-        for middleware, kwargs in self.middlewares:
-            self.app.add_middleware(middleware, **kwargs)
+        for middleware in self.middlewares:
+            if isinstance(middleware, tuple):
+                middleware, kwargs = middleware
+                self.app.add_middleware(middleware, **kwargs)
+            elif callable(middleware):
+                self.app.add_middleware(middleware)
 
     @staticmethod
     def generate_client_file():
