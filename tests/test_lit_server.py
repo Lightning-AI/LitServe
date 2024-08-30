@@ -469,6 +469,7 @@ def test_litserver_run_with_spec(openai_request_data):
         assert response.status_code == 200, "Server response should be 200 (OK)"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
 def test_litserver_run(mock_uvicorn):
     api = ls.examples.SimpleLitAPI()
