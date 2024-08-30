@@ -28,7 +28,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty, Queue
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
@@ -36,7 +36,6 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
-from starlette.middleware import _MiddlewareClass, P
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -423,7 +422,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
-        middlewares: Optional[list[tuple[type[_MiddlewareClass[P]]], dict]] = None,
+        middlewares: Optional[list[tuple[Callable, dict]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
