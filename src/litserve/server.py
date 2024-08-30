@@ -35,7 +35,6 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
-from starlette.middleware import Middleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
@@ -114,7 +113,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
-        middlewares: Optional[list[Union[Middleware, tuple[Callable, dict]]]] = None,
+        middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
