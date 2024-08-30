@@ -710,12 +710,12 @@ class LitServer:
         if num_api_servers is None:
             num_api_servers = len(self.workers)
 
-        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
-
         if sys.platform == "win32":
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
+
+        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)

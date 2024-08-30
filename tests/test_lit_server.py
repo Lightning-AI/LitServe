@@ -15,6 +15,8 @@ import asyncio
 import inspect
 import pickle
 import re
+import sys
+
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
 from fastapi import Request, Response, HTTPException
@@ -457,3 +459,49 @@ def test_http_exception():
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
+
+
+def test_litserver_run_with_spec(openai_request_data):
+    api = ls.examples.TestAPI()
+    server = ls.LitServer(api, spec=ls.OpenAISpec())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/v1/chat/completions", json=openai_request_data)
+        assert response.status_code == 200, "Server response should be 200 (OK)"
+
+
+@patch("litserve.server.uvicorn")
+def test_litserver_run(mock_uvicorn):
+    api = ls.examples.SimpleLitAPI()
+    server = ls.LitServer(api)
+    with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
+        server.run(api_server_worker_type="invalid")
+
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+
+    # Running the method to test
+    server.run(api_server_worker_type=None)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+
+    server.run(api_server_worker_type="thread")
+    actual = server._start_server.call_args
+    assert actual[0][4] == "thread", "Server should run in thread mode"
+
+    server.run(api_server_worker_type="process")
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
+@patch("litserve.server.uvicorn")
+def test_litserver_run_windows(mock_uvicorn):
+    api = ls.examples.SimpleLitAPI()
+    server = ls.LitServer(api)
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+
+    # Running the method to test
+    server.run(api_server_worker_type=None)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "thread", "Windows only supports thread mode"
