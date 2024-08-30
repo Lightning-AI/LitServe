@@ -121,12 +121,12 @@ def test_batch_unbatch_stream():
 
 def test_decode_request():
     request = {"input": 4.0}
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     assert api.decode_request(request) == 4.0, "Decode request should return the input 4.0"
 
 
 def test_decode_request_with_openai_spec():
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     request = ChatCompletionRequest(messages=[{"role": "system", "content": "Hello"}])
     decoded_request = api.decode_request(request)
@@ -134,7 +134,7 @@ def test_decode_request_with_openai_spec():
 
 
 def test_decode_request_with_openai_spec_wrong_request():
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     with pytest.raises(AttributeError, match="object has no attribute 'messages'"):
         api.decode_request({"input": "Hello"})
@@ -142,12 +142,12 @@ def test_decode_request_with_openai_spec_wrong_request():
 
 def test_encode_response():
     response = 4.0
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     assert api.encode_response(response) == {"output": 4.0}, 'Encode response returns encoded output {"output": 4.0}'
 
 
 def test_encode_response_with_openai_spec():
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     response = "This is a LLM generated text".split()
     generated_tokens = []
@@ -164,7 +164,7 @@ def test_encode_response_with_openai_spec_dict_token_usage():
             yield {"content": token, "prompt_tokens": 4, "completion_tokens": 4, "total_tokens": 8}
 
     generated_tokens = []
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
 
     for output in api.encode_response(predict()):
@@ -174,12 +174,12 @@ def test_encode_response_with_openai_spec_dict_token_usage():
 
 
 def test_encode_response_with_custom_spec_api():
-    class CustomSpecAPI(ls.examples.TestAPI):
+    class CustomSpecAPI(ls.test_examples.TestAPI):
         def encode_response(self, output_stream):
             for output in output_stream:
                 yield {"content": output}
 
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=CustomSpecAPI())
     response = "This is a LLM generated text".split()
     generated_tokens = []
@@ -189,7 +189,7 @@ def test_encode_response_with_custom_spec_api():
 
 
 def test_encode_response_with_openai_spec_invalid_input():
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     response = 10
     with pytest.raises(TypeError, match="object is not iterable"):
@@ -200,14 +200,14 @@ def test_encode_response_with_openai_spec_invalid_predict_output():
     def predict():
         yield {"hello": "world"}
 
-    api = ls.examples.TestAPI()
+    api = ls.test_examples.TestAPI()
     api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
     with pytest.raises(HTTPException, match=r"Malformed output from LitAPI.predict"):
         next(api.encode_response(predict()))
 
 
 def test_format_encoded_response():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     sample = {"output": 4.0}
     msg = "Format encoded response should return the encoded response as a string"
     assert api.format_encoded_response(sample) == '{"output": 4.0}\n', msg
@@ -225,18 +225,18 @@ def test_format_encoded_response():
 
 
 def test_batch_torch():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     x = [torch.Tensor([1, 2, 3, 4]), torch.Tensor([5, 6, 7, 8])]
     assert torch.all(api.batch(x) == torch.stack(x)), "Batch should stack torch tensors"
 
 
 def test_batch_numpy():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     x = [np.asarray([1, 2, 3, 4]), np.asarray([5, 6, 7, 8])]
     assert np.all(api.batch(x) == np.stack(x)), "Batch should stack Numpy array"
 
 
 def test_device_property():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     api.device = "cpu"
     assert api.device == "cpu"
