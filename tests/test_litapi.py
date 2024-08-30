@@ -220,6 +220,9 @@ def test_format_encoded_response():
     msg = "Format encoded response should return the encoded response as a json string"
     assert json.loads(api.format_encoded_response(sample)) == {"output": 4.0, "name": "test"}, msg
 
+    msg = "non dict and non Pydantic objects are returned as it is."
+    assert api.format_encoded_response([1, 2, 3, 4]) == [1, 2, 3, 4], msg
+
 
 def test_batch_torch():
     api = ls.examples.SimpleLitAPI()
