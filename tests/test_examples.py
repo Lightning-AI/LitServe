@@ -46,7 +46,7 @@ async def test_simple_api():
 
 @pytest.mark.asyncio()
 async def test_simple_api_without_server():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     api.setup(None)
     assert api.model is not None, "Model should be loaded after setup"
     assert api.predict(4) == 16, "Model should be able to predict"
@@ -54,7 +54,7 @@ async def test_simple_api_without_server():
 
 @pytest.mark.asyncio()
 async def test_simple_pytorch_api_without_server():
-    api = ls.examples.SimpleTorchAPI()
+    api = ls.test_examples.SimpleTorchAPI()
     api.setup("cpu")
     assert api.model is not None, "Model should be loaded after setup"
     assert isinstance(api.model, torch.nn.Module)
