@@ -415,3 +415,17 @@ def test_starlette_middlewares():
 
         response = client.post("/predict", json={"input": 4.0}, headers={"Host": "not-trusted-host"})
         assert response.status_code == 400, f"Expected response to be 400 but got {response.status_code}"
+
+
+def test_middlewares_inputs():
+    server = ls.LitServer(SimpleLitAPI(), middlewares=[])
+    assert len(server.middlewares) == 1, "Default middleware should be present"
+
+    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=[], max_payload_size=1000)
+    assert len(server.middlewares) == 2, "Default middleware should be present"
+
+    server = ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=None)
+    assert len(server.middlewares) == 1, "Default middleware should be present"
+
+    with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
+        ls.LitServer(ls.examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
