@@ -15,7 +15,6 @@ import asyncio
 import inspect
 import logging
 import multiprocessing as mp
-import os
 import pickle
 import sys
 import time
@@ -44,12 +43,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# if defined, it will require clients to auth with X-API-Key in the header
-LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-
-# timeout when we need to poll or wait indefinitely for a result in a loop.
-LONG_TIMEOUT = 100
-
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
 
@@ -59,17 +52,6 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     if "context" in sig.parameters:
         return func(*args, **kwargs, context=context)
     return func(*args, **kwargs)
-
-
-def get_batch_from_uid(uids, lit_api, request_buffer):
-    batches = []
-    for uid in uids:
-        try:
-            x_enc, pipe_s = request_buffer.pop(uid)
-        except KeyError:
-            continue
-        batches.append((x_enc, pipe_s))
-    return batches
 
 
 def collate_requests(
