@@ -3,20 +3,20 @@ import torch.nn
 from asgi_lifespan import LifespanManager
 from httpx import AsyncClient
 
-from litserve.examples.openai_spec_example import (
+from litserve.test_examples.openai_spec_example import (
     OpenAIWithUsage,
     OpenAIWithUsageEncodeResponse,
     OpenAIBatchingWithUsage,
     OpenAIBatchContext,
 )
-from litserve.examples.simple_example import SimpleStreamAPI
+from litserve.test_examples.simple_example import SimpleStreamAPI
 from litserve.utils import wrap_litserve_start
 import litserve as ls
 
 
 @pytest.mark.asyncio()
 async def test_simple_pytorch_api():
-    api = ls.examples.SimpleTorchAPI()
+    api = ls.test_examples.SimpleTorchAPI()
     server = ls.LitServer(api, accelerator="cpu")
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
@@ -26,7 +26,7 @@ async def test_simple_pytorch_api():
 
 @pytest.mark.asyncio()
 async def test_simple_batched_api():
-    api = ls.examples.SimpleBatchedAPI()
+    api = ls.test_examples.SimpleBatchedAPI()
     server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.1)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
@@ -36,7 +36,7 @@ async def test_simple_batched_api():
 
 @pytest.mark.asyncio()
 async def test_simple_api():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
@@ -46,7 +46,7 @@ async def test_simple_api():
 
 @pytest.mark.asyncio()
 async def test_simple_api_without_server():
-    api = ls.examples.SimpleLitAPI()
+    api = ls.test_examples.SimpleLitAPI()
     api.setup(None)
     assert api.model is not None, "Model should be loaded after setup"
     assert api.predict(4) == 16, "Model should be able to predict"
@@ -54,7 +54,7 @@ async def test_simple_api_without_server():
 
 @pytest.mark.asyncio()
 async def test_simple_pytorch_api_without_server():
-    api = ls.examples.SimpleTorchAPI()
+    api = ls.test_examples.SimpleTorchAPI()
     api.setup("cpu")
     assert api.model is not None, "Model should be loaded after setup"
     assert isinstance(api.model, torch.nn.Module)
