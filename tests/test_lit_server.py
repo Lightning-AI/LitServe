@@ -343,6 +343,14 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.Config.assert_called()
 
 
+def test_litserver_run_with_spec(openai_request_data):
+    api = ls.examples.TestAPI()
+    server = ls.LitServer(api, spec=ls.OpenAISpec())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/v1/chat/completions", json=openai_request_data)
+        assert response.status_code == 200, "Server response should be 200 (OK)"
+
+
 @patch("litserve.server.uvicorn")
 def test_server_run_with_api_server_worker_type(mock_uvicorn):
     api = ls.examples.SimpleLitAPI()
@@ -506,11 +514,3 @@ def test_http_exception():
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
-
-
-def test_litserver_run_with_spec(openai_request_data):
-    api = ls.examples.TestAPI()
-    server = ls.LitServer(api, spec=ls.OpenAISpec())
-    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post("/v1/chat/completions", json=openai_request_data)
-        assert response.status_code == 200, "Server response should be 200 (OK)"
