@@ -343,6 +343,53 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.Config.assert_called()
 
 
+@patch("litserve.server.uvicorn")
+def test_server_run_with_api_server_worker_type(mock_uvicorn):
+    api = ls.examples.SimpleLitAPI()
+    server = ls.LitServer(api, devices=1)
+    with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
+        server.run(api_server_worker_type="invalid")
+
+    with pytest.raises(ValueError, match=r"must be greater than 0"):
+        server.run(num_api_servers=0)
+
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+
+    # Running the method to test
+    server.run(api_server_worker_type=None)
+    server.launch_inference_worker.assert_called_with(1)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+
+    server.run(api_server_worker_type="thread")
+    server.launch_inference_worker.assert_called_with(1)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "thread", "Server should run in thread mode"
+
+    server.run(api_server_worker_type="process")
+    server.launch_inference_worker.assert_called_with(1)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+
+    server.run(api_server_worker_type="process", num_api_servers=10)
+    server.launch_inference_worker.assert_called_with(10)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
+@patch("litserve.server.uvicorn")
+def test_server_run_windows(mock_uvicorn):
+    api = ls.examples.SimpleLitAPI()
+    server = ls.LitServer(api)
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+
+    # Running the method to test
+    server.run(api_server_worker_type=None)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "thread", "Windows only supports thread mode"
+
+
 def test_server_terminate():
     server = LitServer(SimpleLitAPI())
     mock_manager = MagicMock()
@@ -467,51 +514,3 @@ def test_litserver_run_with_spec(openai_request_data):
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/v1/chat/completions", json=openai_request_data)
         assert response.status_code == 200, "Server response should be 200 (OK)"
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
-@patch("litserve.server.uvicorn")
-def test_litserver_run(mock_uvicorn):
-    api = ls.examples.SimpleLitAPI()
-    server = ls.LitServer(api, devices=1)
-    with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
-        server.run(api_server_worker_type="invalid")
-
-    with pytest.raises(ValueError, match=r"must be greater than 0"):
-        server.run(num_api_servers=0)
-
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
-    server._start_server = MagicMock()
-
-    # Running the method to test
-    server.run(api_server_worker_type=None)
-    server.launch_inference_worker.assert_called_with(1)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "process", "Server should run in process mode"
-
-    server.run(api_server_worker_type="thread")
-    server.launch_inference_worker.assert_called_with(1)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "thread", "Server should run in thread mode"
-
-    server.run(api_server_worker_type="process")
-    server.launch_inference_worker.assert_called_with(1)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "process", "Server should run in process mode"
-
-    server.run(api_server_worker_type="process", num_api_servers=10)
-    server.launch_inference_worker.assert_called_with(10)
-
-
-@pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
-@patch("litserve.server.uvicorn")
-def test_litserver_run_windows(mock_uvicorn):
-    api = ls.examples.SimpleLitAPI()
-    server = ls.LitServer(api)
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
-    server._start_server = MagicMock()
-
-    # Running the method to test
-    server.run(api_server_worker_type=None)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "thread", "Windows only supports thread mode"
