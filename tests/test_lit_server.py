@@ -429,4 +429,3 @@ def test_middlewares_inputs():
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
-        
