@@ -20,13 +20,20 @@ import sys
 import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional, Tuple, Union
-
+from datetime import datetime
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
+
+import logging
+
+logging.basicConfig(filename='server.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
 
 mp.allow_connection_pickling()
 
@@ -91,6 +98,84 @@ def collate_requests(
             continue
 
     return payloads, timed_out_uids
+
+
+async def run_heter_pipeline(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue], 
+                             max_batch_size: int, batch_timeout: float, heter_pipeline: Queue):
+    cpu_batch = []
+    gpu_batch = []
+    cpu_to_gpu_queue = Queue()
+    last_cpu_process_time = time.time()
+    last_gpu_process_time = time.time()
+    processing_gpu = False
+
+    loop = asyncio.get_event_loop()
+
+    async def process_cpu_batch():
+        nonlocal cpu_batch, last_cpu_process_time
+        while True:
+            if cpu_batch:
+                print(f"Processing batch of {len(cpu_batch)} requests on CPU")
+                cpu_results = await loop.run_in_executor(None, lit_api.process_on_cpu, cpu_batch)
+                for result, (response_queue_id, uid, _, _) in zip(cpu_results, cpu_batch):
+                    cpu_to_gpu_queue.put((response_queue_id, uid, result))
+                print(f"Completed CPU processing for batch of {len(cpu_batch)} requests")
+                cpu_batch = []
+                last_cpu_process_time = time.time()
+            await asyncio.sleep(0.001)
+
+    async def process_gpu_batch():
+        nonlocal gpu_batch, last_gpu_process_time, processing_gpu
+        while True:
+            if gpu_batch:
+                print(f"Processing batch of {len(gpu_batch)} requests on GPU")
+                gpu_results = await loop.run_in_executor(None, lit_api.process_on_gpu, gpu_batch)
+                for (response_queue_id, uid, _), result in zip(gpu_batch, gpu_results):
+                    y_enc = lit_api.encode_response(result)
+                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+                print(f"Completed GPU processing for batch of {len(gpu_batch)} requests")
+                gpu_batch = []
+                last_gpu_process_time = time.time()
+                processing_gpu = False
+            await asyncio.sleep(0.001)
+
+    async def fill_cpu_batch():
+        nonlocal cpu_batch
+        while True:
+            while len(cpu_batch) < max_batch_size:
+                try:
+                    response_queue_id, uid, timestamp, x_enc = request_queue.get_nowait()
+                    cpu_batch.append((response_queue_id, uid, timestamp, x_enc))
+                    print(f"Added request uid={uid} to CPU batch")
+                except Empty:
+                    break
+            await asyncio.sleep(0.001)
+
+    async def move_cpu_results_to_gpu_batch():
+        nonlocal gpu_batch
+        while True:
+            while not cpu_to_gpu_queue.empty():
+                gpu_batch.append(cpu_to_gpu_queue.get_nowait())
+                print(f"Moved request to GPU batch, current GPU batch size: {len(gpu_batch)}")
+            await asyncio.sleep(0.001)
+
+    # Start CPU and GPU processing concurrently
+    cpu_task = asyncio.create_task(process_cpu_batch())
+    gpu_task = asyncio.create_task(process_gpu_batch())
+    fill_cpu_task = asyncio.create_task(fill_cpu_batch())
+    move_to_gpu_task = asyncio.create_task(move_cpu_results_to_gpu_batch())
+
+    # Wait for all tasks to complete
+    await asyncio.gather(cpu_task, gpu_task, fill_cpu_task, move_to_gpu_task)
+
+    # Ensure to break the loop when all tasks are done
+    while not request_queue.empty() or cpu_batch or gpu_batch or not cpu_to_gpu_queue.empty():
+        await asyncio.sleep(0.001)
+
+    print("All batches processed, exiting...")
+
+
+
 
 
 def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
@@ -314,7 +399,7 @@ def run_batched_streaming_loop(
             response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-def inference_worker(
+async def inference_worker(
     lit_api: LitAPI,
     lit_spec: Optional[LitSpec],
     device: str,
@@ -325,7 +410,10 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
+    heter_pipeline: Queue = None,
 ):
+    print(f"Starting inference_worker {worker_id} on device {device}")
+
     lit_api.setup(device)
     lit_api.device = device
 
@@ -335,20 +423,24 @@ def inference_worker(
         workers_setup_status[worker_id] = True
 
     if lit_spec:
-        logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
-    if stream:
+        print(f"LitServe will use {lit_spec.__class__.__name__} spec")
+
+    if heter_pipeline is not None:
+        print(f"Worker {worker_id} using heter pipeline")
+        await run_heter_pipeline(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, heter_pipeline)
+    elif stream:
+        print(f"Worker {worker_id} using streaming")
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
         else:
             run_streaming_loop(lit_api, lit_spec, request_queue, response_queues)
-        return
-
-    if max_batch_size > 1:
-        run_batched_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
     else:
-        run_single_loop(
-            lit_api,
-            lit_spec,
-            request_queue,
-            response_queues,
-        )
+        print(f"Worker {worker_id} using non-streaming")
+        if max_batch_size > 1:
+            run_batched_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
+        else:
+            run_single_loop(lit_api, lit_spec, request_queue, response_queues)
+
+
+def run_inference_worker(*args, **kwargs):
+    asyncio.run(inference_worker(*args, **kwargs))

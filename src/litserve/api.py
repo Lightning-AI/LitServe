@@ -59,6 +59,13 @@ class LitAPI(ABC):
         """Run the model on the input and return or yield the output."""
         pass
 
+    def process_on_gpu(self, batch):
+        """Process the batch on the GPU."""
+        pass
+    def process_on_cpu(self, batch):
+        """Process the batch on the CPU."""
+        pass
+
     def _unbatch_no_stream(self, output):
         return list(output)
 

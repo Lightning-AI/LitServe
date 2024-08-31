@@ -38,7 +38,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.loops import inference_worker
+from litserve.loops import inference_worker,run_heter_pipeline,run_inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
@@ -112,6 +112,7 @@ class LitServer:
         api_path: str = "/predict",
         stream: bool = False,
         spec: Optional[LitSpec] = None,
+        use_heter_pipeline: bool = True,
         max_payload_size=None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
     ):
@@ -197,6 +198,11 @@ class LitServer:
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
         self.workers = self.devices * self.workers_per_device
+        
+        self.use_heter_pipeline = use_heter_pipeline
+        print("use_heter_pipeline ",self.use_heter_pipeline)
+        self.heter_pipeline = None  # Will be initialized in launch_inference_worker if needed
+
         self.setup_server()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
@@ -208,6 +214,11 @@ class LitServer:
         for _ in range(num_uvicorn_servers):
             response_queue = manager.Queue()
             self.response_queues.append(response_queue)
+
+        if self.use_heter_pipeline:
+            self.heter_pipeline = manager.Queue()
+            print("Heterogeneous pipeline queue created")
+
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
@@ -228,7 +239,7 @@ class LitServer:
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
-                target=inference_worker,
+                target=run_inference_worker,
                 args=(
                     self.lit_api,
                     self.lit_spec,
@@ -240,6 +251,7 @@ class LitServer:
                     self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
+                    self.heter_pipeline if self.use_heter_pipeline else None,
                 ),
             )
             process.start()
@@ -311,31 +323,73 @@ class LitServer:
                 return Response(content="ok", status_code=200)
 
             return Response(content="not ready", status_code=503)
-
+        
         async def predict(request: self.request_type) -> self.response_type:
-            response_queue_id = self.app.response_queue_id
-            uid = uuid.uuid4()
-            event = asyncio.Event()
-            self.response_buffer[uid] = event
-            logger.info(f"Received request uid={uid}")
+            try:
+                response_queue_id = self.app.response_queue_id
 
-            payload = request
-            if self.request_type == Request:
-                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
-                    "Content-Type"
-                ].startswith("multipart/form-data"):
-                    payload = await request.form()
-                else:
+                
+                uid = uuid.uuid4()
+                event = asyncio.Event()
+                self.response_buffer[uid] = event
+                print(f"Received request uid={uid}")
+
+                payload = request
+                content_type = request.headers.get("Content-Type", "").lower()
+
+                if self.request_type == Request:
+                    if content_type == "application/x-www-form-urlencoded":
+                        payload = await request.form()
+                    elif content_type.startswith("multipart/form-data"):
+                        payload = await request.form()
+                    elif content_type == "application/json":
+                        try:
+                            payload = await request.json()
+                        except Exception as e:
+                            logger.exception(f"Failed to parse JSON for request uid={uid} with content_type={content_type}")
+                            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+                    else:
+                        logger.error(f"Unsupported Content-Type {content_type} for request uid={uid}")
+                        raise HTTPException(status_code=415, detail="Unsupported Content-Type")
+                print("Request Queue ",self.request_queue)
+                self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
+                # print(f"Request uid={uid} added to request queue")
+                await event.wait()
+                response, status = self.response_buffer.pop(uid)
+
+                if status == LitAPIStatus.ERROR:
+                    load_and_raise(response)
+                return response
+
+            except Exception as e:
+                logger.exception(
+                    f"An error occurred while processing request uid={uid}: {str(e)} with request as {request}, content_type as {content_type}"
+                )
+                raise HTTPException(status_code=500, detail="Internal Server Error")
+
+        async def stream_predict(request: self.request_type) -> self.response_type:
+            try:
+                response_queue_id = self.app.response_queue_id
+                if response_queue_id is None:
+                    raise HTTPException(status_code=500, detail="Response queue ID not set")
+
+                uid = uuid.uuid4()
+                event = asyncio.Event()
+                q = deque()
+                self.response_buffer[uid] = (q, event)
+                logger.debug(f"Received request uid={uid}")
+
+                payload = request
+                if self.request_type == Request:
                     payload = await request.json()
+                self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
-            self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
+                return StreamingResponse(self.data_streamer(q, data_available=event))
 
-            await event.wait()
-            response, status = self.response_buffer.pop(uid)
+            except Exception as e:
+                logger.exception(f"An error occurred while processing request uid={uid}: {str(e)}")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
 
-            if status == LitAPIStatus.ERROR:
-                load_and_raise(response)
-            return response
 
         async def stream_predict(request: self.request_type) -> self.response_type:
             response_queue_id = self.app.response_queue_id
@@ -404,46 +458,52 @@ class LitServer:
         api_server_worker_type: Optional[str] = None,
         **kwargs,
     ):
-        if generate_client_file:
-            self.generate_client_file()
+        try: 
+            if generate_client_file:
+                self.generate_client_file()
 
-        port_msg = f"port must be a value from 1024 to 65535 but got {port}"
-        try:
-            port = int(port)
-        except ValueError:
-            raise ValueError(port_msg)
+            port_msg = f"port must be a value from 1024 to 65535 but got {port}"
+            try:
+                port = int(port)
+            except ValueError:
+                raise ValueError(port_msg)
 
-        if not (1024 <= port <= 65535):
-            raise ValueError(port_msg)
+            if not (1024 <= port <= 65535):
+                raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
-        sockets = [config.bind_socket()]
+            config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+            sockets = [config.bind_socket()]
 
-        if num_api_servers is None:
-            num_api_servers = len(self.workers)
+            if num_api_servers is None:
+                num_api_servers = len(self.workers)
 
-        if num_api_servers < 1:
-            raise ValueError("num_api_servers must be greater than 0")
+            if num_api_servers < 1:
+                raise ValueError("num_api_servers must be greater than 0")
 
-        if sys.platform == "win32":
-            print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
-            api_server_worker_type = "thread"
-        elif api_server_worker_type is None:
-            api_server_worker_type = "process"
+            if sys.platform == "win32":
+                print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
+                api_server_worker_type = "thread"
+            elif api_server_worker_type is None:
+                api_server_worker_type = "process"
 
-        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
+            manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
-        try:
-            servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
-            print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            for s in servers:
-                s.join()
-        finally:
-            print("Shutting down LitServe")
-            for w in litserve_workers:
-                w.terminate()
-                w.join()
-            manager.shutdown()
+            try:
+                servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+                print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+                for s in servers:
+                    s.join()
+
+            except KeyboardInterrupt:
+                print("Received keyboard interrupt. Shutting down gracefully...")
+            finally:
+                print("Shutting down LitServe")
+                for w in litserve_workers:
+                    w.terminate()
+                    w.join()
+                manager.shutdown()
+        except Exception as e:
+            logger.exception(f"Failed to start the server: {str(e)}")
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
