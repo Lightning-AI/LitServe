@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import pickle
+import logging
 import re
 import sys
 
@@ -79,6 +80,27 @@ async def test_stream(simple_stream_api):
             assert (
                 resp2.text == expected_output2
             ), "Server returns input prompt and generated output which didn't match."
+
+
+@pytest.mark.asyncio()
+async def test_stream_client_disconnection(simple_delayed_stream_api, caplog):
+    server = LitServer(simple_delayed_stream_api, stream=True, timeout=10)
+
+    with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
+            await asyncio.sleep(2)
+            task.cancel()  # simulate client disconnection
+            await asyncio.sleep(1)  # wait for the task to stop
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert "Streaming request cancelled for the uid=" in caplog.text
+            # TODO: also check if the task actually stopped in the server
+
+            caplog.clear()
+            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
+            await task
+            assert "Streaming request cancelled for the uid=" not in caplog.text
 
 
 @pytest.mark.asyncio()
