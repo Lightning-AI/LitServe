@@ -24,7 +24,7 @@ from fastapi import Request, Response
 from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.server import run_batched_loop, collate_requests
+from litserve.loops import run_batched_loop, collate_requests
 from litserve.utils import wrap_litserve_start
 import litserve as ls
 
@@ -179,13 +179,13 @@ def test_batched_loop():
     [
         pytest.param(0, 2),
         pytest.param(0, 1000),
-        pytest.param(0.01, 2),
+        pytest.param(0.1, 2),
         pytest.param(1000, 2),
-        pytest.param(0.01, 1000),
+        pytest.param(0.1, 1000),
     ],
 )
 def test_collate_requests(batch_timeout, batch_size):
-    api = ls.examples.SimpleBatchedAPI()
+    api = ls.test_examples.SimpleBatchedAPI()
     api.request_timeout = 5
     request_queue = Queue()
     for i in range(batch_size):

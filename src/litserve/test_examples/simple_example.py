@@ -95,7 +95,7 @@ class SimpleStreamAPI(ls.LitAPI):
 
     def predict(self, x):
         for i in range(3):
-            yield self.model(i, x.encode("utf-8").decode())
+            yield self.model(i, x)
 
     def encode_response(self, output_stream):
         for output in output_stream:
