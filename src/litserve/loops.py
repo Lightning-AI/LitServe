@@ -200,7 +200,13 @@ def run_batched_loop(
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
+def run_streaming_loop(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    response_queues: List[Queue],
+    request_evicted_status: Dict[str, bool],
+):
     while True:
         try:
             response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -239,6 +245,9 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue,
                 y_gen,
             )
             for y_enc in y_enc_gen:
+                if request_evicted_status.get(uid):
+                    request_evicted_status.pop(uid)
+                    break
                 y_enc = lit_api.format_encoded_response(y_enc)
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
             response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
@@ -325,6 +334,7 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
+    request_evicted_status: Dict[str, bool] = None,
 ):
     lit_api.setup(device)
     lit_api.device = device
@@ -340,7 +350,7 @@ def inference_worker(
         if max_batch_size > 1:
             run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues)
+            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, request_evicted_status)
         return
 
     if max_batch_size > 1:
