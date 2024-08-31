@@ -12,34 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import inspect
-import logging
 import pickle
 import re
+import sys
+
 from asgi_lifespan import LifespanManager
 from litserve import LitAPI
 from fastapi import Request, Response, HTTPException
-import time
 import torch
 import torch.nn as nn
-from queue import Queue
 from httpx import AsyncClient
 from litserve.utils import wrap_litserve_start
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from unittest.mock import patch, MagicMock
 import pytest
 
 from litserve.connector import _Connector
-from litserve.server import (
-    inference_worker,
-    run_single_loop,
-    run_streaming_loop,
-    LitAPIStatus,
-    run_batched_streaming_loop,
-)
+
 from litserve.server import LitServer
 import litserve as ls
 from fastapi.testclient import TestClient
+from starlette.types import ASGIApp
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 def test_index(sync_testclient):
@@ -64,42 +60,6 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
     assert server.devices[1][0] == "cuda:2"
 
 
-@patch("litserve.server.run_batched_loop")
-@patch("litserve.server.run_single_loop")
-def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 6, max_batch_size=2, batch_timeout=0, stream=False)
-    mock_batched_loop.assert_called_once()
-
-    inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
-    mock_single_loop.assert_called_once()
-
-
-@pytest.fixture()
-def loop_args():
-    requests_queue = Queue()
-    requests_queue.put((0, "uuid-123", time.monotonic(), 1))  # response_queue_id, uid, timestamp, x_enc
-    requests_queue.put((1, "uuid-234", time.monotonic(), 2))
-
-    lit_api_mock = MagicMock()
-    lit_api_mock.request_timeout = 1
-    lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
-    return lit_api_mock, requests_queue
-
-
-class FakeResponseQueue:
-    def put(self, item):
-        raise StopIteration("exit loop")
-
-
-def test_single_loop(loop_args):
-    lit_api_mock, requests_queue = loop_args
-    lit_api_mock.unbatch.side_effect = None
-    response_queues = [FakeResponseQueue()]
-
-    with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, response_queues)
-
-
 @pytest.mark.asyncio()
 async def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, stream=True, timeout=10)
@@ -122,27 +82,6 @@ async def test_stream(simple_stream_api):
 
 
 @pytest.mark.asyncio()
-async def test_stream_client_disconnection(simple_delayed_stream_api, caplog):
-    server = LitServer(simple_delayed_stream_api, stream=True, timeout=10)
-
-    with wrap_litserve_start(server) as server, caplog.at_level(logging.DEBUG):
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
-            await asyncio.sleep(2)
-            task.cancel()  # simulate client disconnection
-            await asyncio.sleep(1)  # wait for the task to stop
-            with pytest.raises(asyncio.CancelledError):
-                await task
-            assert "Streaming request cancelled for the uid=" in caplog.text
-            # TODO: also check if the task actually stopped in the server
-
-            caplog.clear()
-            task = asyncio.create_task(ac.post("/predict", json={"prompt": "Hey, How are you doing?"}, timeout=10))
-            await task
-            assert "Streaming request cancelled for the uid=" not in caplog.text
-
-
-@pytest.mark.asyncio()
 async def test_batched_stream_server(simple_batched_stream_api):
     server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
@@ -161,109 +100,6 @@ async def test_batched_stream_server(simple_batched_stream_api):
             assert (
                 resp2.text == expected_output2
             ), "Server returns input prompt and generated output which didn't match."
-
-
-class FakeStreamResponseQueue:
-    def __init__(self, num_streamed_outputs):
-        self.num_streamed_outputs = num_streamed_outputs
-        self.count = 0
-
-    def put(self, item):
-        uid, args = item
-        response, status = args
-        if self.count >= self.num_streamed_outputs:
-            raise StopIteration("exit loop")
-        assert response == f"{self.count}", "This streaming loop generates number from 0 to 9 which is sent via Queue"
-        self.count += 1
-
-
-def test_streaming_loop():
-    num_streamed_outputs = 10
-
-    def fake_predict(inputs: str):
-        for i in range(num_streamed_outputs):
-            yield {"output": f"{i}"}
-
-    def fake_encode(output):
-        assert inspect.isgenerator(output), "predict function must be a generator when `stream=True`"
-        for out in output:
-            yield out["output"]
-
-    fake_stream_api = MagicMock()
-    fake_stream_api.request_timeout = 1
-    fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
-    fake_stream_api.predict = MagicMock(side_effect=fake_predict)
-    fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
-    fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
-
-    requests_queue = Queue()
-    requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}))
-    response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
-    request_evicted_status = {}
-
-    with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues, request_evicted_status)
-
-    fake_stream_api.predict.assert_called_once_with("Hello")
-    fake_stream_api.encode_response.assert_called_once()
-
-
-class FakeBatchStreamResponseQueue:
-    def __init__(self, num_streamed_outputs):
-        self.num_streamed_outputs = num_streamed_outputs
-        self.count = 0
-
-    def put(self, item):
-        uid, args = item
-        response, status = args
-        if status == LitAPIStatus.FINISH_STREAMING:
-            raise StopIteration("interrupt iteration")
-        if status == LitAPIStatus.ERROR and b"interrupt iteration" in response:
-            assert self.count // 2 == self.num_streamed_outputs, (
-                f"Loop count must have incremented for " f"{self.num_streamed_outputs} times."
-            )
-            raise StopIteration("finish streaming")
-
-        assert (
-            response == f"{self.count // 2}"
-        ), f"streaming loop generates number from 0 to 9 which is sent via Queue. {args}, count:{self.count}"
-        self.count += 1
-
-
-def test_batched_streaming_loop():
-    num_streamed_outputs = 10
-
-    def fake_predict(inputs: list):
-        n = len(inputs)
-        assert n == 2, "Two requests has been simulated to batched."
-        for i in range(num_streamed_outputs):
-            yield [{"output": f"{i}"}] * n
-
-    def fake_encode(output_iter):
-        assert inspect.isgenerator(output_iter), "predict function must be a generator when `stream=True`"
-        for outputs in output_iter:
-            yield [output["output"] for output in outputs]
-
-    fake_stream_api = MagicMock()
-    fake_stream_api.request_timeout = 1
-    fake_stream_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
-    fake_stream_api.batch = MagicMock(side_effect=lambda inputs: inputs)
-    fake_stream_api.predict = MagicMock(side_effect=fake_predict)
-    fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
-    fake_stream_api.unbatch = MagicMock(side_effect=lambda inputs: inputs)
-    fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
-
-    requests_queue = Queue()
-    requests_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
-    requests_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}))
-    response_queues = [FakeBatchStreamResponseQueue(num_streamed_outputs)]
-
-    with pytest.raises(StopIteration, match="finish streaming"):
-        run_batched_streaming_loop(
-            fake_stream_api, fake_stream_api, requests_queue, response_queues, max_batch_size=2, batch_timeout=2
-        )
-    fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
-    fake_stream_api.encode_response.assert_called_once()
 
 
 def test_litapi_with_stream(simple_litapi):
@@ -364,6 +200,64 @@ def test_server_run(mock_uvicorn):
     mock_uvicorn.Config.assert_called()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@patch("litserve.server.uvicorn")
+def test_start_server(mock_uvicon):
+    server = LitServer(ls.test_examples.TestAPI(), spec=ls.OpenAISpec())
+    sockets = MagicMock()
+    server._start_server(8000, 1, "info", sockets, "process")
+    mock_uvicon.Server.assert_called()
+    assert server.lit_spec.response_queue_id is not None, "response_queue_id must be generated"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@patch("litserve.server.uvicorn")
+def test_server_run_with_api_server_worker_type(mock_uvicorn):
+    api = ls.test_examples.SimpleLitAPI()
+    server = ls.LitServer(api, devices=1)
+    with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
+        server.run(api_server_worker_type="invalid")
+
+    with pytest.raises(ValueError, match=r"must be greater than 0"):
+        server.run(num_api_servers=0)
+
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+
+    # Running the method to test
+    server.run(api_server_worker_type=None)
+    server.launch_inference_worker.assert_called_with(1)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+
+    server.run(api_server_worker_type="thread")
+    server.launch_inference_worker.assert_called_with(1)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "thread", "Server should run in thread mode"
+
+    server.run(api_server_worker_type="process")
+    server.launch_inference_worker.assert_called_with(1)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+
+    server.run(api_server_worker_type="process", num_api_servers=10)
+    server.launch_inference_worker.assert_called_with(10)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
+@patch("litserve.server.uvicorn")
+def test_server_run_windows(mock_uvicorn):
+    api = ls.test_examples.SimpleLitAPI()
+    server = ls.LitServer(api)
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+
+    # Running the method to test
+    server.run(api_server_worker_type=None)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "thread", "Windows only supports thread mode"
+
+
 def test_server_terminate():
     server = LitServer(SimpleLitAPI())
     mock_manager = MagicMock()
@@ -379,7 +273,7 @@ def test_server_terminate():
         mock_manager.shutdown.assert_called()
 
 
-class IdentityAPI(ls.examples.SimpleLitAPI):
+class IdentityAPI(ls.test_examples.SimpleLitAPI):
     def predict(self, x, context):
         context["input"] = x
         return self.model(x)
@@ -389,7 +283,7 @@ class IdentityAPI(ls.examples.SimpleLitAPI):
         return {"output": input}
 
 
-class IdentityBatchedAPI(ls.examples.SimpleBatchedAPI):
+class IdentityBatchedAPI(ls.test_examples.SimpleBatchedAPI):
     def predict(self, x_batch, context):
         for c, x in zip(context, x_batch):
             c["input"] = x
@@ -400,7 +294,7 @@ class IdentityBatchedAPI(ls.examples.SimpleBatchedAPI):
         return {"output": input}
 
 
-class IdentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
+class IdentityBatchedStreamingAPI(ls.test_examples.SimpleBatchedAPI):
     def predict(self, x_batch, context):
         for c, x in zip(context, x_batch):
             c["input"] = x
@@ -411,7 +305,7 @@ class IdentityBatchedStreamingAPI(ls.examples.SimpleBatchedAPI):
             yield [{"output": ctx["input"]} for ctx in context]
 
 
-class PredictErrorAPI(ls.examples.SimpleLitAPI):
+class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
     def predict(self, x, y, context):
         context["input"] = x
         return self.model(x)
@@ -460,16 +354,16 @@ async def test_inject_context(mocked_load_and_raise):
 
 def test_custom_api_path():
     with pytest.raises(ValueError, match="api_path must start with '/'. "):
-        LitServer(ls.examples.SimpleLitAPI(), api_path="predict")
+        LitServer(ls.test_examples.SimpleLitAPI(), api_path="predict")
 
-    server = LitServer(ls.examples.SimpleLitAPI(), api_path="/v1/custom_predict")
+    server = LitServer(ls.test_examples.SimpleLitAPI(), api_path="/v1/custom_predict")
     url = server.api_path
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
 
 
-class TestHTTPExceptionAPI(ls.examples.SimpleLitAPI):
+class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
     def decode_request(self, request):
         raise HTTPException(501, "decode request is bad")
 
@@ -480,3 +374,58 @@ def test_http_exception():
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, length: int) -> None:
+        self.app = app
+        self.length = length
+        super().__init__(app)
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Request-Id"] = "0" * self.length
+        return response
+
+
+def test_custom_middleware():
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=[(RequestIdMiddleware, {"length": 5})])
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
+        assert response.json() == {"output": 16.0}, "server didn't return expected output"
+        assert response.headers["X-Request-Id"] == "00000"
+
+
+def test_starlette_middlewares():
+    middlewares = [
+        (
+            TrustedHostMiddleware,
+            {
+                "allowed_hosts": ["localhost", "127.0.0.1"],
+            },
+        ),
+        HTTPSRedirectMiddleware,
+    ]
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=middlewares)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0}, headers={"Host": "localhost"})
+        assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
+        assert response.json() == {"output": 16.0}, "server didn't return expected output"
+
+        response = client.post("/predict", json={"input": 4.0}, headers={"Host": "not-trusted-host"})
+        assert response.status_code == 400, f"Expected response to be 400 but got {response.status_code}"
+
+
+def test_middlewares_inputs():
+    server = ls.LitServer(SimpleLitAPI(), middlewares=[])
+    assert len(server.middlewares) == 1, "Default middleware should be present"
+
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=[], max_payload_size=1000)
+    assert len(server.middlewares) == 2, "Default middleware should be present"
+
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=None)
+    assert len(server.middlewares) == 1, "Default middleware should be present"
+
+    with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
+        ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
