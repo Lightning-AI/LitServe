@@ -134,8 +134,6 @@ MNIST
 
 src/litserve/server.log
 src/client.py
-src/start_server.py 
-src/litserve/start_server.py 
+src/start_server.py
+src/litserve/start_server.py
 src/litserve/client.py
-
-

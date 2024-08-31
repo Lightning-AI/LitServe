@@ -38,7 +38,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.loops import inference_worker,run_heter_pipeline,run_inference_worker
+from litserve.loops import run_inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
@@ -198,9 +198,9 @@ class LitServer:
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
         self.workers = self.devices * self.workers_per_device
-        
+
         self.use_heter_pipeline = use_heter_pipeline
-        print("use_heter_pipeline ",self.use_heter_pipeline)
+        print("use_heter_pipeline ", self.use_heter_pipeline)
         self.heter_pipeline = None  # Will be initialized in launch_inference_worker if needed
 
         self.setup_server()
@@ -218,7 +218,6 @@ class LitServer:
         if self.use_heter_pipeline:
             self.heter_pipeline = manager.Queue()
             print("Heterogeneous pipeline queue created")
-
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
@@ -323,12 +322,11 @@ class LitServer:
                 return Response(content="ok", status_code=200)
 
             return Response(content="not ready", status_code=503)
-        
+
         async def predict(request: self.request_type) -> self.response_type:
             try:
                 response_queue_id = self.app.response_queue_id
 
-                
                 uid = uuid.uuid4()
                 event = asyncio.Event()
                 self.response_buffer[uid] = event
@@ -338,20 +336,20 @@ class LitServer:
                 content_type = request.headers.get("Content-Type", "").lower()
 
                 if self.request_type == Request:
-                    if content_type == "application/x-www-form-urlencoded":
-                        payload = await request.form()
-                    elif content_type.startswith("multipart/form-data"):
+                    if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
                         payload = await request.form()
                     elif content_type == "application/json":
                         try:
                             payload = await request.json()
-                        except Exception as e:
-                            logger.exception(f"Failed to parse JSON for request uid={uid} with content_type={content_type}")
+                        except Exception:
+                            logger.exception(
+                                f"Failed to parse JSON for request uid={uid} with content_type={content_type}"
+                            )
                             raise HTTPException(status_code=400, detail="Invalid JSON payload")
                     else:
                         logger.error(f"Unsupported Content-Type {content_type} for request uid={uid}")
                         raise HTTPException(status_code=415, detail="Unsupported Content-Type")
-                print("Request Queue ",self.request_queue)
+                print("Request Queue ", self.request_queue)
                 self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
                 # print(f"Request uid={uid} added to request queue")
                 await event.wait()
@@ -389,7 +387,6 @@ class LitServer:
             except Exception as e:
                 logger.exception(f"An error occurred while processing request uid={uid}: {str(e)}")
                 raise HTTPException(status_code=500, detail="Internal Server Error")
-
 
         async def stream_predict(request: self.request_type) -> self.response_type:
             response_queue_id = self.app.response_queue_id
@@ -458,7 +455,7 @@ class LitServer:
         api_server_worker_type: Optional[str] = None,
         **kwargs,
     ):
-        try: 
+        try:
             if generate_client_file:
                 self.generate_client_file()
 
@@ -489,7 +486,9 @@ class LitServer:
             manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
             try:
-                servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+                servers = self._start_server(
+                    port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
+                )
                 print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
                 for s in servers:
                     s.join()

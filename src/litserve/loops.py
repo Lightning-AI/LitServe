@@ -20,7 +20,6 @@ import sys
 import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional, Tuple, Union
-from datetime import datetime
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
 
@@ -28,11 +27,9 @@ from litserve import LitAPI
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
-import logging
 
-logging.basicConfig(filename='server.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename="server.log", level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
 
 
 mp.allow_connection_pickling()
@@ -100,8 +97,15 @@ def collate_requests(
     return payloads, timed_out_uids
 
 
-async def run_heter_pipeline(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue], 
-                             max_batch_size: int, batch_timeout: float, heter_pipeline: Queue):
+async def run_heter_pipeline(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    response_queues: List[Queue],
+    max_batch_size: int,
+    batch_timeout: float,
+    heter_pipeline: Queue,
+):
     cpu_batch = []
     gpu_batch = []
     cpu_to_gpu_queue = Queue()
@@ -173,9 +177,6 @@ async def run_heter_pipeline(lit_api: LitAPI, lit_spec: LitSpec, request_queue: 
         await asyncio.sleep(0.001)
 
     print("All batches processed, exiting...")
-
-
-
 
 
 def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
@@ -427,7 +428,9 @@ async def inference_worker(
 
     if heter_pipeline is not None:
         print(f"Worker {worker_id} using heter pipeline")
-        await run_heter_pipeline(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, heter_pipeline)
+        await run_heter_pipeline(
+            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, heter_pipeline
+        )
     elif stream:
         print(f"Worker {worker_id} using streaming")
         if max_batch_size > 1:
