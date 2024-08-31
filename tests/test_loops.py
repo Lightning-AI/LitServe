@@ -90,9 +90,10 @@ def test_streaming_loop():
     requests_queue = Queue()
     requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}))
     response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
+    request_evicted_status = {}
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues)
+        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues, request_evicted_status)
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
