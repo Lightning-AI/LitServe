@@ -12,4 +12,4 @@ torch >2.0.0
 transformers
 openai>=1.12.0
 pillow
-numpy <2.0
+numpy <3.0
