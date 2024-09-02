@@ -41,6 +41,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 def test_index(sync_testclient):
     assert sync_testclient.get("/").text == "litserve running"
 
+
 def test_metrics_endpoint(sync_testclient):
     response = sync_testclient.get("/metrics")
     assert response.status_code == 200

@@ -101,7 +101,6 @@ async def response_queue_to_buffer(
             event.set()
 
 
-
 def generate_metrics_dir():
     # Generate metrics directory
 
@@ -113,6 +112,7 @@ def generate_metrics_dir():
     # Clean up metrics directory
     for file in os.listdir(metrics_dir):
         os.remove(os.path.join(metrics_dir, file))
+
 
 def make_metrics_app():
     generate_metrics_dir()
@@ -402,7 +402,7 @@ class LitServer:
                 self.app.add_middleware(middleware, **kwargs)
             elif callable(middleware):
                 self.app.add_middleware(middleware)
-        
+
         metrics_app = make_metrics_app()
         self.app.mount("/metrics", metrics_app)
 

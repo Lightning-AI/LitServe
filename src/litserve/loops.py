@@ -33,7 +33,7 @@ from prometheus_client import Summary
 
 mp.allow_connection_pickling()
 
-PREDICT_METRIC = Summary('PREDICT_METRIC', 'A metric to summarize the predict execution times')
+PREDICT_METRIC = Summary("PREDICT_METRIC", "A metric to summarize the predict execution times")
 
 try:
     import uvloop
