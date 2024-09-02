@@ -336,7 +336,9 @@ class LitServer:
                 content_type = request.headers.get("Content-Type", "").lower()
 
                 if self.request_type == Request:
-                    if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
+                    if content_type == "application/x-www-form-urlencoded" or content_type.startswith(
+                        "multipart/form-data"
+                    ):
                         payload = await request.form()
                     elif content_type == "application/json":
                         try:
