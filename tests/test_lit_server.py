@@ -41,6 +41,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 def test_index(sync_testclient):
     assert sync_testclient.get("/").text == "litserve running"
 
+def test_metrics_endpoint(sync_testclient):
+    response = sync_testclient.get("/metrics")
+    assert response.status_code == 200
+    assert response.headers["Content-Type"] == "text/plain; version=0.0.4; charset=utf-8"
+
 
 @patch("litserve.server.LitServer.lifespan")
 def test_device_identifiers(lifespan_mock, simple_litapi):

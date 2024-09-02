@@ -28,7 +28,12 @@ from litserve import LitAPI
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
+from prometheus_client import Summary
+
+
 mp.allow_connection_pickling()
+
+PREDICT_METRIC = Summary('PREDICT_METRIC', 'A metric to summarize the predict execution times')
 
 try:
     import uvloop
@@ -119,11 +124,13 @@ def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, re
                 lit_api.decode_request,
                 x_enc,
             )
+            start_time = time.monotonic()
             y = _inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
+            PREDICT_METRIC.observe(time.monotonic() - start_time)
             y_enc = _inject_context(
                 context,
                 lit_api.encode_response,
@@ -183,8 +190,10 @@ def run_batched_loop(
                 for input, context in zip(inputs, contexts)
             ]
             x = lit_api.batch(x)
+            start_time = time.monotonic()
             y = _inject_context(contexts, lit_api.predict, x)
             outputs = lit_api.unbatch(y)
+            PREDICT_METRIC.observe(time.monotonic() - start_time)
             for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
 
@@ -228,11 +237,14 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue,
                 lit_api.decode_request,
                 x_enc,
             )
+
+            start_time = time.monotonic()
             y_gen = _inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
+            PREDICT_METRIC.observe(time.monotonic() - start_time)
             y_enc_gen = _inject_context(
                 context,
                 lit_api.encode_response,
@@ -292,8 +304,11 @@ def run_batched_streaming_loop(
                 for input, context in zip(inputs, contexts)
             ]
             x = lit_api.batch(x)
+            start_time = time.monotonic()
             y_iter = _inject_context(contexts, lit_api.predict, x)
             unbatched_iter = lit_api.unbatch(y_iter)
+            PREDICT_METRIC.observe(time.monotonic() - start_time)
+
             y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]

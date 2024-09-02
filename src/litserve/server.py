@@ -43,6 +43,8 @@ from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
 
+from prometheus_client import multiprocess, CollectorRegistry, make_asgi_app
+
 mp.allow_connection_pickling()
 
 try:
@@ -97,6 +99,26 @@ async def response_queue_to_buffer(
             event = response_buffer.pop(uid)
             response_buffer[uid] = response
             event.set()
+
+
+
+def generate_metrics_dir():
+    # Generate metrics directory
+
+    metrics_dir = os.path.join(os.getcwd(), "metrics")
+    os.environ["PROMETHEUS_MULTIPROC_DIR"] = "metrics"
+    if not os.path.exists(metrics_dir):
+        os.makedirs(metrics_dir)
+
+    # Clean up metrics directory
+    for file in os.listdir(metrics_dir):
+        os.remove(os.path.join(metrics_dir, file))
+
+def make_metrics_app():
+    generate_metrics_dir()
+    registry = CollectorRegistry()
+    multiprocess.MultiProcessCollector(registry)
+    return make_asgi_app(registry=registry)
 
 
 class LitServer:
@@ -165,6 +187,7 @@ class LitServer:
         self.middlewares = middlewares
         self.lit_api = lit_api
         self.lit_spec = spec
+
         self.workers_per_device = workers_per_device
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
@@ -379,6 +402,9 @@ class LitServer:
                 self.app.add_middleware(middleware, **kwargs)
             elif callable(middleware):
                 self.app.add_middleware(middleware)
+        
+        metrics_app = make_metrics_app()
+        self.app.mount("/metrics", metrics_app)
 
     @staticmethod
     def generate_client_file():
