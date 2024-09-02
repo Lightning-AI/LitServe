@@ -119,7 +119,7 @@ class SlowBatchAPI(SlowLitAPI):
         return list(output)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_timeout():
     # Scenario: first request completes, second request times out in queue
     api = SlowLitAPI()  # takes 2 seconds for each prediction
@@ -146,7 +146,7 @@ async def test_timeout():
             ), "Server takes longer than specified timeout and request should timeout"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_batch_timeout():
     # Scenario: first 2 requests finish as a batch and third request times out in queue
     server = LitServer(

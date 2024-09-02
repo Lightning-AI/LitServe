@@ -83,35 +83,35 @@ class SimpleBatchedStreamAPI(LitAPI):
         yield from output
 
 
-@pytest.fixture()
+@pytest.fixture
 def simple_litapi():
     return SimpleLitAPI()
 
 
-@pytest.fixture()
+@pytest.fixture
 def simple_stream_api():
     return SimpleStreamAPI()
 
 
-@pytest.fixture()
+@pytest.fixture
 def simple_batched_stream_api():
     return SimpleBatchedStreamAPI()
 
 
-@pytest.fixture()
+@pytest.fixture
 def lit_server(simple_litapi):
     server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
     with wrap_litserve_start(server) as s:
         yield s
 
 
-@pytest.fixture()
+@pytest.fixture
 def sync_testclient(lit_server):
     with TestClient(lit_server.app) as client:
         yield client
 
 
-@pytest.fixture()
+@pytest.fixture
 def killall():
     def _run(process):
         parent = psutil.Process(process.pid)
@@ -122,7 +122,7 @@ def killall():
     return _run
 
 
-@pytest.fixture()
+@pytest.fixture
 def openai_request_data():
     return {
         "model": "",
@@ -139,7 +139,7 @@ def openai_request_data():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def openai_response_data():
     return {
         "id": "chatcmpl-9dEtoQu4g45g3431SZ2s98S",
@@ -164,7 +164,7 @@ def openai_response_data():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def openai_request_data_with_image():
     return {
         "model": "lit",
@@ -192,7 +192,7 @@ def openai_request_data_with_image():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def openai_request_data_with_tools():
     return {
         "model": "lit",
@@ -226,7 +226,7 @@ def openai_request_data_with_tools():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def openai_request_data_with_response_format():
     return {
         "model": "lit",
