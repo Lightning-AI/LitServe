@@ -16,7 +16,7 @@ echo "Server started with PID $SERVER_PID"
 
 # Run your benchmark script
 echo "Preparing to run benchmark.py..."
-sleep 60
+sleep 120
 export PYTHONPATH=$PWD && python tests/perf_test/bert/benchmark.py
 
 # Check if benchmark.py exited successfully
