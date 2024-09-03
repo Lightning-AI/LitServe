@@ -354,7 +354,7 @@ def inference_worker(
         )
 
 
-def cpu_worker(lit_api, lit_spec, device, worker_id, request_queue, cpu_to_gpu_queue, workers_setup_status, cpu_batch_size=4):
+def cpu_worker(lit_api, lit_spec, device, worker_id, request_queue, cpu_to_gpu_queue, cpu_batch_size,workers_setup_status):
     lit_api.setup(device)
     workers_setup_status[f"cpu_{worker_id}"] = True
     print(f"CPU Worker {worker_id} started")
