@@ -34,7 +34,7 @@ from litserve.utils import LitAPIStatus
 import litserve as ls
 
 
-@pytest.fixture()
+@pytest.fixture
 def loop_args():
     requests_queue = Queue()
     requests_queue.put((0, "uuid-123", time.monotonic(), 1))  # response_queue_id, uid, timestamp, x_enc

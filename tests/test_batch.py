@@ -82,7 +82,7 @@ class SimpleTorchAPI(LitAPI):
         return {"output": float(output)}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_batched():
     api = SimpleBatchLitAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
@@ -97,7 +97,7 @@ async def test_batched():
     assert response2.json() == {"output": 11.0}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_unbatched():
     api = SimpleTorchAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
