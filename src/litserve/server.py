@@ -72,33 +72,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
             status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
         )
 
-
-# async def response_queue_to_buffer(
-#     response_queue: mp.Queue,
-#     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
-#     stream: bool,
-#     threadpool: ThreadPoolExecutor,
-# ):
-#     loop = asyncio.get_running_loop()
-#     if stream:
-#         while True:
-#             try:
-#                 uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-#             except Empty:
-#                 await asyncio.sleep(0.0001)
-#                 continue
-#             stream_response_buffer, event = response_buffer[uid]
-#             stream_response_buffer.append(response)
-#             event.set()
-
-#     else:
-#         while True:
-#             uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-#             event = response_buffer.pop(uid)
-#             response_buffer[uid] = response
-#             event.set()
-            
-            
+  
 async def response_queue_to_buffer(
     response_queue: mp.Queue,
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
@@ -287,26 +261,6 @@ class LitServer:
         return manager, process_list
 
 
-    # @asynccontextmanager
-    # async def lifespan(self, app: FastAPI):
-    #     loop = asyncio.get_running_loop()
-
-    #     if not hasattr(self, "response_queues") or not self.response_queues:
-    #         raise RuntimeError(
-    #             "Response queues have not been initialized. "
-    #             "Please make sure to call the 'launch_inference_worker' method of "
-    #             "the LitServer class to initialize the response queues."
-    #         )
-
-    #     response_queue = self.response_queues[app.response_queue_id]
-    #     response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
-    #     future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
-    #     task = loop.create_task(future)
-
-    #     yield
-
-    #     task.cancel()
-    #     logger.debug("Shutting down response queue to buffer task")
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -457,60 +411,6 @@ class LitServer:
         except Exception as e:
             print(f"Error copying file: {e}")
 
-#     def run(
-#         self,
-#         port: Union[str, int] = 8000,
-#         num_api_servers: Optional[int] = None,
-#         log_level: str = "info",
-#         generate_client_file: bool = True,
-#         api_server_worker_type: Optional[str] = None,
-#         **kwargs,
-#     ):
-#         if generate_client_file:
-#             self.generate_client_file()
-
-#         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
-#         try:
-#             port = int(port)
-#         except ValueError:
-#             raise ValueError(port_msg)
-
-#         if not (1024 <= port <= 65535):
-#             raise ValueError(port_msg)
-
-#         config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
-#         sockets = [config.bind_socket()]
-
-#         if num_api_servers is None:
-#             num_api_servers = len(self.workers)
-
-#         if num_api_servers < 1:
-#             raise ValueError("num_api_servers must be greater than 0")
-
-#         if sys.platform == "win32":
-#             print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
-#             api_server_worker_type = "thread"
-#         elif api_server_worker_type is None:
-#             api_server_worker_type = "process"
-
-#         # manager, litserve_workers = self.launch_inference_worker(num_api_servers)
-
-#         manager, litserve_workers = self.launch_inference_worker()
-
-#         # manager, workers = self.launch_inference_worker()
-
-#         try:
-#             server = uvicorn.Server(config=config)
-#             process = mp.Process(target=server.run, args=(sockets,))
-#             process.start()
-#             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-#             process.join()
-#         finally:
-#             print("Shutting down LitServe")
-#             for w in litserve_workers:
-#                 w.terminate()
-#                 w.join()
-#             manager.shutdown()
 
     def run(
         self,
