@@ -60,7 +60,7 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
     assert server.devices[1][0] == "cuda:2"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, stream=True, timeout=10)
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
@@ -81,7 +81,7 @@ async def test_stream(simple_stream_api):
             ), "Server returns input prompt and generated output which didn't match."
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_batched_stream_server(simple_batched_stream_api):
     server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
@@ -315,7 +315,7 @@ class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
         return {"output": input}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 @patch("litserve.server.load_and_raise")
 async def test_inject_context(mocked_load_and_raise):
     def dummy_load_and_raise(resp):
