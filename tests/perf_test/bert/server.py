@@ -43,7 +43,7 @@ class HuggingFaceLitAPI(ls.LitAPI):
 def main(
     batch_size: int = 10,
     batch_timeout: float = 0.01,
-    devices: int = "auto",
+    devices: int = 4,
     workers_per_device=2,
 ):
     print(locals())
