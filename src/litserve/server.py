@@ -120,16 +120,15 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
-        run_heter_mode:bool = False,
+        run_heter_mode: bool = False,
         num_cpu_workers: int = 4,
         num_gpu_workers: int = 2,
         cpu_batch_size: int = 2,
-        gpu_batch_size:int = 2,         
-
+        gpu_batch_size: int = 2,
     ):
         self.cpu_to_gpu_queue = mp.Queue()
         self.cpu_workers = num_cpu_workers  # Number of CPU workers
-        self.gpu_workers = num_gpu_workers # Number of GPU workers
+        self.gpu_workers = num_gpu_workers  # Number of GPU workers
         self.gpu_batch_size = gpu_batch_size  # Batch size for GPU processing
         self.cpu_batch_size = cpu_batch_size
 
@@ -239,7 +238,6 @@ class LitServer:
                     self.cpu_to_gpu_queue,
                     self.cpu_batch_size,
                     self.workers_setup_status,
-                    
                 ),
             )
             process.start()
