@@ -24,4 +24,5 @@ def get_average_throughput(num_requests=100, num_samples=10):
 
 
 if __name__ == "__main__":
-    get_average_throughput(100, num_samples=10)
+    rps = get_average_throughput(100, num_samples=10)
+    assert rps >= 350, f"Expected RPS to be greater than 350, got {rps}"
