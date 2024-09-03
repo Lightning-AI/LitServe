@@ -354,7 +354,9 @@ def inference_worker(
         )
 
 
-def cpu_worker(lit_api, lit_spec, device, worker_id, request_queue, cpu_to_gpu_queue, workers_setup_status, cpu_batch_size=4):
+def cpu_worker(
+    lit_api, lit_spec, device, worker_id, request_queue, cpu_to_gpu_queue, workers_setup_status, cpu_batch_size=4
+):
     lit_api.setup(device)
     workers_setup_status[f"cpu_{worker_id}"] = True
     print(f"CPU Worker {worker_id} started")
@@ -370,24 +372,25 @@ def cpu_worker(lit_api, lit_spec, device, worker_id, request_queue, cpu_to_gpu_q
         except Empty:
             if not batch:
                 continue
-        print("batch on cpu",len(batch),cpu_batch_size)
+        print("batch on cpu", len(batch), cpu_batch_size)
 
         try:
             response_queue_ids, uids, timestamps, x_encs = zip(*batch)
-            
+
             contexts = [{}] * len(x_encs)
             if hasattr(lit_spec, "populate_context"):
                 for x_enc, context in zip(x_encs, contexts):
                     lit_spec.populate_context(context, x_enc)
-            
-            x_batch = [_inject_context(context, lit_api.decode_request, x_enc) 
-                       for context, x_enc in zip(contexts, x_encs)]
-            
+
+            x_batch = [
+                _inject_context(context, lit_api.decode_request, x_enc) for context, x_enc in zip(contexts, x_encs)
+            ]
+
             y_batch = _inject_context(contexts, lit_api.process_on_cpu, x_batch)
-            
+
             for response_queue_id, uid, y in zip(response_queue_ids, uids, y_batch):
                 cpu_to_gpu_queue.put((response_queue_id, uid, y))
-            
+
             print(f"CPU Worker {worker_id} processed batch of {len(batch)} requests")
         except Exception as e:
             logger.exception(f"CPU Worker {worker_id} error processing batch")
@@ -397,7 +400,9 @@ def cpu_worker(lit_api, lit_spec, device, worker_id, request_queue, cpu_to_gpu_q
             batch.clear()
 
 
-def gpu_worker(lit_api, lit_spec, device, worker_id, cpu_to_gpu_queue, response_queue, batch_size, workers_setup_status):
+def gpu_worker(
+    lit_api, lit_spec, device, worker_id, cpu_to_gpu_queue, response_queue, batch_size, workers_setup_status
+):
     lit_api.setup(device)
     workers_setup_status[f"gpu_{worker_id}"] = True
     print(f"GPU Worker {worker_id} started")

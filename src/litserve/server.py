@@ -38,7 +38,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.loops import inference_worker,cpu_worker,gpu_worker
+from litserve.loops import cpu_worker, gpu_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
@@ -72,7 +72,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
             status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
         )
 
-  
+
 async def response_queue_to_buffer(
     response_queue: mp.Queue,
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
@@ -105,7 +105,6 @@ async def response_queue_to_buffer(
             logger.debug(f"Response event set for uid={uid}")
 
 
-
 class LitServer:
     def __init__(
         self,
@@ -121,13 +120,11 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
-
     ):
         self.cpu_to_gpu_queue = mp.Queue()
         self.cpu_workers = 4  # Number of CPU workers
-        self.gpu_workers = 4 # Number of GPU workers
+        self.gpu_workers = 4  # Number of GPU workers
         self.gpu_batch_size = 2  # Batch size for GPU processing
-
 
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -213,7 +210,6 @@ class LitServer:
         self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
-
     def launch_inference_worker(self):
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
@@ -260,8 +256,6 @@ class LitServer:
 
         return manager, process_list
 
-
-
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
@@ -281,7 +275,6 @@ class LitServer:
 
         task.cancel()
         logger.debug("Shutting down response queue to buffer task")
-
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
@@ -411,7 +404,6 @@ class LitServer:
         except Exception as e:
             print(f"Error copying file: {e}")
 
-
     def run(
         self,
         port: Union[str, int] = 8000,
@@ -464,7 +456,6 @@ class LitServer:
                 w.join()
             manager.shutdown()
             print("Cleanup completed, all workers terminated.")
-
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
