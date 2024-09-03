@@ -13,6 +13,8 @@ def get_average_throughput(num_requests=100, num_samples=10):
     metric = 0
     latency = 0
 
+    # warmup
+    benchmark(num_requests=50, concurrency_level=10)
     for i in range(num_samples):
         bnmk = benchmark(num_requests=num_requests, concurrency_level=num_requests)
         metric += bnmk[key]
