@@ -19,6 +19,7 @@ from queue import Queue
 
 from unittest.mock import MagicMock, patch
 import pytest
+from fastapi import HTTPException
 
 from litserve.loops import (
     run_single_loop,
@@ -28,6 +29,7 @@ from litserve.loops import (
     run_batched_loop,
 )
 from litserve.utils import LitAPIStatus
+import litserve as ls
 
 
 @pytest.fixture()
@@ -169,14 +171,12 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
 
 
 def test_run_single_loop():
-    lit_api = MagicMock()
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
     lit_api.request_timeout = 1
-    lit_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
-    lit_api.predict = MagicMock(side_effect=lambda x: f"response to {x}")
-    lit_api.encode_response = MagicMock(side_effect=lambda x: f"encoded {x}")
 
     request_queue = Queue()
-    request_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
@@ -191,21 +191,41 @@ def test_run_single_loop():
     loop_thread.join()
 
     response = response_queues[0].get()
-    assert response == ("UUID-001", ("encoded response to Hello", LitAPIStatus.OK))
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+
+
+def test_run_single_loop_timeout(caplog):
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 0.0001
+
+    request_queue = Queue()
+    request = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    time.sleep(0.1)
+    request_queue.put(request)
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread.start()
+
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert isinstance(response_queues[0].get()[1][0], HTTPException), "Timeout should return an HTTPException"
 
 
 def test_run_batched_loop():
-    lit_api = MagicMock()
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 1
-    lit_api.decode_request = MagicMock(side_effect=lambda x: x["prompt"])
-    lit_api.batch = MagicMock(side_effect=lambda inputs: inputs)
-    lit_api.predict = MagicMock(side_effect=lambda x: [f"response to {i}" for i in x])
-    lit_api.unbatch = MagicMock(side_effect=lambda x: x)
-    lit_api.encode_response = MagicMock(side_effect=lambda x: f"encoded {x}")
 
     request_queue = Queue()
-    request_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
-    request_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}))
+    # response_queue_id, uid, timestamp, x_enc
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
@@ -221,8 +241,37 @@ def test_run_batched_loop():
 
     response_1 = response_queues[0].get()
     response_2 = response_queues[0].get()
-    assert response_1 == ("UUID-001", ("encoded response to Hello", LitAPIStatus.OK))
-    assert response_2 == ("UUID-002", ("encoded response to World", LitAPIStatus.OK))
+    assert response_1 == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+    assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
+
+
+def off_test_run_batched_loop_timeout(caplog):
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+    lit_api.request_timeout = 0.0001
+
+    request_queue = Queue()
+    # response_queue_id, uid, timestamp, x_enc
+    r1 = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    r2 = (0, "UUID-002", time.monotonic(), {"input": 5.0})
+    request_queue.put(r1)
+    request_queue.put(r2)
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1))
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
 
 
 def test_run_streaming_loop():
