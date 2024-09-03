@@ -12,20 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import json
+import threading
 
 import time
 from queue import Queue
 
 from unittest.mock import MagicMock, patch
 import pytest
+from fastapi import HTTPException
 
 from litserve.loops import (
     run_single_loop,
     run_streaming_loop,
     run_batched_streaming_loop,
     inference_worker,
+    run_batched_loop,
 )
+from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus
+import litserve as ls
 
 
 @pytest.fixture
@@ -164,3 +170,198 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
 
     inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
     mock_single_loop.assert_called_once()
+
+
+def test_run_single_loop():
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    response = response_queues[0].get()
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+
+
+def test_run_single_loop_timeout(caplog):
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 0.0001
+
+    request_queue = Queue()
+    request = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    time.sleep(0.1)
+    request_queue.put(request)
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread.start()
+
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert isinstance(response_queues[0].get()[1][0], HTTPException), "Timeout should return an HTTPException"
+
+
+def test_run_batched_loop():
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+    lit_api.request_timeout = 1
+
+    request_queue = Queue()
+    # response_queue_id, uid, timestamp, x_enc
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1))
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    response_1 = response_queues[0].get(timeout=10)
+    response_2 = response_queues[0].get(timeout=10)
+    assert response_1 == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+    assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
+
+
+def test_run_batched_loop_timeout(caplog):
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+    lit_api.request_timeout = 0.1
+
+    request_queue = Queue()
+    # response_queue_id, uid, timestamp, x_enc
+    r1 = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    time.sleep(0.1)
+    request_queue.put(r1)
+    r2 = (0, "UUID-002", time.monotonic(), {"input": 5.0})
+    request_queue.put(r2)
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001)
+    )
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    resp1 = response_queues[0].get(timeout=10)[1]
+    resp2 = response_queues[0].get(timeout=10)[1]
+    assert isinstance(resp1[0], HTTPException), "First request was timed out"
+    assert resp2[0] == {"output": 25.0}, "Second request wasn't timed out"
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+
+def test_run_streaming_loop():
+    lit_api = ls.test_examples.SimpleStreamAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    for i in range(3):
+        response = response_queues[0].get(timeout=10)
+        response = json.loads(response[1][0])
+        assert response == {"output": f"{i}: Hello"}
+
+
+def test_run_streaming_loop_timeout(caplog):
+    lit_api = ls.test_examples.SimpleStreamAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 0.1
+
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic() - 5, {"input": "Hello"}))
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    response = response_queues[0].get(timeout=10)[1]
+    assert isinstance(response[0], HTTPException), "request was timed out"
+
+
+def off_test_run_batched_streaming_loop(openai_request_data):
+    lit_api = OpenAIBatchingWithUsage()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+    lit_api.stream = True
+    spec = ls.OpenAISpec()
+    lit_api._sanitize(2, spec)
+
+    request_queue = Queue()
+    # response_queue_id, uid, timestamp, x_enc
+    r1 = (0, "UUID-001", time.monotonic(), openai_request_data)
+    r2 = (0, "UUID-002", time.monotonic(), openai_request_data)
+    request_queue.put(r1)
+    request_queue.put(r2)
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(
+        target=run_batched_streaming_loop, args=(lit_api, spec, request_queue, response_queues, 2, 0.1)
+    )
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    response = response_queues[0].get(timeout=5)[1]
+    assert response[0] == {"role": "assistant", "content": "10 + 6 is equal to 16."}
