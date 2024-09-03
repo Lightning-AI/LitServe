@@ -16,7 +16,12 @@ echo "Server started with PID $SERVER_PID"
 
 # Run your benchmark script
 echo "Preparing to run benchmark.py..."
-sleep 120
+
+# Wait till localhost:8000/health returns "ok"
+while [ "$(curl -s localhost:8000/health)" != "ok" ]; do
+    sleep 1
+done
+
 export PYTHONPATH=$PWD && python tests/perf_test/bert/benchmark.py
 
 # Check if benchmark.py exited successfully
