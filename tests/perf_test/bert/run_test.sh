@@ -18,7 +18,7 @@ echo "Server started with PID $SERVER_PID"
 echo "Preparing to run benchmark.py..."
 
 # Wait till localhost:8000/health returns "ok"
-while [ "$(wget -qO- http://localhost:8000/health)" != "ok" ]; do
+while [ "$(curl -s localhost:8000/health)" != "ok" ]; do
     sleep 1
 done
 
