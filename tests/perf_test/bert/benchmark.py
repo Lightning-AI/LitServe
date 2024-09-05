@@ -1,4 +1,5 @@
 import time
+import logging
 
 import requests
 from simple_benchmark import benchmark
@@ -29,9 +30,12 @@ def get_average_throughput(num_requests=100, num_samples=10):
 
 if __name__ == "__main__":
     for i in range(10):
-        resp = requests.get("localhost:8000/health")
-        if resp.status_code == 200:
-            break
+        try:
+            resp = requests.get("http://localhost:8000/health")
+            if resp.status_code == 200:
+                break
+        except requests.exceptions.ConnectionError as e:
+            logging.error(f"Error connecting to server: {e}")
         time.sleep(10)
 
     rps = get_average_throughput(100, num_samples=10)
