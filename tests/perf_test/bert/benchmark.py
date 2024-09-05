@@ -6,6 +6,7 @@ from simple_benchmark import benchmark
 
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"
+MAX_SPEED = 390  # Nvidia 3090
 
 session = requests.Session()
 
@@ -39,4 +40,4 @@ if __name__ == "__main__":
         time.sleep(10)
 
     rps = get_average_throughput(100, num_samples=10)
-    assert rps >= 350, f"Expected RPS to be greater than 350, got {rps}"
+    assert rps >= MAX_SPEED, f"Expected RPS to be greater than {MAX_SPEED}, got {rps}"
