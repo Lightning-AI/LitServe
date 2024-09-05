@@ -2,7 +2,7 @@ import time
 import logging
 
 import requests
-from simple_benchmark import benchmark
+from utils import benchmark
 
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"

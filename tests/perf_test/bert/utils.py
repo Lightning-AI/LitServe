@@ -5,7 +5,6 @@ import time
 import gpustat
 import psutil
 import requests
-from jsonargparse import CLI
 
 from tests.perf_test.bert.data import phrases
 
@@ -95,8 +94,3 @@ def benchmark(num_requests=1000, concurrency_level=50, print_metrics=True):
         print("-" * 50)
 
     return metrics
-
-
-if __name__ == "__main__":
-    send_request()
-    CLI(benchmark)
