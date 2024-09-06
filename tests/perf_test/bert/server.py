@@ -1,3 +1,5 @@
+"""A BERT-Large text classification server with batching to be used for benchmarking."""
+
 import torch
 from jsonargparse import CLI
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, BertConfig
