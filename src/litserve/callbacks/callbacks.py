@@ -1,18 +1,15 @@
-import typing
+from typing import List, TYPE_CHECKING, Union
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from litserve import LitServer, LitAPI
 
 
 class Callback:
-    def __init__(self):
-        self.callbacks = []
+    def on_endpoint_start(self, server: "LitServer", lit_api: "LitAPI"):
+        """Called before LitServer /predict endpoint is called."""
 
-    def on_endpoint_setup_start(self, server: "LitServer", lit_api: "LitAPI"):
-        """Called before LitServer.setup() is called."""
-
-    def on_endpoint_setup_end(self, server: "LitServer", lit_api: "LitAPI"):
-        """Called after LitServer.setup() is called."""
+    def on_endpoint_end(self, server: "LitServer", lit_api: "LitAPI"):
+        """Called after LitServer /predict endpoint is called."""
 
     def on_litapi_predict_start(self, server: "LitServer", lit_api: "LitAPI"):
         """Called before LitAPI.predict() is called."""
@@ -37,3 +34,15 @@ class Callback:
 
     def on_litapi_setup_end(self, server: "LitServer", lit_api: "LitAPI"):
         """Called after LitAPI.setup() is called."""
+
+
+class _CallbackConnector:
+    def __init__(self, server: "LitServer"):
+        self._server = server
+        self._callbacks = []
+
+    def add_callbacks(self, callbacks: Union[Callback, List[Callback]]):
+        if isinstance(callbacks, list):
+            self._callbacks.extend(callbacks)
+        else:
+            self._callbacks.append(callbacks)

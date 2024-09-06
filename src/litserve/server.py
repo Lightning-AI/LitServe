@@ -27,7 +27,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union, List
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -37,6 +37,7 @@ from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
+from litserve.callbacks.callbacks import _CallbackConnector, Callback
 from litserve.connector import _Connector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
@@ -113,6 +114,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
@@ -171,6 +173,8 @@ class LitServer:
         self.stream = stream
         self.max_payload_size = max_payload_size
         self._connector = _Connector(accelerator=accelerator, devices=devices)
+        self._callback_connector = _CallbackConnector(server=self)
+        self._callback_connector.add_callbacks(callbacks)
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
