@@ -1,4 +1,3 @@
--r test.txt
 uvloop
 tenacity
 jsonargparse
