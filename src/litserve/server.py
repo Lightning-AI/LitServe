@@ -38,7 +38,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.loops import inference_worker,preprocess_worker
+from litserve.loops import inference_worker, preprocess_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
@@ -116,12 +116,11 @@ class LitServer:
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         num_preprocess_workers: int = 4,
         num_inference_workers: int = 2,
-
     ):
         self.ready_to_inference_queue = mp.Queue()
         self.preprocess_workers = num_preprocess_workers  # Number of CPU workers
         self.inference_workers = num_inference_workers  # Number of GPU workers
-        
+
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
@@ -251,7 +250,6 @@ class LitServer:
         #     )
         #     process.start()
         #     process_list.append(process)
-
 
         for worker_id in range(self.preprocess_workers):
             process = mp.Process(
