@@ -38,7 +38,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.loops import cpu_worker, gpu_worker
+from litserve.loops import inference_worker,preprocess_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
@@ -84,25 +84,19 @@ async def response_queue_to_buffer(
         while True:
             try:
                 uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-                logger.debug(f"Streaming response received for uid={uid}")
             except Empty:
                 await asyncio.sleep(0.0001)
                 continue
             stream_response_buffer, event = response_buffer[uid]
             stream_response_buffer.append(response)
             event.set()
+
     else:
         while True:
-            try:
-                uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-                logger.debug(f"Response received for uid={uid}")
-            except Empty:
-                await asyncio.sleep(0.0001)
-                continue
+            uid, response = await loop.run_in_executor(threadpool, response_queue.get)
             event = response_buffer.pop(uid)
             response_buffer[uid] = response
             event.set()
-            logger.debug(f"Response event set for uid={uid}")
 
 
 class LitServer:
@@ -120,18 +114,14 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
-        run_heter_mode: bool = False,
-        num_cpu_workers: int = 4,
-        num_gpu_workers: int = 2,
-        cpu_batch_size: int = 2,
-        gpu_batch_size: int = 2,
-    ):
-        self.cpu_to_gpu_queue = mp.Queue()
-        self.cpu_workers = num_cpu_workers  # Number of CPU workers
-        self.gpu_workers = num_gpu_workers  # Number of GPU workers
-        self.gpu_batch_size = gpu_batch_size  # Batch size for GPU processing
-        self.cpu_batch_size = cpu_batch_size
+        num_preprocess_workers: int = 4,
+        num_inference_workers: int = 2,
 
+    ):
+        self.ready_to_inference_queue = mp.Queue()
+        self.preprocess_workers = num_preprocess_workers  # Number of CPU workers
+        self.inference_workers = num_inference_workers  # Number of GPU workers
+        
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
@@ -216,27 +206,65 @@ class LitServer:
         self.workers = self.devices * self.workers_per_device
         self.setup_server()
 
-    def launch_inference_worker(self):
+    def launch_inference_worker(self, num_uvicorn_servers: int):
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
-        self.cpu_to_gpu_queue = manager.Queue()
-        self.response_queue = manager.Queue()
+
+        self.response_queues = []
+        for _ in range(num_uvicorn_servers):
+            response_queue = manager.Queue()
+            self.response_queues.append(response_queue)
+
+        for spec in self._specs:
+            # Objects of Server class are referenced (not copied)
+            logging.debug(f"shallow copy for Server is created for for spec {spec}")
+            server_copy = copy.copy(self)
+            del server_copy.app
+            try:
+                spec.setup(server_copy)
+            except Exception as e:
+                raise e
 
         process_list = []
+        # for worker_id, device in enumerate(self.devices * self.workers_per_device):
+        #     if len(device) == 1:
+        #         device = device[0]
 
-        # Launch CPU workers
-        for worker_id in range(self.cpu_workers):
+        #     self.workers_setup_status[worker_id] = False
+
+        #     ctx = mp.get_context("spawn")
+        #     process = ctx.Process(
+        #         target=inference_worker,
+        #         args=(
+        #             self.lit_api,
+        #             self.lit_spec,
+        #             device,
+        #             worker_id,
+        #             self.request_queue,
+        #             self.response_queues,
+        #             self.max_batch_size,
+        #             self.batch_timeout,
+        #             self.stream,
+        #             self.workers_setup_status,
+        #         ),
+        #     )
+        #     process.start()
+        #     process_list.append(process)
+
+
+        for worker_id in range(self.preprocess_workers):
             process = mp.Process(
-                target=cpu_worker,
+                target=preprocess_worker,
                 args=(
                     self.lit_api,
                     self.lit_spec,
-                    "cpu",
+                    "preprocess",
                     worker_id,
                     self.request_queue,
-                    self.cpu_to_gpu_queue,
-                    self.cpu_batch_size,
+                    self.ready_to_inference_queue,
+                    self.max_batch_size,
+                    self.batch_timeout,
                     self.workers_setup_status,
                 ),
             )
@@ -244,38 +272,43 @@ class LitServer:
             process_list.append(process)
 
         # Launch GPU workers
-        for worker_id in range(self.gpu_workers):
+        for worker_id in range(self.inference_workers):
             process = mp.Process(
-                target=gpu_worker,
+                target=inference_worker,
                 args=(
                     self.lit_api,
                     self.lit_spec,
-                    f"cuda:{worker_id}",
+                    f"inference:{worker_id}",
                     worker_id,
-                    self.cpu_to_gpu_queue,
-                    self.response_queue,
-                    self.gpu_batch_size,
+                    self.request_queue,
+                    self.ready_to_inference_queue,
+                    self.response_queues,
+                    self.max_batch_size,
+                    self.batch_timeout,
+                    self.stream,
                     self.workers_setup_status,
                 ),
             )
             process.start()
             process_list.append(process)
-
         return manager, process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
 
-        if self.response_queue is None:
+        if not hasattr(self, "response_queues") or not self.response_queues:
             raise RuntimeError(
-                "Response queue has not been initialized. "
+                "Response queues have not been initialized. "
                 "Please make sure to call the 'launch_inference_worker' method of "
-                "the LitServer class to initialize the response queue."
+                "the LitServer class to initialize the response queues."
             )
 
-        response_executor = ThreadPoolExecutor(max_workers=1)
-        future = response_queue_to_buffer(self.response_queue, self.response_buffer, self.stream, response_executor)
+        response_queue = self.response_queues[app.response_queue_id]
+        # response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
+
+        response_executor = ThreadPoolExecutor(max_workers=2)
+        future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
 
         yield
@@ -447,22 +480,19 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager, litserve_workers = self.launch_inference_worker()
+        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
         try:
-            server = uvicorn.Server(config=config)
-            process = mp.Process(target=server.run, args=(sockets,))
-            process.start()
+            servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            process.join()
-        except KeyboardInterrupt:
-            print("Shutting down LitServe")
+            for s in servers:
+                s.join()
         finally:
+            print("Shutting down LitServe")
             for w in litserve_workers:
                 w.terminate()
                 w.join()
             manager.shutdown()
-            print("Cleanup completed, all workers terminated.")
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
