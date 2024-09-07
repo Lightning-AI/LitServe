@@ -19,7 +19,7 @@ import pickle
 import sys
 import time
 from queue import Empty, Queue
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
@@ -93,8 +93,9 @@ def collate_requests(
     return payloads, timed_out_uids
 
 
-
-def run_single_preprocess_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, ready_to_inference_queue: Queue):
+def run_single_preprocess_loop(
+    lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, ready_to_inference_queue: Queue
+):
     while True:
         try:
             response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -120,6 +121,7 @@ def run_single_preprocess_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue
             logger.exception(f"Error processing request {uid}")
             ready_to_inference_queue.put((response_queue_id, uid, e))
 
+
 def run_batched_preprocess_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
@@ -142,7 +144,7 @@ def run_batched_preprocess_loop(
 
         if not batches:
             continue
-        
+
         response_queue_ids, uids, inputs = zip(*batches)
         try:
             contexts = [{}] * len(inputs)
@@ -161,13 +163,13 @@ def run_batched_preprocess_loop(
             x_batched = lit_api.batch(x)
             y_batched = _inject_context(contexts, lit_api.preprocess, x_batched)
 
-            print("runbatched preprocess loop",[response_queue_ids, uids, y_batched])
             ready_to_inference_queue.put([response_queue_ids, uids, y_batched])
 
         except Exception as e:
             print("Error processing batched preprocess request")
             for response_queue_id, uid in zip(response_queue_ids, uids):
                 ready_to_inference_queue.put((response_queue_id, uid, e))
+
 
 def preprocess_worker(
     lit_api: LitAPI,
@@ -189,13 +191,16 @@ def preprocess_worker(
         workers_setup_status[f"preprocess_{worker_id}"] = True
 
     if max_batch_size > 1:
-        run_batched_preprocess_loop(lit_api, lit_spec, request_queue, ready_to_inference_queue, max_batch_size, batch_timeout)
+        run_batched_preprocess_loop(
+            lit_api, lit_spec, request_queue, ready_to_inference_queue, max_batch_size, batch_timeout
+        )
     else:
         run_single_preprocess_loop(lit_api, lit_spec, request_queue, ready_to_inference_queue)
 
 
-
-def run_single_inference_loop(lit_api: LitAPI, lit_spec: LitSpec, ready_to_inference_queue: Queue, response_queues: List[Queue]):
+def run_single_inference_loop(
+    lit_api: LitAPI, lit_spec: LitSpec, ready_to_inference_queue: Queue, response_queues: List[Queue]
+):
     while True:
         try:
             response_queue_id, uid, y = ready_to_inference_queue.get(timeout=1.0)
@@ -239,7 +244,7 @@ def run_batched_inference_loop(
             item = ready_to_inference_queue.get(timeout=batch_timeout)
             ready_to_inference_list.append(item)
         except Empty:
-            pass 
+            pass
 
         if not ready_to_inference_list:
             continue
@@ -248,7 +253,7 @@ def run_batched_inference_loop(
         response_queue_ids, uids, inputs = ready_to_inference_list[0]
 
         try:
-            contexts = [{}] * len(inputs) 
+            contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
@@ -358,7 +363,6 @@ def run_batch_inference_streaming(
             response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-
 def inference_worker(
     lit_api: LitAPI,
     lit_spec: LitSpec,
@@ -386,8 +390,9 @@ def inference_worker(
         else:
             run_single_inference_streaming(lit_api, lit_spec, ready_to_inference_queue, response_queues)
         return
-    elif max_batch_size > 1:
-        run_batched_inference_loop(lit_api, lit_spec, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout)
+    if max_batch_size > 1:
+        run_batched_inference_loop(
+            lit_api, lit_spec, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout
+        )
     else:
         run_single_inference_loop(lit_api, lit_spec, ready_to_inference_queue, response_queues)
-
