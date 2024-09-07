@@ -161,7 +161,7 @@ def run_batched_preprocess_loop(
             x_batched = lit_api.batch(x)
             y_batched = _inject_context(contexts, lit_api.preprocess, x_batched)
 
-            
+            print("runbatched preprocess loop",[response_queue_ids, uids, y_batched])
             ready_to_inference_queue.put([response_queue_ids, uids, y_batched])
 
         except Exception as e:
@@ -268,47 +268,34 @@ def run_batched_inference_loop(
 
 
 
-def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
+
+def run_single_inference_streaming(lit_api: LitAPI, lit_spec: LitSpec, ready_to_inference_queue: Queue, response_queues: List[Queue]):
     while True:
         try:
-            response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
-            logger.debug("uid=%s", uid)
-        except (Empty, ValueError):
-            continue
-
-        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
-            time.monotonic() - timestamp > lit_api.request_timeout
-        ):
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            response_queue_id, uid, y = ready_to_inference_queue.get(timeout=1.0)
+        except Empty:
             continue
 
         try:
             context = {}
             if hasattr(lit_spec, "populate_context"):
-                lit_spec.populate_context(context, x_enc)
-            x = _inject_context(
-                context,
-                lit_api.decode_request,
-                x_enc,
-            )
-            y_gen = _inject_context(
+                lit_spec.populate_context(context, y)
+
+            z_gen= _inject_context(
                 context,
                 lit_api.predict,
-                x,
+                y,
             )
-            y_enc_gen = _inject_context(
-                context,
-                lit_api.encode_response,
-                y_gen,
-            )
-            for y_enc in y_enc_gen:
-                y_enc = lit_api.format_encoded_response(y_enc)
-                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+            z_enc_gen = _inject_context(
+                    context,
+                    lit_api.encode_response,
+                    z_gen,
+                )
+            for z_enc in z_enc_gen:
+
+                z_enc = lit_api.format_encoded_response(z_enc)
+                response_queues[response_queue_id].put((uid, (z_enc, LitAPIStatus.OK)))
+            
             response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
         except Exception as e:
             logger.exception(
@@ -319,48 +306,37 @@ def run_streaming_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue,
             response_queues[response_queue_id].put((uid, (pickle.dumps(e), LitAPIStatus.ERROR)))
 
 
-def run_batched_streaming_loop(
+def run_batch_inference_streaming(
     lit_api: LitAPI,
     lit_spec: LitSpec,
-    request_queue: Queue,
+    ready_to_inference_queue: Queue,
     response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout: float,
 ):
     while True:
-        batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
-            max_batch_size,
-            batch_timeout,
-        )
-        for response_queue_id, uid in timed_out_uids:
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+        ready_to_inference_list = []
 
-        if not batches:
+        # Collect items from the queue up to max_batch_size or until timeout
+        try:
+            item = ready_to_inference_queue.get(timeout=batch_timeout)
+            ready_to_inference_list.append(item)
+        except Empty:
+            pass 
+
+        if not ready_to_inference_list:
             continue
-        response_queue_ids, uids, inputs = zip(*batches)
+
+        # Unpack the collected items
+        response_queue_ids, uids, inputs = ready_to_inference_list[0]
+
         try:
             contexts = [{}] * len(inputs)
             if hasattr(lit_spec, "populate_context"):
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
-            x = [
-                _inject_context(
-                    context,
-                    lit_api.decode_request,
-                    input,
-                )
-                for input, context in zip(inputs, contexts)
-            ]
-            x = lit_api.batch(x)
-            y_iter = _inject_context(contexts, lit_api.predict, x)
+            y_iter = _inject_context(contexts, lit_api.predict, inputs)
             unbatched_iter = lit_api.unbatch(y_iter)
             y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
 
@@ -406,9 +382,9 @@ def inference_worker(
 
     if stream:
         if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
+            run_batch_inference_streaming(lit_api, lit_spec, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout)
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues)
+            run_single_inference_streaming(lit_api, lit_spec, ready_to_inference_queue, response_queues)
         return
     elif max_batch_size > 1:
         run_batched_inference_loop(lit_api, lit_spec, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout)
