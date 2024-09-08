@@ -106,7 +106,6 @@ class LitServer:
         accelerator: str = "auto",
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
-        
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
@@ -116,11 +115,10 @@ class LitServer:
         max_payload_size=None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         num_preprocess_workers: int = None,
-
     ):
         self.ready_to_inference_queue = mp.Queue()
         if num_preprocess_workers:
-            self.num_preprocess_workers = num_preprocess_workers  
+            self.num_preprocess_workers = num_preprocess_workers
         else:
             self.num_preprocess_workers = workers_per_device
 
@@ -207,7 +205,9 @@ class LitServer:
 
         self.inference_workers = self.devices * self.workers_per_device
         self.preprocess_workers = self.devices * self.num_preprocess_workers
-        print(f"Compute status: \n devices: {self.devices}, \n Total inference workers: {self.inference_workers} \n Total preprocess workers: {self.preprocess_workers}")
+        print(
+            f"Compute status: \n devices: {self.devices}, \n Total inference workers: {self.inference_workers} \n Total preprocess workers: {self.preprocess_workers}"
+        )
         self.setup_server()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
@@ -255,9 +255,9 @@ class LitServer:
         #     )
         #     process.start()
         #     process_list.append(process)
-        for worker_id,device in enumerate(self.preprocess_workers):
+        for worker_id, device in enumerate(self.preprocess_workers):
             if len(device) == 1:
-                device = device[0]           
+                device = device[0]
             self.workers_setup_status[worker_id] = False
             worker_id = f"preprocess_{worker_id}"
             process = mp.Process(
@@ -278,7 +278,7 @@ class LitServer:
             process.start()
             process_list.append(process)
 
-        for worker_id,device in enumerate(self.inference_workers):
+        for worker_id, device in enumerate(self.inference_workers):
             if len(device) == 1:
                 device = device[0]
             worker_id = f"inference_{worker_id}"

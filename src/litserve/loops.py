@@ -94,7 +94,11 @@ def collate_requests(
 
 
 def run_single_preprocess_loop(
-    lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, ready_to_inference_queue: Queue,response_queues: List[Queue]
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    ready_to_inference_queue: Queue,
+    response_queues: List[Queue],
 ):
     while True:
         try:
@@ -162,7 +166,6 @@ def run_batched_preprocess_loop(
             )
             response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
 
-
         if not batches:
             continue
 
@@ -218,10 +221,10 @@ def preprocess_worker(
 
     if max_batch_size > 1:
         run_batched_preprocess_loop(
-            lit_api, lit_spec, request_queue, ready_to_inference_queue, response_queues,max_batch_size, batch_timeout
+            lit_api, lit_spec, request_queue, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout
         )
     else:
-        run_single_preprocess_loop(lit_api, lit_spec, request_queue, ready_to_inference_queue,response_queues)
+        run_single_preprocess_loop(lit_api, lit_spec, request_queue, ready_to_inference_queue, response_queues)
 
 
 def run_single_inference_loop(
