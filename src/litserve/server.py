@@ -106,6 +106,7 @@ class LitServer:
         accelerator: str = "auto",
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
+        
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
@@ -114,12 +115,14 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
-        num_preprocess_workers: int = 4,
-        num_inference_workers: int = 2,
+        num_preprocess_workers: int = None,
+
     ):
         self.ready_to_inference_queue = mp.Queue()
-        self.preprocess_workers = num_preprocess_workers  # Number of CPU workers
-        self.inference_workers = num_inference_workers  # Number of GPU workers
+        if num_preprocess_workers:
+            self.num_preprocess_workers = num_preprocess_workers  
+        else:
+            self.num_preprocess_workers = workers_per_device
 
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -202,7 +205,9 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.workers = self.devices * self.workers_per_device
+        self.inference_workers = self.devices * self.workers_per_device
+        self.preprocess_workers = self.devices * self.num_preprocess_workers
+        print(f"Compute status: \n devices: {self.devices}, \n Total inference workers: {self.inference_workers} \n Total preprocess workers: {self.preprocess_workers}")
         self.setup_server()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
@@ -250,17 +255,21 @@ class LitServer:
         #     )
         #     process.start()
         #     process_list.append(process)
-
-        for worker_id in range(self.preprocess_workers):
+        for worker_id,device in enumerate(self.preprocess_workers):
+            if len(device) == 1:
+                device = device[0]           
+            self.workers_setup_status[worker_id] = False
+            worker_id = f"preprocess_{worker_id}"
             process = mp.Process(
                 target=preprocess_worker,
                 args=(
                     self.lit_api,
                     self.lit_spec,
-                    "preprocess",
+                    device,
                     worker_id,
                     self.request_queue,
                     self.ready_to_inference_queue,
+                    self.response_queues,
                     self.max_batch_size,
                     self.batch_timeout,
                     self.workers_setup_status,
@@ -269,14 +278,17 @@ class LitServer:
             process.start()
             process_list.append(process)
 
-        # Launch GPU workers
-        for worker_id in range(self.inference_workers):
+        for worker_id,device in enumerate(self.inference_workers):
+            if len(device) == 1:
+                device = device[0]
+            worker_id = f"inference_{worker_id}"
+            self.workers_setup_status[worker_id] = False
             process = mp.Process(
                 target=inference_worker,
                 args=(
                     self.lit_api,
                     self.lit_spec,
-                    f"inference:{worker_id}",
+                    device,
                     worker_id,
                     self.request_queue,
                     self.ready_to_inference_queue,
@@ -305,7 +317,7 @@ class LitServer:
         response_queue = self.response_queues[app.response_queue_id]
         # response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
 
-        response_executor = ThreadPoolExecutor(max_workers=2)
+        response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
 
@@ -467,7 +479,7 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.workers)
+            num_api_servers = len(self.inference_workers)
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
