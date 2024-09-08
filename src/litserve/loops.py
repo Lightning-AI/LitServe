@@ -306,10 +306,9 @@ def run_batched_inference_loop(
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
-
-
-
-def run_single_inference_streaming(lit_api: LitAPI, lit_spec: LitSpec, ready_to_inference_queue: Queue, response_queues: List[Queue]):
+def run_single_inference_streaming(
+    lit_api: LitAPI, lit_spec: LitSpec, ready_to_inference_queue: Queue, response_queues: List[Queue]
+):
     while True:
         try:
             response_queue_id, uid, y = ready_to_inference_queue.get(timeout=1.0)
@@ -321,21 +320,20 @@ def run_single_inference_streaming(lit_api: LitAPI, lit_spec: LitSpec, ready_to_
             if hasattr(lit_spec, "populate_context"):
                 lit_spec.populate_context(context, y)
 
-            z_gen= _inject_context(
+            z_gen = _inject_context(
                 context,
                 lit_api.predict,
                 y,
             )
             z_enc_gen = _inject_context(
-                    context,
-                    lit_api.encode_response,
-                    z_gen,
-                )
+                context,
+                lit_api.encode_response,
+                z_gen,
+            )
             for z_enc in z_enc_gen:
-
                 z_enc = lit_api.format_encoded_response(z_enc)
                 response_queues[response_queue_id].put((uid, (z_enc, LitAPIStatus.OK)))
-            
+
             response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
         except Exception as e:
             logger.exception(
@@ -362,7 +360,7 @@ def run_batch_inference_streaming(
             item = ready_to_inference_queue.get(timeout=batch_timeout)
             ready_to_inference_list.append(item)
         except Empty:
-            pass 
+            pass
 
         if not ready_to_inference_list:
             continue
@@ -421,7 +419,9 @@ def inference_worker(
 
     if stream:
         if max_batch_size > 1:
-            run_batch_inference_streaming(lit_api, lit_spec, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout)
+            run_batch_inference_streaming(
+                lit_api, lit_spec, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout
+            )
         else:
             run_single_inference_streaming(lit_api, lit_spec, ready_to_inference_queue, response_queues)
         return
