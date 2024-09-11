@@ -27,7 +27,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -472,3 +472,52 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
+
+
+def run_all(
+    servers: List[LitServer],
+    port: Union[str, int] = 8000,
+    num_api_servers: Optional[int] = None,
+    log_level: str = "info",
+    generate_client_file: bool = True,
+    api_server_worker_type: Optional[str] = None,
+    **kwargs,
+):
+    """
+    Run multiple LitServers on the same port.
+    """
+    if not servers:
+        raise ValueError("No servers provided to run_all")
+
+    if any(not isinstance(server, LitServer) for server in servers):
+        raise ValueError("All elements in the servers list must be instances of LitServer")
+
+    if generate_client_file:
+        for server in servers:
+            server.generate_client_file()
+
+    port_msg = f"port must be a value from 1024 to 65535 but got {port}"
+    try:
+        port = int(port)
+    except ValueError:
+        raise ValueError(port_msg)
+    if not (1024 <= port <= 65535):
+        raise ValueError(port_msg)
+
+    if num_api_servers is None:
+        num_api_servers = sum(len(server.workers) for server in servers)
+    if num_api_servers < 1:
+        raise ValueError("num_api_servers must be greater than 0")
+
+    if sys.platform == "win32":
+        print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
+        api_server_worker_type = "thread"
+    elif api_server_worker_type is None:
+        api_server_worker_type = "process"
+
+    litserve_workers = []
+    # TODO: Implement this fn for multiple servers
+
+    # for server in servers:
+    #     server_manager, server_workers = server.launch_inference_worker(num_api_servers)
+    #     litserve_workers.extend(server_workers)
