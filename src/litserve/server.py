@@ -483,9 +483,7 @@ def run_all(
     api_server_worker_type: Optional[str] = None,
     **kwargs,
 ):
-    """
-    Run multiple LitServers on the same port.
-    """
+    """Run multiple LitServers on the same port."""
     if not servers:
         raise ValueError("No servers provided to run_all")
 
