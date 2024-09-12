@@ -1,8 +1,6 @@
-import threading
 
-from httpx import AsyncClient
 
-from litserve.server import LitServer, run_all
+from litserve.server import LitServer
 
 
 async def test_lit_server_with_multi_endpoints(simple_litapi):
