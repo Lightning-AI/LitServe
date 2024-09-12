@@ -491,8 +491,7 @@ def run_all(
         raise ValueError("All elements in the servers list must be instances of LitServer")
 
     if generate_client_file:
-        for server in servers:
-            server.generate_client_file()
+        servers[0].generate_client_file()
 
     port_msg = f"port must be a value from 1024 to 65535 but got {port}"
     try:
