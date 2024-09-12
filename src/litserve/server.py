@@ -515,9 +515,27 @@ def run_all(
     elif api_server_worker_type is None:
         api_server_worker_type = "process"
 
-    litserve_workers = []
-    # TODO: Implement this fn for multiple servers
+    app = servers[0].app
+    config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+    sockets = [config.bind_socket()]
 
-    # for server in servers:
-    #     server_manager, server_workers = server.launch_inference_worker(num_api_servers)
-    #     litserve_workers.extend(server_workers)
+    managers, all_workers = [], []
+    try:
+        all_servers = []
+        for server in servers:
+            manager, litserve_workers = server.launch_inference_worker(num_api_servers)
+            managers.append(manager)
+            all_workers.extend(litserve_workers)
+
+            _servers = server._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+            all_servers.extend(_servers)
+        print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+        for s in all_servers:
+            s.join()
+    finally:
+        print("Shutting down LitServe")
+        for w in all_workers:
+            w.terminate()
+            w.join()
+        for manager in managers:
+            manager.shutdown()
