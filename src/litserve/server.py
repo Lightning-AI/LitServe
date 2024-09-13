@@ -533,7 +533,7 @@ def run_all(
         main_app = copy.copy(app)
         # mount all other apps
         for index, server in enumerate(servers[1:], 1):
-            main_app.mount(f"/subapp-{index}", server.app)  # TODO: Update Mounting Path
+            main_app.mount("/", server.app)  # TODO: Update Mounting Path
 
         config = uvicorn.Config(app=main_app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
         server = uvicorn.Server(config=config)
