@@ -491,7 +491,7 @@ def run_all(
         raise ValueError("All elements in the servers list must be instances of LitServer")
 
     if generate_client_file:
-        servers[0].generate_client_file()
+        LitServer.generate_client_file()
 
     port_msg = f"port must be a value from 1024 to 65535 but got {port}"
     try:
@@ -524,8 +524,28 @@ def run_all(
             managers.append(manager)
             all_workers.extend(litserve_workers)
 
-            _servers = server._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
-            all_servers.extend(_servers)
+        # Start the servers
+        for response_queue_id, server in enumerate(servers):
+            server.app.response_queue_id = response_queue_id
+            if server.lit_spec:
+                server.lit_spec.response_queue_id = response_queue_id
+
+        main_app = copy.copy(app)
+        # mount all other apps
+        for index, server in enumerate(servers[1:], 1):
+            main_app.mount(f"/subapp-{index}", server.app)  # TODO: Update Mounting Path
+
+        config = uvicorn.Config(app=main_app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+        server = uvicorn.Server(config=config)
+        if api_server_worker_type == "process":
+            ctx = mp.get_context("fork")
+            w = ctx.Process(target=server.run, args=(sockets,))
+        elif api_server_worker_type == "thread":
+            w = threading.Thread(target=server.run, args=(sockets,))
+        else:
+            raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
+        w.start()
+        all_servers.append(w)
         print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
         for s in all_servers:
             s.join()
