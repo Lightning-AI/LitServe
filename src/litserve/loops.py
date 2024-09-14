@@ -93,7 +93,6 @@ def collate_requests(
     return payloads, timed_out_uids
 
 
-
 def run_single_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
@@ -630,7 +629,6 @@ def preprocess_worker(
     ready_to_inference_queue: Queue,
     response_queues: List[Queue],
     max_batch_size: int,
-   
 ):
     print(f"Preprocess worker {worker_id}.")
 
@@ -640,4 +638,3 @@ def preprocess_worker(
         )
     else:
         run_single_preprocess_loop(lit_api, lit_spec, request_queue, ready_to_inference_queue, response_queues)
-

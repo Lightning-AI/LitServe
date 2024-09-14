@@ -260,7 +260,6 @@ class LitServer:
                         self.response_queues,
                         self.max_batch_size,
                         self.batch_timeout,
-                        
                     ),
                 )
                 process.start()
