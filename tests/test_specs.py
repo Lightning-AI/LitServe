@@ -30,7 +30,7 @@ from litserve.utils import wrap_litserve_start
 from litserve.specs.openai import OpenAISpec, ChatMessage
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_spec(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPI(), spec=spec)
@@ -45,7 +45,7 @@ async def test_openai_spec(openai_request_data):
 
 
 # OpenAIWithUsage
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("api", "batch_size"),
     [
@@ -72,7 +72,7 @@ async def test_openai_token_usage(api, batch_size, openai_request_data, openai_r
             assert result["usage"] == openai_response_data["usage"]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_spec_with_image(openai_request_data_with_image):
     server = ls.LitServer(TestAPI(), spec=OpenAISpec())
     with wrap_litserve_start(server) as server:
@@ -85,7 +85,7 @@ async def test_openai_spec_with_image(openai_request_data_with_image):
             ), "LitAPI predict response should match with the generated output"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_override_encode(openai_request_data):
     server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
     with wrap_litserve_start(server) as server:
@@ -98,7 +98,7 @@ async def test_override_encode(openai_request_data):
             ), "LitAPI predict response should match with the generated output"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_spec_with_tools(openai_request_data_with_tools):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPIWithToolCalls(), spec=spec)
@@ -118,7 +118,7 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
             ], "LitAPI predict response should match with the generated output"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_spec_with_response_format(openai_request_data_with_response_format):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPIWithStructuredOutput(), spec=spec)
@@ -148,7 +148,7 @@ class IncorrectAPI2(IncorrectAPI1):
         return ChatMessage(role="assistant", content="This is a generated output")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_spec_validation(openai_request_data):
     server = ls.LitServer(IncorrectAPI1(), spec=OpenAISpec())
     with pytest.raises(ValueError, match="predict is not a generator"), wrap_litserve_start(server) as server:
@@ -172,7 +172,7 @@ class PrePopulatedAPI(ls.LitAPI):
                 return
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_oai_prepopulated_context(openai_request_data):
     openai_request_data["max_tokens"] = 3
     spec = OpenAISpec()
@@ -194,7 +194,7 @@ class WrongLitAPI(ls.LitAPI):
         raise HTTPException(501, "test LitAPI.predict error")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_fail_http(openai_request_data):
     server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
     with wrap_litserve_start(server) as server:

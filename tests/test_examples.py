@@ -14,7 +14,7 @@ from litserve.utils import wrap_litserve_start
 import litserve as ls
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_simple_pytorch_api():
     api = ls.test_examples.SimpleTorchAPI()
     server = ls.LitServer(api, accelerator="cpu")
@@ -24,7 +24,7 @@ async def test_simple_pytorch_api():
             assert response.json() == {"output": 9.0}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_simple_batched_api():
     api = ls.test_examples.SimpleBatchedAPI()
     server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.1)
@@ -34,7 +34,7 @@ async def test_simple_batched_api():
             assert response.json() == {"output": 16.0}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_simple_api():
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
@@ -44,7 +44,7 @@ async def test_simple_api():
             assert response.json() == {"output": 16.0}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_simple_api_without_server():
     api = ls.test_examples.SimpleLitAPI()
     api.setup(None)
@@ -52,7 +52,7 @@ async def test_simple_api_without_server():
     assert api.predict(4) == 16, "Model should be able to predict"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_simple_pytorch_api_without_server():
     api = ls.test_examples.SimpleTorchAPI()
     api.setup("cpu")
@@ -63,7 +63,7 @@ async def test_simple_pytorch_api_without_server():
     assert api.encode_response(9) == {"output": 9}, "Response should be encoded"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_simple_stream_api_without_server():
     api = SimpleStreamAPI()
     api.setup(None)
@@ -77,7 +77,7 @@ async def test_simple_stream_api_without_server():
     ], "Response should be encoded"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_with_usage():
     api = OpenAIWithUsage()
     api.setup(None)
@@ -93,7 +93,7 @@ async def test_openai_with_usage():
     ], "Response should match expected output"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_with_usage_encode_response():
     api = OpenAIWithUsageEncodeResponse()
     api.setup(None)
@@ -114,7 +114,7 @@ async def test_openai_with_usage_encode_response():
     ], "Encoded response should match expected output"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_batching_with_usage():
     api = OpenAIBatchingWithUsage()
     api.setup(None)
@@ -136,7 +136,7 @@ async def test_openai_batching_with_usage():
     ], "Encoded batched response should match expected output"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_openai_batch_context():
     api = OpenAIBatchContext()
     api.setup(None)

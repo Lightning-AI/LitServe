@@ -1,4 +1,4 @@
-from .simple_example import SimpleBatchedAPI, SimpleLitAPI, SimpleTorchAPI
+from .simple_example import SimpleBatchedAPI, SimpleLitAPI, SimpleTorchAPI, SimpleStreamAPI
 from .openai_spec_example import (
     TestAPI,
     TestAPIWithCustomEncode,
@@ -16,4 +16,5 @@ __all__ = [
     "TestAPIWithStructuredOutput",
     "TestAPIWithToolCalls",
     "OpenAIBatchContext",
+    "SimpleStreamAPI",
 ]
