@@ -554,7 +554,7 @@ def run_single_preprocess_loop(
             ready_to_inference_queue.put((response_queue_id, uid, y))
         except Exception as e:
             logger.exception(
-                "LitAPI ran into an error while doing preprocessing the request uid=%s.\n"
+                "LitAPI ran into an error while preprocessing the request uid=%s.\n"
                 "Please check the error trace for more details.",
                 uid,
             )
@@ -612,7 +612,7 @@ def run_batched_preprocess_loop(
 
         except Exception as e:
             logger.exception(
-                "LitAPI ran into an error while doing preprocessing the batched request.\n"
+                "LitAPI ran into an error while preprocessing the batched request.\n"
                 "Please check the error trace for more details."
             )
             err_pkl = pickle.dumps(e)

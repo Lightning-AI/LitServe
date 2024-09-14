@@ -166,7 +166,7 @@ def test_batched_loop():
 
     with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
         run_batched_loop(
-            lit_api_mock, lit_api_mock, requests_queue, FakeResponseQueue(), max_batch_size=2, batch_timeout=4
+            lit_api_mock, lit_api_mock, requests_queue, None,FakeResponseQueue(), max_batch_size=2, batch_timeout=4
         )
 
     lit_api_mock.batch.assert_called_once()
