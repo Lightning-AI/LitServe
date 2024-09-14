@@ -211,8 +211,6 @@ def preprocess_worker(
     batch_timeout: float,
     # workers_setup_status: Dict[str, bool] = None,
 ):
-
-
     print(f"Preprocess worker {worker_id}.")
 
     if max_batch_size > 1:
@@ -246,7 +244,10 @@ def run_single_loop(
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
                 continue
 
             try:
@@ -316,9 +317,10 @@ def run_batched_loop(
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                response_queues[response_queue_id].put(
-                    (uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR))
-                )
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
 
             if not batches:
                 continue
@@ -416,9 +418,10 @@ def run_streaming_loop(
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                response_queues[response_queue_id].put(
-                    (uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR))
-                )
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
                 continue
 
             try:
@@ -494,9 +497,10 @@ def run_batched_streaming_loop(
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                response_queues[response_queue_id].put(
-                    (uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR))
-                )
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
 
             if not batches:
                 continue
@@ -576,6 +580,7 @@ def run_batched_streaming_loop(
                 err_pkl = pickle.dumps(e)
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
+
 def inference_worker(
     lit_api: LitAPI,
     lit_spec: LitSpec,
@@ -635,5 +640,3 @@ def inference_worker(
                 ready_to_inference_queue,
                 response_queues,
             )
-
-

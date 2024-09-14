@@ -116,9 +116,6 @@ class LitServer:
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         num_preprocess_workers: int = None,
     ):
-
-
-
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
@@ -229,11 +226,12 @@ class LitServer:
 
         def has_preprocess_method_override(api_instance):
             # Check if preprocess is implemented by the user
-            if hasattr(api_instance, 'preprocess'):
+            if hasattr(api_instance, "preprocess"):
                 return api_instance.preprocess.__code__ is not LitAPI.preprocess.__code__
             # If preprocess method does not exist in the subclass
             return False
-        print("has_preprocess_method_override is ",has_preprocess_method_override(self.lit_api))
+
+        print("has_preprocess_method_override is ", has_preprocess_method_override(self.lit_api))
 
         if has_preprocess_method_override(self.lit_api):
             if self.num_preprocess_workers:
@@ -242,12 +240,10 @@ class LitServer:
                 print("Using Workers per device as number of preprocess workers")
                 self.num_preprocess_workers = self.workers_per_device
 
-
             self.preprocess_workers = self.devices * self.num_preprocess_workers
             self.ready_to_inference_queue = mp.Queue()
 
             for worker_id, device in enumerate(self.preprocess_workers):
-
                 if len(device) == 1:
                     device = device[0]
 
@@ -294,9 +290,8 @@ class LitServer:
                 process.start()
                 process_list.append(process)
         else:
-
             for worker_id, device in enumerate(self.inference_workers):
-                self.ready_to_inference_queue = None 
+                self.ready_to_inference_queue = None
                 if len(device) == 1:
                     device = device[0]
                 worker_id = f"inference_{worker_id}"

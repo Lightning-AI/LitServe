@@ -54,16 +54,12 @@ class LitAPI(ABC):
 
         return inputs
 
-
-
-        
     def preprocess(self, x, **kwargs):
-        """
-        Preprocess the input data before passing it to the model for inference.
+        """Preprocess the input data before passing it to the model for inference.
 
-        The `preprocess` function handles necessary transformations (e.g., data normalization, 
-        tokenization, feature extraction, or image resizing) before sending the data to 
-        the model for prediction. 
+        The `preprocess` function handles necessary transformations (e.g., data normalization,
+        tokenization, feature extraction, or image resizing) before sending the data to
+        the model for prediction.
 
         Args:
             x: Input data, either a single instance or a batch, depending on the model’s requirements.
@@ -73,13 +69,13 @@ class LitAPI(ABC):
             Preprocessed data in a format compatible with the model's `predict` function.
 
         Usage:
-            - Separate Workers for Preprocessing and Inference: If the preprocessing step is 
-              computationally intensive, it is run on separate process workers to prevent it from 
-              blocking the main prediction flow. The processed data is passed via a queue to the 
+            - Separate Workers for Preprocessing and Inference: If the preprocessing step is
+              computationally intensive, it is run on separate process workers to prevent it from
+              blocking the main prediction flow. The processed data is passed via a queue to the
               inference workers, ensuring both stages can work in parallel.
-            - Performance Optimization: By decoupling preprocessing and inference, the system 
-              can handle more requests simultaneously, reducing latency and improving throughput. 
-              For example, while one request is being preprocessed, another can be inferred, 
+            - Performance Optimization: By decoupling preprocessing and inference, the system
+              can handle more requests simultaneously, reducing latency and improving throughput.
+              For example, while one request is being preprocessed, another can be inferred,
               overlapping the time spent on both operations.
 
         Example:
@@ -95,7 +91,7 @@ class LitAPI(ABC):
                 Request 2:                                  |-- Preprocess --|-- Inference --|
                 Request 3:                                                                   |-- Preprocess --|-- Inference --|
 
-                                                  
+
             Total time: (4s + 2s) * 3 = 18s
 
         2. With Separate Preprocessing Workers (Concurrent):
@@ -110,28 +106,28 @@ class LitAPI(ABC):
             Total time: 4s + 4s + 4s + 2s = 14s
 
         When to Override:
-            - When preprocessing is time-consuming: If your preprocessing step involves heavy 
-              computations (e.g., applying complex filters, large-scale image processing, or 
-              extensive feature extraction), you should override `preprocess` to run it separately 
-              from inference. This is especially important when preprocessing and inference both 
+            - When preprocessing is time-consuming: If your preprocessing step involves heavy
+              computations (e.g., applying complex filters, large-scale image processing, or
+              extensive feature extraction), you should override `preprocess` to run it separately
+              from inference. This is especially important when preprocessing and inference both
               take considerable time, as overlapping the two processes improves throughput.
 
-            - If both preprocessing and inference take significant time (e.g., several 
-              seconds), running them concurrently can significantly reduce latency and improve 
-              performance. For example, in high-latency models like image segmentation or NLP 
+            - If both preprocessing and inference take significant time (e.g., several
+              seconds), running them concurrently can significantly reduce latency and improve
+              performance. For example, in high-latency models like image segmentation or NLP
               models that require tokenization, separating the two stages will be highly effective.
 
-            - Less effective for fast models: If both preprocessing and inference take only a 
-              few milliseconds each, the benefit of separating them into parallel processes may 
-              be minimal. In such cases, the overhead of managing multiple workers and queues may 
+            - Less effective for fast models: If both preprocessing and inference take only a
+              few milliseconds each, the benefit of separating them into parallel processes may
+              be minimal. In such cases, the overhead of managing multiple workers and queues may
               outweigh the performance gain.
-              
-            - Dynamic workloads: If your workload fluctuates or you expect periods of high 
-              demand, decoupling preprocessing from inference allows you to scale each stage 
+
+            - Dynamic workloads: If your workload fluctuates or you expect periods of high
+              demand, decoupling preprocessing from inference allows you to scale each stage
               independently by adding more workers based on the current system load.
 
         """
-        pass 
+        pass
 
     @abstractmethod
     def predict(self, x, **kwargs):
