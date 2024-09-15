@@ -26,12 +26,12 @@ from litserve.utils import wrap_litserve_start
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 import pytest
 
 from litserve.connector import _Connector
 
-from litserve.server import LitServer
+from litserve.server import LitServer, manage_lifespan
 import litserve as ls
 from fastapi.testclient import TestClient
 from starlette.types import ASGIApp
@@ -429,3 +429,28 @@ def test_middlewares_inputs():
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+
+
+@pytest.mark.asyncio
+@patch("litserve.server.LitServer")
+async def test_manage_lifespan(mock_litserver):
+    # Mock the LitServer instance
+    mock_server_instance = MagicMock(spec=LitServer)
+    mock_server_instance.app = MagicMock()
+
+    # Create an async context manager mock for the lifespan method
+    mock_lifespan_cm = MagicMock()
+    mock_lifespan_cm.__aenter__ = AsyncMock()
+    mock_lifespan_cm.__aexit__ = AsyncMock()
+    mock_server_instance.lifespan.return_value = mock_lifespan_cm
+
+    mock_litserver.return_value = mock_server_instance
+
+    servers = [mock_server_instance, mock_server_instance]
+
+    async with manage_lifespan(None, servers):
+        # Assertions to ensure the function behaves as expected
+        assert mock_lifespan_cm.__aenter__.call_count == 2
+
+    # Ensure the __aexit__ method was called
+    assert mock_lifespan_cm.__aexit__.call_count == 2
