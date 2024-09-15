@@ -25,7 +25,19 @@ class SimpleLitAPI2(SimpleLitAPI):
         self.model = lambda x: x**2
 
 
+class SimpleLitAPI3(SimpleLitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**3
+
+
+class SimpleLitAPI4(SimpleLitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**4
+
+
 if __name__ == "__main__":
-    server1 = LitServer(SimpleLitAPI1(), accelerator="cpu", devices=1, timeout=10, api_path="/predict-1")
-    server2 = LitServer(SimpleLitAPI2(), accelerator="cpu", devices=1, timeout=10, api_path="/predict-2")
-    run_all([server1, server2], port=8000)
+    server1 = LitServer(SimpleLitAPI1(), api_path="/predict-1")
+    server2 = LitServer(SimpleLitAPI2(), api_path="/predict-2")
+    server3 = LitServer(SimpleLitAPI3(), api_path="/predict-3")
+    server4 = LitServer(SimpleLitAPI4(), api_path="/predict-4")
+    run_all([server1, server2, server3, server4], port=8000)
