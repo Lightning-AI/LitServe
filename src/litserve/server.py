@@ -474,20 +474,40 @@ class LitServer:
         return no_auth
 
 
+@asynccontextmanager
+async def manage_lifespan(app: FastAPI, servers: List[LitServer]):
+    """
+    Context manager to handle the lifespan events of multiple FastAPI servers.
+    """
+    # Start lifespan events for each server
+    lifespans = [server.lifespan(server.app) for server in servers]
+    for lifespan in lifespans:
+        await lifespan.__aenter__()
+
+    try:
+        yield
+    finally:
+        # Exit lifespan events for each server
+        for lifespan in lifespans:
+            await lifespan.__aexit__(None, None, None)
+
+
 def run_all(
-    servers: List[LitServer],
+    litservers: List[LitServer],
     port: Union[str, int] = 8000,
-    num_api_servers: Optional[int] = None,
+    num_api_servers: Optional[int] = 1,
     log_level: str = "info",
     generate_client_file: bool = True,
     api_server_worker_type: Optional[str] = None,
     **kwargs,
 ):
-    """Run multiple LitServers on the same port."""
-    if not servers:
+    """
+    Run multiple LitServers on the same port.
+    """
+    if not litservers:
         raise ValueError("No servers provided to run_all")
 
-    if any(not isinstance(server, LitServer) for server in servers):
+    if any(not isinstance(server, LitServer) for server in litservers):
         raise ValueError("All elements in the servers list must be instances of LitServer")
 
     if generate_client_file:
@@ -501,8 +521,6 @@ def run_all(
     if not (1024 <= port <= 65535):
         raise ValueError(port_msg)
 
-    if num_api_servers is None:
-        num_api_servers = sum(len(server.workers) for server in servers)
     if num_api_servers < 1:
         raise ValueError("num_api_servers must be greater than 0")
 
@@ -512,47 +530,48 @@ def run_all(
     elif api_server_worker_type is None:
         api_server_worker_type = "process"
 
-    app = servers[0].app
+    # Create the main FastAPI app
+    app = FastAPI(lifespan=lambda app: manage_lifespan(app, litservers))
     config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
     sockets = [config.bind_socket()]
 
-    managers, all_workers = [], []
+    managers, workers = [], []
     try:
-        all_servers = []
-        for server in servers:
-            manager, litserve_workers = server.launch_inference_worker(num_api_servers)
+        for litserver in litservers:
+            manager, litserve_workers = litserver.launch_inference_worker(num_api_servers)
             managers.append(manager)
-            all_workers.extend(litserve_workers)
+            workers.extend(litserve_workers)
 
-        # Start the servers
-        for response_queue_id, server in enumerate(servers):
-            server.app.response_queue_id = response_queue_id
-            if server.lit_spec:
-                server.lit_spec.response_queue_id = response_queue_id
+            # include routes from each litserver's app into the main app
+            app.include_router(litserver.app.router)
 
-        main_app = copy.copy(app)
-        # mount all other apps
-        for index, server in enumerate(servers[1:], 1):
-            main_app.mount("/", server.app)  # TODO: Update Mounting Path
+        server_processes = []
+        for response_queue_id in range(num_api_servers):
+            for litserver in litservers:
+                litserver.app.response_queue_id = response_queue_id
+                if litserver.lit_spec:
+                    litserver.lit_spec.response_queue_id = response_queue_id
 
-        config = uvicorn.Config(app=main_app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
-        server = uvicorn.Server(config=config)
-        if api_server_worker_type == "process":
-            ctx = mp.get_context("fork")
-            w = ctx.Process(target=server.run, args=(sockets,))
-        elif api_server_worker_type == "thread":
-            w = threading.Thread(target=server.run, args=(sockets,))
-        else:
-            raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
-        w.start()
-        all_servers.append(w)
+            app = copy.copy(app)
+            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+            uvicorn_server = uvicorn.Server(config=config)
+
+            if api_server_worker_type == "process":
+                ctx = mp.get_context("fork")
+                worker = ctx.Process(target=uvicorn_server.run, args=(sockets,))
+            elif api_server_worker_type == "thread":
+                worker = threading.Thread(target=uvicorn_server.run, args=(sockets,))
+            else:
+                raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
+            worker.start()
+            server_processes.append(worker)
         print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-        for s in all_servers:
-            s.join()
+        for process in server_processes:
+            process.join()
     finally:
         print("Shutting down LitServe")
-        for w in all_workers:
-            w.terminate()
-            w.join()
+        for worker in workers:
+            worker.terminate()
+            worker.join()
         for manager in managers:
             manager.shutdown()
