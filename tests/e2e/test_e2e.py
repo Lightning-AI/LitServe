@@ -57,6 +57,17 @@ def test_run():
     os.remove("client.py")
 
 
+@e2e_from_file("tests/simple_server_with_multi_endpoints.py")
+def test_run_with_multi_endpoints():
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    for i in range(1, 5):
+        resp = requests.post(f"http://127.0.0.1:8000/predict-{i}", json={"input": 4.0}, headers=None)
+        assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+        assert resp.json() == {
+            "output": 4.0**i
+        }, "tests/simple_server_with_multi_endpoints.py didn't return expected output"
+
+
 @e2e_from_file("tests/e2e/default_api.py")
 def test_e2e_default_api():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
