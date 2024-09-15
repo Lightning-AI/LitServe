@@ -15,27 +15,25 @@ import asyncio
 import pickle
 import re
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from asgi_lifespan import LifespanManager
-from litserve import LitAPI
-from fastapi import Request, Response, HTTPException
+import pytest
 import torch
 import torch.nn as nn
+from asgi_lifespan import LifespanManager
+from fastapi import HTTPException, Request, Response
+from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from litserve.utils import wrap_litserve_start
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-
-from unittest.mock import patch, MagicMock, AsyncMock
-import pytest
-
-from litserve.connector import _Connector
-
-from litserve.server import LitServer, manage_lifespan
-import litserve as ls
-from fastapi.testclient import TestClient
 from starlette.types import ASGIApp
-from starlette.middleware.base import BaseHTTPMiddleware
+
+import litserve as ls
+from litserve import LitAPI
+from litserve.connector import _Connector
+from litserve.server import LitServer, manage_lifespan
+from litserve.utils import wrap_litserve_start
 
 
 def test_index(sync_testclient):
