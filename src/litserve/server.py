@@ -476,9 +476,7 @@ class LitServer:
 
 @asynccontextmanager
 async def manage_lifespan(app: FastAPI, servers: List[LitServer]):
-    """
-    Context manager to handle the lifespan events of multiple FastAPI servers.
-    """
+    """Context manager to handle the lifespan events of multiple FastAPI servers."""
     # Start lifespan events for each server
     lifespans = [server.lifespan(server.app) for server in servers]
     for lifespan in lifespans:
@@ -501,9 +499,7 @@ def run_all(
     api_server_worker_type: Optional[str] = None,
     **kwargs,
 ):
-    """
-    Run multiple LitServers on the same port.
-    """
+    """Run multiple LitServers on the same port."""
     if not litservers:
         raise ValueError("No servers provided to run_all")
 
