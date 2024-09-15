@@ -500,8 +500,6 @@ def run_all(
     **kwargs,
 ):
     """Run multiple LitServers on the same port."""
-    if not litservers:
-        raise ValueError("No servers provided to run_all")
 
     if any(not isinstance(server, LitServer) for server in litservers):
         raise ValueError("All elements in the servers list must be instances of LitServer")
