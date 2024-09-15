@@ -32,7 +32,7 @@ from starlette.types import ASGIApp
 import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.server import LitServer, manage_lifespan
+from litserve.server import LitServer, manage_lifespan, run_all
 from litserve.utils import wrap_litserve_start
 
 
@@ -452,3 +452,24 @@ async def test_manage_lifespan(mock_litserver):
 
     # Ensure the __aexit__ method was called
     assert mock_lifespan_cm.__aexit__.call_count == 2
+
+
+@patch("litserve.server.uvicorn")
+def test_run_all_litservers(mock_uvicorn):
+    server1 = LitServer(SimpleLitAPI(), api_path="/predict-1")
+    server2 = LitServer(SimpleLitAPI(), api_path="/predict-2")
+
+    with pytest.raises(ValueError, match="All elements in the servers list must be instances of LitServer"):
+        run_all([server1, "server2"])
+
+    with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
+        run_all([server1, server2], port="invalid port")
+
+    with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
+        run_all([server1, server2], port=65536)
+
+    run_all([server1, server2], port=8000)
+    mock_uvicorn.Config.assert_called()
+    mock_uvicorn.reset_mock()
+    run_all([server1, server2], port="8001")
+    mock_uvicorn.Config.assert_called()
