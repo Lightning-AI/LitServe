@@ -14,19 +14,11 @@ class EventTypes:
     LITAPI_ENCODE_RESPONSE_END = "on_litapi_encode_response_end"
     LITAPI_PREDICT_START = "on_litapi_predict_start"
     LITAPI_PREDICT_END = "on_litapi_predict_end"
-    ENDPOINT_START = "on_endpoint_start"
-    ENDPOINT_END = "on_endpoint_end"
     SERVER_SETUP_START = "on_server_setup_start"
     SERVER_SETUP_END = "on_server_setup_end"
 
 
 class Callback(ABC):
-    def on_endpoint_start(self, *args, **kwargs):
-        """Called before LitServer /predict endpoint is called."""
-
-    def on_endpoint_end(self, *args, **kwargs):
-        """Called after LitServer /predict endpoint is called."""
-
     def on_litapi_predict_start(self, *args, **kwargs):
         """Called before LitAPI.predict() is called."""
 
