@@ -16,5 +16,6 @@ from litserve.api import LitAPI
 from litserve.server import LitServer, Request, Response
 from litserve import test_examples
 from litserve.specs.openai import OpenAISpec
+from litserve.callbacks import Callback
 
-__all__ = ["LitAPI", "LitServer", "Request", "Response", "test_examples", "OpenAISpec"]
+__all__ = ["LitAPI", "LitServer", "Request", "Response", "test_examples", "OpenAISpec", "Callback"]

@@ -1,10 +1,7 @@
 import dataclasses
 import logging
 from abc import ABC
-from typing import List, TYPE_CHECKING, Union
-
-if TYPE_CHECKING:
-    pass
+from typing import List, Union
 
 
 @dataclasses.dataclass
