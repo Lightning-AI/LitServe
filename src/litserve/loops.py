@@ -109,9 +109,7 @@ def run_single_loop(
                 continue
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
                 time.monotonic() - timestamp > lit_api.request_timeout
-                
             ):
-                
                 logger.error(
                     f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
                     "has been timed out. "
@@ -630,7 +628,7 @@ def preprocess_worker(
     ready_to_inference_queue: Queue,
     response_queues: List[Queue],
     max_batch_size: int,
-    batch_timeout :float
+    batch_timeout: float,
 ):
     print(f"Preprocess worker {worker_id}.")
 
