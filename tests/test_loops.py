@@ -29,6 +29,8 @@ from litserve.loops import (
     run_batched_streaming_loop,
     inference_worker,
     run_batched_loop,
+    run_single_preprocess_loop,
+    run_batched_preprocess_loop
 )
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus
@@ -197,38 +199,6 @@ def test_run_single_loop():
     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
 
 
-# def test_run_single_loop_with_preprocess():
-#     lit_api = ls.test_examples.SimpleLitAPI()
-#     lit_api.setup(None)
-#     lit_api.preprocess = lambda x: {"input":x}
-#     lit_api.request_timeout = 1
-
-#     request_queue = Queue()
-#     ready_to_inference =  Queue()
-#     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
-#     response_queues = [Queue()]
-
-
-#     # Run the loop in a separate thread to allow it to be stopped
-#     loop_thread = threading.Thread(target=run_single_preprocess_loop, args=(lit_api, None, request_queue,ready_to_inference,response_queues))
-#     loop_thread.start()
-
-#     # Allow some time for the loop to process
-#     time.sleep(1)
-
-#     # Run the loop in a separate thread to allow it to be stopped
-#     run_single_loop(lit_api, None, request_queue,ready_to_inference,response_queues)
-
-
-#     # Allow some time for the loop to process
-#     time.sleep(1)
-
-#     # Stop the loop by putting a sentinel value in the queue
-#     request_queue.put((None, None, None, None))
-
-#     loop_thread.join()
-#     response = response_queues[0].get()
-#     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
 
 
 def test_run_single_loop_timeout(caplog):
@@ -285,52 +255,180 @@ def test_run_batched_loop():
     assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
 
 
-def preprocess_batch(batch):
-    out = []
-    for x in batch:
-        out.append({"input": x + 1})
-    return out
+
+def test_run_single_loop_with_preprocess():
+   
+
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+    lit_api.decode_request = lambda x: x
+    lit_api.preprocess = lambda x: {"input": x["input"] + 1}
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
 
 
-# def test_run_batched_loop_with_preprocess():
-#     lit_api = ls.test_examples.SimpleBatchedAPI()
-#     lit_api.setup(None)
-#     lit_api.preprocess  = preprocess_batch
-#     lit_api._sanitize(2, None)
-#     assert lit_api.model is not None, "Setup must initialize the model"
-#     lit_api.request_timeout = 1
 
-#     request_queue = Queue()
-#     ready_to_inference = Queue()
-#     response_queues = [Queue()]
-#     # response_queue_id, uid, timestamp, x_enc
-#     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
-#     request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
+    request_queue = Queue()
+    ready_to_inference_queue = Queue()
+    response_queues = [Queue()]
+
+    # Put a request in the queue
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+
+    # Run the preprocess loop in a separate thread
+    import threading
+    loop_thread = threading.Thread(
+        target=run_single_preprocess_loop,
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues)
+    )
+    loop_thread.start()
+
+    # Allow some time for processing
+    time.sleep(0.5)
+
+    # Check if the preprocessed data is in the ready_to_inference_queue
+    assert not ready_to_inference_queue.empty()
+    response_queue_id, uid, preprocessed_data = ready_to_inference_queue.get()
+    assert response_queue_id == 0
+    assert uid == "UUID-001"
+    assert preprocessed_data == {"input": 5.0}
+
+    # Stop the loop
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+def test_run_batched_loop_with_preprocess():
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+    lit_api.decode_request = lambda x: x
+    lit_api.preprocess = lambda batch: [{"input": x["input"] + 1} for x in batch]
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
 
 
-#     # Run the loop in a separate thread to allow it to be stopped
-#     loop_thread = threading.Thread(target=run_batched_preprocess_loop, args=(lit_api, None, request_queue,ready_to_inference,response_queues, 2, 1))
-#     loop_thread.start()
 
-#     # Allow some time for the loop to process
-#     time.sleep(1)
+   
+    request_queue = Queue()
+    ready_to_inference_queue = Queue()
+    response_queues = [Queue()]
 
-#     # Run the loop in a separate thread to allow it to be stopped
-#     run_batched_loop(lit_api, None, request_queue,ready_to_inference,response_queues, 2, 1)
+    # Put multiple requests in the queue
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
+
+    # Run the batched preprocess loop in a separate thread
+    import threading
+    loop_thread = threading.Thread(
+        target=run_batched_preprocess_loop,
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues, 2, 0.1)
+    )
+    loop_thread.start()
+
+    # Allow some time for processing
+    time.sleep(0.5)
+
+    # Check if the preprocessed batch is in the ready_to_inference_queue
+    assert not ready_to_inference_queue.empty()
+    result = ready_to_inference_queue.get()
+    assert isinstance(result, list), "Expected a list result from batched preprocessing"
+    assert len(result) == 3, "Expected a list with 3 elements: [response_queue_ids, uids, preprocessed_batch]"
+    
+    response_queue_ids, uids, preprocessed_batch = result
+    assert response_queue_ids == (0, 0), "Expected response_queue_ids to be (0, 0)"
+    assert uids == ("UUID-001", "UUID-002"), "Expected uids to be ('UUID-001', 'UUID-002')"
+    assert preprocessed_batch == [{"input": 5.0}, {"input": 6.0}], "Expected preprocessed batch to be [{'input': 5.0}, {'input': 6.0}]"
+
+    # Stop the loop
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+def test_run_single_loop_with_preprocess_timeout(caplog):
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 0.0001  # Very small timeout to force a timeout
+    lit_api.decode_request = lambda x: x
+    lit_api.preprocess = lambda x: {"input": x["input"] + 1}
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+
+    request_queue = Queue()
+    ready_to_inference_queue = Queue()
+    response_queues = [Queue()]
+
+    # Simulate an old request to trigger timeout
+    request = (0, "UUID-001", time.monotonic() - 1, {"input": 4.0})
+    request_queue.put(request)
+
+    # Run the preprocess loop in a separate thread
+    loop_thread = threading.Thread(
+        target=run_single_preprocess_loop,
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues)
+    )
+    loop_thread.start()
+
+    # Allow some time for processing
+    time.sleep(0.5)
+
+    # Stop the loop
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    # Check if the response queue has an error
+    assert not response_queues[0].empty()
+    uid, (response, status) = response_queues[0].get()
+    assert uid == "UUID-001"
+    assert isinstance(response, HTTPException), "Timeout should return an HTTPException"
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
 
 
-#     # Allow some time for the loop to process
-#     time.sleep(1)
+def test_run_batched_loop_with_preprocess_timeout(caplog):
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 0.0001  # Very small timeout to force a timeout
+    lit_api.decode_request = lambda x: x
+    lit_api.preprocess = lambda batch: [{"input": x["input"] + 1} for x in batch]
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
 
-#     # Stop the loop by putting a sentinel value in the queue
-#     request_queue.put((None, None, None, None))
+    request_queue = Queue()
+    ready_to_inference_queue = Queue()
+    response_queues = [Queue()]
 
-#     loop_thread.join()
+    # Simulate an old request to trigger timeout
+    request = (0, "UUID-001", time.monotonic() - 1, {"input": 4.0})
+    request_queue.put(request)
 
-#     response_1 = response_queues[0].get(timeout=10)
-#     response_2 = response_queues[0].get(timeout=10)
-#     assert response_1 == ("UUID-001", ({"output": 25.0}, LitAPIStatus.OK))
-#     assert response_2 == ("UUID-002", ({"output": 36.0}, LitAPIStatus.OK))
+    # Run the batched preprocess loop in a separate thread
+    loop_thread = threading.Thread(
+        target=run_batched_preprocess_loop,
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues, 2, 0.1)
+    )
+    loop_thread.start()
+
+    # Allow some time for processing
+    time.sleep(0.5)
+
+    # Stop the loop
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
+
+    # Check if the response queue has an error
+    assert not response_queues[0].empty()
+    uid, (response, status) = response_queues[0].get()
+    assert uid == "UUID-001"
+    assert isinstance(response, HTTPException), "Timeout should return an HTTPException"
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+
+
+def test_run_single_loop_with_preprocess_inference_flow():
+    # !TODO working on this
+    pass 
+
+def test_run_batched_loop_with_preprocess_inference_flow():
+    # !TODO working on this
+    pass 
 
 
 def test_run_batched_loop_timeout(caplog):
