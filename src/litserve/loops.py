@@ -97,11 +97,11 @@ def run_single_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    ready_to_inference_queue: Optional[Queue],
+    preprocess_queue: Optional[Queue],
     response_queues: List[Queue],
 ):
     while True:
-        if ready_to_inference_queue is None:
+        if preprocess_queue is None:
             # We are handling the full pipeline
             try:
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -141,9 +141,9 @@ def run_single_loop(
                 err_pkl = pickle.dumps(e)
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
         else:
-            # We are in the inference worker, get data from ready_to_inference_queue
+            # We are in the inference worker, get data from preprocess_queue
             try:
-                response_queue_id, uid, y = ready_to_inference_queue.get(timeout=1.0)
+                response_queue_id, uid, y = preprocess_queue.get(timeout=1.0)
             except Empty:
                 continue
 
@@ -169,13 +169,13 @@ def run_batched_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    ready_to_inference_queue: Optional[Queue],
+    preprocess_queue: Optional[Queue],
     response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout: float,
 ):
     while True:
-        if ready_to_inference_queue is None:
+        if preprocess_queue is None:
             # We are handling the full pipeline
             batches, timed_out_uids = collate_requests(
                 lit_api,
@@ -229,12 +229,12 @@ def run_batched_loop(
                 for response_queue_id, uid in zip(response_queue_ids, uids):
                     response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
         else:
-            # We are in the inference worker, get data from ready_to_inference_queue
+            # We are in the inference worker, get data from preprocess_queue
             ready_to_inference_list = []
 
             # Collect items from the queue up to max_batch_size or until timeout
             try:
-                item = ready_to_inference_queue.get(timeout=batch_timeout)
+                item = preprocess_queue.get(timeout=batch_timeout)
                 ready_to_inference_list.append(item)
             except Empty:
                 pass
@@ -272,11 +272,11 @@ def run_streaming_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    ready_to_inference_queue: Optional[Queue],
+    preprocess_queue: Optional[Queue],
     response_queues: List[Queue],
 ):
     while True:
-        if ready_to_inference_queue is None:
+        if preprocess_queue is None:
             # We are handling the full pipeline
             try:
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -318,9 +318,9 @@ def run_streaming_loop(
                 err_pkl = pickle.dumps(e)
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
         else:
-            # We are in the inference worker, get data from ready_to_inference_queue
+            # We are in the inference worker, get data from preprocess_queue
             try:
-                response_queue_id, uid, y = ready_to_inference_queue.get(timeout=1.0)
+                response_queue_id, uid, y = preprocess_queue.get(timeout=1.0)
             except Empty:
                 continue
 
@@ -349,13 +349,13 @@ def run_batched_streaming_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    ready_to_inference_queue: Optional[Queue],
+    preprocess_queue: Optional[Queue],
     response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout: float,
 ):
     while True:
-        if ready_to_inference_queue is None:
+        if preprocess_queue is None:
             # We are handling the full pipeline
             batches, timed_out_uids = collate_requests(
                 lit_api,
@@ -413,12 +413,12 @@ def run_batched_streaming_loop(
                 err_pkl = pickle.dumps(e)
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
         else:
-            # We are in the inference worker, get data from ready_to_inference_queue
+            # We are in the inference worker, get data from preprocess_queue
             ready_to_inference_list = []
 
             # Collect items from the queue up to max_batch_size or until timeout
             try:
-                item = ready_to_inference_queue.get(timeout=batch_timeout)
+                item = preprocess_queue.get(timeout=batch_timeout)
                 ready_to_inference_list.append(item)
             except Empty:
                 pass
@@ -460,7 +460,7 @@ def inference_worker(
     device: str,
     worker_id: int,
     request_queue: Queue,
-    ready_to_inference_queue: Optional[Queue],
+    preprocess_queue: Optional[Queue],
     response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout: float,
@@ -481,7 +481,7 @@ def inference_worker(
                 lit_api,
                 lit_spec,
                 request_queue,
-                ready_to_inference_queue,
+                preprocess_queue,
                 response_queues,
                 max_batch_size,
                 batch_timeout,
@@ -491,7 +491,7 @@ def inference_worker(
                 lit_api,
                 lit_spec,
                 request_queue,
-                ready_to_inference_queue,
+                preprocess_queue,
                 response_queues,
             )
     else:
@@ -500,7 +500,7 @@ def inference_worker(
                 lit_api,
                 lit_spec,
                 request_queue,
-                ready_to_inference_queue,
+                preprocess_queue,
                 response_queues,
                 max_batch_size,
                 batch_timeout,
@@ -510,7 +510,7 @@ def inference_worker(
                 lit_api,
                 lit_spec,
                 request_queue,
-                ready_to_inference_queue,
+                preprocess_queue,
                 response_queues,
             )
 
@@ -519,7 +519,7 @@ def run_single_preprocess_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    ready_to_inference_queue: Queue,
+    preprocess_queue: Queue,
     response_queues: List[Queue],
 ):
     while True:
@@ -552,7 +552,7 @@ def run_single_preprocess_loop(
                 lit_api.preprocess,
                 x,
             )
-            ready_to_inference_queue.put((response_queue_id, uid, y))
+            preprocess_queue.put((response_queue_id, uid, y))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while preprocessing the request uid=%s.\n"
@@ -567,7 +567,7 @@ def run_batched_preprocess_loop(
     lit_api: LitAPI,
     lit_spec: LitSpec,
     request_queue: Queue,
-    ready_to_inference_queue: Queue,
+    preprocess_queue: Queue,
     response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout: float,
@@ -609,7 +609,7 @@ def run_batched_preprocess_loop(
             x_batched = lit_api.batch(x)
             y_batched = _inject_context(contexts, lit_api.preprocess, x_batched)
 
-            ready_to_inference_queue.put([response_queue_ids, uids, y_batched])
+            preprocess_queue.put([response_queue_ids, uids, y_batched])
 
         except Exception as e:
             logger.exception(
@@ -627,7 +627,7 @@ def preprocess_worker(
     device: str,
     worker_id: int,
     request_queue: Queue,
-    ready_to_inference_queue: Queue,
+    preprocess_queue: Queue,
     response_queues: List[Queue],
     max_batch_size: int,
     batch_timeout :float
@@ -636,7 +636,7 @@ def preprocess_worker(
 
     if max_batch_size > 1:
         run_batched_preprocess_loop(
-            lit_api, lit_spec, request_queue, ready_to_inference_queue, response_queues, max_batch_size, batch_timeout
+            lit_api, lit_spec, request_queue, preprocess_queue, response_queues, max_batch_size, batch_timeout
         )
     else:
-        run_single_preprocess_loop(lit_api, lit_spec, request_queue, ready_to_inference_queue, response_queues)
+        run_single_preprocess_loop(lit_api, lit_spec, request_queue, preprocess_queue, response_queues)

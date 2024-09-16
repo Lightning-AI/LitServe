@@ -241,7 +241,7 @@ class LitServer:
                 self.num_preprocess_workers = self.workers_per_device
 
             self.preprocess_workers = self.devices * self.num_preprocess_workers
-            self.ready_to_inference_queue = manager.Queue()
+            self.preprocess_queue = manager.Queue()
 
             for worker_id, device in enumerate(self.preprocess_workers):
                 if len(device) == 1:
@@ -257,7 +257,7 @@ class LitServer:
                         device,
                         worker_id,
                         self.request_queue,
-                        self.ready_to_inference_queue,
+                        self.preprocess_queue,
                         self.response_queues,
                         self.max_batch_size,
                         self.batch_timeout,
@@ -280,7 +280,7 @@ class LitServer:
                         device,
                         worker_id,
                         self.request_queue,
-                        self.ready_to_inference_queue,
+                        self.preprocess_queue,
                         self.response_queues,
                         self.max_batch_size,
                         self.batch_timeout,
@@ -292,7 +292,7 @@ class LitServer:
                 process_list.append(process)
         else:
             for worker_id, device in enumerate(self.inference_workers):
-                self.ready_to_inference_queue = None
+                self.preprocess_queue = None
                 if len(device) == 1:
                     device = device[0]
                 worker_id = f"inference_{worker_id}"
@@ -306,7 +306,7 @@ class LitServer:
                         device,
                         worker_id,
                         self.request_queue,
-                        self.ready_to_inference_queue,
+                        self.preprocess_queue,
                         self.response_queues,
                         self.max_batch_size,
                         self.batch_timeout,
