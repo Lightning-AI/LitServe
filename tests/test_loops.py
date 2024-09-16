@@ -254,6 +254,40 @@ def test_run_batched_loop():
     assert response_1 == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
     assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
 
+def test_run_batched_loop_timeout(caplog):
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+    lit_api.request_timeout = 0.1
+
+    request_queue = Queue()
+    # response_queue_id, uid, timestamp, x_enc
+    r1 = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    time.sleep(0.1)
+    request_queue.put(r1)
+    r2 = (0, "UUID-002", time.monotonic(), {"input": 5.0})
+    request_queue.put(r2)
+    response_queues = [Queue()]
+
+    # Run the loop in a separate thread to allow it to be stopped
+    loop_thread = threading.Thread(
+        target=run_batched_loop, args=(lit_api, None, request_queue, None, response_queues, 2, 0.001)
+    )
+    loop_thread.start()
+
+    # Allow some time for the loop to process
+    time.sleep(1)
+
+    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    resp1 = response_queues[0].get(timeout=10)[1]
+    resp2 = response_queues[0].get(timeout=10)[1]
+    assert isinstance(resp1[0], HTTPException), "First request was timed out"
+    assert resp2[0] == {"output": 25.0}, "Second request wasn't timed out"
+
+    # Stop the loop by putting a sentinel value in the queue
+    request_queue.put((None, None, None, None))
+    loop_thread.join()
 
 
 def test_run_single_loop_with_preprocess():
@@ -429,43 +463,6 @@ def test_run_single_loop_with_preprocess_inference_flow():
 def test_run_batched_loop_with_preprocess_inference_flow():
     # !TODO working on this
     pass 
-
-
-def test_run_batched_loop_timeout(caplog):
-    lit_api = ls.test_examples.SimpleBatchedAPI()
-    lit_api.setup(None)
-    lit_api._sanitize(2, None)
-    assert lit_api.model is not None, "Setup must initialize the model"
-    lit_api.request_timeout = 0.1
-
-    request_queue = Queue()
-    # response_queue_id, uid, timestamp, x_enc
-    r1 = (0, "UUID-001", time.monotonic(), {"input": 4.0})
-    time.sleep(0.1)
-    request_queue.put(r1)
-    r2 = (0, "UUID-002", time.monotonic(), {"input": 5.0})
-    request_queue.put(r2)
-    response_queues = [Queue()]
-
-    # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(
-        target=run_batched_loop, args=(lit_api, None, request_queue, None, response_queues, 2, 0.001)
-    )
-    loop_thread.start()
-
-    # Allow some time for the loop to process
-    time.sleep(1)
-
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
-    resp1 = response_queues[0].get(timeout=10)[1]
-    resp2 = response_queues[0].get(timeout=10)[1]
-    assert isinstance(resp1[0], HTTPException), "First request was timed out"
-    assert resp2[0] == {"output": 25.0}, "Second request wasn't timed out"
-
-    # Stop the loop by putting a sentinel value in the queue
-    request_queue.put((None, None, None, None))
-    loop_thread.join()
-
 
 def test_run_streaming_loop():
     lit_api = ls.test_examples.SimpleStreamAPI()
