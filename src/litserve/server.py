@@ -230,6 +230,7 @@ class LitServer:
                 return api_instance.preprocess.__code__ is not LitAPI.preprocess.__code__
             # If preprocess method does not exist in the subclass
             return False
+
         enable_process_worker = has_preprocess_method_override(self.lit_api)
         logger.debug("override lit_api.preprocess method: ", enable_process_worker)
 
