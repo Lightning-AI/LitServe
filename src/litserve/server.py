@@ -37,7 +37,7 @@ from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
-from litserve.callbacks.base import CallbackRunner, Callback
+from litserve.callbacks.base import CallbackRunner, Callback, EventTypes
 from litserve.connector import _Connector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
@@ -300,6 +300,7 @@ class LitServer:
             data_available.clear()
 
     def setup_server(self):
+        self._callback_runner.trigger_event(EventTypes.SERVER_SETUP_START, litserver=self)
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -384,6 +385,8 @@ class LitServer:
                 self.app.add_middleware(middleware, **kwargs)
             elif callable(middleware):
                 self.app.add_middleware(middleware)
+
+        self._callback_runner.trigger_event(EventTypes.SERVER_SETUP_END, litserver=self)
 
     @staticmethod
     def generate_client_file():

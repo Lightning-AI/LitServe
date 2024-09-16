@@ -16,6 +16,8 @@ class EventTypes:
     LITAPI_PREDICT_END = "on_litapi_predict_end"
     ENDPOINT_START = "on_endpoint_start"
     ENDPOINT_END = "on_endpoint_end"
+    SERVER_SETUP_START = "on_server_setup_start"
+    SERVER_SETUP_END = "on_server_setup_end"
 
 
 class Callback(ABC):
