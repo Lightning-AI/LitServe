@@ -64,6 +64,8 @@ class CallbackRunner:
 
     def trigger_event(self, event_name, *args, **kwargs):
         """Triggers an event, invoking all registered callbacks for that event."""
+        if not self._callbacks:
+            return
         for callback in self._callbacks:
             try:
                 getattr(callback, event_name)(*args, **kwargs)
