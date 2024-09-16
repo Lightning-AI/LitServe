@@ -37,7 +37,7 @@ from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
-from litserve.callbacks.callbacks import _CallbackConnector, Callback
+from litserve.callbacks.base import CallbackRunner, Callback
 from litserve.connector import _Connector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
@@ -173,8 +173,8 @@ class LitServer:
         self.stream = stream
         self.max_payload_size = max_payload_size
         self._connector = _Connector(accelerator=accelerator, devices=devices)
-        self._callback_connector = _CallbackConnector(server=self)
-        self._callback_connector.add_callbacks(callbacks)
+        self._callback_runner = CallbackRunner()
+        self._callback_runner.add_callbacks(callbacks)
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -244,6 +244,7 @@ class LitServer:
                     self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
+                    self._callback_runner,
                 ),
             )
             process.start()

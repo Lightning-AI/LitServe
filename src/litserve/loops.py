@@ -25,6 +25,7 @@ from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
+from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
@@ -93,7 +94,13 @@ def collate_requests(
     return payloads, timed_out_uids
 
 
-def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, response_queues: List[Queue]):
+def run_single_loop(
+    lit_api: LitAPI,
+    lit_spec: LitSpec,
+    request_queue: Queue,
+    response_queues: List[Queue],
+    callback_runner: CallbackRunner,
+):
     while True:
         try:
             response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -119,11 +126,13 @@ def run_single_loop(lit_api: LitAPI, lit_spec: LitSpec, request_queue: Queue, re
                 lit_api.decode_request,
                 x_enc,
             )
+            callback_runner.trigger_event(EventTypes.LITAPI_PREDICT_START)
             y = _inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
+            callback_runner.trigger_event(EventTypes.LITAPI_PREDICT_END)
             y_enc = _inject_context(
                 context,
                 lit_api.encode_response,
@@ -325,9 +334,12 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool] = None,
+    callback_runner: CallbackRunner = None,
 ):
+    callback_runner.trigger_event(EventTypes.LITAPI_SETUP_START, lit_api=lit_api)
     lit_api.setup(device)
     lit_api.device = device
+    callback_runner.trigger_event(EventTypes.LITAPI_SETUP_END, lit_api=lit_api)
 
     print(f"Setup complete for worker {worker_id}.")
 
