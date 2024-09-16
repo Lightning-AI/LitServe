@@ -43,6 +43,12 @@ class Callback(ABC):
     def on_litapi_setup_end(self, *args, **kwargs):
         """Called after LitAPI.setup() is called."""
 
+    def on_server_setup_start(self, *args, **kwargs):
+        """Called before LitServer.setup_server() is called."""
+
+    def on_server_setup_end(self, *args, **kwargs):
+        """Called after LitServer.setup_server() is called."""
+
 
 class CallbackRunner:
     def __init__(self):
@@ -64,3 +70,7 @@ class CallbackRunner:
             except Exception:
                 # Handle exceptions to prevent one callback from disrupting others
                 logging.exception(f"Error in callback '{callback}' during event '{event_name}'")
+
+
+class NoopCallback(Callback):
+    """This callback does nothing."""

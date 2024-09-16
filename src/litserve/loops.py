@@ -376,8 +376,8 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
-    workers_setup_status: Dict[str, bool] = None,
-    callback_runner: CallbackRunner = None,
+    workers_setup_status: Dict[str, bool],
+    callback_runner: CallbackRunner,
 ):
     callback_runner.trigger_event(EventTypes.LITAPI_SETUP_START, lit_api=lit_api)
     lit_api.setup(device)
@@ -393,12 +393,16 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
         if max_batch_size > 1:
-            run_batched_streaming_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
+            run_batched_streaming_loop(
+                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+            )
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues)
+            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
         return
 
     if max_batch_size > 1:
-        run_batched_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
+        run_batched_loop(
+            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+        )
     else:
         run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
