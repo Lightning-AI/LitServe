@@ -231,24 +231,25 @@ class LitServer:
             # If preprocess method does not exist in the subclass
             return False
 
-        print("has_preprocess_method_override is ", has_preprocess_method_override(self.lit_api))
+        logger.debug("override lit_api.preprocess method: ", has_preprocess_method_override(self.lit_api))
 
         if has_preprocess_method_override(self.lit_api):
             if self.num_preprocess_workers:
                 pass
             else:
-                print("Using Workers per device as number of preprocess workers")
+                logger.info("Using Workers per device as number of preprocess workers")
                 self.num_preprocess_workers = self.workers_per_device
 
             self.preprocess_workers = self.devices * self.num_preprocess_workers
-            self.ready_to_inference_queue = mp.Queue()
+            self.ready_to_inference_queue = manager.Queue()
 
             for worker_id, device in enumerate(self.preprocess_workers):
                 if len(device) == 1:
                     device = device[0]
 
                 worker_id = f"preprocess_{worker_id}"
-                process = mp.Process(
+                ctx = mp.get_context("spawn")
+                process = ctx.Process(
                     target=preprocess_worker,
                     args=(
                         self.lit_api,
@@ -270,7 +271,8 @@ class LitServer:
                     device = device[0]
                 worker_id = f"inference_{worker_id}"
                 self.workers_setup_status[worker_id] = False
-                process = mp.Process(
+                ctx = mp.get_context("spawn")
+                process = ctx.Process(
                     target=inference_worker,
                     args=(
                         self.lit_api,
@@ -295,7 +297,8 @@ class LitServer:
                     device = device[0]
                 worker_id = f"inference_{worker_id}"
                 self.workers_setup_status[worker_id] = False
-                process = mp.Process(
+                ctx = mp.get_context("spawn")
+                process = ctx.Process(
                     target=inference_worker,
                     args=(
                         self.lit_api,
