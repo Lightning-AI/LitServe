@@ -30,7 +30,7 @@ from litserve.loops import (
     inference_worker,
     run_batched_loop,
     run_single_preprocess_loop,
-    run_batched_preprocess_loop
+    run_batched_preprocess_loop,
 )
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus
@@ -199,8 +199,6 @@ def test_run_single_loop():
     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
 
 
-
-
 def test_run_single_loop_timeout(caplog):
     lit_api = ls.test_examples.SimpleLitAPI()
     lit_api.setup(None)
@@ -254,6 +252,7 @@ def test_run_batched_loop():
     assert response_1 == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
     assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
 
+
 def test_run_batched_loop_timeout(caplog):
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
@@ -291,8 +290,6 @@ def test_run_batched_loop_timeout(caplog):
 
 
 def test_run_single_loop_with_preprocess():
-   
-
     lit_api = ls.test_examples.SimpleLitAPI()
     lit_api.setup(None)
     lit_api.request_timeout = 1
@@ -300,8 +297,6 @@ def test_run_single_loop_with_preprocess():
     lit_api.preprocess = lambda x: {"input": x["input"] + 1}
     lit_api._sanitize(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
-
-
 
     request_queue = Queue()
     ready_to_inference_queue = Queue()
@@ -312,9 +307,10 @@ def test_run_single_loop_with_preprocess():
 
     # Run the preprocess loop in a separate thread
     import threading
+
     loop_thread = threading.Thread(
         target=run_single_preprocess_loop,
-        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues)
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues),
     )
     loop_thread.start()
 
@@ -332,6 +328,7 @@ def test_run_single_loop_with_preprocess():
     request_queue.put((None, None, None, None))
     loop_thread.join()
 
+
 def test_run_batched_loop_with_preprocess():
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
@@ -341,9 +338,6 @@ def test_run_batched_loop_with_preprocess():
     lit_api._sanitize(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
 
-
-
-   
     request_queue = Queue()
     ready_to_inference_queue = Queue()
     response_queues = [Queue()]
@@ -354,9 +348,10 @@ def test_run_batched_loop_with_preprocess():
 
     # Run the batched preprocess loop in a separate thread
     import threading
+
     loop_thread = threading.Thread(
         target=run_batched_preprocess_loop,
-        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues, 2, 0.1)
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues, 2, 0.1),
     )
     loop_thread.start()
 
@@ -368,15 +363,19 @@ def test_run_batched_loop_with_preprocess():
     result = ready_to_inference_queue.get()
     assert isinstance(result, list), "Expected a list result from batched preprocessing"
     assert len(result) == 3, "Expected a list with 3 elements: [response_queue_ids, uids, preprocessed_batch]"
-    
+
     response_queue_ids, uids, preprocessed_batch = result
     assert response_queue_ids == (0, 0), "Expected response_queue_ids to be (0, 0)"
     assert uids == ("UUID-001", "UUID-002"), "Expected uids to be ('UUID-001', 'UUID-002')"
-    assert preprocessed_batch == [{"input": 5.0}, {"input": 6.0}], "Expected preprocessed batch to be [{'input': 5.0}, {'input': 6.0}]"
+    assert preprocessed_batch == [
+        {"input": 5.0},
+        {"input": 6.0},
+    ], "Expected preprocessed batch to be [{'input': 5.0}, {'input': 6.0}]"
 
     # Stop the loop
     request_queue.put((None, None, None, None))
     loop_thread.join()
+
 
 def test_run_single_loop_with_preprocess_timeout(caplog):
     lit_api = ls.test_examples.SimpleLitAPI()
@@ -398,7 +397,7 @@ def test_run_single_loop_with_preprocess_timeout(caplog):
     # Run the preprocess loop in a separate thread
     loop_thread = threading.Thread(
         target=run_single_preprocess_loop,
-        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues)
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues),
     )
     loop_thread.start()
 
@@ -437,7 +436,7 @@ def test_run_batched_loop_with_preprocess_timeout(caplog):
     # Run the batched preprocess loop in a separate thread
     loop_thread = threading.Thread(
         target=run_batched_preprocess_loop,
-        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues, 2, 0.1)
+        args=(lit_api, None, request_queue, ready_to_inference_queue, response_queues, 2, 0.1),
     )
     loop_thread.start()
 
@@ -458,11 +457,13 @@ def test_run_batched_loop_with_preprocess_timeout(caplog):
 
 def test_run_single_loop_with_preprocess_inference_flow():
     # !TODO working on this
-    pass 
+    pass
+
 
 def test_run_batched_loop_with_preprocess_inference_flow():
     # !TODO working on this
-    pass 
+    pass
+
 
 def test_run_streaming_loop():
     lit_api = ls.test_examples.SimpleStreamAPI()
