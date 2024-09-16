@@ -62,7 +62,6 @@ class CallbackRunner:
             self._callbacks.extend(callbacks)
         else:
             self._callbacks.append(callbacks)
-        print("added runners")
 
     def trigger_event(self, event_name, *args, **kwargs):
         """Triggers an event, invoking all registered callbacks for that event."""
@@ -71,4 +70,4 @@ class CallbackRunner:
                 getattr(callback, event_name)(*args, **kwargs)
             except Exception:
                 # Handle exceptions to prevent one callback from disrupting others
-                logging.exception(f"Error in callback '{callback.name}' during event '{event_name}'")
+                logging.exception(f"Error in callback '{callback}' during event '{event_name}'")

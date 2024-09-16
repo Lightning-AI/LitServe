@@ -126,13 +126,13 @@ def run_single_loop(
                 lit_api.decode_request,
                 x_enc,
             )
-            callback_runner.trigger_event(EventTypes.LITAPI_PREDICT_START)
+            callback_runner.trigger_event(EventTypes.LITAPI_PREDICT_START, lit_api=lit_api)
             y = _inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
-            callback_runner.trigger_event(EventTypes.LITAPI_PREDICT_END)
+            callback_runner.trigger_event(EventTypes.LITAPI_PREDICT_END, lit_api=lit_api)
             y_enc = _inject_context(
                 context,
                 lit_api.encode_response,
@@ -358,9 +358,4 @@ def inference_worker(
     if max_batch_size > 1:
         run_batched_loop(lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout)
     else:
-        run_single_loop(
-            lit_api,
-            lit_spec,
-            request_queue,
-            response_queues,
-        )
+        run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
