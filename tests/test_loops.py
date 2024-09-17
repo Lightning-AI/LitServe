@@ -483,9 +483,7 @@ def test_run_single_loop_with_preprocess_inference_flow():
 
     # Run the inference loop in a separate daemon thread
     inference_thread = threading.Thread(
-        target=run_single_loop,
-        args=(lit_api, None, None, preprocess_queue, response_queues),
-        daemon=True
+        target=run_single_loop, args=(lit_api, None, None, preprocess_queue, response_queues), daemon=True
     )
     inference_thread.start()
 
@@ -496,6 +494,7 @@ def test_run_single_loop_with_preprocess_inference_flow():
 
     # Allow the thread to exit
     time.sleep(0.1)
+
 
 def test_run_batched_loop_with_preprocess_inference_flow():
     lit_api = ls.test_examples.SimpleBatchedAPI()
@@ -526,9 +525,7 @@ def test_run_batched_loop_with_preprocess_inference_flow():
 
     # Run the inference loop in a separate daemon thread
     inference_thread = threading.Thread(
-        target=run_batched_loop,
-        args=(lit_api, None, None, preprocess_queue, response_queues, 2, 0.1),
-        daemon=True
+        target=run_batched_loop, args=(lit_api, None, None, preprocess_queue, response_queues, 2, 0.1), daemon=True
     )
     inference_thread.start()
 
@@ -578,9 +575,7 @@ def test_run_single_streaming_loop_with_preprocess_inference_flow():
 
     # Run the streaming inference loop in a separate daemon thread
     inference_thread = threading.Thread(
-        target=run_streaming_loop,
-        args=(lit_api, None, None, preprocess_queue, response_queues),
-        daemon=True
+        target=run_streaming_loop, args=(lit_api, None, None, preprocess_queue, response_queues), daemon=True
     )
     inference_thread.start()
 
@@ -598,7 +593,6 @@ def test_run_single_streaming_loop_with_preprocess_inference_flow():
 
     # Allow the thread to exit
     time.sleep(0.1)
-
 
 
 def test_run_streaming_loop():
