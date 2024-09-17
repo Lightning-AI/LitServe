@@ -124,7 +124,7 @@ class LitServer:
 
         if middlewares is None:
             middlewares = []
-        if not isinstance(middlewares, list):
+        elif not isinstance(middlewares, list):
             _msg = (
                 "middlewares must be a list of tuples"
                 " where each tuple contains a middleware and its arguments. For example:\n"
@@ -204,20 +204,14 @@ class LitServer:
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
 
-        self.response_queues = []
-        for _ in range(num_uvicorn_servers):
-            response_queue = manager.Queue()
-            self.response_queues.append(response_queue)
+        self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app
-            try:
-                spec.setup(server_copy)
-            except Exception as e:
-                raise e
+            spec.setup(server_copy)
 
         process_list = []
         for worker_id, device in enumerate(self.devices * self.workers_per_device):
@@ -405,7 +399,7 @@ class LitServer:
         **kwargs,
     ):
         if generate_client_file:
-            self.generate_client_file()
+            LitServer.generate_client_file()
 
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
@@ -420,13 +414,15 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.workers)
+            num_api_servers = len(self.num_inference_workers)
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
 
         if sys.platform == "win32":
-            print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
+            warnings.warn(
+                "Windows does not support forking. Using threads" " api_server_worker_type will be set to 'thread'"
+            )
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
