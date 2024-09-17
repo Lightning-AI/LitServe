@@ -1,3 +1,5 @@
+import re
+
 import litserve as ls
 from fastapi.testclient import TestClient
 
@@ -14,4 +16,5 @@ def test_callback(capfd):
         assert response.json() == {"output": 16.0}
 
     captured = capfd.readouterr()
-    assert "Prediction took 0.00 seconds" in captured.out
+    pattern = r"Prediction took \d+\.\d{2} seconds"
+    assert re.search(pattern, captured.out), f"Expected pattern not found in output: {captured.out}"

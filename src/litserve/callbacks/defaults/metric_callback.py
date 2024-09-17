@@ -18,4 +18,4 @@ class MetricLogger(Callback):
     def on_litapi_predict_end(self, lit_api: "LitAPI"):
         t1 = time.perf_counter()
         elapsed = t1 - self._start_time
-        print(f"Prediction took {elapsed:.2f} seconds")
+        print(f"Prediction took {elapsed:.2f} seconds", flush=True)
