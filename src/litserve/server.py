@@ -124,7 +124,7 @@ class LitServer:
 
         if middlewares is None:
             middlewares = []
-        elif not isinstance(middlewares, list):
+        if not isinstance(middlewares, list):
             _msg = (
                 "middlewares must be a list of tuples"
                 " where each tuple contains a middleware and its arguments. For example:\n"
