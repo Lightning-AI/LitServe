@@ -478,6 +478,7 @@ class LitServer:
 async def multi_server_lifespan(app: FastAPI, servers: List[LitServer]):
     """Context manager to handle the lifespan events of multiple FastAPI servers."""
     # Start lifespan events for each server
+    app.response_queue_id = 0
     async with AsyncExitStack() as stack:
         for server in servers:
             await stack.enter_async_context(server.lifespan(server.app))
