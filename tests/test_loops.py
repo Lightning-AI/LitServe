@@ -292,7 +292,7 @@ def test_run_batched_loop_timeout(caplog):
 def test_run_single_loop_with_preprocess():
     lit_api = ls.test_examples.SimpleLitAPI()
     lit_api.setup(None)
-    lit_api.request_timeout = 1    
+    lit_api.request_timeout = 1
     lit_api.preprocess = lambda x: x + 1
     lit_api._sanitize(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
@@ -471,9 +471,7 @@ def test_run_single_loop_with_preprocess_inference_flow():
 
     # Run the inference loop in a separate daemon thread
     inference_thread = threading.Thread(
-        target=run_single_loop,
-        args=(lit_api, None, None, preprocess_queue, response_queues),
-        daemon=True
+        target=run_single_loop, args=(lit_api, None, None, preprocess_queue, response_queues), daemon=True
     )
     inference_thread.start()
 
@@ -484,6 +482,7 @@ def test_run_single_loop_with_preprocess_inference_flow():
 
     # Allow the thread to exit
     time.sleep(0.1)
+
 
 def test_run_batched_loop_with_preprocess_inference_flow():
     lit_api = ls.test_examples.SimpleBatchedAPI()
@@ -502,15 +501,13 @@ def test_run_batched_loop_with_preprocess_inference_flow():
     uids = ("UUID-001", "UUID-002")
     preprocessed_batch = [5.0, 6.0]  # Inputs 4.0 +1 and 5.0 +1
 
-    #Since lit_api decode request convert requests into np array
+    # Since lit_api decode request convert requests into np array
     preprocessed_batch = np.asarray(preprocessed_batch)
     preprocess_queue.put([response_queue_ids, uids, preprocessed_batch])
 
     # Run the inference loop in a separate daemon thread
     inference_thread = threading.Thread(
-        target=run_batched_loop,
-        args=(lit_api, None, None, preprocess_queue, response_queues, 2, 0.1),
-        daemon=True
+        target=run_batched_loop, args=(lit_api, None, None, preprocess_queue, response_queues, 2, 0.1), daemon=True
     )
     inference_thread.start()
 
@@ -551,9 +548,7 @@ def test_run_single_streaming_loop_with_preprocess_inference_flow():
 
     # Run the streaming inference loop in a separate daemon thread
     inference_thread = threading.Thread(
-        target=run_streaming_loop,
-        args=(lit_api, None, None, preprocess_queue, response_queues),
-        daemon=True
+        target=run_streaming_loop, args=(lit_api, None, None, preprocess_queue, response_queues), daemon=True
     )
     inference_thread.start()
 
@@ -561,13 +556,12 @@ def test_run_single_streaming_loop_with_preprocess_inference_flow():
     streamed_outputs = []
     while True:
         uid_received, (response, status) = response_queue.get(timeout=10)
-        
+
         if status == LitAPIStatus.FINISH_STREAMING:
             break
         streamed_outputs.append(response)
 
     expected_outputs = [{"output": f"{i}: Hello"} for i in range(3)]
-    
 
     assert streamed_outputs == expected_outputs, f"Expected {expected_outputs} but got {streamed_outputs}"
 
