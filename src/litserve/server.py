@@ -196,7 +196,7 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.workers = self.devices * self.workers_per_device
+        self.inference_workers = self.devices * self.workers_per_device
         self.setup_server()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
@@ -414,7 +414,7 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.num_inference_workers)
+            num_api_servers = len(self.inference_workers)
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
