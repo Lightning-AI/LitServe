@@ -15,7 +15,7 @@ import asyncio
 import pickle
 import re
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
