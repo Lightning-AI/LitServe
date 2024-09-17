@@ -57,8 +57,8 @@ def test_run():
     os.remove("client.py")
 
 
-@e2e_from_file("tests/simple_server_with_multi_endpoints.py")
-def test_e2e_with_multi_endpoints():
+@e2e_from_file("tests/multiple_litserver.py")
+def test_e2e_combined_multiple_litserver():
     assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     for i in range(1, 5):
         resp = requests.post(f"http://127.0.0.1:8000/predict-{i}", json={"input": 4.0}, headers=None)
