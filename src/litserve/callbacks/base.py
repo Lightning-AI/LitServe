@@ -32,7 +32,7 @@ class Callback(ABC):
         """Called after LitAPI.decode_request() is called."""
 
     def on_litapi_encode_response_start(self, *args, **kwargs):
-        """Called before LitAPI.decode_request() is called."""
+        """Called before LitAPI.encode_response() is called."""
 
     def on_litapi_encode_response_end(self, *args, **kwargs):
         """Called after LitAPI.encode_response() is called."""
