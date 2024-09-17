@@ -485,7 +485,7 @@ async def multi_server_lifespan(app: FastAPI, servers: List[LitServer]):
 
 
 def run_all(
-    litservers: List[LitServer],
+    servers: List[LitServer],
     port: Union[str, int] = 8000,
     num_api_servers: Optional[int] = 1,
     log_level: str = "info",
@@ -495,7 +495,7 @@ def run_all(
 ):
     """Run multiple LitServers on the same port."""
 
-    if any(not isinstance(server, LitServer) for server in litservers):
+    if any(not isinstance(server, LitServer) for server in servers):
         raise ValueError("All elements in the servers list must be instances of LitServer")
 
     if generate_client_file:
@@ -519,13 +519,13 @@ def run_all(
         api_server_worker_type = "process"
 
     # Create the main FastAPI app
-    app = FastAPI(lifespan=lambda app: multi_server_lifespan(app, litservers))
+    app = FastAPI(lifespan=lambda app: multi_server_lifespan(app, servers))
     config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
     sockets = [config.bind_socket()]
 
     managers, workers = [], []
     try:
-        for litserver in litservers:
+        for litserver in servers:
             manager, litserve_workers = litserver.launch_inference_worker(num_api_servers)
             managers.append(manager)
             workers.extend(litserve_workers)
@@ -535,7 +535,7 @@ def run_all(
 
         server_processes = []
         for response_queue_id in range(num_api_servers):
-            for litserver in litservers:
+            for litserver in servers:
                 litserver.app.response_queue_id = response_queue_id
                 if litserver.lit_spec:
                     litserver.lit_spec.response_queue_id = response_queue_id
