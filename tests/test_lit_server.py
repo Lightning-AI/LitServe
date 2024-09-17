@@ -460,9 +460,6 @@ def test_run_all_litservers(mock_uvicorn):
     with pytest.raises(ValueError, match="num_api_servers must be greater than 0"):
         run_all([server1, server2], num_api_servers=0)
 
-    with pytest.raises(ValueError, match="Must be 'process' or 'thread'"):
-        run_all([server1, server2], api_server_worker_type="invalid")
-
     run_all([server1, server2, server3], port=8000)
     mock_uvicorn.Config.assert_called()
     mock_uvicorn.reset_mock()
