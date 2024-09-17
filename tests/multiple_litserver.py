@@ -40,4 +40,4 @@ if __name__ == "__main__":
     server2 = LitServer(MultipleLitServerAPI2(), api_path="/predict-2")
     server3 = LitServer(MultipleLitServerAPI3(), api_path="/predict-3")
     server4 = LitServer(MultipleLitServerAPI4(), api_path="/predict-4")
-    run_all([server1, server2, server3, server4], port=8000, num_api_servers=2)
+    run_all([server1, server2, server3, server4], port=8000)
