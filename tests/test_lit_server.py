@@ -32,7 +32,7 @@ from starlette.types import ASGIApp
 import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.server import LitServer, manage_lifespan, run_all
+from litserve.server import LitServer, multi_server_lifespan, run_all
 from litserve.utils import wrap_litserve_start
 
 
@@ -431,27 +431,14 @@ def test_middlewares_inputs():
 
 @pytest.mark.asyncio
 @patch("litserve.server.LitServer")
-async def test_manage_lifespan(mock_litserver):
-    # Mock the LitServer instance
-    mock_server_instance = MagicMock(spec=LitServer)
-    mock_server_instance.app = MagicMock()
-
-    # Create an async context manager mock for the lifespan method
-    mock_lifespan_cm = MagicMock()
-    mock_lifespan_cm.__aenter__ = AsyncMock()
-    mock_lifespan_cm.__aexit__ = AsyncMock()
-    mock_server_instance.lifespan.return_value = mock_lifespan_cm
-
-    mock_litserver.return_value = mock_server_instance
-
-    servers = [mock_server_instance, mock_server_instance]
-
-    async with manage_lifespan(None, servers):
-        # Assertions to ensure the function behaves as expected
-        assert mock_lifespan_cm.__aenter__.call_count == 2
-
-    # Ensure the __aexit__ method was called
-    assert mock_lifespan_cm.__aexit__.call_count == 2
+async def test_multi_server_lifespan(mock_litserver):
+    # List of servers
+    servers = [mock_litserver, mock_litserver]
+    # Use the async context manager
+    async with multi_server_lifespan(MagicMock(), servers):
+        # Check if the lifespan method was called for each server
+        assert mock_litserver.lifespan.call_count == 2
+    assert mock_litserver.lifespan.return_value.__aexit__.call_count == 2
 
 
 @patch("litserve.server.uvicorn")
