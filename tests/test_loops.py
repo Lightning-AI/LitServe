@@ -456,13 +456,149 @@ def test_run_batched_loop_with_preprocess_timeout(caplog):
 
 
 def test_run_single_loop_with_preprocess_inference_flow():
-    # !TODO working on this
-    pass
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+    lit_api.decode_request = lambda x: x  # Returns the input as-is
+    lit_api.preprocess = lambda x: {"input": x["input"] + 1}
 
+    # Override predict to handle dictionaries
+    lit_api.predict = lambda x: x["input"] ** 2
+
+    # Override encode_response to wrap the output in a dictionary
+    lit_api.encode_response = lambda y: {"output": y}
+
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+
+    preprocess_queue = Queue()
+    response_queue = Queue()
+    response_queues = [response_queue]
+
+    # Prepare the preprocessed data
+    response_queue_id = 0
+    uid = "UUID-001"
+    preprocessed_data = {"input": 5.0}  # Since preprocess adds 1 to the input 4.0
+    preprocess_queue.put((response_queue_id, uid, preprocessed_data))
+
+    # Run the inference loop in a separate daemon thread
+    inference_thread = threading.Thread(
+        target=run_single_loop,
+        args=(lit_api, None, None, preprocess_queue, response_queues),
+        daemon=True
+    )
+    inference_thread.start()
+
+    # Wait for the response
+    uid_received, (response, status) = response_queue.get(timeout=10)
+    assert uid_received == "UUID-001"
+    assert response == {"output": 25.0}, f"Expected output to be 25.0 but got {response}"
+
+    # Allow the thread to exit
+    time.sleep(0.1)
 
 def test_run_batched_loop_with_preprocess_inference_flow():
-    # !TODO working on this
-    pass
+    lit_api = ls.test_examples.SimpleBatchedAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+    lit_api.decode_request = lambda x: x
+    lit_api.preprocess = lambda batch: [{"input": x["input"] + 1} for x in batch]
+
+    # Override predict to handle lists of dictionaries
+    lit_api.predict = lambda x_list: [x["input"] ** 2 for x in x_list]
+
+    # Correct encode_response to handle single outputs
+    lit_api.encode_response = lambda y: {"output": y}
+
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+
+    preprocess_queue = Queue()
+    response_queue = Queue()
+    response_queues = [response_queue]
+
+    # Prepare the preprocessed data
+    response_queue_ids = (0, 0)
+    uids = ("UUID-001", "UUID-002")
+    preprocessed_batch = [{"input": 5.0}, {"input": 6.0}]  # Inputs 4.0 +1 and 5.0 +1
+
+    preprocess_queue.put([response_queue_ids, uids, preprocessed_batch])
+
+    # Run the inference loop in a separate daemon thread
+    inference_thread = threading.Thread(
+        target=run_batched_loop,
+        args=(lit_api, None, None, preprocess_queue, response_queues, 2, 0.1),
+        daemon=True
+    )
+    inference_thread.start()
+
+    # Collect the responses
+    outputs = {}
+    for _ in range(2):
+        uid_received, (response, status) = response_queue.get(timeout=10)
+        outputs[uid_received] = response
+
+    expected_output1 = {"output": 25.0}  # (5.0)^2
+    expected_output2 = {"output": 36.0}  # (6.0)^2
+
+    assert outputs["UUID-001"] == expected_output1, f"Expected {expected_output1} but got {outputs['UUID-001']}"
+    assert outputs["UUID-002"] == expected_output2, f"Expected {expected_output2} but got {outputs['UUID-002']}"
+
+    # Allow the thread to exit
+    time.sleep(0.1)
+
+
+def test_run_single_streaming_loop_with_preprocess_inference_flow():
+    lit_api = ls.test_examples.SimpleStreamAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+    lit_api.decode_request = lambda x: x
+    lit_api.preprocess = lambda x: {"input": f"Preprocessed {x['input']}"}
+
+    # Override predict to format the output correctly
+    lit_api.predict = lambda x: (f"{i}: {x['input']}" for i in range(3))
+
+    # Override encode_response to yield JSON strings
+    lit_api.encode_response = lambda y_gen: (json.dumps({"output": y}) for y in y_gen)
+
+    lit_api.format_encoded_response = lambda y_enc: y_enc
+
+    lit_api._sanitize(2, None)
+    assert lit_api.model is not None, "Setup must initialize the model"
+
+    preprocess_queue = Queue()
+    response_queue = Queue()
+    response_queues = [response_queue]
+
+    # Prepare the preprocessed data
+    response_queue_id = 0
+    uid = "UUID-001"
+    preprocessed_data = {"input": "Preprocessed Hello"}
+    preprocess_queue.put((response_queue_id, uid, preprocessed_data))
+
+    # Run the streaming inference loop in a separate daemon thread
+    inference_thread = threading.Thread(
+        target=run_streaming_loop,
+        args=(lit_api, None, None, preprocess_queue, response_queues),
+        daemon=True
+    )
+    inference_thread.start()
+
+    # Collect the streamed responses
+    streamed_outputs = []
+    while True:
+        uid_received, (response, status) = response_queue.get(timeout=10)
+        if status == LitAPIStatus.FINISH_STREAMING:
+            break
+        streamed_outputs.append(json.loads(response))
+
+    expected_outputs = [{"output": f"{i}: Preprocessed Hello"} for i in range(3)]
+
+    assert streamed_outputs == expected_outputs, f"Expected {expected_outputs} but got {streamed_outputs}"
+
+    # Allow the thread to exit
+    time.sleep(0.1)
+
 
 
 def test_run_streaming_loop():
