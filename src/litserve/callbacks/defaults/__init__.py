@@ -1,3 +1,3 @@
-from litserve.callbacks.defaults.metric_callback import MetricLogger
+from litserve.callbacks.defaults.metric_callback import PredictionTimeLogger
 
-__all__ = ["MetricLogger"]
+__all__ = ["PredictionTimeLogger"]

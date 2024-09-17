@@ -10,7 +10,7 @@ if typing.TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class MetricLogger(Callback):
+class PredictionTimeLogger(Callback):
     def on_litapi_predict_start(self, lit_api: "LitAPI"):
         t0 = time.perf_counter()
         self._start_time = t0

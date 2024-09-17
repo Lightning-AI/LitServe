@@ -4,13 +4,13 @@ import litserve as ls
 from fastapi.testclient import TestClient
 
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.callbacks.defaults import MetricLogger
+from litserve.callbacks.defaults import PredictionTimeLogger
 from litserve.utils import wrap_litserve_start
 
 
 def test_callback(capfd):
     lit_api = ls.test_examples.SimpleLitAPI()
-    server = ls.LitServer(lit_api, callbacks=[MetricLogger()])
+    server = ls.LitServer(lit_api, callbacks=[PredictionTimeLogger()])
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
@@ -22,7 +22,7 @@ def test_callback(capfd):
 
 
 def test_metric_logger(capfd):
-    cb = MetricLogger()
+    cb = PredictionTimeLogger()
     cb_runner = CallbackRunner()
     cb_runner.add_callbacks(cb)
     assert cb_runner._callbacks == [cb], "Callback not added to runner"
