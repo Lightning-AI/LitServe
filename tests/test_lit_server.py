@@ -33,6 +33,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import LitServer, multi_server_lifespan, run_all
+from litserve.test_examples.openai_spec_example import TestAPI
 from litserve.utils import wrap_litserve_start
 
 
@@ -445,6 +446,7 @@ async def test_multi_server_lifespan(mock_litserver):
 def test_run_all_litservers(mock_uvicorn):
     server1 = LitServer(SimpleLitAPI(), api_path="/predict-1")
     server2 = LitServer(SimpleLitAPI(), api_path="/predict-2")
+    server3 = LitServer(TestAPI(), spec=ls.OpenAISpec())
 
     with pytest.raises(ValueError, match="All elements in the servers list must be instances of LitServer"):
         run_all([server1, "server2"])
@@ -455,8 +457,14 @@ def test_run_all_litservers(mock_uvicorn):
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         run_all([server1, server2], port=65536)
 
-    run_all([server1, server2], port=8000)
+    with pytest.raises(ValueError, match="num_api_servers must be greater than 0"):
+        run_all([server1, server2], num_api_servers=0)
+
+    with pytest.raises(ValueError, match="Must be 'process' or 'thread'"):
+        run_all([server1, server2], api_server_worker_type="invalid")
+
+    run_all([server1, server2, server3], port=8000)
     mock_uvicorn.Config.assert_called()
     mock_uvicorn.reset_mock()
-    run_all([server1, server2], port="8001")
+    run_all([server1, server2, server3], port="8001")
     mock_uvicorn.Config.assert_called()
