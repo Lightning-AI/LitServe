@@ -25,7 +25,7 @@ import uuid
 import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from queue import Empty
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -475,19 +475,13 @@ class LitServer:
 
 
 @asynccontextmanager
-async def manage_lifespan(app: FastAPI, servers: List[LitServer]):
+async def multi_server_lifespan(app: FastAPI, servers: List[LitServer]):
     """Context manager to handle the lifespan events of multiple FastAPI servers."""
     # Start lifespan events for each server
-    lifespans = [server.lifespan(server.app) for server in servers]
-    for lifespan in lifespans:
-        await lifespan.__aenter__()
-
-    try:
+    async with AsyncExitStack() as stack:
+        for server in servers:
+            await stack.enter_async_context(server.lifespan(server.app))
         yield
-    finally:
-        # Exit lifespan events for each server
-        for lifespan in lifespans:
-            await lifespan.__aexit__(None, None, None)
 
 
 def run_all(
@@ -525,7 +519,7 @@ def run_all(
         api_server_worker_type = "process"
 
     # Create the main FastAPI app
-    app = FastAPI(lifespan=lambda app: manage_lifespan(app, litservers))
+    app = FastAPI(lifespan=lambda app: multi_server_lifespan(app, litservers))
     config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
     sockets = [config.bind_socket()]
 
