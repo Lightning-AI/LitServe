@@ -51,19 +51,21 @@ class Callback(ABC):
 
 
 class CallbackRunner:
-    def __init__(self):
+    def __init__(self, callbacks: Union[Callback, List[Callback]] = None):
         self._callbacks = []
+        if callbacks:
+            self._add_callbacks(callbacks)
 
-    def add_callbacks(self, callbacks: Union[Callback, List[Callback]]):
-        if isinstance(callbacks, list):
-            self._callbacks.extend(callbacks)
-        else:
-            self._callbacks.append(callbacks)
+    def _add_callbacks(self, callbacks: Union[Callback, List[Callback]]):
+        if not isinstance(callbacks, list):
+            callbacks = [callbacks]
+        for callback in callbacks:
+            if not isinstance(callback, Callback):
+                raise ValueError(f"Invalid callback type: {callback}")
+        self._callbacks.extend(callbacks)
 
     def trigger_event(self, event_name, *args, **kwargs):
         """Triggers an event, invoking all registered callbacks for that event."""
-        if not self._callbacks:
-            return
         for callback in self._callbacks:
             try:
                 getattr(callback, event_name)(*args, **kwargs)

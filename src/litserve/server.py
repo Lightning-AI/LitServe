@@ -173,8 +173,7 @@ class LitServer:
         self.stream = stream
         self.max_payload_size = max_payload_size
         self._connector = _Connector(accelerator=accelerator, devices=devices)
-        self._callback_runner = CallbackRunner()
-        self._callback_runner.add_callbacks(callbacks)
+        self._callback_runner = CallbackRunner(callbacks)
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
