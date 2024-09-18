@@ -251,7 +251,7 @@ class LitServer:
                 "the LitServer class to initialize the response queues."
             )
 
-        response_queue = self.response_queues[app.response_queue_id]
+        response_queue = self.response_queues[self.app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
