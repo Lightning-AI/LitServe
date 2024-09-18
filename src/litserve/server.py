@@ -523,22 +523,22 @@ def run_all(
     config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
     sockets = [config.bind_socket()]
 
-    managers, workers = [], []
+    managers, inference_workers = [], []
     try:
-        for litserver in servers:
-            manager, litserve_workers = litserver.launch_inference_worker(num_api_servers)
+        for server in servers:
+            manager, workers = server.launch_inference_worker(num_api_servers)
             managers.append(manager)
-            workers.extend(litserve_workers)
+            inference_workers.extend(workers)
 
             # include routes from each litserver's app into the main app
-            app.include_router(litserver.app.router)
+            app.include_router(server.app.router)
 
         server_processes = []
         for response_queue_id in range(num_api_servers):
-            for litserver in servers:
-                litserver.app.response_queue_id = response_queue_id
-                if litserver.lit_spec:
-                    litserver.lit_spec.response_queue_id = response_queue_id
+            for server in servers:
+                server.app.response_queue_id = response_queue_id
+                if server.lit_spec:
+                    server.lit_spec.response_queue_id = response_queue_id
 
             app = copy.copy(app)
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
@@ -558,7 +558,7 @@ def run_all(
             process.join()
     finally:
         print("Shutting down LitServe")
-        for worker in workers:
+        for worker in inference_workers:
             worker.terminate()
             worker.join()
         for manager in managers:
