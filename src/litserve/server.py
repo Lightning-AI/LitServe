@@ -214,7 +214,7 @@ class LitServer:
             spec.setup(server_copy)
 
         process_list = []
-        for worker_id, device in enumerate(self.devices * self.workers_per_device):
+        for worker_id, device in enumerate(self.inference_workers):
             if len(device) == 1:
                 device = device[0]
 
@@ -252,7 +252,7 @@ class LitServer:
             )
 
         response_queue = self.response_queues[app.response_queue_id]
-        response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
+        response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
 
