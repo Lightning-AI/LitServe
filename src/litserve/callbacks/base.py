@@ -6,48 +6,48 @@ from typing import List, Union
 
 @dataclasses.dataclass
 class EventTypes:
-    LITAPI_SETUP_START = "on_litapi_setup_start"
-    LITAPI_SETUP_END = "on_litapi_setup_end"
-    LITAPI_DECODE_REQUEST_START = "on_litapi_decode_request_start"
-    LITAPI_DECODE_REQUEST_END = "on_litapi_decode_request_end"
-    LITAPI_ENCODE_RESPONSE_START = "on_litapi_encode_response_start"
-    LITAPI_ENCODE_RESPONSE_END = "on_litapi_encode_response_end"
-    LITAPI_PREDICT_START = "on_litapi_predict_start"
-    LITAPI_PREDICT_END = "on_litapi_predict_end"
-    SERVER_SETUP_START = "on_server_setup_start"
-    SERVER_SETUP_END = "on_server_setup_end"
+    BEFORE_SETUP = "on_before_setup"
+    AFTER_SETUP = "on_after_setup"
+    BEFORE_DECODE_REQUEST = "on_before_decode_request"
+    AFTER_DECODE_REQUEST = "on_after_decode_request"
+    BEFORE_ENCODE_RESPONSE = "on_before_encode_response"
+    AFTER_ENCODE_RESPONSE = "on_after_encode_response"
+    BEFORE_PREDICT = "on_before_predict"
+    AFTER_PREDICT = "on_after_predict"
+    BEFORE_SERVER_REGISTER = "on_before_server_register"
+    AFTER_SERVER_REGISTER = "on_after_server_register"
 
 
 class Callback(ABC):
-    def on_litapi_predict_start(self, *args, **kwargs):
-        """Called before LitAPI.predict() is called."""
+    def on_before_setup(self, *args, **kwargs):
+        """Called before setup is started."""
 
-    def on_litapi_predict_end(self, *args, **kwargs):
-        """Called after LitAPI.predict() is called."""
+    def on_after_setup(self, *args, **kwargs):
+        """Called after setup is completed."""
 
-    def on_litapi_decode_request_start(self, *args, **kwargs):
-        """Called before LitAPI.decode_request() is called."""
+    def on_before_decode_request(self, *args, **kwargs):
+        """Called before request decoding is started."""
 
-    def on_litapi_decode_request_end(self, *args, **kwargs):
-        """Called after LitAPI.decode_request() is called."""
+    def on_after_decode_request(self, *args, **kwargs):
+        """Called after request decoding is completed."""
 
-    def on_litapi_encode_response_start(self, *args, **kwargs):
-        """Called before LitAPI.encode_response() is called."""
+    def on_before_encode_response(self, *args, **kwargs):
+        """Called before response encoding is started."""
 
-    def on_litapi_encode_response_end(self, *args, **kwargs):
-        """Called after LitAPI.encode_response() is called."""
+    def on_after_encode_response(self, *args, **kwargs):
+        """Called after response encoding is completed."""
 
-    def on_litapi_setup_start(self, *args, **kwargs):
-        """Called before LitAPI.setup() is called."""
+    def on_before_predict(self, *args, **kwargs):
+        """Called before prediction is started."""
 
-    def on_litapi_setup_end(self, *args, **kwargs):
-        """Called after LitAPI.setup() is called."""
+    def on_after_predict(self, *args, **kwargs):
+        """Called after prediction is completed."""
 
-    def on_server_setup_start(self, *args, **kwargs):
-        """Called before LitServer.setup_server() is called."""
+    def on_before_server_register(self, *args, **kwargs):
+        """Called before LitServer endpoint setup is started."""
 
-    def on_server_setup_end(self, *args, **kwargs):
-        """Called after LitServer.setup_server() is called."""
+    def on_after_server_register(self, *args, **kwargs):
+        """Called after LitServer endpoint setup is completed."""
 
 
 class CallbackRunner:

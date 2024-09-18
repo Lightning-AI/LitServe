@@ -300,7 +300,7 @@ class LitServer:
             data_available.clear()
 
     def setup_server(self):
-        self._callback_runner.trigger_event(EventTypes.SERVER_SETUP_START, litserver=self)
+        self._callback_runner.trigger_event(EventTypes.BEFORE_SERVER_REGISTER, litserver=self)
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -386,7 +386,7 @@ class LitServer:
             elif callable(middleware):
                 self.app.add_middleware(middleware)
 
-        self._callback_runner.trigger_event(EventTypes.SERVER_SETUP_END, litserver=self)
+        self._callback_runner.trigger_event(EventTypes.AFTER_SERVER_REGISTER, litserver=self)
 
     @staticmethod
     def generate_client_file():
