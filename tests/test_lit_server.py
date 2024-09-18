@@ -15,27 +15,26 @@ import asyncio
 import pickle
 import re
 import sys
+from unittest.mock import MagicMock, patch
 
-from asgi_lifespan import LifespanManager
-from litserve import LitAPI
-from fastapi import Request, Response, HTTPException
+import pytest
 import torch
 import torch.nn as nn
+from asgi_lifespan import LifespanManager
+from fastapi import HTTPException, Request, Response
+from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from litserve.utils import wrap_litserve_start
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-
-from unittest.mock import patch, MagicMock
-import pytest
-
-from litserve.connector import _Connector
-
-from litserve.server import LitServer
-import litserve as ls
-from fastapi.testclient import TestClient
 from starlette.types import ASGIApp
-from starlette.middleware.base import BaseHTTPMiddleware
+
+import litserve as ls
+from litserve import LitAPI
+from litserve.connector import _Connector
+from litserve.server import LitServer, multi_server_lifespan, run_all
+from litserve.test_examples.openai_spec_example import TestAPI
+from litserve.utils import wrap_litserve_start
 
 
 def test_index(sync_testclient):
@@ -429,3 +428,40 @@ def test_middlewares_inputs():
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+
+
+@pytest.mark.asyncio
+@patch("litserve.server.LitServer")
+async def test_multi_server_lifespan(mock_litserver):
+    # List of servers
+    servers = [mock_litserver, mock_litserver]
+    # Use the async context manager
+    async with multi_server_lifespan(MagicMock(), servers):
+        # Check if the lifespan method was called for each server
+        assert mock_litserver.lifespan.call_count == 2
+    assert mock_litserver.lifespan.return_value.__aexit__.call_count == 2
+
+
+@patch("litserve.server.uvicorn")
+def test_run_all_litservers(mock_uvicorn):
+    server1 = LitServer(SimpleLitAPI(), api_path="/predict-1")
+    server2 = LitServer(SimpleLitAPI(), api_path="/predict-2")
+    server3 = LitServer(TestAPI(), spec=ls.OpenAISpec())
+
+    with pytest.raises(ValueError, match="All elements in the servers list must be instances of LitServer"):
+        run_all([server1, "server2"])
+
+    with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
+        run_all([server1, server2], port="invalid port")
+
+    with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
+        run_all([server1, server2], port=65536)
+
+    with pytest.raises(ValueError, match="num_api_servers must be greater than 0"):
+        run_all([server1, server2], num_api_servers=0)
+
+    run_all([server1, server2, server3], port=8000)
+    mock_uvicorn.Config.assert_called()
+    mock_uvicorn.reset_mock()
+    run_all([server1, server2, server3], port="8001")
+    mock_uvicorn.Config.assert_called()

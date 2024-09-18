@@ -25,9 +25,9 @@ import uuid
 import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from queue import Empty
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -251,7 +251,7 @@ class LitServer:
                 "the LitServer class to initialize the response queues."
             )
 
-        response_queue = self.response_queues[app.response_queue_id]
+        response_queue = self.response_queues[self.app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
@@ -469,3 +469,94 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
+
+
+@asynccontextmanager
+async def multi_server_lifespan(app: FastAPI, servers: List[LitServer]):
+    """Context manager to handle the lifespan events of multiple FastAPI servers."""
+    # Start lifespan events for each server
+    async with AsyncExitStack() as stack:
+        for server in servers:
+            await stack.enter_async_context(server.lifespan(server.app))
+        yield
+
+
+def run_all(
+    servers: List[LitServer],
+    port: Union[str, int] = 8000,
+    num_api_servers: Optional[int] = 1,
+    log_level: str = "info",
+    generate_client_file: bool = True,
+    api_server_worker_type: Optional[str] = None,
+    **kwargs,
+):
+    """Run multiple LitServers on the same port."""
+
+    if any(not isinstance(server, LitServer) for server in servers):
+        raise ValueError("All elements in the servers list must be instances of LitServer")
+
+    if generate_client_file:
+        LitServer.generate_client_file()
+
+    port_msg = f"port must be a value from 1024 to 65535 but got {port}"
+    try:
+        port = int(port)
+    except ValueError:
+        raise ValueError(port_msg)
+    if not (1024 <= port <= 65535):
+        raise ValueError(port_msg)
+
+    if num_api_servers < 1:
+        raise ValueError("num_api_servers must be greater than 0")
+
+    if sys.platform == "win32":
+        print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
+        api_server_worker_type = "thread"
+    elif api_server_worker_type is None:
+        api_server_worker_type = "process"
+
+    # Create the main FastAPI app
+    app = FastAPI(lifespan=lambda app: multi_server_lifespan(app, servers))
+    config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+    sockets = [config.bind_socket()]
+
+    managers, inference_workers = [], []
+    try:
+        for server in servers:
+            manager, workers = server.launch_inference_worker(num_api_servers)
+            managers.append(manager)
+            inference_workers.extend(workers)
+
+            # include routes from each litserver's app into the main app
+            app.include_router(server.app.router)
+
+        server_processes = []
+        for response_queue_id in range(num_api_servers):
+            for server in servers:
+                server.app.response_queue_id = response_queue_id
+                if server.lit_spec:
+                    server.lit_spec.response_queue_id = response_queue_id
+
+            app = copy.copy(app)
+            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+            uvicorn_server = uvicorn.Server(config=config)
+
+            if api_server_worker_type == "process":
+                ctx = mp.get_context("fork")
+                worker = ctx.Process(target=uvicorn_server.run, args=(sockets,))
+            elif api_server_worker_type == "thread":
+                worker = threading.Thread(target=uvicorn_server.run, args=(sockets,))
+            else:
+                raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
+            worker.start()
+            server_processes.append(worker)
+        print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+        for process in server_processes:
+            process.join()
+    finally:
+        print("Shutting down LitServe")
+        for worker in inference_workers:
+            worker.terminate()
+            worker.join()
+        for manager in managers:
+            manager.shutdown()
