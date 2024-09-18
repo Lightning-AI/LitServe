@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
+from litserve.callbacks import CallbackRunner
 from litserve.loops import (
     run_single_loop,
     run_streaming_loop,
@@ -32,6 +33,8 @@ from litserve.loops import (
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus
 import litserve as ls
+
+NOOP_CB_RUNNER = CallbackRunner()
 
 
 @pytest.fixture
@@ -57,7 +60,7 @@ def test_single_loop(loop_args):
     response_queues = [FakeResponseQueue()]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, response_queues)
+        run_single_loop(lit_api_mock, None, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER)
 
 
 class FakeStreamResponseQueue:
@@ -98,7 +101,9 @@ def test_streaming_loop():
     response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues)
+        run_streaming_loop(
+            fake_stream_api, fake_stream_api, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER
+        )
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
@@ -156,7 +161,13 @@ def test_batched_streaming_loop():
 
     with pytest.raises(StopIteration, match="finish streaming"):
         run_batched_streaming_loop(
-            fake_stream_api, fake_stream_api, requests_queue, response_queues, max_batch_size=2, batch_timeout=2
+            fake_stream_api,
+            fake_stream_api,
+            requests_queue,
+            response_queues,
+            max_batch_size=2,
+            batch_timeout=2,
+            callback_runner=NOOP_CB_RUNNER,
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
@@ -165,10 +176,24 @@ def test_batched_streaming_loop():
 @patch("litserve.loops.run_batched_loop")
 @patch("litserve.loops.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 6, max_batch_size=2, batch_timeout=0, stream=False)
+    inference_worker(
+        *[MagicMock()] * 6,
+        max_batch_size=2,
+        batch_timeout=0,
+        stream=False,
+        workers_setup_status={},
+        callback_runner=NOOP_CB_RUNNER,
+    )
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
+    inference_worker(
+        *[MagicMock()] * 6,
+        max_batch_size=1,
+        batch_timeout=0,
+        stream=False,
+        workers_setup_status={},
+        callback_runner=NOOP_CB_RUNNER,
+    )
     mock_single_loop.assert_called_once()
 
 
@@ -182,7 +207,9 @@ def test_run_single_loop():
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -208,7 +235,9 @@ def test_run_single_loop_timeout(caplog):
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+    )
     loop_thread.start()
 
     request_queue.put((None, None, None, None))
@@ -231,7 +260,9 @@ def test_run_batched_loop():
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1))
+    loop_thread = threading.Thread(
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1, NOOP_CB_RUNNER)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -265,7 +296,7 @@ def test_run_batched_loop_timeout(caplog):
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001)
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -293,7 +324,9 @@ def test_run_streaming_loop():
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -319,7 +352,9 @@ def test_run_streaming_loop_timeout(caplog):
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -352,7 +387,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_batched_streaming_loop, args=(lit_api, spec, request_queue, response_queues, 2, 0.1)
+        target=run_batched_streaming_loop, args=(lit_api, spec, request_queue, response_queues, 2, 0.1, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 

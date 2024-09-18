@@ -24,9 +24,12 @@ from fastapi import Request, Response
 from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
+from litserve.callbacks import CallbackRunner
 from litserve.loops import run_batched_loop, collate_requests
 from litserve.utils import wrap_litserve_start
 import litserve as ls
+
+NOOP_CB_RUNNER = CallbackRunner()
 
 
 class Linear(nn.Module):
@@ -166,7 +169,13 @@ def test_batched_loop():
 
     with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
         run_batched_loop(
-            lit_api_mock, lit_api_mock, requests_queue, FakeResponseQueue(), max_batch_size=2, batch_timeout=4
+            lit_api_mock,
+            lit_api_mock,
+            requests_queue,
+            FakeResponseQueue(),
+            max_batch_size=2,
+            batch_timeout=4,
+            callback_runner=NOOP_CB_RUNNER,
         )
 
     lit_api_mock.batch.assert_called_once()
