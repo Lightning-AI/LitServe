@@ -262,6 +262,7 @@ class LitServer:
 
         yield
 
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
         task.cancel()
         logger.debug("Shutting down response queue to buffer task")
 
@@ -294,7 +295,7 @@ class LitServer:
 
     def register_endpoints(self):
         """Register endpoint routes for the FastAPI app and setup middlewares."""
-        self._callback_runner.trigger_event(EventTypes.BEFORE_SERVER_REGISTER, litserver=self)
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START, litserver=self)
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -379,8 +380,6 @@ class LitServer:
                 self.app.add_middleware(middleware, **kwargs)
             elif callable(middleware):
                 self.app.add_middleware(middleware)
-
-        self._callback_runner.trigger_event(EventTypes.AFTER_SERVER_REGISTER, litserver=self)
 
     @staticmethod
     def generate_client_file():

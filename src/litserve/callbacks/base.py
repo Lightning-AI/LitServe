@@ -16,8 +16,8 @@ class EventTypes:
     AFTER_ENCODE_RESPONSE = "on_after_encode_response"
     BEFORE_PREDICT = "on_before_predict"
     AFTER_PREDICT = "on_after_predict"
-    BEFORE_SERVER_REGISTER = "on_before_server_register"
-    AFTER_SERVER_REGISTER = "on_after_server_register"
+    ON_SERVER_START = "on_server_start"
+    ON_SERVER_END = "on_serve_end"
 
 
 class Callback(ABC):
@@ -45,11 +45,11 @@ class Callback(ABC):
     def on_after_predict(self, *args, **kwargs):
         """Called after prediction is completed."""
 
-    def on_before_server_register(self, *args, **kwargs):
-        """Called before LitServer endpoint setup is started."""
+    def on_server_start(self, *args, **kwargs):
+        """Called before server starts."""
 
-    def on_after_server_register(self, *args, **kwargs):
-        """Called after LitServer endpoint setup is completed."""
+    def on_server_end(self, *args, **kwargs):
+        """Called when server terminates."""
 
 
 class CallbackRunner:
