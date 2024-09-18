@@ -3,6 +3,8 @@ import logging
 from abc import ABC
 from typing import List, Union
 
+logger = logging.getLogger(__name__)
+
 
 @dataclasses.dataclass
 class EventTypes:
@@ -71,7 +73,7 @@ class CallbackRunner:
                 getattr(callback, event_name)(*args, **kwargs)
             except Exception:
                 # Handle exceptions to prevent one callback from disrupting others
-                logging.exception(f"Error in callback '{callback}' during event '{event_name}'")
+                logger.exception(f"Error in callback '{callback}' during event '{event_name}'")
 
 
 class NoopCallback(Callback):
