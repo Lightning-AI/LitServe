@@ -197,7 +197,7 @@ class LitServer:
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
         self.inference_workers = self.devices * self.workers_per_device
-        self.setup_server()
+        self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
         manager = mp.Manager()
@@ -288,7 +288,8 @@ class LitServer:
                     yield data
             data_available.clear()
 
-    def setup_server(self):
+    def register_endpoints(self):
+        """Register endpoint routes for the FastAPI app and setup middlewares."""
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
