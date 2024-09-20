@@ -1,5 +1,6 @@
 import contextlib
 import os
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -101,6 +102,8 @@ def test_logger_with_api():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
+        # Wait for FileLogger to write to file
+        time.sleep(0.1)
         with open("test_logger_temp.txt") as f:
             data = f.readlines()
             assert data == [
@@ -109,4 +112,4 @@ def test_logger_with_api():
                 "time: 0.3\n",
                 "time: 0.4\n",
             ], f"Expected metric not found in logger file {data}"
-    os.remove("test_logger_temp.txt")
+        os.remove("test_logger_temp.txt")
