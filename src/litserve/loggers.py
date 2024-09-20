@@ -62,10 +62,12 @@ class Logger(ABC):
 
 
 class _LoggerConnector:
-    """Connects Logger with LitServer and manages the logger instances.
+    """_LoggerConnector is responsible for connecting Logger instances with the LitServer and managing their lifecycle.
 
-    - log queue is a multiprocessing.Queue where the log data is put using the LitAPI.log method.
-    - The connector starts a new process to consume the log queue and process the log data.
+    This class handles the following tasks:
+    - Manages a queue (multiprocessing.Queue) where log data is placed using the LitAPI.log method.
+    - Initiates a separate process to consume the log queue and process the log data using the associated
+    Logger instances.
 
     """
 
