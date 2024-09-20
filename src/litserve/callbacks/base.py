@@ -17,7 +17,7 @@ class EventTypes:
     BEFORE_PREDICT = "on_before_predict"
     AFTER_PREDICT = "on_after_predict"
     ON_SERVER_START = "on_server_start"
-    ON_SERVER_END = "on_serve_end"
+    ON_SERVER_END = "on_server_end"
 
 
 class Callback(ABC):
