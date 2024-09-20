@@ -5,7 +5,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from litserve.loggers import Logger, _LoggerConnector
 
 import litserve as ls
@@ -59,13 +59,13 @@ def test_connector_mount(mock_lit_server, test_logger, logger_connector):
     mock_lit_server.app.mount.assert_called_with("/test", mock_app)
 
 
-def test_process_logger_queue(mock_lit_server, logger_connector, test_logger):
-    with patch("litserve.loggers._LoggerConnector._process_logger_queue", side_effect=KeyboardInterrupt), pytest.raises(
-        KeyboardInterrupt
-    ):
-        logger_connector._process_logger_queue()
-    test_logger.process("test_key", "test_value")
-    assert test_logger.processed_data == ("test_key", "test_value")
+def test_invalid_loggers():
+    _LoggerConnector(None, TestLogger())
+    with pytest.raises(ValueError, match="Logger must be an instance of litserve.Logger"):
+        _ = _LoggerConnector(None, [MagicMock()])
+
+    with pytest.raises(ValueError, match="loggers must be a list or an instance of litserve.Logger"):
+        _ = _LoggerConnector(None, MagicMock())
 
 
 class LoggerAPI(ls.test_examples.SimpleLitAPI):

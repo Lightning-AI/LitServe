@@ -5,7 +5,7 @@ from typing import List, Optional, Union, TYPE_CHECKING
 
 from starlette.types import ASGIApp
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from litserve import LitServer
 
 
