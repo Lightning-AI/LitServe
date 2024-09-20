@@ -1,3 +1,5 @@
+"""Consume 10K tokens from the stream endpoint and measure the speed."""
+
 import logging
 import time
 
