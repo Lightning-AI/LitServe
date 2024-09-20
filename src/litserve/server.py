@@ -172,7 +172,6 @@ class LitServer:
         self.batch_timeout = batch_timeout
         self.stream = stream
         self.max_payload_size = max_payload_size
-        self.manager = mp.Manager()
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
 
@@ -204,9 +203,10 @@ class LitServer:
         self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
-        manager = self.manager
+        manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
+        self.logger_queue = manager.Queue()
 
         self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 

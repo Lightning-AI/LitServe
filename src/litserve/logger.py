@@ -1,3 +1,4 @@
+import multiprocessing as mp
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union, TYPE_CHECKING
 
@@ -57,9 +58,14 @@ class _LoggerConnector:
         if "mount" in logger._config:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
-    def _process_logger_queue(self):
-        queue = self._lit_server.log_queue
+    def _process_logger_queue(self, queue):
         while True:
             key, value = queue.get()
             for logger in self._loggers:
                 logger.process(key, value)
+
+    def run(self):
+        ctx = mp.get_context("spawn")
+        queue = self._lit_server.logger_queue
+        process = ctx.Process(target=self._process_logger_queue, args=(queue,))
+        process.start()
