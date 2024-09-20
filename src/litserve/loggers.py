@@ -29,6 +29,35 @@ class Logger(ABC):
 
     @abstractmethod
     def process(self, key, value):
+        """Process a log entry from the log queue.
+
+        This method should be implemented to define the specific logic for processing
+        log entries.
+
+        Args:
+            key (str): The key associated with the log entry, typically indicating the type or category of the log.
+            value (Any): The value associated with the log entry, containing the actual log data.
+
+        Raises:
+            NotImplementedError: This method must be overridden by subclasses. If not, calling this method will raise
+            a NotImplementedError.
+
+        Example:
+            Here is an example of a Logger that logs monitoring metrics using Prometheus:
+
+            from prometheus_client import Counter
+
+            class PrometheusLogger(Logger):
+                def __init__(self):
+                    super().__init__()
+                    self._metric_counter = Counter('log_entries', 'Count of log entries')
+
+                def process(self, key, value):
+                    # Increment the Prometheus counter for each log entry
+                    self._metric_counter.inc()
+                    print(f"Logged {key}: {value}")
+
+        """
         raise NotImplementedError
 
 
