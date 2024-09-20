@@ -29,5 +29,8 @@ jobs:
           pip install . torchvision jsonargparse uvloop -U -q -r _requirements/test.txt -U -q
           pip list
 
-      - name: Tests
+      - name: Parity test
         run: export PYTHONPATH=$PWD && python tests/parity_fastapi/main.py
+
+      - name: Streaming speed test
+        run: bash tests/perf_test/stream/run_test.sh
