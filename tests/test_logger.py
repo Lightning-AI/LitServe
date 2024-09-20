@@ -34,10 +34,6 @@ def logger_connector(mock_lit_server, test_logger):
     return _LoggerConnector(mock_lit_server, [test_logger])
 
 
-def test_logger_set_connector(test_logger, logger_connector):
-    assert test_logger._connector == logger_connector
-
-
 def test_logger_mount(test_logger):
     mock_app = MagicMock()
     test_logger.mount("/test", mock_app)
@@ -49,7 +45,6 @@ def test_connector_add_logger(logger_connector):
     new_logger = TestLogger()
     logger_connector.add_logger(new_logger)
     assert new_logger in logger_connector._loggers
-    assert new_logger._connector == logger_connector
 
 
 def test_connector_mount(mock_lit_server, test_logger, logger_connector):

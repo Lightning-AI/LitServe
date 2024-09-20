@@ -11,11 +11,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class Logger(ABC):
     def __init__(self):
-        self._connector = None  # Reference to _LoggerConnector
         self._config = {}
-
-    def set_connector(self, connector: "_LoggerConnector"):
-        self._connector = connector
 
     def mount(self, path: str, app: ASGIApp) -> None:
         """Mount an ASGI app endpoint to LitServer. Use this method when you want to add an additional endpoint to the
@@ -92,7 +88,6 @@ class _LoggerConnector:
 
     def add_logger(self, logger: Logger):
         self._loggers.append(logger)
-        logger.set_connector(self)  # Set the connector reference in Logger
         if "mount" in logger._config:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
