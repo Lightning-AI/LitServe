@@ -1,3 +1,4 @@
+import functools
 import multiprocessing as mp
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union, TYPE_CHECKING
@@ -95,22 +96,24 @@ class _LoggerConnector:
         if "mount" in logger._config:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
-    def _process_logger_queue(self, loggers: List[Logger], queue):
+    @staticmethod
+    def _process_logger_queue(loggers: List[Logger], queue):
         while True:
             key, value = queue.get()
             for logger in loggers:
                 logger.process(key, value)
 
+    @functools.cache  # Run once per LitServer instance
     def run(self):
         ctx = mp.get_context("spawn")
         queue = self._lit_server.logger_queue
         # Disconnect the logger connector from the LitServer to avoid pickling issues
-        del self._lit_server
+        self._lit_server = None
         if not self._loggers:
             return
 
         process = ctx.Process(
-            target=self._process_logger_queue,
+            target=_LoggerConnector._process_logger_queue,
             args=(
                 self._loggers,
                 queue,
