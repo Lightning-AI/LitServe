@@ -15,6 +15,7 @@ import inspect
 import json
 from abc import ABC, abstractmethod
 from typing import Optional
+from queue import Queue
 
 from pydantic import BaseModel
 
@@ -26,6 +27,7 @@ class LitAPI(ABC):
     _default_unbatch: callable = None
     _spec: LitSpec = None
     _device: Optional[str] = None
+    _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
 
     @abstractmethod
@@ -175,4 +177,8 @@ class LitAPI(ABC):
 
     def log(self, key, value):
         """Log a key-value pair to the server."""
+        if self._logger_queue is None:
+            raise ValueError(
+                "Please set the logger queue in the LitAPI. Check if the LitAPI is connected to the LitServer."
+            )
         self._logger_queue.put((key, value))

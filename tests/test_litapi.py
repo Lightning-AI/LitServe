@@ -240,3 +240,14 @@ def test_device_property():
     api = ls.test_examples.SimpleLitAPI()
     api.device = "cpu"
     assert api.device == "cpu"
+
+
+def test_log():
+    api = ls.test_examples.SimpleLitAPI()
+    with pytest.raises(ValueError, match="Please set the logger queue"):
+        api.log("time", 0.1)
+
+    server = ls.LitServer(api)
+    server.launch_inference_worker(1)
+    api.log("time", 0.1)
+    assert server.logger_queue.get() == ("time", 0.1)

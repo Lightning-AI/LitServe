@@ -75,6 +75,8 @@ class _LoggerConnector:
             return
         ctx = mp.get_context("spawn")
         queue = self._lit_server.logger_queue
+        # Disconnect the logger connector from the LitServer to avoid pickling issues
+        del self._lit_server
         process = ctx.Process(
             target=self._process_logger_queue,
             args=(

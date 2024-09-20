@@ -1,3 +1,6 @@
+import contextlib
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -67,11 +70,12 @@ def test_process_logger_queue(mock_lit_server, logger_connector, test_logger):
 class LoggerAPI(ls.test_examples.SimpleLitAPI):
     def predict(self, input):
         result = super().predict(input)
-        self.log("time", 0.1)
+        for i in range(1, 5):
+            self.log("time", i * 0.1)
         return result
 
 
-def test_logger_with_api():
+def test_logger_queue():
     api = LoggerAPI()
     server = ls.LitServer(api)
 
@@ -80,3 +84,29 @@ def test_logger_with_api():
         assert response.json() == {"output": 16.0}
         metric = server.logger_queue.get(timeout=1)
         assert metric == ("time", 0.1), "Expected metric not found in logger queue"
+
+
+class FileLogger(ls.Logger):
+    def process(self, key, value):
+        with open("test_logger_temp.txt", "a+") as f:
+            f.write(f"{key}: {value:.1f}\n")
+
+
+def test_logger_with_api():
+    # Connect with a Logger
+    api = LoggerAPI()
+    server = ls.LitServer(api, loggers=[FileLogger()])
+    with contextlib.suppress(Exception):
+        os.remove("test_logger_temp.txt")
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 16.0}
+        with open("test_logger_temp.txt") as f:
+            data = f.readlines()
+            assert data == [
+                "time: 0.1\n",
+                "time: 0.2\n",
+                "time: 0.3\n",
+                "time: 0.4\n",
+            ], f"Expected metric not found in logger file {data}"
+    os.remove("test_logger_temp.txt")
