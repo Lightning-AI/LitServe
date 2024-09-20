@@ -10,7 +10,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"
 TOTAL_TOKENS = 10000
-MAX_SPEED = 10000  # tokens per second
+EXPECTED_TTFT = 0.005  # time to first token
+
+# tokens per second
+MAX_SPEED = 3600  # 3600 on GitHub CI, 10000 on M3 Pro
 
 session = requests.Session()
 
@@ -18,7 +21,7 @@ session = requests.Session()
 def speed_test():
     start = time.time()
     resp = session.post(SERVER_URL, stream=True, json={"input": 1})
-    num_lines = 0
+    num_tokens = 0
     ttft = None  # time to first token
     for line in resp.iter_lines():
         if not line:
@@ -26,12 +29,12 @@ def speed_test():
         if ttft is None:
             ttft = time.time() - start
             print(f"Time to first token: {ttft}")
-            assert ttft < 0.1, "Expected time to first token to be less than 0.1 seconds"
-        num_lines += 1
+            assert ttft < EXPECTED_TTFT, "Expected time to first token to be less than 0.1 seconds"
+        num_tokens += 1
     end = time.time()
     resp.raise_for_status()
-    assert num_lines == TOTAL_TOKENS, f"Expected 1000 lines, got {num_lines}"
-    speed = num_lines / (end - start)
+    assert num_tokens == TOTAL_TOKENS, f"Expected {TOTAL_TOKENS} tokens, got {num_tokens}"
+    speed = num_tokens / (end - start)
     return {"speed": speed, "time": end - start}
 
 
