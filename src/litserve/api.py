@@ -172,3 +172,7 @@ class LitAPI(ABC):
                         yield encoded_output
              """
             )
+
+    def log(self, key, value):
+        """Log a key-value pair to the server."""
+        self._logger_queue.put((key, value))

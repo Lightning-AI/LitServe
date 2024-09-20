@@ -207,6 +207,7 @@ class LitServer:
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
         self.logger_queue = manager.Queue()
+        self.lit_api._logger_queue = self.logger_queue
 
         self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 

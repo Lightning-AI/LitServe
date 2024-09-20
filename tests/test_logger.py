@@ -1,6 +1,11 @@
 import pytest
+from fastapi.testclient import TestClient
+
 from unittest.mock import MagicMock, patch
 from litserve.logger import Logger, _LoggerConnector
+
+import litserve as ls
+from litserve.utils import wrap_litserve_start
 
 
 class TestLogger(Logger):
@@ -57,3 +62,21 @@ def test_process_logger_queue(mock_lit_server, logger_connector, test_logger):
         logger_connector._process_logger_queue()
     test_logger.process("test_key", "test_value")
     assert test_logger.processed_data == ("test_key", "test_value")
+
+
+class LoggerAPI(ls.test_examples.SimpleLitAPI):
+    def predict(self, input):
+        result = super().predict(input)
+        self.log("time", 0.1)
+        return result
+
+
+def test_logger_with_api():
+    api = LoggerAPI()
+    server = ls.LitServer(api)
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 16.0}
+        metric = server.logger_queue.get(timeout=1)
+        assert metric == ("time", 0.1), "Expected metric not found in logger queue"
