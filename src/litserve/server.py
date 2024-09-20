@@ -39,6 +39,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from litserve import LitAPI
 from litserve.callbacks.base import CallbackRunner, Callback, EventTypes
 from litserve.connector import _Connector
+from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
@@ -116,6 +117,7 @@ class LitServer:
         max_payload_size=None,
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
+        loggers: Optional[Union[Logger, List[Logger]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -165,6 +167,7 @@ class LitServer:
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
         self.middlewares = middlewares
+        self._logger_connector = _LoggerConnector(self, loggers)
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
@@ -208,6 +211,7 @@ class LitServer:
         self.request_queue = manager.Queue()
         self.logger_queue = manager.Queue()
         self.lit_api._logger_queue = self.logger_queue
+        self._logger_connector.run()
 
         self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 

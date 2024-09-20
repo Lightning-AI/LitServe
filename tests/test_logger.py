@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from unittest.mock import MagicMock, patch
-from litserve.logger import Logger, _LoggerConnector
+from litserve.loggers import Logger, _LoggerConnector
 
 import litserve as ls
 from litserve.utils import wrap_litserve_start
@@ -56,7 +56,7 @@ def test_connector_mount(mock_lit_server, test_logger, logger_connector):
 
 
 def test_process_logger_queue(mock_lit_server, logger_connector, test_logger):
-    with patch("litserve.logger._LoggerConnector._process_logger_queue", side_effect=KeyboardInterrupt), pytest.raises(
+    with patch("litserve.loggers._LoggerConnector._process_logger_queue", side_effect=KeyboardInterrupt), pytest.raises(
         KeyboardInterrupt
     ):
         logger_connector._process_logger_queue()

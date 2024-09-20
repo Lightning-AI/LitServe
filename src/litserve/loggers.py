@@ -33,12 +33,18 @@ class Logger(ABC):
 
 
 class _LoggerConnector:
-    """self.log will put data into a Queue multiple workers will put in the same queue The logger will have a single
-    instance which would process the consumed data."""
+    """Connects Logger with LitServer and manages the logger instances.
+
+    - log queue is a multiprocessing.Queue where the log data is put using the LitAPI.log method.
+    - The connector starts a new process to consume the log queue and process the log data.
+
+    """
 
     def __init__(self, lit_server: "LitServer", loggers: Optional[Union[List[Logger], Logger]] = None):
         self._loggers = []
         self._lit_server = lit_server
+        if loggers is None:
+            return  # No loggers to add
         if isinstance(loggers, list):
             for logger in loggers:
                 if not isinstance(logger, Logger):
@@ -58,14 +64,22 @@ class _LoggerConnector:
         if "mount" in logger._config:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
-    def _process_logger_queue(self, queue):
+    def _process_logger_queue(self, loggers: List[Logger], queue):
         while True:
             key, value = queue.get()
-            for logger in self._loggers:
+            for logger in loggers:
                 logger.process(key, value)
 
     def run(self):
+        if not self._loggers:
+            return
         ctx = mp.get_context("spawn")
         queue = self._lit_server.logger_queue
-        process = ctx.Process(target=self._process_logger_queue, args=(queue,))
+        process = ctx.Process(
+            target=self._process_logger_queue,
+            args=(
+                self._loggers,
+                queue,
+            ),
+        )
         process.start()
