@@ -188,6 +188,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         batch_timeout=0,
         stream=False,
         workers_setup_status={},
+        request_evicted_status={},
         callback_runner=NOOP_CB_RUNNER,
     )
     mock_batched_loop.assert_called_once()
