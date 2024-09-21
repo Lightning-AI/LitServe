@@ -280,9 +280,8 @@ def run_streaming_loop(
                 lit_api.encode_response,
                 y_gen,
             )
-            check_interval = 10
             for index, y_enc in enumerate(y_enc_gen):
-                if index % check_interval == 0 and request_evicted_status.get(uid):
+                if request_evicted_status.get(uid):
                     request_evicted_status.pop(uid)
                     break
                 y_enc = lit_api.format_encoded_response(y_enc)
