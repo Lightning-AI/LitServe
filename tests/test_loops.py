@@ -330,10 +330,12 @@ def test_run_streaming_loop():
     request_queue = Queue()
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
     response_queues = [Queue()]
+    request_evicted_status = {}
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+        target=run_streaming_loop,
+        args=(lit_api, None, request_queue, response_queues, request_evicted_status, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -358,10 +360,12 @@ def test_run_streaming_loop_timeout(caplog):
     request_queue = Queue()
     request_queue.put((0, "UUID-001", time.monotonic() - 5, {"input": "Hello"}))
     response_queues = [Queue()]
+    request_evicted_status = {}
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+        target=run_streaming_loop,
+        args=(lit_api, None, request_queue, response_queues, request_evicted_status, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
