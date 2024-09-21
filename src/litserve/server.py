@@ -27,7 +27,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union, List
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -37,6 +37,7 @@ from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
+from litserve.callbacks.base import CallbackRunner, Callback, EventTypes
 from litserve.connector import _Connector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
@@ -113,6 +114,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
@@ -171,6 +173,7 @@ class LitServer:
         self.stream = stream
         self.max_payload_size = max_payload_size
         self._connector = _Connector(accelerator=accelerator, devices=devices)
+        self._callback_runner = CallbackRunner(callbacks)
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -196,32 +199,26 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.workers = self.devices * self.workers_per_device
-        self.setup_server()
+        self.inference_workers = self.devices * self.workers_per_device
+        self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
-
-        self.response_queues = []
-        for _ in range(num_uvicorn_servers):
-            response_queue = manager.Queue()
-            self.response_queues.append(response_queue)
-            self.request_evicted_status = manager.dict()
+        self.request_evicted_status = manager.dict()
+        
+        self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app
-            try:
-                spec.setup(server_copy)
-            except Exception as e:
-                raise e
+            spec.setup(server_copy)
 
         process_list = []
-        for worker_id, device in enumerate(self.devices * self.workers_per_device):
+        for worker_id, device in enumerate(self.inference_workers):
             if len(device) == 1:
                 device = device[0]
 
@@ -242,6 +239,7 @@ class LitServer:
                     self.stream,
                     self.workers_setup_status,
                     self.request_evicted_status,
+                    self._callback_runner,
                 ),
             )
             process.start()
@@ -260,12 +258,13 @@ class LitServer:
             )
 
         response_queue = self.response_queues[app.response_queue_id]
-        response_executor = ThreadPoolExecutor(max_workers=len(self.devices * self.workers_per_device))
+        response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
         task = loop.create_task(future)
 
         yield
 
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
         task.cancel()
         logger.debug("Shutting down response queue to buffer task")
 
@@ -302,7 +301,9 @@ class LitServer:
                     logger.exception("Streaming request cancelled for the uid=%s", uid)
                 return
 
-    def setup_server(self):
+    def register_endpoints(self):
+        """Register endpoint routes for the FastAPI app and setup middlewares."""
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START, litserver=self)
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -413,7 +414,7 @@ class LitServer:
         **kwargs,
     ):
         if generate_client_file:
-            self.generate_client_file()
+            LitServer.generate_client_file()
 
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
@@ -428,13 +429,15 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.workers)
+            num_api_servers = len(self.inference_workers)
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
 
         if sys.platform == "win32":
-            print("Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'")
+            warnings.warn(
+                "Windows does not support forking. Using threads" " api_server_worker_type will be set to 'thread'"
+            )
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
