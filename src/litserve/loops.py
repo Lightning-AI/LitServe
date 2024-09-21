@@ -382,7 +382,7 @@ def inference_worker(
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[str, bool],
-    request_evicted_status: Dict[str, bool],
+    request_evicted_status: Dict[str, bool] ,
     callback_runner: CallbackRunner,
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
