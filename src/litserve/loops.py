@@ -381,8 +381,8 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
-    workers_setup_status: Dict[str, bool] = None,
-    request_evicted_status: Dict[str, bool] = None,
+    workers_setup_status: Dict[str, bool],
+    request_evicted_status: Dict[str, bool],
     callback_runner: CallbackRunner,
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
@@ -403,7 +403,9 @@ def inference_worker(
                 lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
             )
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, request_evicted_status, callback_runner)
+            run_streaming_loop(
+                lit_api, lit_spec, request_queue, response_queues, request_evicted_status, callback_runner
+            )
         return
 
     if max_batch_size > 1:
