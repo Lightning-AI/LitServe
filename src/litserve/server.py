@@ -207,7 +207,7 @@ class LitServer:
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
         self.request_evicted_status = manager.dict()
-        
+
         self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 
         for spec in self._specs:

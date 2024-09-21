@@ -106,7 +106,7 @@ def simple_batched_stream_api():
     return SimpleBatchedStreamAPI()
 
 
-@pytest.fixture()
+@pytest.fixture
 def simple_delayed_stream_api():
     return SimpleDelayedStreamAPI()
 

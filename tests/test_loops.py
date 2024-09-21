@@ -102,7 +102,14 @@ def test_streaming_loop():
     request_evicted_status = {}
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues, request_evicted_status, callback_runner=NOOP_CB_RUNNER)
+        run_streaming_loop(
+            fake_stream_api,
+            fake_stream_api,
+            requests_queue,
+            response_queues,
+            request_evicted_status,
+            callback_runner=NOOP_CB_RUNNER,
+        )
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
