@@ -129,7 +129,7 @@ class _LoggerConnector:
                         f"with key {key} and value {value}: {e}"
                     )
 
-    def _monitor_process(self, process, heartbeat, interval=10, timeout=30):
+    def _monitor_process(self, process, heartbeat, interval=30, timeout=60):
         while process.is_alive():
             time.sleep(interval)
             if time.monotonic() - heartbeat.value > timeout:
