@@ -115,7 +115,10 @@ class _LoggerConnector:
                 try:
                     logger.process(key, value)
                 except Exception as e:
-                    module_logger.error(f"Error processing log entry with key {key} and value {value}: {e}")
+                    module_logger.error(
+                        f"{logger.__class__.__name__} ran into an error while processing log for entry "
+                        f"with key {key} and value {value}: {e}"
+                    )
 
     @functools.cache  # Run once per LitServer instance
     def run(self, lit_server: "LitServer"):
