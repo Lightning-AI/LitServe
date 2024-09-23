@@ -112,7 +112,10 @@ class _LoggerConnector:
         while True:
             key, value = queue.get()
             for logger in loggers:
-                logger.process(key, value)
+                try:
+                    logger.process(key, value)
+                except Exception as e:
+                    module_logger.error(f"Error processing log entry with key {key} and value {value}: {e}")
 
     @functools.cache  # Run once per LitServer instance
     def run(self, lit_server: "LitServer"):
