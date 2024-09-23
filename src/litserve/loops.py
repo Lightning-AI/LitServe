@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import concurrent.futures
 import inspect
 import logging
 import multiprocessing as mp
@@ -19,7 +20,7 @@ import pickle
 import sys
 import time
 from queue import Empty, Queue
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
@@ -54,6 +55,21 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
         return func(*args, **kwargs, context=context)
     return func(*args, **kwargs)
 
+def inject_context_in_threadpool(
+    contexts: List[dict], func: Callable, inputs: List[dict]
+):
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=min(len(inputs), len(contexts))
+    ) as executor:
+        x = [
+            executor.submit(_inject_context, context, func, input)
+            for input, context in zip(inputs, contexts)
+        ]
+
+    for i in range(len(x)):
+        x[i] = x[i].result()
+
+    return x
 
 def collate_requests(
     lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float
@@ -193,14 +209,7 @@ def run_batched_loop(
                     lit_spec.populate_context(context, input)
 
             callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = [
-                _inject_context(
-                    context,
-                    lit_api.decode_request,
-                    input,
-                )
-                for input, context in zip(inputs, contexts)
-            ]
+            x = inject_context_in_threadpool(contexts, lit_api.decode_request, inputs)
             callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
 
             x = lit_api.batch(x)
@@ -326,14 +335,7 @@ def run_batched_streaming_loop(
                     lit_spec.populate_context(context, input)
 
             callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = [
-                _inject_context(
-                    context,
-                    lit_api.decode_request,
-                    input,
-                )
-                for input, context in zip(inputs, contexts)
-            ]
+            x = inject_context_in_threadpool(contexts, lit_api.decode_request, inputs)
             callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
 
             x = lit_api.batch(x)
