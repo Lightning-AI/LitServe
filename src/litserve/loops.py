@@ -60,8 +60,8 @@ def inject_context_in_threadpool(contexts: List[Union[List[dict], dict]], func: 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(inputs), len(contexts))) as executor:
         x = [executor.submit(_inject_context, context, func, input) for input, context in zip(inputs, contexts)]
 
-    for i in range(len(x)):
-        x[i] = x[i].result()
+    for i, _x in enumerate(x):
+        x[i] = _x.result()
 
     return x
 
