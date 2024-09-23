@@ -16,6 +16,7 @@ import concurrent.futures
 import inspect
 import logging
 import multiprocessing as mp
+import os
 import pickle
 import sys
 import time
@@ -56,9 +57,14 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-def decode_requests_in_threadpool(contexts: List[Union[List[dict], dict]], func: Callable, inputs: List[dict]):
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(inputs), len(contexts))) as executor:
-        x = [executor.submit(_inject_context, context, func, input) for input, context in zip(inputs, contexts)]
+def decode_requests_in_threadpool(
+    executor: concurrent.futures.ThreadPoolExecutor,
+    contexts: List[Union[List[dict], dict]],
+    func: Callable,
+    inputs: List[dict]
+):
+
+    x = [executor.submit(_inject_context, context, func, input) for input, context in zip(inputs, contexts)]
 
     for i, _x in enumerate(x):
         x[i] = _x.result()
@@ -176,7 +182,11 @@ def run_batched_loop(
     max_batch_size: int,
     batch_timeout: float,
     callback_runner: CallbackRunner,
+    concurrent_decode: bool = True,
 ):
+    if concurrent_decode:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count())
+
     while True:
         batches, timed_out_uids = collate_requests(
             lit_api,
@@ -204,7 +214,17 @@ def run_batched_loop(
                     lit_spec.populate_context(context, input)
 
             callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = inject_context_in_threadpool(contexts, lit_api.decode_request, inputs)
+            if concurrent_decode:
+                x = decode_requests_in_threadpool(executor, contexts, lit_api.decode_request, inputs)
+            else:
+                x = [
+                    _inject_context(
+                        context,
+                        lit_api.decode_request,
+                        input,
+                    )
+                    for input, context in zip(inputs, contexts)
+                ]
             callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
 
             x = lit_api.batch(x)
@@ -304,7 +324,11 @@ def run_batched_streaming_loop(
     max_batch_size: int,
     batch_timeout: float,
     callback_runner: CallbackRunner,
+    concurrent_decode: bool = True,
 ):
+    if concurrent_decode:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count())
+
     while True:
         batches, timed_out_uids = collate_requests(
             lit_api,
@@ -330,7 +354,17 @@ def run_batched_streaming_loop(
                     lit_spec.populate_context(context, input)
 
             callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = inject_context_in_threadpool(contexts, lit_api.decode_request, inputs)
+            if concurrent_decode:
+                x = decode_requests_in_threadpool(executor, contexts, lit_api.decode_request, inputs)
+            else:
+                x = [
+                    _inject_context(
+                        context,
+                        lit_api.decode_request,
+                        input,
+                    )
+                    for input, context in zip(inputs, contexts)
+                ]
             callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
 
             x = lit_api.batch(x)
@@ -375,6 +409,7 @@ def inference_worker(
     stream: bool,
     workers_setup_status: Dict[str, bool],
     callback_runner: CallbackRunner,
+    concurrent_decode: bool = True,
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
     lit_api.setup(device)
@@ -391,7 +426,7 @@ def inference_worker(
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(
-                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner, concurrent_decode
             )
         else:
             run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
@@ -399,7 +434,7 @@ def inference_worker(
 
     if max_batch_size > 1:
         run_batched_loop(
-            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner, concurrent_decode
         )
     else:
         run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)

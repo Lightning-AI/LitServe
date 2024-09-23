@@ -118,6 +118,7 @@ class LitServer:
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
+        concurrent_decode: bool = True,
     ):
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
@@ -178,6 +179,7 @@ class LitServer:
         self.max_payload_size = max_payload_size
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
+        self._concurrent_decode = concurrent_decode
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -246,6 +248,7 @@ class LitServer:
                     self.stream,
                     self.workers_setup_status,
                     self._callback_runner,
+                    self._concurrent_decode,
                 ),
             )
             process.start()
