@@ -13,6 +13,7 @@
 # limitations under the License.
 import inspect
 import json
+import warnings
 from abc import ABC, abstractmethod
 from typing import Optional
 from queue import Queue
@@ -175,10 +176,18 @@ class LitAPI(ABC):
              """
             )
 
+    def set_logger_queue(self, queue: Queue):
+        """Set the queue for logging events."""
+
+        self._logger_queue = queue
+
     def log(self, key, value):
         """Log a key-value pair to the server."""
         if self._logger_queue is None:
-            raise ValueError(
-                "Please set the logger queue in the LitAPI. Check if the LitAPI is connected to the LitServer."
+            warnings.warn(
+                f"Logging event ('{key}', '{value}') attempted without a configured logger. "
+                "To track and visualize metrics, please initialize and attach a logger. "
+                "If this is intentional, you can safely ignore this message."
             )
+            return
         self._logger_queue.put((key, value))

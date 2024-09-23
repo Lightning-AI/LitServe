@@ -242,12 +242,21 @@ def test_device_property():
     assert api.device == "cpu"
 
 
+class TestLogger(ls.Logger):
+    def process(self, key, value):
+        self.processed_data = (key, value)
+
+
 def test_log():
     api = ls.test_examples.SimpleLitAPI()
-    with pytest.raises(ValueError, match="Please set the logger queue"):
+    assert api._logger_queue is None, "Logger queue should be None"
+    assert api.log("time", 0.1) is None, "Log should return None"
+    with pytest.warns(UserWarning, match="attempted without a configured logger"):
         api.log("time", 0.1)
 
-    server = ls.LitServer(api)
+    api = ls.test_examples.SimpleLitAPI()
+    assert api._logger_queue is None, "Logger queue should be None"
+    server = ls.LitServer(api, loggers=TestLogger())
     server.launch_inference_worker(1)
     api.log("time", 0.1)
     assert server.logger_queue.get() == ("time", 0.1)

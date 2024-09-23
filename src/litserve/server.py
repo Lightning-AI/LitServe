@@ -168,6 +168,7 @@ class LitServer:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
+        self.logger_queue = None
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
@@ -209,9 +210,10 @@ class LitServer:
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
-        self.logger_queue = manager.Queue()
-        self.lit_api._logger_queue = self.logger_queue
-        self._logger_connector.run()
+        if self._logger_connector._loggers:
+            self.logger_queue = manager.Queue()
+
+        self._logger_connector.run(self)
 
         self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 

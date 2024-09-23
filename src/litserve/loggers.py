@@ -17,6 +17,9 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Union, TYPE_CHECKING
 
 from starlette.types import ASGIApp
+import logging
+
+module_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # pragma: no cover
     from litserve import LitServer
@@ -68,7 +71,7 @@ class Logger(ABC):
                     print(f"Logged {key}: {value}")
 
         """
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
 
 class _LoggerConnector:
@@ -112,14 +115,18 @@ class _LoggerConnector:
                 logger.process(key, value)
 
     @functools.cache  # Run once per LitServer instance
-    def run(self):
-        ctx = mp.get_context("spawn")
-        queue = self._lit_server.logger_queue
+    def run(self, lit_server: "LitServer"):
+        queue = lit_server.logger_queue
+        lit_server.lit_api.set_logger_queue(queue)
+
         # Disconnect the logger connector from the LitServer to avoid pickling issues
         self._lit_server = None
+
         if not self._loggers:
             return
 
+        module_logger.debug(f"Starting logger process with {len(self._loggers)} loggers")
+        ctx = mp.get_context("spawn")
         process = ctx.Process(
             target=_LoggerConnector._process_logger_queue,
             args=(

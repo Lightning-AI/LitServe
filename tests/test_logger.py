@@ -84,15 +84,13 @@ class LoggerAPI(ls.test_examples.SimpleLitAPI):
         return result
 
 
-def test_logger_queue():
+def test_server_wo_logger():
     api = LoggerAPI()
     server = ls.LitServer(api)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
-        metric = server.logger_queue.get(timeout=1)
-        assert metric == ("time", 0.1), "Expected metric not found in logger queue"
 
 
 class FileLogger(ls.Logger):
@@ -102,7 +100,6 @@ class FileLogger(ls.Logger):
 
 
 def test_logger_with_api():
-    # Connect with a Logger
     api = LoggerAPI()
     server = ls.LitServer(api, loggers=[FileLogger()])
     with contextlib.suppress(Exception):
@@ -112,6 +109,33 @@ def test_logger_with_api():
         assert response.json() == {"output": 16.0}
         # Wait for FileLogger to write to file
         time.sleep(0.1)
+        with open("test_logger_temp.txt") as f:
+            data = f.readlines()
+            assert data == [
+                "time: 0.1\n",
+                "time: 0.2\n",
+                "time: 0.3\n",
+                "time: 0.4\n",
+            ], f"Expected metric not found in logger file {data}"
+        os.remove("test_logger_temp.txt")
+
+
+class PredictionTimeLogger(ls.Callback):
+    def on_after_predict(self, lit_api):
+        for i in range(1, 5):
+            lit_api.log("time", i * 0.1)
+
+
+def test_logger_with_callback():
+    api = ls.test_examples.SimpleLitAPI()
+    server = ls.LitServer(api, loggers=[FileLogger()], callbacks=[PredictionTimeLogger()])
+    with contextlib.suppress(Exception):
+        os.remove("test_logger_temp.txt")
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 16.0}
+        # Wait for FileLogger to write to file
+        time.sleep(1)
         with open("test_logger_temp.txt") as f:
             data = f.readlines()
             assert data == [
