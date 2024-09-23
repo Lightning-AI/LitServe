@@ -61,9 +61,8 @@ def decode_requests_in_threadpool(
     executor: concurrent.futures.ThreadPoolExecutor,
     contexts: List[Union[List[dict], dict]],
     func: Callable,
-    inputs: List[dict]
+    inputs: List[dict],
 ):
-
     x = [executor.submit(_inject_context, context, func, input) for input, context in zip(inputs, contexts)]
 
     for i, _x in enumerate(x):
@@ -426,7 +425,14 @@ def inference_worker(
     if stream:
         if max_batch_size > 1:
             run_batched_streaming_loop(
-                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner, concurrent_decode
+                lit_api,
+                lit_spec,
+                request_queue,
+                response_queues,
+                max_batch_size,
+                batch_timeout,
+                callback_runner,
+                concurrent_decode,
             )
         else:
             run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
@@ -434,7 +440,14 @@ def inference_worker(
 
     if max_batch_size > 1:
         run_batched_loop(
-            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner, concurrent_decode
+            lit_api,
+            lit_spec,
+            request_queue,
+            response_queues,
+            max_batch_size,
+            batch_timeout,
+            callback_runner,
+            concurrent_decode,
         )
     else:
         run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
