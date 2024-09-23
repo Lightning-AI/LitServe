@@ -56,7 +56,7 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 def inject_context_in_threadpool(
-    contexts: List[dict], func: Callable, inputs: List[dict]
+    contexts: List[Union[List[dict], dict]], func: Callable, inputs: List[dict]
 ):
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=min(len(inputs), len(contexts))
