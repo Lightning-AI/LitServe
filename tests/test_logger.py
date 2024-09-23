@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
 import time
 
 import pytest
@@ -21,6 +22,8 @@ from litserve.loggers import Logger, _LoggerConnector
 
 import litserve as ls
 from litserve.utils import wrap_litserve_start
+from multiprocessing import Queue
+from unittest.mock import patch
 
 
 class TestLogger(Logger):
@@ -143,3 +146,44 @@ def test_logger_with_callback(tmp_path):
                 "time: 0.3\n",
                 "time: 0.4\n",
             ], f"Expected metric not found in logger file {data}"
+
+
+class MockLitServer:
+    def __init__(self):
+        self.logger_queue = Queue()
+        self.lit_api = MagicMock()
+
+
+class MockLogger(Logger):
+    def process(self, key, value):
+        pass
+
+
+@pytest.fixture
+def logger_connector_monitor():
+    lit_server = MockLitServer()
+    logger = MockLogger()
+    connector = _LoggerConnector(lit_server, [logger])
+    return connector, lit_server
+
+
+def test_end_to_end_logger_process_restart(logger_connector_monitor):
+    connector, lit_server = logger_connector_monitor
+
+    # Patch the time.monotonic to control the heartbeat
+    with patch("time.monotonic", side_effect=[0, 0, 100, 100, 200, 200, 300, 300]):
+        # Start the logger process
+        connector.run(lit_server)
+
+        # Allow some time for the process to start and monitor thread to run
+        time.sleep(1)
+
+        # Simulate the process getting stuck by advancing the heartbeat time
+        time.sleep(3)
+
+        # Check if the process was restarted
+        assert connector._logger_queue is not None
+        assert lit_server.lit_api.set_logger_queue.called
+
+        # Check if the logger process is alive after restart
+        assert any(thread.is_alive() for thread in threading.enumerate() if thread.name == "Logger monitor")

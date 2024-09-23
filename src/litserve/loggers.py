@@ -150,7 +150,7 @@ class _LoggerConnector:
             ),
         )
         process.start()
-        monitor_thread = Thread(target=self._monitor_process, args=(process, heartbeat))
+        monitor_thread = Thread(target=self._monitor_process, name="Logger monitor", args=(process, heartbeat))
         monitor_thread.daemon = True
         monitor_thread.start()
 
