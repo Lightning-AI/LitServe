@@ -56,7 +56,7 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-def inject_context_in_threadpool(contexts: List[Union[List[dict], dict]], func: Callable, inputs: List[dict]):
+def decode_requests_in_threadpool(contexts: List[Union[List[dict], dict]], func: Callable, inputs: List[dict]):
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(inputs), len(contexts))) as executor:
         x = [executor.submit(_inject_context, context, func, input) for input, context in zip(inputs, contexts)]
 
