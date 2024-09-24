@@ -88,8 +88,13 @@ def test_build(mock_docker_client):
             f.write("")
 
         with patch("litserve.docker_builder.get_docker_client", return_value=mock_client_instance):
+            # Change the working directory to tmpdir
+            current_dir = os.getcwd()
             os.chdir(tmpdir)
-            build(server_path=server_path, tag="test_tag", port=8000, timeout=600)
+            try:
+                build(server_path=server_path, tag="test_tag", port=8000, timeout=600)
+            finally:
+                os.chdir(current_dir)
 
             mock_client_instance.build.assert_called_once()
             mock_client_instance.images.assert_called_once_with(name="test_tag")
