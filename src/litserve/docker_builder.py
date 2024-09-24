@@ -20,6 +20,7 @@ import sys
 import tarfile
 import tempfile
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor
 
 import docker
 
@@ -102,9 +103,10 @@ def build_docker_image_with_tempdir(
 
         # Copy other files
         try:
-            for file_path in files:
-                shutil.copy(file_path, tmpdir)
-                logger.info(f"Copied {file_path} to {tmpdir}.")
+            with ThreadPoolExecutor(os.cpu_count()) as executor:
+                futures = executor.map(shutil.copy, files, [tmpdir] * len(files))
+            for file, dst_path in zip(files, futures):
+                logger.info(f"Copied {file} to {dst_path}.")
         except Exception as e:
             logger.error(f"Failed to copy files: {e}")
             raise
