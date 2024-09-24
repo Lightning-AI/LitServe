@@ -19,9 +19,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import warnings
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
-
+import litserve as ls
 import docker
 
 logger = logging.getLogger(__name__)
@@ -35,11 +36,12 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
+REQUIREMENTS_FILE = "requirements.txt"
 DOCKERFILE_CONTENT = """FROM python:3.9-slim
 WORKDIR /app
 COPY . /app
 
-RUN pip install litserve -r requirements.txt
+RUN pip install litserve=={version} {requirements}
 EXPOSE {port}
 CMD ["python", "/app/{server_path}"]
 """
@@ -183,14 +185,27 @@ def build(server_path: str, tag: Optional[str] = None, port: int = 8000, timeout
 
     client = get_docker_client()
 
-    files = [server_path, "requirements.txt"]  # TODO: Make it flexible
+    files = []
+    requirements = ""
+    if os.path.exists(REQUIREMENTS_FILE):
+        requirements = f"-r {REQUIREMENTS_FILE}"
+        files.append(REQUIREMENTS_FILE)
+    else:
+        warnings.warn(
+            f"requirements.txt not found at {os.getcwd()}. "
+            f"Make sure to install the required packages in the Dockerfile."
+        )
+    files.append(server_path)  # TODO: Make it flexible
     for file in files:
         if not os.path.exists(file):
             logger.error(f"File not found: {file}")
             sys.exit(1)
 
+    version = ls.__version__
+    dockerfile_content = DOCKERFILE_CONTENT.format(
+        server_path=server_path, port=port, version=version, requirements=requirements
+    )
     try:
-        dockerfile_content = DOCKERFILE_CONTENT.format(server_path=server_path, port=port)
         image_id = build_docker_image_with_tempdir(
             client=client, dockerfile_str=dockerfile_content, files=files, tag=tag, timeout=timeout
         )

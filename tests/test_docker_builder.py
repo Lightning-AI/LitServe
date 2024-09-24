@@ -94,11 +94,8 @@ def test_build(mock_docker_client):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         server_path = os.path.join(tmpdir, "server.py")
-        requirements_path = os.path.join(tmpdir, "requirements.txt")
         with open(server_path, "w") as f:
             f.write("print('Hello, World!')")
-        with open(requirements_path, "w") as f:
-            f.write("")
 
         with patch("litserve.docker_builder.get_docker_client", return_value=mock_client_instance):
             # Change the working directory to tmpdir
