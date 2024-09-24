@@ -22,6 +22,15 @@ from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+logger.propagate = False
+
+# Add a console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
 
 # Your Dockerfile as a string
 DOCKERFILE_CONTENT = """
@@ -56,9 +65,9 @@ def build_docker_image_with_tempdir(
         dockerfile_path = os.path.join(tmpdir, "Dockerfile")
         try:
             with open(dockerfile_path, "w", encoding="utf-8") as df:
-                print(dockerfile_str)
+                logger.debug(dockerfile_str)
                 df.write(dockerfile_str)
-            logger.info("Dockerfile written successfully.")
+            logger.debug("Dockerfile written successfully.")
         except Exception as e:
             logger.error(f"Failed to write Dockerfile: {e}")
             return None
@@ -67,14 +76,14 @@ def build_docker_image_with_tempdir(
         try:
             for file_path in files:
                 shutil.copy(file_path, tmpdir)
-                logger.info(f"Copied {file_path} to {tmpdir}.")
+                logger.debug(f"Copied {file_path} to {tmpdir}.")
         except Exception as e:
             logger.error(f"Failed to copy files: {e}")
             return None
 
         # Build the Docker image
         try:
-            return client.images.build(path=tmpdir, tag=tag, rm=True, timeout=timeout)
+            return client.images.build(path=tmpdir, tag=tag, rm=True, timeout=timeout, forcerm=True)
         except docker.errors.BuildError as e:
             logger.error(f"Build failed: {e}")
             raise
@@ -105,7 +114,14 @@ def build(server_path: str, tag: Optional[str] = None, timeout=600):
 
     try:
         dockerfile_content = DOCKERFILE_CONTENT.format(server_path=server_path)
-        image, logs = build_docker_image_with_tempdir(client, dockerfile_content, files, tag, timeout=timeout)
+        logger.info("Building Docker image, this might take a while...")
+        image, logs = build_docker_image_with_tempdir(
+            client,
+            dockerfile_content,
+            files,
+            tag,
+            timeout=timeout,
+        )
         for log in logs:
             if "stream" in log:
                 logger.info(log["stream"].strip())
