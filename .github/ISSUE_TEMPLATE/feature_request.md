@@ -2,11 +2,13 @@
 name: Feature request
 about: Suggest an idea for this project
 title: ''
-labels: enhancement, help wanted
+labels: enhancement
 assignees: ''
 ---
 
-### ⚠️ BEFORE SUBMITTING, READ:
+<!--
+
+⚠️ BEFORE SUBMITTING, READ:
 
 We're excited for your request! However, here are things we are not interested in:
 
@@ -16,6 +18,8 @@ We're excited for your request! However, here are things we are not interested i
 - Features that over-engineer or complicate the code internals.    
 - Linters, and crud that complicates projects.    
 
+-->
+
 ----
 
 ## 🚀 Feature
@@ -24,7 +28,11 @@ We're excited for your request! However, here are things we are not interested i
 
 ### Motivation
 
-<!-- Please outline the motivation for the proposal. Is your feature request related to a problem? e.g., I'm always frustrated when [...]. If this is related to another GitHub issue, please link here too -->
+<!--
+Please outline the motivation for the proposal.
+Is your feature request related to a problem? e.g., I'm always frustrated when [...].
+If this is related to another GitHub issue, please link here too...
+-->
 
 ### Pitch
 
