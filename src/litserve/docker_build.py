@@ -97,10 +97,13 @@ def build(server_path: str, tag: Optional[str] = None, timeout=600):
         tag = "litserve:latest"
 
     client = get_docker_client()
-    if not os.path.exists(server_path):
-        raise FileNotFoundError(f"Server file not found at: {server_path}")
+
+    files = [server_path, "requirements.txt"]  # TODO: Make it flexible
+    for file in files:
+        if not os.path.exists(file):
+            raise FileNotFoundError(f"file not found at: {file}")
+
     try:
-        files = [server_path, "requirements.txt"]  # TODO: Make it flexible
         dockerfile_content = DOCKERFILE_CONTENT.format(server_path=server_path)
         image, logs = build_docker_image_with_tempdir(client, dockerfile_content, files, tag, timeout=timeout)
         for log in logs:
