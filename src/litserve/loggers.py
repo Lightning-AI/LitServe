@@ -16,7 +16,6 @@ import multiprocessing as mp
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union, TYPE_CHECKING
 import time
-from multiprocessing import Value
 from threading import Thread
 
 from starlette.types import ASGIApp
@@ -119,7 +118,7 @@ class _LoggerConnector:
     def _process_logger_queue(loggers: List[Logger], queue, heartbeat):
         while True:
             key, value = queue.get()
-            heartbeat.value = time.monotonic()  # Update heartbeat
+            heartbeat["timestamp"] = time.monotonic()  # Update heartbeat
             for logger in loggers:
                 try:
                     logger.process(key, value)
@@ -132,15 +131,15 @@ class _LoggerConnector:
     def _monitor_process(self, process, heartbeat, interval=30, timeout=60):
         while process.is_alive():
             time.sleep(interval)
-            if time.monotonic() - heartbeat.value > timeout:
+            if time.monotonic() - heartbeat["timestamp"] > timeout:
                 module_logger.warning("Logger process is stuck. Restarting...")
                 process.terminate()
                 process.join()
-                self._start_logger_process()  # Restart the process
+                self._start_logger_process(heartbeat)  # Restart the process
 
-    def _start_logger_process(self):
+    def _start_logger_process(self, heartbeat):
         ctx = mp.get_context("spawn")
-        heartbeat = Value("d", time.monotonic())
+        heartbeat["timestamp"] = time.monotonic()
         process = ctx.Process(
             target=_LoggerConnector._process_logger_queue,
             args=(
@@ -155,9 +154,10 @@ class _LoggerConnector:
         monitor_thread.start()
 
     @functools.cache  # Run once per LitServer instance
-    def run(self, lit_server: "LitServer"):
-        queue = self._logger_queue = lit_server.logger_queue  # logger_queue is initialized now, during LitServer.run
+    def run(self, lit_server: "LitServer", manager: mp.Manager):
+        queue = self._logger_queue = manager.Queue()  # logger_queue is initialized now, during LitServer.run
         lit_server.lit_api.set_logger_queue(queue)
+        heartbeat = manager.dict()
 
         # Disconnect the logger connector from the LitServer to avoid pickling issues
         self._lit_server = None
@@ -166,4 +166,4 @@ class _LoggerConnector:
             return
 
         module_logger.debug(f"Starting logger process with {len(self._loggers)} loggers")
-        self._start_logger_process()
+        self._start_logger_process(heartbeat)
