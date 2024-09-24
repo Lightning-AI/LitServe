@@ -76,10 +76,10 @@ def build_docker_image_with_tempdir(
         try:
             for file_path in files:
                 shutil.copy(file_path, tmpdir)
-                logger.debug(f"Copied {file_path} to {tmpdir}.")
+                logger.info(f"Copied {file_path} to {tmpdir}.")
         except Exception as e:
             logger.error(f"Failed to copy files: {e}")
-            return None
+            raise
 
         # Build the Docker image
         try:
@@ -129,3 +129,7 @@ def build(server_path: str, tag: Optional[str] = None, port: int = 8000, timeout
         print(f"Image {tag} built successfully: {image.id}")
     finally:
         client.close()
+
+
+if __name__ == "__main__":
+    build("app.py")
