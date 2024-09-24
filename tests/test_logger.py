@@ -167,6 +167,7 @@ def logger_connector_monitor():
     return connector, lit_server
 
 
+# TODO: fix this test
 def test_end_to_end_logger_process_restart(logger_connector_monitor):
     connector, lit_server = logger_connector_monitor
 
