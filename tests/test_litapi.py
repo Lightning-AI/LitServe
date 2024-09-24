@@ -259,4 +259,4 @@ def test_log():
     server = ls.LitServer(api, loggers=TestLogger())
     server.launch_inference_worker(1)
     api.log("time", 0.1)
-    assert server.logger_queue.get() == ("time", 0.1)
+    assert api._logger_queue.get() == ("time", 0.1)
