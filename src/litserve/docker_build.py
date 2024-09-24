@@ -97,6 +97,8 @@ def build(server_path: str, tag: Optional[str] = None, timeout=600):
         tag = "litserve:latest"
 
     client = get_docker_client()
+    if not os.path.exists(server_path):
+        raise FileNotFoundError(f"Server file not found at: {server_path}")
     try:
         files = [server_path, "requirements.txt"]  # TODO: Make it flexible
         dockerfile_content = DOCKERFILE_CONTENT.format(server_path=server_path)
@@ -104,6 +106,6 @@ def build(server_path: str, tag: Optional[str] = None, timeout=600):
         for log in logs:
             if "stream" in log:
                 logger.info(log["stream"].strip())
-        print(f"Image built successfully: {image.id}")
+        print(f"Image {tag} built successfully: {image.id}")
     finally:
         client.close()
