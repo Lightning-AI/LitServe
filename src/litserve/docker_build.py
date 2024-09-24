@@ -31,13 +31,13 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-
-# Your Dockerfile as a string
 DOCKERFILE_CONTENT = """
 FROM python:3.9-slim
 WORKDIR /app
 COPY . /app
+
 RUN pip install -r requirements.txt
+EXPOSE {port}
 CMD ["python", /app/{server_path}]
 """
 
@@ -92,12 +92,13 @@ def build_docker_image_with_tempdir(
             raise
 
 
-def build(server_path: str, tag: Optional[str] = None, timeout=600):
+def build(server_path: str, tag: Optional[str] = None, port: int = 8000, timeout: int = 600):
     """Build a Docker image from the given server code.
 
     Args:
         server_path (str): The path to the server file.
         tag (str): The tag of the docker image. Defaults to litserve:latest.
+        port (int): The port to expose. Defaults to 8000.
         timeout (int): The timeout for building the Docker image. Defaults to 600 seconds.
 
     """
@@ -113,7 +114,7 @@ def build(server_path: str, tag: Optional[str] = None, timeout=600):
             raise FileNotFoundError(f"file not found at: {file}")
 
     try:
-        dockerfile_content = DOCKERFILE_CONTENT.format(server_path=server_path)
+        dockerfile_content = DOCKERFILE_CONTENT.format(server_path=server_path, port=port)
         logger.info("Building Docker image, this might take a while...")
         image, logs = build_docker_image_with_tempdir(
             client,
