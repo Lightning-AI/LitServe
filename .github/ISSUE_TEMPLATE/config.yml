@@ -7,8 +7,8 @@ contact_links:
     url: https://discord.gg/VptPCZkGNa
     about: Live chat with experts, engineers, and users in our Discord community.
   - name: 📖 Read the documentation
-    url: https://lightning.ai/lightning-docs/
+    url: https://lightning.ai/litserve/
     about: Please consult the documentation before opening any issues!
-  - name: 🙋 Contact us about professional services
+  - name: 🙋 Get help with Lightning Studio
     url: https://lightning.ai
-    about: Contact the Lightning.ai sales team for paid support.
+    about: Contact the Lightning.ai sales team.
