@@ -61,19 +61,11 @@ class LitAPI(ABC):
     def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output."""
         pass
-    
-    def _check_predict_output(self, output) -> bool:
-        """Check if the output is a string and warn the user."""
-        if isinstance(output, str):
-            warnings.warn(
-                "The 'predict' method returned a string, but a list is expected when batching is enabled.")
 
     def _unbatch_no_stream(self, output):
-        self._check_predict_output(output)
         return list(output)
 
     def _unbatch_stream(self, output_stream):
-        self._check_predict_output(output)
         for output in output_stream:
             yield list(output)
 
