@@ -208,13 +208,7 @@ def run_batched_loop(
             callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
             y = _inject_context(contexts, lit_api.predict, x)
             callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-            if isinstance(y, str):
-                logger.warning(
-                    "The 'predict' method returned a string instead of a list of predictions. "
-                    "When batching is enabled, 'predict' should return a list of predictions. "
-                    "To avoid unexpected behavior, ensure 'predict' returns a list of predictions, or implement 'LitAPI.unbatch' correctly."
-                )
-
+            
             outputs = lit_api.unbatch(y)
             callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
             y_enc_list = []

@@ -63,6 +63,12 @@ class LitAPI(ABC):
         pass
 
     def _unbatch_no_stream(self, output):
+        if isinstance(output, str):
+            warnings.warn(
+                "The 'predict' method returned a string instead of a list of predictions. "
+                "When batching is enabled, 'predict' should return a list of predictions. "
+                "To avoid unexpected behavior, ensure 'predict' returns a list of predictions, or implement 'LitAPI.unbatch' correctly."
+            )
         return list(output)
 
     def _unbatch_stream(self, output_stream):
