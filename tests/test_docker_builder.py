@@ -24,7 +24,7 @@ def test_color():
 
 EXPECTED_CONENT = f"""FROM python:3.10-slim
 
-####### Put any installation commands here #######
+####### Put installation commands here #######
 # RUN apt-get update && apt-get install -y <package-name>
 
 WORKDIR /app
