@@ -63,10 +63,11 @@ EXPOSE {port}
 CMD ["python", "/app/{server_filename}"]
 """
 
+# Link our documentation as the bottom of this msg
 SUCCESS_MSG = """
 {BOLD}{MAGENTA}Dockerfile created successfully at{RESET} {UNDERLINE}{dockerfile_path}{RESET}
 
-{BOLD}{BLUE}To build the Docker image, run: {UNDERLINE}docker build -t <tag> .{RESET}
+{BOLD}{BLUE}Follow the instructions below to build & run a docker image:{RESET}
 - To build the Docker image, run: {UNDERLINE}docker build -t <tag> .{RESET}
 - To run the Docker container, run: {UNDERLINE}docker run -p <host_port>:<container_port> <tag>{RESET}
 - To push the Docker image to a registry, run: {UNDERLINE}docker push <tag>{RESET}
