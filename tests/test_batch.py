@@ -148,6 +148,22 @@ def test_max_batch_size_warning():
         LitServer(SimpleTorchAPI(), accelerator="cpu", devices=1, timeout=2)
 
 
+def test_batch_predict_string_warning():
+    api = ls.test_examples.SimpleBatchedAPI()
+    api._sanitize(2, None)
+    api.predict = MagicMock(return_value="This is a string")
+
+    mock_input = torch.tensor([[1.0], [2.0]])
+
+    with pytest.warns(
+        UserWarning,
+        match="When batching is enabled, 'predict' must return a list to handle multiple inputs correctly.",
+    ):
+        # Simulate the behavior in run_batched_loop
+        y = api.predict(mock_input)
+        api.unbatch(y)
+
+
 class FakeResponseQueue:
     def put(self, *args):
         raise Exception("Exit loop")
