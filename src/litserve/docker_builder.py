@@ -73,7 +73,7 @@ def build(server_path: str, port: int = 8000):
 
     Args:
         server_path (str): The path to the server file.
-        port (int, optional): The port to expose in the Docker container. Defaults
+        port (int, optional): The port to expose in the Docker container. Defaults to 8000.
 
     """
     files = []
@@ -100,6 +100,7 @@ def build(server_path: str, port: int = 8000):
         f.write(dockerfile_content)
     success_msg = SUCCESS_MSG.format(
         dockerfile_path=os.path.abspath("Dockerfile"),
+        port=port,
         BOLD=BOLD,
         MAGENTA=MAGENTA,
         GREEN=GREEN,

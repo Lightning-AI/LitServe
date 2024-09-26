@@ -11,100 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pytest
-from unittest.mock import patch
-import os
-import sys
-import tempfile
-import io
-import docker
-from litserve.docker_builder import (
-    get_docker_client,
-    build_docker_image_with_tempdir,
-    create_tar_stream,
-    build,
-)
+from litserve import docker_builder
 
 
-@pytest.fixture
-def mock_docker_client():
-    with patch("litserve.docker_builder.docker.APIClient") as mock_client:
-        yield mock_client
+def test_color():
+    assert docker_builder.color("hi", docker_builder.RED) == f"{docker_builder.RED}hi{docker_builder.RESET}"
+
+    expected = f"{docker_builder.INFO} {docker_builder.RED}hi{docker_builder.RESET}"
+    assert docker_builder.color("hi", docker_builder.RED, docker_builder.INFO) == expected
 
 
-def test_get_docker_client_success(mock_docker_client):
-    mock_client_instance = mock_docker_client.return_value
-    mock_client_instance.ping.return_value = True
+def test_build(tmp_path):
+    with open(tmp_path / "app.py", "w") as f:
+        f.write("print('hello')")
+    with open(tmp_path / "requirements.txt", "w") as f:
+        f.write("litserve")
 
-    client = get_docker_client()
-    assert client == mock_client_instance
-    mock_client_instance.ping.assert_called_once()
-
-
-def test_get_docker_client_import_error():
-    with patch.dict(sys.modules, {"docker": None}), patch("builtins.input", return_value="no"), pytest.raises(
-        SystemExit
-    ):
-        get_docker_client()
-
-
-def test_get_docker_client_api_error(mock_docker_client):
-    mock_client_instance = mock_docker_client.return_value
-    mock_client_instance.ping.side_effect = docker.errors.APIError("Error")
-
-    with pytest.raises(SystemExit):
-        get_docker_client()
-
-
-def test_create_tar_stream():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tar_stream = create_tar_stream(tmpdir)
-        assert isinstance(tar_stream, io.BytesIO)
-
-
-def test_build_docker_image_with_tempdir(mock_docker_client):
-    mock_client_instance = mock_docker_client.return_value
-    mock_client_instance.build.return_value = [{"stream": "Step 1/1 : FROM python:3.9-slim\n"}]
-    mock_client_instance.images.return_value = [{"Id": "test_image_id"}]
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        server_path = os.path.join(tmpdir, "server.py")
-        requirements_path = os.path.join(tmpdir, "requirements.txt")
-        with open(server_path, "w") as f:
-            f.write("print('Hello, World!')")
-        with open(requirements_path, "w") as f:
-            f.write("")
-
-        files = [server_path, requirements_path]
-        dockerfile_content = "FROM python:3.9-slim\nCOPY . /app\n"
-        image_id = build_docker_image_with_tempdir(
-            client=mock_client_instance,
-            dockerfile_str=dockerfile_content,
-            files=files,
-            tag="test_tag",
-            timeout=600,
-        )
-        assert image_id == "test_image_id"
-
-
-def test_build(mock_docker_client):
-    mock_client_instance = mock_docker_client.return_value
-    mock_client_instance.build.return_value = [{"stream": "Step 1/1 : FROM python:3.9-slim\n"}]
-    mock_client_instance.images.return_value = [{"Id": "test_image_id"}]
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        server_path = os.path.join(tmpdir, "server.py")
-        with open(server_path, "w") as f:
-            f.write("print('Hello, World!')")
-
-        with patch("litserve.docker_builder.get_docker_client", return_value=mock_client_instance):
-            # Change the working directory to tmpdir
-            current_dir = os.getcwd()
-            os.chdir(tmpdir)
-            try:
-                build(server_path=server_path, tag="test_tag", port=8000, timeout=600)
-            finally:
-                os.chdir(current_dir)
-
-            mock_client_instance.build.assert_called_once()
-            mock_client_instance.images.assert_called_once_with(name="test_tag")
+    docker_builder.build(tmp_path / "app.py", 8000)
+    with open("Dockerfile") as f:
+        content = f.read()
+    assert (
+        """FROM python:3.10-slim
+WORKDIR /app
+COPY . /app"""
+        in content
+    )
+    assert "EXPOSE 8000" in content
