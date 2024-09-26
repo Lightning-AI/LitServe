@@ -67,8 +67,7 @@ class LitAPI(ABC):
             warnings.warn(
                 "The 'predict' method returned a string instead of a list of predictions. "
                 "When batching is enabled, 'predict' should return a list of predictions. "
-                "To avoid unexpected behavior, ensure 'predict' returns a list of predictions, "
-                "or implement 'LitAPI.unbatch' correctly."
+                "To avoid unexpected behavior, ensure 'predict' returns a list of predictions."
             )
         return list(output)
 
