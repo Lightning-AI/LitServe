@@ -13,7 +13,6 @@
 # limitations under the License.
 import logging
 import os
-import sys
 import warnings
 import litserve as ls
 
@@ -48,11 +47,14 @@ def color(text, color_code, action_code=None):
 
 
 REQUIREMENTS_FILE = "requirements.txt"
-DOCKERFILE_TEMPLATE = """
-FROM python:3.10-slim
+DOCKERFILE_TEMPLATE = """FROM python:3.10-slim
 WORKDIR /app
-COPY . /app
 
+####### Put any installation commands here #######
+# RUN apt-get update && apt-get install -y <package-name>
+
+COPY . /app
+# Install litserve and requirements
 RUN pip install --no-cache-dir litserve=={version} {requirements}
 EXPOSE {port}
 CMD ["python", "/app/{server_path}"]
@@ -76,21 +78,15 @@ def build(server_path: str, port: int = 8000):
         port (int, optional): The port to expose in the Docker container. Defaults to 8000.
 
     """
-    files = []
     requirements = ""
     if os.path.exists(REQUIREMENTS_FILE):
         requirements = f"-r {REQUIREMENTS_FILE}"
-        files.append(REQUIREMENTS_FILE)
     else:
         warnings.warn(
             f"requirements.txt not found at {os.getcwd()}. "
-            f"Make sure to install the required packages in the Dockerfile."
+            f"Make sure to install the required packages in the Dockerfile.",
+            UserWarning,
         )
-    files.append(server_path)  # TODO: Make it flexible
-    for file in files:
-        if not os.path.exists(file):
-            logger.error(f"File not found: {file}")
-            sys.exit(1)
 
     version = ls.__version__
     dockerfile_content = DOCKERFILE_TEMPLATE.format(
