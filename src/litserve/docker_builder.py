@@ -27,17 +27,18 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # COLOR CODES
-BOLD = "\u001b[1m"
 RESET = "\u001b[0m"
 RED = "\u001b[31m"
 GREEN = "\u001b[32m"
 BLUE = "\u001b[34m"
 MAGENTA = "\u001b[35m"
+BG_MAGENTA = "\u001b[45m"
 
 # ACTION CODES
-INFO = f"{BOLD}{BLUE}[INFO]{RESET}"
-BOLD_ACT = f"{BOLD}{MAGENTA}"
-WARNING = f"{BOLD}{RED}[WARNING]{RESET}"
+BOLD = "\u001b[1m"
+UNDERLINE = "\u001b[4m"
+INFO = f"{BOLD}{BLUE}[INFO]"
+WARNING = f"{BOLD}{RED}[WARNING]"
 
 
 def color(text, color_code, action_code=None):
@@ -58,10 +59,12 @@ CMD ["python", "/app/{server_path}"]
 """
 
 SUCCESS_MSG = """
-Dockerfile created successfully at {dockerfile_path}.
-- To build the Docker image, run: docker build -t <tag> .
-- To run the Docker container, run: docker run -p <host_port>:<container_port> <tag>
-- To push the Docker image to a registry, run: docker push <tag>
+{BOLD}{MAGENTA}Dockerfile created successfully at{RESET} {UNDERLINE}{dockerfile_path}{RESET}
+
+{BOLD}{BLUE}To build the Docker image, run: {UNDERLINE}docker build -t <tag> .{RESET}
+- To build the Docker image, run: {UNDERLINE}docker build -t <tag> .{RESET}
+- To run the Docker container, run: {UNDERLINE}docker run -p <host_port>:<container_port> <tag>{RESET}
+- To push the Docker image to a registry, run: {UNDERLINE}docker push <tag>{RESET}
 """
 
 
@@ -95,5 +98,14 @@ def build(server_path: str, port: int = 8000):
     )
     with open("Dockerfile", "w") as f:
         f.write(dockerfile_content)
-    success_msg = SUCCESS_MSG.format(dockerfile_path=os.path.abspath("Dockerfile"))
+    success_msg = SUCCESS_MSG.format(
+        dockerfile_path=os.path.abspath("Dockerfile"),
+        BOLD=BOLD,
+        MAGENTA=MAGENTA,
+        GREEN=GREEN,
+        BLUE=BLUE,
+        UNDERLINE=UNDERLINE,
+        BG_MAGENTA=BG_MAGENTA,
+        RESET=RESET,
+    )
     print(success_msg)
