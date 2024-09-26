@@ -149,7 +149,8 @@ def test_max_batch_size_warning():
 
 
 def test_batch_predict_string_warning():
-    api = SimpleBatchLitAPI()
+    api = ls.test_examples.SimpleBatchedAPI()
+    api._sanitize(2, None)
     api.predict = MagicMock(return_value="This is a string")
 
     mock_input = torch.tensor([[1.0], [2.0]])
@@ -159,7 +160,8 @@ def test_batch_predict_string_warning():
         match="When batching is enabled, 'predict' must return a list to handle multiple inputs correctly.",
     ):
         # Simulate the behavior in run_batched_loop
-        api.predict(mock_input)
+        y = api.predict(mock_input)
+        api.unbatch(y)
 
 
 class FakeResponseQueue:
