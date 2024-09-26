@@ -68,7 +68,7 @@ class LitAPI(ABC):
                 "The 'predict' method returned a string instead of a list of predictions. "
                 "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
                 "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
-                UserWarning
+                UserWarning,
             )
         return list(output)
 
