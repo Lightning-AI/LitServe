@@ -13,6 +13,8 @@
 # limitations under the License.
 import logging
 import os
+from pathlib import Path
+
 import warnings
 import litserve as ls
 
@@ -58,7 +60,7 @@ COPY . /app
 # Install litserve and requirements
 RUN pip install --no-cache-dir litserve=={version} {requirements}
 EXPOSE {port}
-CMD ["python", "/app/{server_path}"]
+CMD ["python", "/app/{server_filename}"]
 """
 
 SUCCESS_MSG = """
@@ -71,11 +73,11 @@ SUCCESS_MSG = """
 """
 
 
-def build(server_path: str, port: int = 8000):
+def build(server_filename: str, port: int = 8000):
     """Build a Docker image from the given server code.
 
     Args:
-        server_path (str): The path to the server file.
+        server_filename (str): The path to the server file. Example sever.py or app.py.
         port (int, optional): The port to expose in the Docker container. Defaults to 8000.
 
     """
@@ -89,9 +91,13 @@ def build(server_path: str, port: int = 8000):
             UserWarning,
         )
 
+    current_dir = Path.cwd()
+    if not (current_dir / server_filename).is_file():
+        raise FileNotFoundError(f"Server file `{server_filename}` must be in the current directory: {os.getcwd()}")
+
     version = ls.__version__
     dockerfile_content = DOCKERFILE_TEMPLATE.format(
-        server_path=server_path, port=port, version=version, requirements=requirements
+        server_filename=server_filename, port=port, version=version, requirements=requirements
     )
     with open("Dockerfile", "w") as f:
         f.write(dockerfile_content)
