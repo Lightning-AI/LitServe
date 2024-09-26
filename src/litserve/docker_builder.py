@@ -51,7 +51,9 @@ def color(text, color_code, action_code=None):
 REQUIREMENTS_FILE = "requirements.txt"
 DOCKERFILE_TEMPLATE = """FROM python:3.10-slim
 
-####### Put installation commands here #######
+####### Add your own installation commands here #######
+# RUN pip install some-package
+# RUN wget https://path/to/some/data/or/weights
 # RUN apt-get update && apt-get install -y <package-name>
 
 WORKDIR /app
