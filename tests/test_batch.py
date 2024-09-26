@@ -156,9 +156,7 @@ def test_batch_predict_string_warning():
 
     with pytest.warns(
         UserWarning,
-        match="The 'predict' method returned a string instead of a list of predictions. "
-        "When batching is enabled, 'predict' should return a list of predictions. "
-        "To avoid unexpected behavior, ensure 'predict' returns a list of predictions.",
+        match="When batching is enabled, 'predict' must return a list to handle multiple inputs correctly.",
     ):
         # Simulate the behavior in run_batched_loop
         api.predict(mock_input)
