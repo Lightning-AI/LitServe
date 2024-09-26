@@ -24,7 +24,9 @@ def test_color():
 
 EXPECTED_CONENT = f"""FROM python:3.10-slim
 
-####### Put installation commands here #######
+####### Add your own installation commands here #######
+# RUN pip install some-package
+# RUN wget https://path/to/some/data/or/weights
 # RUN apt-get update && apt-get install -y <package-name>
 
 WORKDIR /app
