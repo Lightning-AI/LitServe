@@ -148,7 +148,7 @@ def test_max_batch_size_warning():
         LitServer(SimpleTorchAPI(), accelerator="cpu", devices=1, timeout=2)
 
 
-def test_check_predict_output_warnings():
+def test_batch_predict_string_warning():
     api = SimpleBatchLitAPI()
     api.predict = MagicMock(return_value="This is a string")
 
