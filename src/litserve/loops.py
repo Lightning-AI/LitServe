@@ -31,6 +31,24 @@ from litserve.utils import LitAPIStatus
 
 mp.allow_connection_pickling()
 
+
+class PickleableHTTPException(HTTPException):
+    @staticmethod
+    def from_exception(exc: HTTPException):
+        status_code = exc.status_code
+        detail = exc.detail
+        return PickleableHTTPException(status_code, detail)
+
+    def __reduce__(self):
+        return (HTTPException, (self.status_code, self.detail))
+
+
+def dump_exceptions(exception):
+    if isinstance(exception, HTTPException):
+        exception = PickleableHTTPException.from_exception(exception)
+    return pickle.dumps(exception)
+
+
 try:
     import uvloop
 
@@ -153,7 +171,7 @@ def run_single_loop(
                 "Please check the error trace for more details.",
                 uid,
             )
-            err_pkl = pickle.dumps(e)
+            err_pkl = dump_exceptions(e)  # pickle.dumps(e)
             response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
