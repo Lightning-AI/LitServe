@@ -15,7 +15,6 @@ import asyncio
 import inspect
 import logging
 import multiprocessing as mp
-import pickle
 import sys
 import time
 from queue import Empty, Queue
@@ -27,26 +26,9 @@ from starlette.formparsers import MultiPartParser
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, dump_exceptions
 
 mp.allow_connection_pickling()
-
-
-class PickleableHTTPException(HTTPException):
-    @staticmethod
-    def from_exception(exc: HTTPException):
-        status_code = exc.status_code
-        detail = exc.detail
-        return PickleableHTTPException(status_code, detail)
-
-    def __reduce__(self):
-        return (HTTPException, (self.status_code, self.detail))
-
-
-def dump_exceptions(exception):
-    if isinstance(exception, HTTPException):
-        exception = PickleableHTTPException.from_exception(exception)
-    return pickle.dumps(exception)
 
 
 try:
@@ -171,7 +153,7 @@ def run_single_loop(
                 "Please check the error trace for more details.",
                 uid,
             )
-            err_pkl = dump_exceptions(e)  # pickle.dumps(e)
+            err_pkl = dump_exceptions(e)
             response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
@@ -244,7 +226,7 @@ def run_batched_loop(
                 "LitAPI ran into an error while processing the batched request.\n"
                 "Please check the error trace for more details."
             )
-            err_pkl = pickle.dumps(e)
+            err_pkl = dump_exceptions(e)
             for response_queue_id, uid in zip(response_queue_ids, uids):
                 response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
@@ -307,7 +289,7 @@ def run_streaming_loop(
                 "Please check the error trace for more details.",
                 uid,
             )
-            response_queues[response_queue_id].put((uid, (pickle.dumps(e), LitAPIStatus.ERROR)))
+            response_queues[response_queue_id].put((uid, (dump_exceptions(e), LitAPIStatus.ERROR)))
 
 
 def run_batched_streaming_loop(
@@ -380,7 +362,7 @@ def run_batched_streaming_loop(
                 "LitAPI ran into an error while processing the streaming batched request.\n"
                 "Please check the error trace for more details."
             )
-            err_pkl = pickle.dumps(e)
+            err_pkl = dump_exceptions(e)
             response_queues[response_queue_id].put((uid, (err_pkl, LitAPIStatus.ERROR)))
 
 
