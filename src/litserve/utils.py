@@ -46,7 +46,7 @@ class PickleableHTTPException(HTTPException):
         return (HTTPException, (self.status_code, self.detail))
 
 
-def dump_exceptions(exception):
+def dump_exception(exception):
     if isinstance(exception, HTTPException):
         exception = PickleableHTTPException.from_exception(exception)
     return pickle.dumps(exception)
