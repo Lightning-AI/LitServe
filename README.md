@@ -22,6 +22,7 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
 ✅ (2x)+ faster serving  ✅ Easy to use          ✅ LLMs, non LLMs and more
 ✅ Bring your own model  ✅ PyTorch/JAX/TF/...   ✅ Built on FastAPI       
 ✅ GPU autoscaling       ✅ Batching, Streaming  ✅ Self-host or ⚡️ managed 
+                         ✅ Integrate with vLLM and more                   
 </pre>
 
 <div align='center'>
