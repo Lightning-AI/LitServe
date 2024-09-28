@@ -35,6 +35,23 @@ class LitAPIStatus:
     FINISH_STREAMING = "FINISH_STREAMING"
 
 
+class PickleableHTTPException(HTTPException):
+    @staticmethod
+    def from_exception(exc: HTTPException):
+        status_code = exc.status_code
+        detail = exc.detail
+        return PickleableHTTPException(status_code, detail)
+
+    def __reduce__(self):
+        return (HTTPException, (self.status_code, self.detail))
+
+
+def dump_exception(exception):
+    if isinstance(exception, HTTPException):
+        exception = PickleableHTTPException.from_exception(exception)
+    return pickle.dumps(exception)
+
+
 def load_and_raise(response):
     try:
         exception = pickle.loads(response) if isinstance(response, bytes) else response

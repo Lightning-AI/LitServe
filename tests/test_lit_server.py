@@ -368,11 +368,22 @@ class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
         raise HTTPException(501, "decode request is bad")
 
 
+class TestHTTPExceptionAPI2(ls.test_examples.SimpleLitAPI):
+    def decode_request(self, request):
+        raise HTTPException(status_code=400, detail="decode request is bad")
+
+
 def test_http_exception():
     server = LitServer(TestHTTPExceptionAPI())
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
+        assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
+
+    server = LitServer(TestHTTPExceptionAPI2())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 400, "Server raises 400 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
 
 
