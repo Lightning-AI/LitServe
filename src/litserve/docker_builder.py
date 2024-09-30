@@ -78,8 +78,8 @@ To push the container to a registry:
 """
 
 
-def build(server_filename: str, port: int = 8000):
-    """Build a Docker image from the given server code.
+def dockerize(server_filename: str, port: int = 8000):
+    """Generate a Dockerfile for the given server code.
 
     Args:
         server_filename (str): The path to the server file. Example sever.py or app.py.

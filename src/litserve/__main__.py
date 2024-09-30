@@ -13,11 +13,11 @@
 # limitations under the License.
 from jsonargparse import set_config_read_mode, set_docstring_parse_options, CLI
 
-from litserve.docker_builder import build
+from litserve.docker_builder import dockerize
 
 
 def main():
-    cli_components = {"build": build}
+    cli_components = {"dockerize": dockerize}
     set_docstring_parse_options(attribute_docstrings=True)
     set_config_read_mode(urls_enabled=True)
     CLI(cli_components)

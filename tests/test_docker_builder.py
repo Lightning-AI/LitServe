@@ -49,14 +49,14 @@ def test_build(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     with pytest.warns(UserWarning, match="Make sure to install the required packages in the Dockerfile."):
-        docker_builder.build("app.py", 8000)
+        docker_builder.dockerize("app.py", 8000)
 
     with open(tmp_path / "requirements.txt", "w") as f:
         f.write("lightning")
-    docker_builder.build("app.py", 8000)
+    docker_builder.dockerize("app.py", 8000)
     with open("Dockerfile") as f:
         content = f.read()
     assert content == EXPECTED_CONENT
 
     with pytest.raises(FileNotFoundError, match="must be in the current directory"):
-        docker_builder.build("random_file_name.py", 8000)
+        docker_builder.dockerize("random_file_name.py", 8000)
