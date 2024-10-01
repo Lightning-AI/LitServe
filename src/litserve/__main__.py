@@ -20,10 +20,21 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
 
     # dockerize sub-command
-    dockerize_parser = subparsers.add_parser("dockerize", help=dockerize.__doc__)
-    dockerize_parser.add_argument("server_filename", help="The path to the server file. Example: server.py or app.py.")
+    dockerize_parser = subparsers.add_parser(
+        "dockerize",
+        help=dockerize.__doc__,
+        description="Generate a Dockerfile for the given server code.",
+    )
     dockerize_parser.add_argument(
-        "--port", type=int, default=8000, help="The port to expose in the Docker container. Defaults to 8000."
+        "server_filename",
+        type=str,
+        help="The path to the server file. Example: server.py or app.py.",
+    )
+    dockerize_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="The port to expose in the Docker container. Defaults to 8000.",
     )
     dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port))
 
