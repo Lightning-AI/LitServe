@@ -43,12 +43,6 @@ def main():
         help="Whether to use a GPU-enabled Docker image. Defaults to false.",
     )
     dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port, args.gpu))
-
-    # Add "litserve build or litserve serve" sub-commands here
-    # serve_command_parser = subparsers.add_parser("serve", help="Another command help")
-    # serve_command_parser.add_argument("filename", help="Some argument for another command")
-    # serve_command_parser.set_defaults(func=lambda args: another_command_function(args.some_arg))
-
     args = parser.parse_args()
 
     if hasattr(args, "func"):
