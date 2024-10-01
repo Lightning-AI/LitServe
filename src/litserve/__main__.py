@@ -11,16 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from jsonargparse import set_config_read_mode, set_docstring_parse_options, CLI
-
+from argparse import ArgumentParser
 from litserve.docker_builder import dockerize
 
 
 def main():
-    cli_components = {"dockerize": dockerize}
-    set_docstring_parse_options(attribute_docstrings=True)
-    set_config_read_mode(urls_enabled=True)
-    CLI(cli_components)
+    parser = ArgumentParser(description="CLI for LitServe")
+    subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
+
+    # dockerize sub-command
+    dockerize_parser = subparsers.add_parser("dockerize", help=dockerize.__doc__)
+    dockerize_parser.add_argument("server_filename", help="The path to the server file. Example: server.py or app.py.")
+    dockerize_parser.add_argument(
+        "--port", type=int, default=8000, help="The port to expose in the Docker container. Defaults to 8000."
+    )
+    dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port))
+
+    # Add "litserve build or litserve serve" sub-commands here
+    # serve_command_parser = subparsers.add_parser("serve", help="Another command help")
+    # serve_command_parser.add_argument("filename", help="Some argument for another command")
+    # serve_command_parser.set_defaults(func=lambda args: another_command_function(args.some_arg))
+
+    args = parser.parse_args()
+
+    if hasattr(args, "func"):
+        args.func(args)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
