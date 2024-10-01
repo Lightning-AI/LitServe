@@ -19,14 +19,15 @@ class Formatter(ArgumentDefaultsHelpFormatter, RawTextHelpFormatter): ...
 
 
 def main():
-    parser = ArgumentParser(description="CLI for LitServe")
+    parser = ArgumentParser(description="CLI for LitServe", formatter_class=Formatter)
     subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
 
     # dockerize sub-command
     dockerize_parser = subparsers.add_parser(
         "dockerize",
-        help="Generate a Dockerfile for the given server code.",
-        description=dockerize.__doc__,
+        help=dockerize.__doc__,
+        description="Generate a Dockerfile for the given server code.\nExample usage:"
+        " litserve dockerize server.py --port 8000 --gpu",
         formatter_class=Formatter,
     )
     dockerize_parser.add_argument(
@@ -38,13 +39,13 @@ def main():
         "--port",
         type=int,
         default=8000,
-        help="The port to expose in the Docker container. Defaults to 8000.",
+        help="The port to expose in the Docker container.",
     )
     dockerize_parser.add_argument(
         "--gpu",
         default=False,
         action="store_true",
-        help="Whether to use a GPU-enabled Docker image. Defaults to false.",
+        help="Whether to use a GPU-enabled Docker image.",
     )
     dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port, args.gpu))
     args = parser.parse_args()
