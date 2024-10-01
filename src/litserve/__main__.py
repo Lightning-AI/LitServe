@@ -36,7 +36,13 @@ def main():
         default=8000,
         help="The port to expose in the Docker container. Defaults to 8000.",
     )
-    dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port))
+    dockerize_parser.add_argument(
+        "--gpu",
+        default=False,
+        action="store_true",
+        help="Whether to use a GPU-enabled Docker image. Defaults to false.",
+    )
+    dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port, args.gpu))
 
     # Add "litserve build or litserve serve" sub-commands here
     # serve_command_parser = subparsers.add_parser("serve", help="Another command help")

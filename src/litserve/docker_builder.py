@@ -143,7 +143,7 @@ def dockerize(server_filename: str, port: int = 8000, gpu: bool = False):
         run_cmd = f"docker run --gpus all -p {port}:{port} litserve-model:latest"
         docker_template = CUDA_DOCKER_TEMPLATE
     else:
-        run_cmd = "docker run -p {port}:{port} litserve-model:latest"
+        run_cmd = f"docker run -p {port}:{port} litserve-model:latest"
         docker_template = DOCKERFILE_TEMPLATE
     dockerfile_content = docker_template.format(
         server_filename=server_filename,
