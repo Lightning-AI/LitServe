@@ -15,19 +15,23 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawTextHelpF
 from litserve.docker_builder import dockerize
 
 
-class Formatter(ArgumentDefaultsHelpFormatter, RawTextHelpFormatter): ...
+class LitFormatter(ArgumentDefaultsHelpFormatter, RawTextHelpFormatter): ...
 
 
 def main():
-    parser = ArgumentParser(description="CLI for LitServe", formatter_class=Formatter)
-    subparsers = parser.add_subparsers(dest="command", help=dockerize.__doc__)
+    parser = ArgumentParser(description="CLI for LitServe", formatter_class=LitFormatter)
+    subparsers = parser.add_subparsers(
+        dest="command",
+        title="Commands",
+    )
 
     # dockerize sub-command
     dockerize_parser = subparsers.add_parser(
         "dockerize",
+        help="Generate a Dockerfile for the given server code.",
         description="Generate a Dockerfile for the given server code.\nExample usage:"
         " litserve dockerize server.py --port 8000 --gpu",
-        formatter_class=Formatter,
+        formatter_class=LitFormatter,
     )
     dockerize_parser.add_argument(
         "server_filename",
