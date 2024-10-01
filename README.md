@@ -81,7 +81,7 @@ class SimpleLitAPI(ls.LitAPI):
         # Convert the request payload to model input.
         return request["input"] 
 
-    def predict(self, x, **kwargs):
+    def predict(self, x, **kwargs) -> Any:
         # Easily build compound systems. Run inference and return the output.
         squared = self.model1(x)
         cubed = self.model2(x)
