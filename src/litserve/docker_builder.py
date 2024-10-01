@@ -103,14 +103,16 @@ CMD ["python", "/app/{server_filename}"]
 """
 
 # Link our documentation as the bottom of this msg
-SUCCESS_MSG = """{BOLD}{MAGENTA}Dockerfile created successfully at{RESET} {UNDERLINE}{dockerfile_path}{RESET}
-Build the container with:
+SUCCESS_MSG = """{BOLD}{MAGENTA}Dockerfile created successfully{RESET}
+Update {UNDERLINE}{dockerfile_path}{RESET} to add any additional dependencies or commands.{RESET}
+
+{BOLD}Build the container with:{RESET}
 > {UNDERLINE}docker build -t litserve-model .{RESET}
 
-To run the Docker container on the machine:
+{BOLD}To run the Docker container on the machine:{RESET}
 > {UNDERLINE}{RUN_CMD}{RESET}
 
-To push the container to a registry:
+{BOLD}To push the container to a registry:{RESET}
 > {UNDERLINE}docker push litserve-model{RESET}
 """
 
