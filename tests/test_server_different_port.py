@@ -1,7 +1,13 @@
-# from litserve.server import LitServer
-# from litserve.api import LitAPI
-from src.litserve.server import LitServer
-from src.litserve.server import LitAPI
+import requests
+import multiprocessing as mp
+
+# NOTE: HAD TO ADD THIS TO RUN LOCALLY W/O ERROR
+if __name__ == "__main__":
+    mp.set_start_method('fork')  # Try using 'spawn' if 'fork' doesn't work
+
+
+from litserve.server import LitServer
+from litserve.api import LitAPI
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
@@ -24,8 +30,19 @@ class SimpleLitAPI(LitAPI):
         # Convert the model output to a response payload.
         return {"output": output} 
 
-def main():
+def test_server_different_port():
     server = LitServer(SimpleLitAPI(), accelerator="auto", max_batch_size=1)
     
     # TEST: testing the server can run and and receive requests from client.py on non-8000 port
-    server.run(port=8080)
+    non_default_port_no = 8080
+    server.run(port=non_default_port_no)
+
+    response = requests.post(f"http://127.0.0.1:{non_default_port_no}/predict", json={"input": 4.0})
+    print(response)
+    assert response.status_code == 200
+
+
+# Couldn't get pytest to run this, so calling the method and running in the terminal
+test_server_different_port()
+
+
