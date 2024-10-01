@@ -11,8 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawTextHelpFormatter
 from litserve.docker_builder import dockerize
+
+
+class Formatter(ArgumentDefaultsHelpFormatter, RawTextHelpFormatter): ...
 
 
 def main():
@@ -22,8 +25,9 @@ def main():
     # dockerize sub-command
     dockerize_parser = subparsers.add_parser(
         "dockerize",
-        help=dockerize.__doc__,
-        description="Generate a Dockerfile for the given server code.",
+        help="Generate a Dockerfile for the given server code.",
+        description=dockerize.__doc__,
+        formatter_class=Formatter,
     )
     dockerize_parser.add_argument(
         "server_filename",
