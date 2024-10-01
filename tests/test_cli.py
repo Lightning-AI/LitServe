@@ -22,7 +22,6 @@ def test_dockerize_command(monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["litserve", "dockerize", dummy_server_file])
     main()
     captured = capsys.readouterr()
+    os.remove(dummy_server_file)
     assert "Dockerfile created successfully" in captured.out, "CLI did not create Dockerfile"
     assert os.path.exists("Dockerfile"), "CLI did not create Dockerfile"
-
-    os.remove(dummy_server_file)
