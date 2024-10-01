@@ -84,7 +84,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
     && ln -sf /usr/local/bin/pip3.10 /usr/local/bin/pip \\
     && python --version \\
     && pip --version \\
-    # Clean up to reduce image size
     && apt-get purge -y --auto-remove software-properties-common \\
     && apt-get clean \\
     && rm -rf /var/lib/apt/lists/*
@@ -123,6 +122,7 @@ def dockerize(server_filename: str, port: int = 8000, gpu: bool = False):
         server_filename (str): The path to the server file. Example sever.py or app.py.
         port (int, optional): The port to expose in the Docker container. Defaults to 8000.
         gpu (bool, optional): Whether to use a GPU-enabled Docker image. Defaults to False.
+
     """
     requirements = ""
     if os.path.exists(REQUIREMENTS_FILE):
@@ -136,9 +136,7 @@ def dockerize(server_filename: str, port: int = 8000, gpu: bool = False):
 
     current_dir = Path.cwd()
     if not (current_dir / server_filename).is_file():
-        raise FileNotFoundError(
-            f"Server file `{server_filename}` must be in the current directory: {os.getcwd()}"
-        )
+        raise FileNotFoundError(f"Server file `{server_filename}` must be in the current directory: {os.getcwd()}")
 
     version = ls.__version__
     if gpu:

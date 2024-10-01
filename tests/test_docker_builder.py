@@ -44,7 +44,6 @@ CMD ["python", "/app/app.py"]
 EXPECTED_GPU_DOCKERFILE = """# Change CUDA and cuDNN version here
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04
 
-# Install Python 3.10 and necessary dependencies
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \\
         software-properties-common \\
@@ -57,13 +56,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
     && wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py \\
     && python3.10 get-pip.py \\
     && rm get-pip.py \\
-    # Create symbolic links for python and pip to point to python3.10 and pip3.10
     && ln -sf /usr/bin/python3.10 /usr/bin/python \\
     && ln -sf /usr/local/bin/pip3.10 /usr/local/bin/pip \\
-    # Verify Python and pip installations
     && python --version \\
     && pip --version \\
-    # Clean up to reduce image size
     && apt-get purge -y --auto-remove software-properties-common \\
     && apt-get clean \\
     && rm -rf /var/lib/apt/lists/*
