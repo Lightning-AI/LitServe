@@ -68,6 +68,7 @@ This toy example with 2 models (AI compound system) shows LitServe's flexibility
 ```python
 # server.py
 import litserve as ls
+from typing import Any
 
 # (STEP 1) - DEFINE THE API (compound AI system)
 class SimpleLitAPI(ls.LitAPI):
@@ -76,18 +77,18 @@ class SimpleLitAPI(ls.LitAPI):
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
-    def decode_request(self, request):
+    def decode_request(self, request, **kwargs):
         # Convert the request payload to model input.
         return request["input"] 
 
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         # Easily build compound systems. Run inference and return the output.
         squared = self.model1(x)
         cubed = self.model2(x)
         output = squared + cubed
         return {"output": output}
 
-    def encode_response(self, output):
+    def encode_response(self, output, **kwargs):
         # Convert the model output to a response payload.
         return {"output": output} 
 
