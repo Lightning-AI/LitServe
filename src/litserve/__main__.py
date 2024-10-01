@@ -20,12 +20,11 @@ class Formatter(ArgumentDefaultsHelpFormatter, RawTextHelpFormatter): ...
 
 def main():
     parser = ArgumentParser(description="CLI for LitServe", formatter_class=Formatter)
-    subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
+    subparsers = parser.add_subparsers(dest="command", help=dockerize.__doc__)
 
     # dockerize sub-command
     dockerize_parser = subparsers.add_parser(
         "dockerize",
-        help=dockerize.__doc__,
         description="Generate a Dockerfile for the given server code.\nExample usage:"
         " litserve dockerize server.py --port 8000 --gpu",
         formatter_class=Formatter,
