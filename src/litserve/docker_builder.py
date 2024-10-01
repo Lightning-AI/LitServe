@@ -65,26 +65,62 @@ EXPOSE {port}
 CMD ["python", "/app/{server_filename}"]
 """
 
+CUDA_DOCKER_TEMPLATE = """# Change CUDA and cuDNN version here
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04
+
+# Install Python 3.10 and necessary dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    software-properties-common \\
+    && add-apt-repository ppa:deadsnakes/ppa \\
+    && apt-get update && apt-get install -y --no-install-recommends \\
+    python3.10 \\
+    python3.10-venv \\
+    python3.10-dev \\
+    python3-pip \\
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \\
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \\
+    # Upgrade pip to the latest version
+    && pip install --no-cache-dir --upgrade pip \\
+    # Clean up to reduce image size
+    && apt-get purge -y --auto-remove software-properties-common \\
+    && apt-get clean \\
+    && rm -rf /var/lib/apt/lists/*
+
+####### Add your own installation commands here #######
+# RUN pip install some-package
+# RUN wget https://path/to/some/data/or/weights
+# RUN apt-get update && apt-get install -y <package-name>
+
+WORKDIR /app
+COPY . /app
+
+# Install litserve and requirements
+RUN pip install --no-cache-dir litserve=={version} {requirements}
+EXPOSE {port}
+CMD ["python", "/app/{server_filename}"]
+"""
+
 # Link our documentation as the bottom of this msg
 SUCCESS_MSG = """{BOLD}{MAGENTA}Dockerfile created successfully at{RESET} {UNDERLINE}{dockerfile_path}{RESET}
 Build the container with:
 > {UNDERLINE}docker build -t litserve-model .{RESET}
 
 To run the Docker container on the machine:
-> {UNDERLINE}docker run -p 8000:8000 litserve-model{RESET}
+> {UNDERLINE}{RUN_CMD}{RESET}
 
 To push the container to a registry:
 > {UNDERLINE}docker push litserve-model{RESET}
 """
 
 
-def dockerize(server_filename: str, port: int = 8000):
+def dockerize(server_filename: str, port: int = 8000, gpu: bool = False):
     """Generate a Dockerfile for the given server code.
 
     Args:
         server_filename (str): The path to the server file. Example sever.py or app.py.
         port (int, optional): The port to expose in the Docker container. Defaults to 8000.
-
+        gpu (bool, optional): Whether to use a GPU-enabled Docker image. Defaults to False.
     """
     requirements = ""
     if os.path.exists(REQUIREMENTS_FILE):
@@ -98,17 +134,28 @@ def dockerize(server_filename: str, port: int = 8000):
 
     current_dir = Path.cwd()
     if not (current_dir / server_filename).is_file():
-        raise FileNotFoundError(f"Server file `{server_filename}` must be in the current directory: {os.getcwd()}")
+        raise FileNotFoundError(
+            f"Server file `{server_filename}` must be in the current directory: {os.getcwd()}"
+        )
 
     version = ls.__version__
-    dockerfile_content = DOCKERFILE_TEMPLATE.format(
-        server_filename=server_filename, port=port, version=version, requirements=requirements
+    if gpu:
+        run_cmd = f"docker run --gpus all -p {port}:{port} litserve-model:latest"
+        docker_template = CUDA_DOCKER_TEMPLATE
+    else:
+        run_cmd = "docker run -p {port}:{port} litserve-model:latest"
+        docker_template = DOCKERFILE_TEMPLATE
+    dockerfile_content = docker_template.format(
+        server_filename=server_filename,
+        port=port,
+        version=version,
+        requirements=requirements,
     )
     with open("Dockerfile", "w") as f:
         f.write(dockerfile_content)
     success_msg = SUCCESS_MSG.format(
         dockerfile_path=os.path.abspath("Dockerfile"),
-        port=port,
+        RUN_CMD=run_cmd,
         BOLD=BOLD,
         MAGENTA=MAGENTA,
         GREEN=GREEN,
