@@ -75,7 +75,7 @@ class Logger(ABC):
         raise NotImplementedError  # pragma: no cover
 
 
-class LoggerProxy:
+class _LoggerProxy:
     def __init__(self, logger_class):
         self.logger_class = logger_class
 
@@ -117,19 +117,6 @@ class _LoggerConnector:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
     @staticmethod
-    def _process_logger_queue(loggers: List[Logger], queue):
-        while True:
-            key, value = queue.get()
-            for logger in loggers:
-                try:
-                    logger.process(key, value)
-                except Exception as e:
-                    module_logger.error(
-                        f"{logger.__class__.__name__} ran into an error while processing log for entry "
-                        f"with key {key} and value {value}: {e}"
-                    )
-
-    @staticmethod
     def _is_picklable(obj):
         try:
             pickle.dumps(obj)
@@ -139,8 +126,8 @@ class _LoggerConnector:
             return False
 
     @staticmethod
-    def _process_logger_queue(logger_proxies: List[LoggerProxy], queue):
-        loggers = [proxy.create_logger() for proxy in logger_proxies]
+    def _process_logger_queue(logger_proxies: List[_LoggerProxy], queue):
+        loggers = [proxy if isinstance(proxy, Logger) else proxy.create_logger() for proxy in logger_proxies]
         while True:
             key, value = queue.get()
             for logger in loggers:
@@ -169,7 +156,7 @@ class _LoggerConnector:
             if self._is_picklable(logger):
                 logger_proxies.append(logger)
             else:
-                logger_proxies.append(LoggerProxy(logger.__class__))
+                logger_proxies.append(_LoggerProxy(logger.__class__))
 
         module_logger.debug(f"Starting logger process with {len(logger_proxies)} loggers")
         ctx = mp.get_context("spawn")
