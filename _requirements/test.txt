@@ -13,3 +13,4 @@ transformers
 openai>=1.12.0
 pillow
 numpy <2.0
+prometheus-client>=0.21.0

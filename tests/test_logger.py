@@ -17,6 +17,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from unittest.mock import MagicMock
+
+from prometheus_client import Counter
+
 from litserve.loggers import Logger, _LoggerConnector
 
 import litserve as ls
@@ -143,3 +146,32 @@ def test_logger_with_callback(tmp_path):
                 "time: 0.3\n",
                 "time: 0.4\n",
             ], f"Expected metric not found in logger file {data}"
+
+
+class PrometheusLogger(ls.Logger):
+    # This is a non-pickleable class
+    def __init__(self):
+        super().__init__()
+        self._metric_counter = Counter("log_entries", "Count of log entries")
+
+    def process(self, key, value):
+        # Increment the Prometheus counter for each log entry
+        self._metric_counter.inc()
+        print(f"Logged {key}: {value}")
+
+
+class PickleTestAPI(ls.test_examples.SimpleLitAPI):
+    def predict(self, x):
+        self.log("my-key", x)
+        return super().predict(x)
+
+
+def test_pickle_safety(capfd):
+    api = PickleTestAPI()
+    server = ls.LitServer(api, loggers=PrometheusLogger())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 16.0}
+        time.sleep(0.5)
+        captured = capfd.readouterr()
+        assert "Logged my-key: 4.0" in captured.out, captured.out
