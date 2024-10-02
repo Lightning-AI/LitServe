@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 
 from unittest.mock import MagicMock
 
-
 from litserve.loggers import Logger, _LoggerConnector
 
 import litserve as ls
@@ -173,4 +172,4 @@ def test_pickle_safety(capfd):
         assert response.json() == {"output": 16.0}
         time.sleep(0.5)
         captured = capfd.readouterr()
-        assert "Logged my-key: 4.0" in captured.out, captured.out
+        assert "Logged my-key: 4.0" in captured.out, f"Expected log not found in captured output {captured}"
