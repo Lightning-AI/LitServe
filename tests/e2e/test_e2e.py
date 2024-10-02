@@ -56,6 +56,13 @@ def test_run():
     assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
     os.remove("client.py")
 
+@e2e_from_file("tests/simple_server_diff_port.py")
+def test_run():
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output, f"tests/simple_server_server_diff_port.py didn't return expected output, got {output}"
+    os.remove("client.py")
+
 
 @e2e_from_file("tests/e2e/default_api.py")
 def test_e2e_default_api():

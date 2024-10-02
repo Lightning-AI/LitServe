@@ -394,27 +394,18 @@ class LitServer:
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
         dest_path = os.path.join(os.getcwd(), "client.py")
 
-        if os.path.exists(dest_path):
-            return
-
         try:
-            # Copy the file to the destination directory
-            shutil.copy(src_path, dest_path)
-            print(f"File '{src_path}' copied to '{dest_path}'")
-
-            # After copying, close the client file and replace the default port
-            with open(dest_path, "r") as f:
+            # Read the template code
+            with open(src_path, "r") as f:
                 client_code = f.read()
 
-            # Replace the placeholder port with the actual port specified by user via Server.run()
+            # Replace the default port number with the user-specified port number
             client_code = client_code.replace("{{PORT}}", str(port))
-
-            # Write the updated code back to the client file
+            
+            # Write client code template w/ updated port number to destination
             with open(dest_path, "w") as f:
                 f.write(client_code)
-
-            print(f"Port {port} has been set in 'dest_path'")
-
+            
         except Exception as e:
             print(f"Error copying file: {e}")
 
