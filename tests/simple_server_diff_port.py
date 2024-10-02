@@ -14,6 +14,7 @@
 from litserve.server import LitServer
 from litserve.api import LitAPI
 
+
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
         self.model = lambda x: x**2

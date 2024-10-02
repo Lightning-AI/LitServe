@@ -17,7 +17,6 @@ import inspect
 import logging
 import multiprocessing as mp
 import os
-import shutil
 import sys
 import threading
 import time
@@ -396,16 +395,16 @@ class LitServer:
 
         try:
             # Read the template code
-            with open(src_path, "r") as f:
+            with open(src_path) as f:
                 client_code = f.read()
 
             # Replace the default port number with the user-specified port number
             client_code = client_code.replace("{{PORT}}", str(port))
-            
+
             # Write client code template w/ updated port number to destination
             with open(dest_path, "w") as f:
                 f.write(client_code)
-            
+
         except Exception as e:
             print(f"Error copying file: {e}")
 
