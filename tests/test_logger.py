@@ -155,7 +155,7 @@ class NonPickleableLogger(ls.Logger):
 
     def process(self, key, value):
         with self._lock:
-            print(f"Logged {key}: {value}")
+            print(f"Logged {key}: {value}", flush=True)
 
 
 class PickleTestAPI(ls.test_examples.SimpleLitAPI):
