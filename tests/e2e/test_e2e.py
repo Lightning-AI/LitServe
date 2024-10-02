@@ -58,7 +58,7 @@ def test_run():
 
 
 @e2e_from_file("tests/simple_server_diff_port.py")
-def test_run():
+def test_run_with_port():
     assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert (
