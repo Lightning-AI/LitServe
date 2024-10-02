@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
 import time
 
 import pytest
@@ -18,7 +19,6 @@ from fastapi.testclient import TestClient
 
 from unittest.mock import MagicMock
 
-from prometheus_client import Counter
 
 from litserve.loggers import Logger, _LoggerConnector
 
@@ -148,16 +148,15 @@ def test_logger_with_callback(tmp_path):
             ], f"Expected metric not found in logger file {data}"
 
 
-class PrometheusLogger(ls.Logger):
-    # This is a non-pickleable class
-    def __init__(self):
-        super().__init__()
-        self._metric_counter = Counter("log_entries", "Count of log entries")
+class NonPickleableLogger(ls.Logger):
+    # This is a logger that contains a non-picklable resource
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lock = threading.Lock()  # Non-picklable resource
 
     def process(self, key, value):
-        # Increment the Prometheus counter for each log entry
-        self._metric_counter.inc()
-        print(f"Logged {key}: {value}")
+        with self._lock:
+            print(f"Logged {key}: {value}")
 
 
 class PickleTestAPI(ls.test_examples.SimpleLitAPI):
@@ -168,7 +167,7 @@ class PickleTestAPI(ls.test_examples.SimpleLitAPI):
 
 def test_pickle_safety(capfd):
     api = PickleTestAPI()
-    server = ls.LitServer(api, loggers=PrometheusLogger())
+    server = ls.LitServer(api, loggers=NonPickleableLogger())
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
