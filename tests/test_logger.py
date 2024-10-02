@@ -11,12 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
 import time
 
 import pytest
 from fastapi.testclient import TestClient
 
 from unittest.mock import MagicMock
+
 from litserve.loggers import Logger, _LoggerConnector
 
 import litserve as ls
@@ -143,3 +145,31 @@ def test_logger_with_callback(tmp_path):
                 "time: 0.3\n",
                 "time: 0.4\n",
             ], f"Expected metric not found in logger file {data}"
+
+
+class NonPickleableLogger(ls.Logger):
+    # This is a logger that contains a non-picklable resource
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lock = threading.Lock()  # Non-picklable resource
+
+    def process(self, key, value):
+        with self._lock:
+            print(f"Logged {key}: {value}", flush=True)
+
+
+class PickleTestAPI(ls.test_examples.SimpleLitAPI):
+    def predict(self, x):
+        self.log("my-key", x)
+        return super().predict(x)
+
+
+def test_pickle_safety(capfd):
+    api = PickleTestAPI()
+    server = ls.LitServer(api, loggers=NonPickleableLogger())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 16.0}
+        time.sleep(0.5)
+        captured = capfd.readouterr()
+        assert "Logged my-key: 4.0" in captured.out, f"Expected log not found in captured output {captured}"
