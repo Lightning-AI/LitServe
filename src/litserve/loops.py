@@ -192,7 +192,7 @@ def run_batched_loop(
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue)
             x = [
                 _inject_context(
                     context,
@@ -201,22 +201,22 @@ def run_batched_loop(
                 )
                 for input, context in zip(inputs, contexts)
             ]
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue)
 
             x = lit_api.batch(x)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api, request_queue=request_queue)
             y = _inject_context(contexts, lit_api.predict, x)
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api, request_queue=request_queue)
 
             outputs = lit_api.unbatch(y)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api, request_queue=request_queue)
             y_enc_list = []
             for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
                 y_enc_list.append((response_queue_id, uid, y_enc))
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api, request_queue=request_queue)
 
             for response_queue_id, uid, y_enc in y_enc_list:
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
@@ -266,13 +266,13 @@ def run_streaming_loop(
                 x_enc,
             )
 
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api, request_queue=request_queue)
             y_gen = _inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api, request_queue=request_queue)
 
             y_enc_gen = _inject_context(
                 context,
@@ -325,7 +325,7 @@ def run_batched_streaming_loop(
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue)
             x = [
                 _inject_context(
                     context,
@@ -334,19 +334,19 @@ def run_batched_streaming_loop(
                 )
                 for input, context in zip(inputs, contexts)
             ]
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue)
 
             x = lit_api.batch(x)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api, request_queue=request_queue)
             y_iter = _inject_context(contexts, lit_api.predict, x)
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api, request_queue=request_queue)
 
             unbatched_iter = lit_api.unbatch(y_iter)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api, request_queue=request_queue)
             y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api, request_queue=request_queue)
 
             # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
             for y_batch in y_enc_iter:
