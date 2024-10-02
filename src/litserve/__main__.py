@@ -11,19 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawTextHelpFormatter
 from litserve.docker_builder import dockerize
 
 
+class LitFormatter(ArgumentDefaultsHelpFormatter, RawTextHelpFormatter): ...
+
+
 def main():
-    parser = ArgumentParser(description="CLI for LitServe")
-    subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
+    parser = ArgumentParser(description="CLI for LitServe", formatter_class=LitFormatter)
+    subparsers = parser.add_subparsers(
+        dest="command",
+        title="Commands",
+    )
 
     # dockerize sub-command
     dockerize_parser = subparsers.add_parser(
         "dockerize",
-        help=dockerize.__doc__,
-        description="Generate a Dockerfile for the given server code.",
+        help="Generate a Dockerfile for the given server code.",
+        description="Generate a Dockerfile for the given server code.\nExample usage:"
+        " litserve dockerize server.py --port 8000 --gpu",
+        formatter_class=LitFormatter,
     )
     dockerize_parser.add_argument(
         "server_filename",
@@ -34,13 +42,13 @@ def main():
         "--port",
         type=int,
         default=8000,
-        help="The port to expose in the Docker container. Defaults to 8000.",
+        help="The port to expose in the Docker container.",
     )
     dockerize_parser.add_argument(
         "--gpu",
         default=False,
         action="store_true",
-        help="Whether to use a GPU-enabled Docker image. Defaults to false.",
+        help="Whether to use a GPU-enabled Docker image.",
     )
     dockerize_parser.set_defaults(func=lambda args: dockerize(args.server_filename, args.port, args.gpu))
     args = parser.parse_args()
