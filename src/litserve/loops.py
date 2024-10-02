@@ -122,7 +122,11 @@ def run_single_loop(
             if hasattr(lit_spec, "populate_context"):
                 lit_spec.populate_context(context, x_enc)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue,)
+            callback_runner.trigger_event(
+                EventTypes.BEFORE_DECODE_REQUEST,
+                lit_api=lit_api,
+                request_queue=request_queue,
+            )
             x = _inject_context(
                 context,
                 lit_api.decode_request,
@@ -192,7 +196,11 @@ def run_batched_loop(
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue,)
+            callback_runner.trigger_event(
+                EventTypes.BEFORE_DECODE_REQUEST,
+                lit_api=lit_api,
+                request_queue=request_queue,
+            )
             x = [
                 _inject_context(
                     context,
@@ -325,7 +333,11 @@ def run_batched_streaming_loop(
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api, request_queue=request_queue,)
+            callback_runner.trigger_event(
+                EventTypes.BEFORE_DECODE_REQUEST,
+                lit_api=lit_api,
+                request_queue=request_queue,
+            )
             x = [
                 _inject_context(
                     context,
