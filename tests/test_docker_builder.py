@@ -41,7 +41,7 @@ CMD ["python", "/app/app.py"]
 """
 
 
-EXPECTED_GPU_DOCKERFILE = """# Change CUDA and cuDNN version here
+EXPECTED_GPU_DOCKERFILE = f"""# Change CUDA and cuDNN version here
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -73,7 +73,7 @@ WORKDIR /app
 COPY . /app
 
 # Install litserve and requirements
-RUN pip install --no-cache-dir litserve==0.2.2 -r requirements.txt
+RUN pip install --no-cache-dir litserve=={ls.__version__} -r requirements.txt
 EXPOSE 8000
 CMD ["python", "/app/app.py"]
 """

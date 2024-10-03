@@ -13,6 +13,7 @@
 # limitations under the License.
 import functools
 import multiprocessing as mp
+import pickle
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union, TYPE_CHECKING
 
@@ -74,6 +75,14 @@ class Logger(ABC):
         raise NotImplementedError  # pragma: no cover
 
 
+class _LoggerProxy:
+    def __init__(self, logger_class):
+        self.logger_class = logger_class
+
+    def create_logger(self):
+        return self.logger_class()
+
+
 class _LoggerConnector:
     """_LoggerConnector is responsible for connecting Logger instances with the LitServer and managing their lifecycle.
 
@@ -108,7 +117,17 @@ class _LoggerConnector:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
     @staticmethod
-    def _process_logger_queue(loggers: List[Logger], queue):
+    def _is_picklable(obj):
+        try:
+            pickle.dumps(obj)
+            return True
+        except (pickle.PicklingError, TypeError, AttributeError):
+            module_logger.warning(f"Logger {obj.__class__.__name__} is not pickleable and might not work properly.")
+            return False
+
+    @staticmethod
+    def _process_logger_queue(logger_proxies: List[_LoggerProxy], queue):
+        loggers = [proxy if isinstance(proxy, Logger) else proxy.create_logger() for proxy in logger_proxies]
         while True:
             key, value = queue.get()
             for logger in loggers:
@@ -131,12 +150,20 @@ class _LoggerConnector:
         if not self._loggers:
             return
 
-        module_logger.debug(f"Starting logger process with {len(self._loggers)} loggers")
+        # Create proxies for loggers
+        logger_proxies = []
+        for logger in self._loggers:
+            if self._is_picklable(logger):
+                logger_proxies.append(logger)
+            else:
+                logger_proxies.append(_LoggerProxy(logger.__class__))
+
+        module_logger.debug(f"Starting logger process with {len(logger_proxies)} loggers")
         ctx = mp.get_context("spawn")
         process = ctx.Process(
             target=_LoggerConnector._process_logger_queue,
             args=(
-                self._loggers,
+                logger_proxies,
                 queue,
             ),
         )

@@ -120,10 +120,13 @@ Update {UNDERLINE}{dockerfile_path}{RESET} to add any additional dependencies or
 def dockerize(server_filename: str, port: int = 8000, gpu: bool = False):
     """Generate a Dockerfile for the given server code.
 
+    Example usage:
+        litserve dockerize server.py --port 8000 --gpu
+
     Args:
         server_filename (str): The path to the server file. Example sever.py or app.py.
-        port (int, optional): The port to expose in the Docker container. Defaults to 8000.
-        gpu (bool, optional): Whether to use a GPU-enabled Docker image. Defaults to False.
+        port (int, optional): The port to expose in the Docker container.
+        gpu (bool, optional): Whether to use a GPU-enabled Docker image.
 
     """
     requirements = ""
