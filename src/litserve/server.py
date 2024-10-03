@@ -17,7 +17,6 @@ import inspect
 import logging
 import multiprocessing as mp
 import os
-import shutil
 import sys
 import threading
 import time
@@ -390,17 +389,22 @@ class LitServer:
                 self.app.add_middleware(middleware)
 
     @staticmethod
-    def generate_client_file():
+    def generate_client_file(port: Union[str, int] = 8000):
         src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
         dest_path = os.path.join(os.getcwd(), "client.py")
 
-        if os.path.exists(dest_path):
-            return
-
-        # Copy the file to the destination directory
         try:
-            shutil.copy(src_path, dest_path)
-            print(f"File '{src_path}' copied to '{dest_path}'")
+            # Read the template code
+            with open(src_path) as f:
+                client_code = f.read()
+
+            # Replace the default port number with the user-specified port number
+            client_code = client_code.replace("{{PORT}}", str(port))
+
+            # Write client code template w/ updated port number to destination
+            with open(dest_path, "w") as f:
+                f.write(client_code)
+
         except Exception as e:
             print(f"Error copying file: {e}")
 
@@ -414,7 +418,7 @@ class LitServer:
         **kwargs,
     ):
         if generate_client_file:
-            LitServer.generate_client_file()
+            LitServer.generate_client_file(port=port)
 
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
