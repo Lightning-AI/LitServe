@@ -440,3 +440,14 @@ def test_middlewares_inputs():
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+
+
+def test_generate_client_file(tmp_path, monkeypatch):
+    expected = """import requests
+
+response = requests.post("http://127.0.0.1:8123/predict", json={"input": 4.0})
+print(f"Status: {response.status_code}\\nResponse:\\n {response.text}")"""
+    monkeypatch.chdir(tmp_path)
+    LitServer.generate_client_file(8123)
+    with open(tmp_path / "client.py") as fr:
+        assert expected in fr.read(), f"Expected {expected} in client.py"
