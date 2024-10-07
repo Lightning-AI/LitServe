@@ -11,17 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from litserve.utils import wrap_litserve_start
+import pytest
+from fastapi.testclient import TestClient
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-
-import pytest
-
+from starlette.types import ASGIApp
 
 import litserve as ls
-from fastapi.testclient import TestClient
-from starlette.types import ASGIApp
-from starlette.middleware.base import BaseHTTPMiddleware
+from litserve.utils import wrap_litserve_start
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):

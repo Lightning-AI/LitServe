@@ -16,7 +16,6 @@ from typing import Optional
 
 from fastapi import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)

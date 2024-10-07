@@ -15,23 +15,21 @@ import asyncio
 import pickle
 import re
 import sys
+from unittest.mock import MagicMock, patch
 
-from asgi_lifespan import LifespanManager
-from litserve import LitAPI
-from fastapi import Request, Response, HTTPException
+import pytest
 import torch
 import torch.nn as nn
-from httpx import AsyncClient
-from litserve.utils import wrap_litserve_start
-
-from unittest.mock import patch, MagicMock
-import pytest
-
-from litserve.connector import _Connector
-
-from litserve.server import LitServer
-import litserve as ls
+from asgi_lifespan import LifespanManager
+from fastapi import HTTPException, Request, Response
 from fastapi.testclient import TestClient
+from httpx import AsyncClient
+
+import litserve as ls
+from litserve import LitAPI
+from litserve.connector import _Connector
+from litserve.server import LitServer
+from litserve.utils import wrap_litserve_start
 
 
 def test_index(sync_testclient):
