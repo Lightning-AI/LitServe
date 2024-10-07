@@ -1,11 +1,11 @@
-from .openai_spec_example import (
+from litserve.test_examples.openai_spec_example import (
     OpenAIBatchContext,
     TestAPI,
     TestAPIWithCustomEncode,
     TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
 )
-from .simple_example import SimpleBatchedAPI, SimpleLitAPI, SimpleStreamAPI, SimpleTorchAPI
+from litserve.test_examples.simple_example import SimpleBatchedAPI, SimpleLitAPI, SimpleStreamAPI, SimpleTorchAPI
 
 __all__ = [
     "SimpleLitAPI",
