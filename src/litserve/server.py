@@ -42,7 +42,8 @@ from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
+from litserve.utils import LitAPIStatus, load_and_raise
+from litserve.middlewares import MaxSizeMiddleware
 
 mp.allow_connection_pickling()
 
