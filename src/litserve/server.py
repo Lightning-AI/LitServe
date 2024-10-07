@@ -27,6 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty
 from typing import Callable, Dict, Optional, Sequence, Tuple, Union, List
+
+from litserve.middlewares import MaxSizeMiddleware
 from litserve.python_client import client_template
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -42,7 +44,7 @@ from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
+from litserve.utils import LitAPIStatus, load_and_raise
 
 mp.allow_connection_pickling()
 
