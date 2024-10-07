@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from litserve.callbacks.base import LitSpec
+from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, azip, load_and_raise
 
 if typing.TYPE_CHECKING:
