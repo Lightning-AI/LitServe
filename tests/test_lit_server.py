@@ -451,3 +451,7 @@ print(f"Status: {response.status_code}\\nResponse:\\n {response.text}")"""
     LitServer.generate_client_file(8123)
     with open(tmp_path / "client.py") as fr:
         assert expected in fr.read(), f"Expected {expected} in client.py"
+
+    LitServer.generate_client_file(8000)
+    with open(tmp_path / "client.py") as fr:
+        assert expected in fr.read(), "Shouldn't replace existing client.py"
