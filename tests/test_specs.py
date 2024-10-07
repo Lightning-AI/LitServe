@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import litserve as ls
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
 from httpx import AsyncClient
+
+import litserve as ls
+from litserve.specs.openai import ChatMessage, OpenAISpec
 from litserve.test_examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsage,
@@ -27,7 +29,6 @@ from litserve.test_examples.openai_spec_example import (
     TestAPIWithToolCalls,
 )
 from litserve.utils import wrap_litserve_start
-from litserve.specs.openai import OpenAISpec, ChatMessage
 
 
 @pytest.mark.asyncio

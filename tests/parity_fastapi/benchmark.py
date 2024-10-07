@@ -3,10 +3,10 @@ import concurrent.futures
 import random
 import time
 
+import numpy as np
 import requests
 import torch
 from PIL import Image
-import numpy as np
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device

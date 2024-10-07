@@ -23,11 +23,11 @@ from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from httpx import AsyncClient
 
+import litserve as ls
 from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
-from litserve.loops import run_batched_loop, collate_requests
+from litserve.loops import collate_requests, run_batched_loop
 from litserve.utils import wrap_litserve_start
-import litserve as ls
 
 NOOP_CB_RUNNER = CallbackRunner()
 

@@ -13,9 +13,9 @@
 # limitations under the License.
 import logging
 import os
+import warnings
 from pathlib import Path
 
-import warnings
 import litserve as ls
 
 logger = logging.getLogger(__name__)

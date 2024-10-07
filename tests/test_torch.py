@@ -11,16 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pytest
+import torch
+import torch.nn as nn
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
 from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
-
-import torch
-import torch.nn as nn
-
-import pytest
 
 
 class Linear(nn.Module):

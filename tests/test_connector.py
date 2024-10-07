@@ -13,9 +13,10 @@
 # limitations under the License.
 from unittest.mock import patch
 
-from litserve.connector import _Connector, check_cuda_with_nvidia_smi
 import pytest
 import torch
+
+from litserve.connector import _Connector, check_cuda_with_nvidia_smi
 
 
 @pytest.mark.skipif(torch.cuda.device_count() == 0, reason="Only tested on Nvidia GPU")

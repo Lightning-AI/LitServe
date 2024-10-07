@@ -13,15 +13,13 @@
 # limitations under the License.
 import threading
 import time
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from unittest.mock import MagicMock
-
-from litserve.loggers import Logger, _LoggerConnector
-
 import litserve as ls
+from litserve.loggers import Logger, _LoggerConnector
 from litserve.utils import wrap_litserve_start
 
 

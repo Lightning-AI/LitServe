@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from litserve import test_examples
 from litserve.__about__ import *  # noqa: F403
 from litserve.api import LitAPI
-from litserve.server import LitServer, Request, Response
-from litserve import test_examples
-from litserve.specs.openai import OpenAISpec
 from litserve.callbacks import Callback
 from litserve.loggers import Logger
+from litserve.server import LitServer, Request, Response
+from litserve.specs.openai import OpenAISpec
 
-__all__ = ["LitAPI", "LitServer", "Request", "Response", "test_examples", "OpenAISpec", "Callback", "Logger"]
+__all__ = ["LitAPI", "LitServer", "Request", "Response", "OpenAISpec", "test_examples", "Callback", "Logger"]
