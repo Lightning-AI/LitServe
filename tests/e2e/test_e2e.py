@@ -13,13 +13,13 @@
 # limitations under the License.
 import json
 import os
-import psutil
-import requests
 import subprocess
 import time
-
-from openai import OpenAI
 from functools import wraps
+
+import psutil
+import requests
+from openai import OpenAI
 
 
 def e2e_from_file(filename):

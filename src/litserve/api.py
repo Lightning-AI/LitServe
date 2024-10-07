@@ -15,8 +15,8 @@ import inspect
 import json
 import warnings
 from abc import ABC, abstractmethod
-from typing import Optional
 from queue import Queue
+from typing import Optional
 
 from pydantic import BaseModel
 

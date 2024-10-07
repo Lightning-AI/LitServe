@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -19,12 +20,9 @@ import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-import time
-
 from httpx import AsyncClient
 
 from litserve import LitAPI, LitServer
-
 from litserve.utils import wrap_litserve_start
 
 

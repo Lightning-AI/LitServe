@@ -2,7 +2,7 @@ import time
 import typing
 from logging import getLogger
 
-from ..base import Callback
+from litserve.callbacks.base import Callback
 
 if typing.TYPE_CHECKING:
     from litserve import LitAPI

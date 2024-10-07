@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from fastapi import Request, Response, HTTPException, Depends
+from fastapi import Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.testclient import TestClient
 
-from litserve import LitAPI, LitServer
 import litserve.server
+from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
 
 
