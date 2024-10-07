@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from fastapi.testclient import TestClient
-
 from pydantic import BaseModel
-from litserve.utils import wrap_litserve_start
+
 from litserve import LitAPI, LitServer
+from litserve.utils import wrap_litserve_start
 
 
 class PredictRequest(BaseModel):

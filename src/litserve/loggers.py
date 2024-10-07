@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import functools
+import logging
 import multiprocessing as mp
 import pickle
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from starlette.types import ASGIApp
-import logging
 
 module_logger = logging.getLogger(__name__)
 

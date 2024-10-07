@@ -1,6 +1,8 @@
-import pytest
-from litserve.__main__ import main
 import os
+
+import pytest
+
+from litserve.__main__ import main
 
 
 def test_dockerize_help(monkeypatch, capsys):

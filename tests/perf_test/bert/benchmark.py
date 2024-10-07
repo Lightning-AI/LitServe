@@ -1,9 +1,9 @@
-import time
 import logging
+import time
 
 import requests
-from utils import benchmark
 from tenacity import retry, stop_after_attempt
+from utils import benchmark
 
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"

@@ -14,9 +14,9 @@
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-from litserve.utils import wrap_litserve_start
 
 from litserve import LitAPI, LitServer
+from litserve.utils import wrap_litserve_start
 
 
 class SimpleFileLitAPI(LitAPI):
