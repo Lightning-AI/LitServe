@@ -43,7 +43,7 @@ from litserve.loops import inference_worker
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, load_and_raise
-from litserve.middlewares import MaxSizeMiddleware
+from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 
 mp.allow_connection_pickling()
 
@@ -115,6 +115,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        track_requests: bool = False,
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
@@ -166,6 +167,10 @@ class LitServer:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
+        self.active_counter: Optional[mp.Value] = None
+        if track_requests:
+            self.active_counter = mp.Value("i", 0)
+            middlewares.append((RequestCountMiddleware, {"active_counter": self.active_counter}))
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
@@ -322,6 +327,11 @@ class LitServer:
             return Response(content="not ready", status_code=503)
 
         async def predict(request: self.request_type) -> self.response_type:
+            self._callback_runner.trigger_event(
+                EventTypes.ON_REQUEST,
+                active_requests=self.active_counter.value,
+                litserver=self,
+            )
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
@@ -344,6 +354,7 @@ class LitServer:
 
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
+            self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
             return response
 
         async def stream_predict(request: self.request_type) -> self.response_type:
@@ -456,6 +467,9 @@ class LitServer:
                 w.terminate()
                 w.join()
             manager.shutdown()
+
+    def aggregate_active_counter(self):
+        return sum([counter.value for counter in self.active_counters])
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
