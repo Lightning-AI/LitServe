@@ -329,7 +329,7 @@ class LitServer:
         async def predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST,
-                active_requests=self.active_counter.value,
+                active_requests=(self.active_counter.value if self.active_counter else None),
                 litserver=self,
             )
             response_queue_id = self.app.response_queue_id
