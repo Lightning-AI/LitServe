@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 
+
 if TYPE_CHECKING:
     from litserve.server import LitServer
 
