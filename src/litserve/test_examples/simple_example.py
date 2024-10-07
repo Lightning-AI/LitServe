@@ -1,7 +1,7 @@
-import litserve as ls
+from litserve.api import LitAPI
 
 
-class SimpleLitAPI(ls.LitAPI):
+class SimpleLitAPI(LitAPI):
     def setup(self, device):
         # Set up the model, so it can be called in `predict`.
         self.model = lambda x: x**2
@@ -19,7 +19,7 @@ class SimpleLitAPI(ls.LitAPI):
         return {"output": output}
 
 
-class SimpleBatchedAPI(ls.LitAPI):
+class SimpleBatchedAPI(LitAPI):
     def setup(self, device) -> None:
         self.model = lambda x: x**2
 
@@ -35,7 +35,7 @@ class SimpleBatchedAPI(ls.LitAPI):
         return {"output": output}
 
 
-class SimpleTorchAPI(ls.LitAPI):
+class SimpleTorchAPI(LitAPI):
     def setup(self, device):
         # move the model to the correct device
         # keep track of the device for moving data accordingly
@@ -69,7 +69,7 @@ class SimpleTorchAPI(ls.LitAPI):
         return {"output": float(output)}
 
 
-class SimpleStreamAPI(ls.LitAPI):
+class SimpleStreamAPI(LitAPI):
     """
     Run as:
         ```
