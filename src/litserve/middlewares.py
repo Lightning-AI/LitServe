@@ -65,9 +65,6 @@ class RequestCountMiddleware(BaseHTTPMiddleware):
             await self.app(scope, receive, send)
             return
 
-        lock = self._active_requests.get_lock()
-        with lock:
-            self._active_requests.value += 1
+        self._active_requests.value += 1
         await self.app(scope, receive, send)
-        with lock:
-            self._active_requests.value -= 1
+        self._active_requests.value -= 1

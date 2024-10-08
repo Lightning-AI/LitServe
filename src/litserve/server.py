@@ -170,7 +170,7 @@ class LitServer:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
         self.active_counter: Optional[mp.Value] = None
         if track_requests:
-            self.active_counter = mp.Value("i", 0)
+            self.active_counter = mp.Value("i", 0, lock=True)
             middlewares.append((RequestCountMiddleware, {"active_counter": self.active_counter}))
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
@@ -347,7 +347,7 @@ class LitServer:
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
-            logger.info(f"Received request uid={uid}")
+            logger.debug(f"Received request uid={uid}")
 
             payload = request
             if self.request_type == Request:
