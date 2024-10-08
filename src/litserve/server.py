@@ -307,6 +307,16 @@ class LitServer:
                     yield data
             data_available.clear()
 
+    @property
+    def active_requests(self):
+        if self.active_counter:
+            return self.active_counter.value
+        warnings.warn(
+            "Active request counter is not enabled while using `on_request` callback hook. "
+            "Please set track_requests=True in the LitServer."
+        )
+        return None
+
     def register_endpoints(self):
         """Register endpoint routes for the FastAPI app and setup middlewares."""
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START, litserver=self)
@@ -330,7 +340,7 @@ class LitServer:
         async def predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST,
-                active_requests=(self.active_counter.value if self.active_counter else None),
+                active_requests=self.active_requests,
                 litserver=self,
             )
             response_queue_id = self.app.response_queue_id
