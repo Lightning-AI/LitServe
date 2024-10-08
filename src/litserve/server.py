@@ -469,9 +469,6 @@ class LitServer:
                 w.join()
             manager.shutdown()
 
-    def aggregate_active_counter(self):
-        return sum([counter.value for counter in self.active_counters])
-
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):

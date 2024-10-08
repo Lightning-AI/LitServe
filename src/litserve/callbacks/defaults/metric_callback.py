@@ -23,4 +23,4 @@ class PredictionTimeLogger(Callback):
 
 class RequestTracker(Callback):
     def on_request(self, active_requests: int, **kwargs):
-        print(f"Active requests: {active_requests}")
+        print(f"Active requests: {active_requests}", flush=True)
