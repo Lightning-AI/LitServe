@@ -58,13 +58,13 @@ class RequestCountMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: ASGIApp, active_counter: multiprocessing.Value) -> None:
         self.app = app
-        self._active_requests = active_counter
+        self.active_counter = active_counter
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        self._active_requests.value += 1
+        self.active_counter.value += 1
         await self.app(scope, receive, send)
-        self._active_requests.value -= 1
+        self.active_counter.value -= 1
