@@ -40,11 +40,11 @@ from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import inference_worker
-from litserve.middlewares import MaxSizeMiddleware
+from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, load_and_raise
+from litserve.utils import LitAPIStatus, call_after_stream, load_and_raise
 
 mp.allow_connection_pickling()
 
@@ -116,6 +116,7 @@ class LitServer:
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        track_requests: bool = False,
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
@@ -155,6 +156,7 @@ class LitServer:
             )
 
         self.api_path = api_path
+        self.track_requests = track_requests
         lit_api.stream = stream
         lit_api.request_timeout = timeout
         lit_api._sanitize(max_batch_size, spec=spec)
@@ -167,6 +169,7 @@ class LitServer:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
+        self.active_counters: List[mp.Value] = []
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
@@ -302,6 +305,16 @@ class LitServer:
                     yield data
             data_available.clear()
 
+    @property
+    def active_requests(self):
+        if self.track_requests and self.active_counters:
+            return self.active_counters[self.app.response_queue_id].value
+        warnings.warn(
+            "Active request counter is not enabled while using `on_request` callback hook. "
+            "Please set track_requests=True in the LitServer."
+        )
+        return None
+
     def register_endpoints(self):
         """Register endpoint routes for the FastAPI app and setup middlewares."""
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START, litserver=self)
@@ -323,11 +336,16 @@ class LitServer:
             return Response(content="not ready", status_code=503)
 
         async def predict(request: self.request_type) -> self.response_type:
+            self._callback_runner.trigger_event(
+                EventTypes.ON_REQUEST,
+                active_requests=self.active_requests,
+                litserver=self,
+            )
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
-            logger.info(f"Received request uid={uid}")
+            logger.debug(f"Received request uid={uid}")
 
             payload = request
             if self.request_type == Request:
@@ -345,9 +363,15 @@ class LitServer:
 
             if status == LitAPIStatus.ERROR:
                 load_and_raise(response)
+            self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
             return response
 
         async def stream_predict(request: self.request_type) -> self.response_type:
+            self._callback_runner.trigger_event(
+                EventTypes.ON_REQUEST,
+                active_requests=self.active_requests,
+                litserver=self,
+            )
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
@@ -360,7 +384,13 @@ class LitServer:
                 payload = await request.json()
             self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
-            return StreamingResponse(self.data_streamer(q, data_available=event))
+            response = call_after_stream(
+                self.data_streamer(q, data_available=event),
+                self._callback_runner.trigger_event,
+                EventTypes.ON_RESPONSE,
+                litserver=self,
+            )
+            return StreamingResponse(response)
 
         if not self._specs:
             stream = self.lit_api.stream
@@ -458,13 +488,21 @@ class LitServer:
                 w.join()
             manager.shutdown()
 
+    def _prepare_app_run(self, app: FastAPI):
+        # Add middleware to count active requests
+        active_counter = mp.Value("i", 0, lock=True)
+        self.active_counters.append(active_counter)
+        app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
             if self.lit_spec:
                 self.lit_spec.response_queue_id = response_queue_id
-            app = copy.copy(self.app)
+            app: FastAPI = copy.copy(self.app)
+
+            self._prepare_app_run(app)
 
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             server = uvicorn.Server(config=config)
