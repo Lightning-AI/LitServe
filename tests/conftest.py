@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
-import psutil
 from typing import Generator
 
-from litserve.server import LitServer
+import psutil
 import pytest
-from litserve.api import LitAPI
-from litserve.utils import wrap_litserve_start
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
+
+from litserve.api import LitAPI
+from litserve.server import LitServer
+from litserve.utils import wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):

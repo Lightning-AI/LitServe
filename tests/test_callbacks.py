@@ -1,8 +1,8 @@
 import re
 
-import litserve as ls
 from fastapi.testclient import TestClient
 
+import litserve as ls
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.callbacks.defaults import PredictionTimeLogger
 from litserve.utils import wrap_litserve_start

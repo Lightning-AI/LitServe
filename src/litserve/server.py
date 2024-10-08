@@ -17,7 +17,6 @@ import inspect
 import logging
 import multiprocessing as mp
 import os
-import shutil
 import sys
 import threading
 import time
@@ -27,7 +26,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from queue import Empty
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union, List
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -37,13 +36,15 @@ from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
-from litserve.callbacks.base import CallbackRunner, Callback, EventTypes
+from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import inference_worker
+from litserve.middlewares import MaxSizeMiddleware
+from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
+from litserve.utils import LitAPIStatus, load_and_raise
 
 mp.allow_connection_pickling()
 
@@ -386,19 +387,20 @@ class LitServer:
                 self.app.add_middleware(middleware)
 
     @staticmethod
-    def generate_client_file():
-        src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
+    def generate_client_file(port: Union[str, int] = 8000):
         dest_path = os.path.join(os.getcwd(), "client.py")
 
         if os.path.exists(dest_path):
+            logger.debug("client.py already exists in the current directory. Skipping generation.")
             return
 
-        # Copy the file to the destination directory
         try:
-            shutil.copy(src_path, dest_path)
-            print(f"File '{src_path}' copied to '{dest_path}'")
+            client_code = client_template.format(PORT=port)
+            with open(dest_path, "w") as f:
+                f.write(client_code)
+
         except Exception as e:
-            print(f"Error copying file: {e}")
+            logger.exception(f"Error copying file: {e}")
 
     def run(
         self,
@@ -410,7 +412,7 @@ class LitServer:
         **kwargs,
     ):
         if generate_client_file:
-            LitServer.generate_client_file()
+            LitServer.generate_client_file(port=port)
 
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:

@@ -13,17 +13,14 @@
 # limitations under the License.
 import threading
 import time
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from unittest.mock import MagicMock
-from litserve.loggers import Logger, _LoggerConnector
-
 import litserve as ls
+from litserve.loggers import Logger, _LoggerConnector
 from litserve.utils import wrap_litserve_start
-from multiprocessing import Queue
-from unittest.mock import patch
 
 
 class TestLogger(Logger):
@@ -148,43 +145,29 @@ def test_logger_with_callback(tmp_path):
             ], f"Expected metric not found in logger file {data}"
 
 
-class MockLitServer:
-    def __init__(self):
-        self.logger_queue = Queue()
-        self.lit_api = MagicMock()
+class NonPickleableLogger(ls.Logger):
+    # This is a logger that contains a non-picklable resource
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lock = threading.Lock()  # Non-picklable resource
 
-
-class MockLogger(Logger):
     def process(self, key, value):
-        pass
+        with self._lock:
+            print(f"Logged {key}: {value}", flush=True)
 
 
-@pytest.fixture
-def logger_connector_monitor():
-    lit_server = MockLitServer()
-    logger = MockLogger()
-    connector = _LoggerConnector(lit_server, [logger])
-    return connector, lit_server
+class PickleTestAPI(ls.test_examples.SimpleLitAPI):
+    def predict(self, x):
+        self.log("my-key", x)
+        return super().predict(x)
 
 
-# TODO: fix this test after architecture review
-def off_test_end_to_end_logger_process_restart(logger_connector_monitor):
-    connector, lit_server = logger_connector_monitor
-
-    # Patch the time.monotonic to control the heartbeat
-    with patch("time.monotonic", side_effect=[0, 0, 100, 100, 200, 200, 300, 300]):
-        # Start the logger process
-        connector.run(lit_server, MagicMock())
-
-        # Allow some time for the process to start and monitor thread to run
-        time.sleep(1)
-
-        # Simulate the process getting stuck by advancing the heartbeat time
-        time.sleep(3)
-
-        # Check if the process was restarted
-        assert connector._logger_queue is not None
-        assert lit_server.lit_api.set_logger_queue.called
-
-        # Check if the logger process is alive after restart
-        assert any(thread.is_alive() for thread in threading.enumerate() if thread.name == "Logger monitor")
+def test_pickle_safety(capfd):
+    api = PickleTestAPI()
+    server = ls.LitServer(api, loggers=NonPickleableLogger())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 16.0}
+        time.sleep(0.5)
+        captured = capfd.readouterr()
+        assert "Logged my-key: 4.0" in captured.out, f"Expected log not found in captured output {captured}"

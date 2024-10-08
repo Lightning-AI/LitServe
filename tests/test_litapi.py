@@ -16,10 +16,11 @@ import json
 import numpy as np
 import pytest
 import torch
-from pydantic import BaseModel
 from fastapi import HTTPException
-from litserve.specs.openai import ChatCompletionRequest
+from pydantic import BaseModel
+
 import litserve as ls
+from litserve.specs.openai import ChatCompletionRequest
 
 
 class TestDefaultBatchedAPI(ls.LitAPI):

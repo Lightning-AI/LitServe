@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import functools
+import logging
 import multiprocessing as mp
+import pickle
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union, TYPE_CHECKING
-import time
-from threading import Thread
+from typing import TYPE_CHECKING, List, Optional, Union
 
 from starlette.types import ASGIApp
-import logging
 
 module_logger = logging.getLogger(__name__)
 
@@ -76,6 +75,14 @@ class Logger(ABC):
         raise NotImplementedError  # pragma: no cover
 
 
+class _LoggerProxy:
+    def __init__(self, logger_class):
+        self.logger_class = logger_class
+
+    def create_logger(self):
+        return self.logger_class()
+
+
 class _LoggerConnector:
     """_LoggerConnector is responsible for connecting Logger instances with the LitServer and managing their lifecycle.
 
@@ -89,7 +96,6 @@ class _LoggerConnector:
     def __init__(self, lit_server: "LitServer", loggers: Optional[Union[List[Logger], Logger]] = None):
         self._loggers = []
         self._lit_server = lit_server
-        self._logger_queue = None
         if loggers is None:
             return  # No loggers to add
         if isinstance(loggers, list):
@@ -102,10 +108,6 @@ class _LoggerConnector:
         else:
             raise ValueError("loggers must be a list or an instance of litserve.Logger")
 
-    @property
-    def logger_queue(self):
-        return self._logger_queue
-
     def _mount(self, path: str, app: ASGIApp) -> None:
         self._lit_server.app.mount(path, app)
 
@@ -115,10 +117,19 @@ class _LoggerConnector:
             self._mount(logger._config["mount"]["path"], logger._config["mount"]["app"])
 
     @staticmethod
-    def _process_logger_queue(loggers: List[Logger], queue, heartbeat):
+    def _is_picklable(obj):
+        try:
+            pickle.dumps(obj)
+            return True
+        except (pickle.PicklingError, TypeError, AttributeError):
+            module_logger.warning(f"Logger {obj.__class__.__name__} is not pickleable and might not work properly.")
+            return False
+
+    @staticmethod
+    def _process_logger_queue(logger_proxies: List[_LoggerProxy], queue):
+        loggers = [proxy if isinstance(proxy, Logger) else proxy.create_logger() for proxy in logger_proxies]
         while True:
             key, value = queue.get()
-            heartbeat["timestamp"] = time.monotonic()  # Update heartbeat
             for logger in loggers:
                 try:
                     logger.process(key, value)
@@ -128,36 +139,10 @@ class _LoggerConnector:
                         f"with key {key} and value {value}: {e}"
                     )
 
-    def _monitor_process(self, process, heartbeat, interval=30, timeout=60):
-        while process.is_alive():
-            time.sleep(interval)
-            if time.monotonic() - heartbeat["timestamp"] > timeout:
-                module_logger.warning("Logger process is stuck. Restarting...")
-                process.terminate()
-                process.join()
-                self._start_logger_process(heartbeat)  # Restart the process
-
-    def _start_logger_process(self, heartbeat):
-        ctx = mp.get_context("spawn")
-        heartbeat["timestamp"] = time.monotonic()
-        process = ctx.Process(
-            target=_LoggerConnector._process_logger_queue,
-            args=(
-                self._loggers,
-                self.logger_queue,
-                heartbeat,
-            ),
-        )
-        process.start()
-        monitor_thread = Thread(target=self._monitor_process, name="Logger monitor", args=(process, heartbeat))
-        monitor_thread.daemon = True
-        monitor_thread.start()
-
     @functools.cache  # Run once per LitServer instance
-    def run(self, lit_server: "LitServer", manager: mp.Manager):
-        queue = self._logger_queue = manager.Queue()  # logger_queue is initialized now, during LitServer.run
+    def run(self, lit_server: "LitServer"):
+        queue = lit_server.logger_queue
         lit_server.lit_api.set_logger_queue(queue)
-        heartbeat = manager.dict()
 
         # Disconnect the logger connector from the LitServer to avoid pickling issues
         self._lit_server = None
@@ -165,5 +150,21 @@ class _LoggerConnector:
         if not self._loggers:
             return
 
-        module_logger.debug(f"Starting logger process with {len(self._loggers)} loggers")
-        self._start_logger_process(heartbeat)
+        # Create proxies for loggers
+        logger_proxies = []
+        for logger in self._loggers:
+            if self._is_picklable(logger):
+                logger_proxies.append(logger)
+            else:
+                logger_proxies.append(_LoggerProxy(logger.__class__))
+
+        module_logger.debug(f"Starting logger process with {len(logger_proxies)} loggers")
+        ctx = mp.get_context("spawn")
+        process = ctx.Process(
+            target=_LoggerConnector._process_logger_queue,
+            args=(
+                logger_proxies,
+                queue,
+            ),
+        )
+        process.start()

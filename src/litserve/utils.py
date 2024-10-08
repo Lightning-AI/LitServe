@@ -14,14 +14,10 @@
 import asyncio
 import logging
 import pickle
-from typing import Optional
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
-
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 if TYPE_CHECKING:
     from litserve.server import LitServer
@@ -33,6 +29,23 @@ class LitAPIStatus:
     OK = "OK"
     ERROR = "ERROR"
     FINISH_STREAMING = "FINISH_STREAMING"
+
+
+class PickleableHTTPException(HTTPException):
+    @staticmethod
+    def from_exception(exc: HTTPException):
+        status_code = exc.status_code
+        detail = exc.detail
+        return PickleableHTTPException(status_code, detail)
+
+    def __reduce__(self):
+        return (HTTPException, (self.status_code, self.detail))
+
+
+def dump_exception(exception):
+    if isinstance(exception, HTTPException):
+        exception = PickleableHTTPException.from_exception(exception)
+    return pickle.dumps(exception)
 
 
 def load_and_raise(response):
@@ -66,32 +79,3 @@ def wrap_litserve_start(server: "LitServer"):
     for p in processes:
         p.terminate()
     manager.shutdown()
-
-
-class MaxSizeMiddleware(BaseHTTPMiddleware):
-    def __init__(
-        self,
-        app: ASGIApp,
-        *,
-        max_size: Optional[int] = None,
-    ) -> None:
-        self.app = app
-        self.max_size = max_size
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        total_size = 0
-
-        async def rcv() -> Message:
-            nonlocal total_size
-            message = await receive()
-            chunk_size = len(message.get("body", b""))
-            total_size += chunk_size
-            if self.max_size is not None and total_size > self.max_size:
-                raise HTTPException(413, "Payload too large")
-            return message
-
-        await self.app(scope, rcv, send)

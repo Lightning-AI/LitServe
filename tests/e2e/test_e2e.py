@@ -13,13 +13,13 @@
 # limitations under the License.
 import json
 import os
-import psutil
-import requests
 import subprocess
 import time
-
-from openai import OpenAI
 from functools import wraps
+
+import psutil
+import requests
+from openai import OpenAI
 
 
 def e2e_from_file(filename):
@@ -54,6 +54,19 @@ def test_run():
     assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
     assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
+    os.remove("client.py")
+
+
+@e2e_from_file("tests/simple_server_diff_port.py")
+def test_run_with_port():
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    with open(os.path.join(os.getcwd(), "client.py")) as f:
+        client_code = f.read()
+        assert ":8080" in client_code, "Could not find 8080 in client.py"
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert (
+        '{"output":16.0}' in output
+    ), f"tests/simple_server_server_diff_port.py didn't return expected output, got {output}"
     os.remove("client.py")
 
 
