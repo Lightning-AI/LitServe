@@ -67,14 +67,13 @@ def test_metric_logger(capfd):
 @pytest.mark.asyncio
 async def test_request_tracker(capfd):
     lit_api = SlowAPI()
-    server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
-    await run_simple_request(server, 4)
-
-    captured = capfd.readouterr()
-    assert "Active requests: 4" in captured.out, f"Expected pattern not found in output: {captured.out}"
 
     server = ls.LitServer(lit_api, track_requests=False, callbacks=[RequestTracker()])
     await run_simple_request(server, 1)
-
     captured = capfd.readouterr()
     assert "Active requests: None" in captured.out, f"Expected pattern not found in output: {captured.out}"
+
+    server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
+    await run_simple_request(server, 4)
+    captured = capfd.readouterr()
+    assert "Active requests: 4" in captured.out, f"Expected pattern not found in output: {captured.out}"

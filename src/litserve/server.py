@@ -156,6 +156,7 @@ class LitServer:
             )
 
         self.api_path = api_path
+        self.track_requests = track_requests
         lit_api.stream = stream
         lit_api.request_timeout = timeout
         lit_api._sanitize(max_batch_size, spec=spec)
@@ -168,10 +169,7 @@ class LitServer:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
-        self.active_counter: Optional[mp.Value] = None
-        if track_requests:
-            self.active_counter = mp.Value("i", 0, lock=True)
-            middlewares.append((RequestCountMiddleware, {"active_counter": self.active_counter}))
+        self.active_counters: List[mp.Value] = []
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
@@ -309,8 +307,8 @@ class LitServer:
 
     @property
     def active_requests(self):
-        if self.active_counter:
-            return self.active_counter.value
+        if self.track_requests and self.active_counters:
+            return self.active_counters[self.app.response_queue_id].value
         warnings.warn(
             "Active request counter is not enabled while using `on_request` callback hook. "
             "Please set track_requests=True in the LitServer."
@@ -479,13 +477,21 @@ class LitServer:
                 w.join()
             manager.shutdown()
 
+    def _prepare_app_run(self, app: FastAPI):
+        # Add middleware to count active requests
+        active_counter = mp.Value("i", 0, lock=True)
+        self.active_counters.append(active_counter)
+        app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
             if self.lit_spec:
                 self.lit_spec.response_queue_id = response_queue_id
-            app = copy.copy(self.app)
+            app: FastAPI = copy.copy(self.app)
+
+            self._prepare_app_run(app)
 
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             server = uvicorn.Server(config=config)
