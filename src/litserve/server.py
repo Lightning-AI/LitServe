@@ -44,7 +44,7 @@ from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, load_and_raise
+from litserve.utils import LitAPIStatus, call_after_stream, load_and_raise
 
 mp.allow_connection_pickling()
 
@@ -367,6 +367,11 @@ class LitServer:
             return response
 
         async def stream_predict(request: self.request_type) -> self.response_type:
+            self._callback_runner.trigger_event(
+                EventTypes.ON_REQUEST,
+                active_requests=self.active_requests,
+                litserver=self,
+            )
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
@@ -379,7 +384,13 @@ class LitServer:
                 payload = await request.json()
             self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
-            return StreamingResponse(self.data_streamer(q, data_available=event))
+            response = call_after_stream(
+                self.data_streamer(q, data_available=event),
+                self._callback_runner.trigger_event,
+                EventTypes.ON_RESPONSE,
+                litserver=self,
+            )
+            return StreamingResponse(response)
 
         if not self._specs:
             stream = self.lit_api.stream
