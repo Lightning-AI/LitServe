@@ -18,6 +18,8 @@ class EventTypes:
     AFTER_PREDICT = "on_after_predict"
     ON_SERVER_START = "on_server_start"
     ON_SERVER_END = "on_server_end"
+    ON_REQUEST = "on_request"
+    ON_RESPONSE = "on_response"
 
 
 class Callback(ABC):
@@ -50,6 +52,14 @@ class Callback(ABC):
 
     def on_server_end(self, *args, **kwargs):
         """Called when server terminates."""
+
+    def on_request(self, *args, **kwargs):
+        """Called when request enters the endpoint function."""
+
+    def on_response(self, *args, **kwargs):
+        """Called when response is generated from the worker and ready to return to the client."""
+
+    # Adding a new hook? Register it with the EventTypes dataclass too,
 
 
 class CallbackRunner:

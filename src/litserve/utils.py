@@ -15,7 +15,7 @@ import asyncio
 import logging
 import pickle
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator
 
 from fastapi import HTTPException
 
@@ -75,7 +75,18 @@ def wrap_litserve_start(server: "LitServer"):
     if server.lit_spec:
         server.lit_spec.response_queue_id = 0
     manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
+    server._prepare_app_run(server.app)
     yield server
     for p in processes:
         p.terminate()
     manager.shutdown()
+
+
+async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
+    try:
+        async for item in streamer:
+            yield item
+    except Exception as e:
+        logger.exception(f"Error in streamer: {e}")
+    finally:
+        callback(*args, **kwargs)

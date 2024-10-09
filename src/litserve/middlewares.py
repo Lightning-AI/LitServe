@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import multiprocessing
 from typing import Optional
 
 from fastapi import HTTPException
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class MaxSizeMiddleware(BaseHTTPMiddleware):
+    """Rejects requests with a payload that is too large."""
+
     def __init__(
         self,
         app: ASGIApp,
@@ -48,3 +51,20 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
             return message
 
         await self.app(scope, rcv, send)
+
+
+class RequestCountMiddleware(BaseHTTPMiddleware):
+    """Adds a header to the response with the number of active requests."""
+
+    def __init__(self, app: ASGIApp, active_counter: multiprocessing.Value) -> None:
+        self.app = app
+        self.active_counter = active_counter
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        self.active_counter.value += 1
+        await self.app(scope, receive, send)
+        self.active_counter.value -= 1
