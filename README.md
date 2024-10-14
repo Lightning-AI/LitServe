@@ -242,5 +242,5 @@ Self-hosting is ideal for hackers, students, and DIY developers, while fully man
 # Community
 LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community) - Let's make the world's most advanced AI inference engine.
 
-💬 [Get help on Discord](https://discord.com/invite/XncpTy7DSt)    
+💬 [Get help on Discord](https://discord.com/invite/tfXFetEZxv)    
 📋 [License: Apache 2.0](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)    
