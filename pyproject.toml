@@ -80,6 +80,7 @@ blank = true
 
 [tool.ruff]
 line-length = 120
+target-version = ["py38"]
 # Enable Pyflakes `E` and `F` codes by default.
 lint.select = [
     "E", "W",  # see: https://pypi.org/project/pycodestyle
@@ -87,6 +88,8 @@ lint.select = [
     "N",  # see: https://pypi.org/project/pep8-naming
 #    "D",  # see: https://pypi.org/project/pydocstyle
     "I", # implementation for isort
+    "UP", # implementation for pyupgrade
+    "RUF100", # implementation for yesqa
 ]
 lint.extend-select = [
     "C4",  # see: https://pypi.org/project/flake8-comprehensions
