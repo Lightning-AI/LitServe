@@ -80,7 +80,7 @@ blank = true
 
 [tool.ruff]
 line-length = 120
-target-version = ["py38"]
+target-version = "py38"
 # Enable Pyflakes `E` and `F` codes by default.
 lint.select = [
     "E", "W",  # see: https://pypi.org/project/pycodestyle
