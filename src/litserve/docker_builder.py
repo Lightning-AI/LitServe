@@ -49,7 +49,8 @@ def color(text, color_code, action_code=None):
 
 
 REQUIREMENTS_FILE = "requirements.txt"
-DOCKERFILE_TEMPLATE = """FROM python:3.10-slim
+DOCKERFILE_TEMPLATE = """ARG PYTHON_VERSION=3.12
+FROM python:$PYTHON_VERSION-slim
 
 ####### Add your own installation commands here #######
 # RUN pip install some-package
@@ -66,6 +67,7 @@ CMD ["python", "/app/{server_filename}"]
 """
 
 CUDA_DOCKER_TEMPLATE = """# Change CUDA and cuDNN version here
+ARG PYTHON_VERSION=3.12
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -74,14 +76,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
         wget \\
     && add-apt-repository ppa:deadsnakes/ppa \\
     && apt-get update && apt-get install -y --no-install-recommends \\
-        python3.10 \\
-        python3.10-dev \\
-        python3.10-venv \\
+        python$PYTHON_VERSION \\
+        python$PYTHON_VERSION-dev \\
+        python$PYTHON_VERSION-venv \\
     && wget https://bootstrap.pypa.io/get-pip.py -O get-pip.py \\
-    && python3.10 get-pip.py \\
+    && python$PYTHON_VERSION get-pip.py \\
     && rm get-pip.py \\
-    && ln -sf /usr/bin/python3.10 /usr/bin/python \\
-    && ln -sf /usr/local/bin/pip3.10 /usr/local/bin/pip \\
+    && ln -sf /usr/bin/python$PYTHON_VERSION /usr/bin/python \\
+    && ln -sf /usr/local/bin/pip$PYTHON_VERSION /usr/local/bin/pip \\
     && python --version \\
     && pip --version \\
     && apt-get purge -y --auto-remove software-properties-common \\
