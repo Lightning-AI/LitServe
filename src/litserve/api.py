@@ -32,7 +32,7 @@ class LitAPI(ABC):
     request_timeout: Optional[float] = None
 
     @abstractmethod
-    def setup(self, device):
+    def setup(self, devices):
         """Setup the model so it can be called in `predict`."""
         pass
 
