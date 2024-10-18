@@ -23,11 +23,11 @@ from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from httpx import AsyncClient
 
+import litserve as ls
 from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
-from litserve.loops import run_batched_loop, collate_requests
+from litserve.loops import collate_requests, run_batched_loop
 from litserve.utils import wrap_litserve_start
-import litserve as ls
 
 NOOP_CB_RUNNER = CallbackRunner()
 
@@ -146,6 +146,22 @@ def test_max_batch_size_warning():
         match=warning,
     ):
         LitServer(SimpleTorchAPI(), accelerator="cpu", devices=1, timeout=2)
+
+
+def test_batch_predict_string_warning():
+    api = ls.test_examples.SimpleBatchedAPI()
+    api._sanitize(2, None)
+    api.predict = MagicMock(return_value="This is a string")
+
+    mock_input = torch.tensor([[1.0], [2.0]])
+
+    with pytest.warns(
+        UserWarning,
+        match="When batching is enabled, 'predict' must return a list to handle multiple inputs correctly.",
+    ):
+        # Simulate the behavior in run_batched_loop
+        y = api.predict(mock_input)
+        api.unbatch(y)
 
 
 class FakeResponseQueue:

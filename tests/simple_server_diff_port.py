@@ -11,20 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-__version__ = "0.2.3"
-__author__ = "Lightning-AI et al."
-__author_email__ = "community@lightning.ai"
-__license__ = "Apache-2.0"
-__copyright__ = f"Copyright (c) 2024, {__author__}."
-__homepage__ = "https://github.com/Lightning-AI/litserve"
-__docs__ = "Lightweight AI server."
+from litserve.api import LitAPI
+from litserve.server import LitServer
 
-__all__ = [
-    "__author__",
-    "__author_email__",
-    "__copyright__",
-    "__docs__",
-    "__homepage__",
-    "__license__",
-    "__version__",
-]
+
+class SimpleLitAPI(LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output):
+        return {"output": output}
+
+
+if __name__ == "__main__":
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=10)
+    server.run(port=8080)

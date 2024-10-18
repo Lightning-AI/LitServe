@@ -24,7 +24,7 @@ class LitSpec:
     def __init__(self):
         self._endpoints = []
 
-        self._server: "LitServer" = None
+        self._server: LitServer = None
 
     def setup(self, server: "LitServer"):
         self._server = server

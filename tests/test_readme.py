@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # Code extraction adapted from https://github.com/tassaron/get_code_from_markdown
-import subprocess
-from typing import List
-import sys
 import re
-import pytest
 import selectors
+import subprocess
+import sys
 import time
+from typing import List
 
+import pytest
 from tqdm import tqdm
 
 uvicorn_msg = "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"

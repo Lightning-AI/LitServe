@@ -11,11 +11,10 @@ concurrency:
   cancel-in-progress: ${{ ! (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) }}
 
 jobs:
-
-#  check-typing:
-#    uses: Lightning-AI/utilities/.github/workflows/check-typing.yml@main
-#    with:
-#      actions-ref: main
+  #  check-typing:
+  #    uses: Lightning-AI/utilities/.github/workflows/check-typing.yml@main
+  #    with:
+  #      actions-ref: main
 
   check-schema:
     uses: Lightning-AI/utilities/.github/workflows/check-schema.yml@v0.11.7

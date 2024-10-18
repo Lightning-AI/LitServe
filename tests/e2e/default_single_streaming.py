@@ -1,4 +1,4 @@
-from litserve import LitServer, LitAPI
+from litserve import LitAPI, LitServer
 
 
 class SimpleStreamingAPI(LitAPI):
