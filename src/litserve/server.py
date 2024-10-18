@@ -406,6 +406,7 @@ class LitServer:
 
     def run(
         self,
+        host: str = "0.0.0.0",
         port: Union[str, int] = 8000,
         num_api_servers: Optional[int] = None,
         log_level: str = "info",
@@ -425,7 +426,7 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+        config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
