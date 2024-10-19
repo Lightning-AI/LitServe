@@ -11,10 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from litserve.test_examples.openai_spec_example import TestAPI
-from litserve.specs.openai import OpenAISpec
-
 import litserve as ls
+from litserve.specs.openai import OpenAISpec
+from litserve.test_examples.openai_spec_example import TestAPI
 
 if __name__ == "__main__":
     server = ls.LitServer(TestAPI(), spec=OpenAISpec())

@@ -14,25 +14,24 @@
 import inspect
 import json
 import threading
-
 import time
 from queue import Queue
-
 from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi import HTTPException
 
+import litserve as ls
 from litserve.callbacks import CallbackRunner
 from litserve.loops import (
-    run_single_loop,
-    run_streaming_loop,
-    run_batched_streaming_loop,
     inference_worker,
     run_batched_loop,
+    run_batched_streaming_loop,
+    run_single_loop,
+    run_streaming_loop,
 )
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus
-import litserve as ls
 
 NOOP_CB_RUNNER = CallbackRunner()
 

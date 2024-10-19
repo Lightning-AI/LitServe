@@ -3,6 +3,7 @@
 import torch
 from jsonargparse import CLI
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, BertConfig
+
 import litserve as ls
 
 # Set float32 matrix multiplication precision if GPU is available and capable

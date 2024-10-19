@@ -1,6 +1,5 @@
-from litserve.test_examples.openai_spec_example import OpenAIBatchContext
-
 import litserve as ls
+from litserve.test_examples.openai_spec_example import OpenAIBatchContext
 
 if __name__ == "__main__":
     api = OpenAIBatchContext()

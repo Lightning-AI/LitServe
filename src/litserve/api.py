@@ -15,8 +15,8 @@ import inspect
 import json
 import warnings
 from abc import ABC, abstractmethod
-from typing import Optional
 from queue import Queue
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class LitAPI(ABC):
     request_timeout: Optional[float] = None
 
     @abstractmethod
-    def setup(self, devices):
+    def setup(self, device):
         """Setup the model so it can be called in `predict`."""
         pass
 
@@ -63,6 +63,13 @@ class LitAPI(ABC):
         pass
 
     def _unbatch_no_stream(self, output):
+        if isinstance(output, str):
+            warnings.warn(
+                "The 'predict' method returned a string instead of a list of predictions. "
+                "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
+                "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
+                UserWarning,
+            )
         return list(output)
 
     def _unbatch_stream(self, output_stream):

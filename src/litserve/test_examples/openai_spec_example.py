@@ -13,11 +13,11 @@
 # limitations under the License.
 import time
 
-import litserve as ls
+from litserve.api import LitAPI
 from litserve.specs.openai import ChatMessage
 
 
-class TestAPI(ls.LitAPI):
+class TestAPI(LitAPI):
     def setup(self, device):
         self.model = None
 
@@ -53,7 +53,7 @@ class TestAPIWithStructuredOutput(TestAPI):
         )
 
 
-class OpenAIBatchContext(ls.LitAPI):
+class OpenAIBatchContext(LitAPI):
     def setup(self, device: str) -> None:
         self.model = None
 
@@ -82,7 +82,7 @@ class OpenAIBatchContext(ls.LitAPI):
             assert ctx["temperature"] == 1.0, f"context {ctx} is not 1.0"
 
 
-class OpenAIWithUsage(ls.LitAPI):
+class OpenAIWithUsage(LitAPI):
     def setup(self, device):
         self.model = None
 
@@ -96,7 +96,7 @@ class OpenAIWithUsage(ls.LitAPI):
         }
 
 
-class OpenAIWithUsageEncodeResponse(ls.LitAPI):
+class OpenAIWithUsageEncodeResponse(LitAPI):
     def setup(self, device):
         self.model = None
 

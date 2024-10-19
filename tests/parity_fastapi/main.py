@@ -1,12 +1,11 @@
-import torch
-import requests
-
-from benchmark import run_bench
-import psutil
 import subprocess
 import time
-
 from functools import wraps
+
+import psutil
+import requests
+import torch
+from benchmark import run_bench
 
 CONF = {
     "cpu": {"num_requests": 50},
