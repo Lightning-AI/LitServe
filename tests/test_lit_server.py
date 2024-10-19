@@ -186,7 +186,7 @@ def test_server_run(mock_uvicorn):
 
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         server.run(port=65536)
-    
+
     with pytest.raises(ValueError, match="host must be '0.0.0.0', '127.0.0.1', or '::' but got"):
         server.run(host="127.0.0.2")
 

@@ -457,7 +457,7 @@ class LitServer:
 
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
-    
+
         host_msg = f"host must be '0.0.0.0', '127.0.0.1', or '::' but got {host}"
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:
             raise ValueError(host_msg)
