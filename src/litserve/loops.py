@@ -26,7 +26,7 @@ from starlette.formparsers import MultiPartParser
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, PickleableHTTPException
 
 mp.allow_connection_pickling()
 
@@ -147,6 +147,13 @@ def run_single_loop(
             callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
 
             response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+
+        except HTTPException as e:
+            response_queues[response_queue_id].put((
+                uid,
+                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+            ))
+
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the request uid=%s.\n"
@@ -220,6 +227,13 @@ def run_batched_loop(
             for response_queue_id, uid, y_enc in y_enc_list:
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
+        except HTTPException as e:
+            for response_queue_id, uid in zip(response_queue_ids, uids):
+                response_queues[response_queue_id].put((
+                    uid,
+                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                ))
+
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the batched request.\n"
@@ -281,6 +295,12 @@ def run_streaming_loop(
                 y_enc = lit_api.format_encoded_response(y_enc)
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
             response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+
+        except HTTPException as e:
+            response_queues[response_queue_id].put((
+                uid,
+                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+            ))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming request uid=%s.\n"
@@ -354,6 +374,12 @@ def run_batched_streaming_loop(
 
             for response_queue_id, uid in zip(response_queue_ids, uids):
                 response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+
+        except HTTPException as e:
+            response_queues[response_queue_id].put((
+                uid,
+                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+            ))
 
         except Exception as e:
             logger.exception(
