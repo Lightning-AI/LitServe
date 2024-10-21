@@ -48,18 +48,6 @@ def dump_exception(exception):
     return pickle.dumps(exception)
 
 
-def load_and_raise(response):
-    try:
-        exception = pickle.loads(response) if isinstance(response, bytes) else response
-        raise exception
-    except pickle.PickleError:
-        logger.exception(
-            f"main process failed to load the exception from the parallel worker process. "
-            f"{response} couldn't be unpickled."
-        )
-        raise
-
-
 async def azip(*async_iterables):
     iterators = [ait.__aiter__() for ait in async_iterables]
     while True:

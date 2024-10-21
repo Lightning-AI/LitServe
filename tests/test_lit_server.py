@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import pickle
 import re
 import sys
 from unittest.mock import MagicMock, patch
@@ -315,13 +314,7 @@ class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
 
 
 @pytest.mark.asyncio
-@patch("litserve.server.load_and_raise")
-async def test_inject_context(mocked_load_and_raise):
-    def dummy_load_and_raise(resp):
-        raise pickle.loads(resp)
-
-    mocked_load_and_raise.side_effect = dummy_load_and_raise
-
+async def test_inject_context():
     # Test context injection with single loop
     api = IdentityAPI()
     server = LitServer(api)

@@ -44,7 +44,7 @@ from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, call_after_stream, load_and_raise
+from litserve.utils import LitAPIStatus, call_after_stream
 
 mp.allow_connection_pickling()
 
@@ -362,7 +362,7 @@ class LitServer:
             response, status = self.response_buffer.pop(uid)
 
             if status == LitAPIStatus.ERROR:
-                load_and_raise(response)
+                raise response
             self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
             return response
 
