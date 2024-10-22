@@ -27,7 +27,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, azip, load_and_raise
+from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
     from litserve import LitServer
@@ -380,7 +380,7 @@ class OpenAISpec(LitSpec):
             # iterate over n choices
             for i, (response, status) in enumerate(streaming_response):
                 if status == LitAPIStatus.ERROR:
-                    load_and_raise(response)
+                    raise response
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
                 chat_msg = ChoiceDelta(**encoded_response)
@@ -424,7 +424,7 @@ class OpenAISpec(LitSpec):
             usage = None
             async for response, status in streaming_response:
                 if status == LitAPIStatus.ERROR:
-                    load_and_raise(response)
+                    raise response
                 # data from LitAPI.encode_response
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)

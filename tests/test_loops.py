@@ -118,7 +118,7 @@ class FakeBatchStreamResponseQueue:
         response, status = args
         if status == LitAPIStatus.FINISH_STREAMING:
             raise StopIteration("interrupt iteration")
-        if status == LitAPIStatus.ERROR and b"interrupt iteration" in response:
+        if status == LitAPIStatus.ERROR and isinstance(response, StopIteration):
             assert self.count // 2 == self.num_streamed_outputs, (
                 f"Loop count must have incremented for " f"{self.num_streamed_outputs} times."
             )
