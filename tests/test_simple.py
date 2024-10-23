@@ -71,6 +71,32 @@ def test_workers_health():
         assert response.text == "ok"
 
 
+def test_workers_health_custom_path():
+    server = LitServer(
+        SlowSetupLitAPI(),
+        accelerator="cpu",
+        healthcheck_path="/my_server/health",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.get("/my_server/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(1)
+        response = client.get("/my_server/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(3)
+        response = client.get("/my_server/health")
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
         for _ in range(100):
