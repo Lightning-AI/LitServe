@@ -355,6 +355,7 @@ def test_custom_api_path():
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
 
+
 def test_custom_healthcheck_path():
     with pytest.raises(ValueError, match="healthcheck_path must start with '/'. "):
         LitServer(ls.test_examples.SimpleLitAPI(), healthcheck_path="customhealth")

@@ -145,7 +145,7 @@ class LitServer:
                 "api_path must start with '/'. "
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
-        
+
         if not healthcheck_path.startswith("/"):
             raise ValueError(
                 "healthcheck_path must start with '/'. "
