@@ -168,7 +168,7 @@ State-of-the-art features:
 
 ✅ [(2x)+ faster than plain FastAPI](#performance)      
 ✅ [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)    
-✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
+✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)    
 ✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
