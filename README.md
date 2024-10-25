@@ -181,6 +181,8 @@ State-of-the-art features:
 ✅ [OpenAPI compliant](https://www.openapis.org/)          
 ✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
 ✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
+✅ [Dockerization](https://lightning.ai/docs/litserve/features/dockerization-deployment)
+
 
 
 [10+ features...](https://lightning.ai/docs/litserve/features)    
