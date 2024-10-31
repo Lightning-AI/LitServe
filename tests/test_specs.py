@@ -115,6 +115,7 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
                     "id": "call_1",
                     "type": "function",
                     "function": {"name": "function_1", "arguments": '{"arg_1": "arg_1_value"}'},
+                    "index": 0,
                 }
             ], "LitAPI predict response should match with the generated output"
 
