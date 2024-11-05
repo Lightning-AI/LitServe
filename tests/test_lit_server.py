@@ -65,13 +65,13 @@ async def test_stream(simple_stream_api):
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)
             assert resp1.status_code == 200, "Check if server is running and the request format is valid."
-            assert (
-                resp1.text == expected_output1
-            ), "Server returns input prompt and generated output which didn't match."
+            assert resp1.text == expected_output1, (
+                "Server returns input prompt and generated output which didn't match."
+            )
             assert resp2.status_code == 200, "Check if server is running and the request format is valid."
-            assert (
-                resp2.text == expected_output2
-            ), "Server returns input prompt and generated output which didn't match."
+            assert resp2.text == expected_output2, (
+                "Server returns input prompt and generated output which didn't match."
+            )
 
 
 @pytest.mark.asyncio
@@ -87,12 +87,12 @@ async def test_batched_stream_server(simple_batched_stream_api):
             resp1, resp2 = await asyncio.gather(resp1, resp2)
             assert resp1.status_code == 200, "Check if server is running and the request format is valid."
             assert resp2.status_code == 200, "Check if server is running and the request format is valid."
-            assert (
-                resp1.text == expected_output1
-            ), "Server returns input prompt and generated output which didn't match."
-            assert (
-                resp2.text == expected_output2
-            ), "Server returns input prompt and generated output which didn't match."
+            assert resp1.text == expected_output1, (
+                "Server returns input prompt and generated output which didn't match."
+            )
+            assert resp2.text == expected_output2, (
+                "Server returns input prompt and generated output which didn't match."
+            )
 
 
 def test_litapi_with_stream(simple_litapi):

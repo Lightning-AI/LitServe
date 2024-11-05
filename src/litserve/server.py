@@ -473,7 +473,7 @@ class LitServer:
 
         if sys.platform == "win32":
             warnings.warn(
-                "Windows does not support forking. Using threads" " api_server_worker_type will be set to 'thread'"
+                "Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'"
             )
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
