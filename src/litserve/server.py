@@ -44,17 +44,9 @@ from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, call_after_stream
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
 
 mp.allow_connection_pickling()
-
-try:
-    import uvloop
-
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-except ImportError:
-    print("uvloop is not installed. Falling back to the default asyncio event loop.")
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +225,7 @@ class LitServer:
             if len(device) == 1:
                 device = device[0]
 
-            self.workers_setup_status[worker_id] = False
+            self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
@@ -480,7 +472,16 @@ class LitServer:
             api_server_worker_type = "process"
 
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
+        ready = False
+        while not ready:
+            for k, v in self.workers_setup_status.items():
+                if v == WorkerSetupStatus.ERROR:
+                    raise RuntimeError(f"Worker {k} failed to start. Shutting down LitServe")
 
+                if v == WorkerSetupStatus.READY:
+                    logger.info("One or more workers are ready to serve requests")
+                    ready = True
+            time.sleep(0.1)
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")

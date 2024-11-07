@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import dataclasses
 import logging
 import pickle
 from contextlib import contextmanager
@@ -78,3 +79,11 @@ async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
         logger.exception(f"Error in streamer: {e}")
     finally:
         callback(*args, **kwargs)
+
+
+@dataclasses.dataclass
+class WorkerSetupStatus:
+    STARTING: str = "starting"
+    READY: str = "ready"
+    ERROR: str = "error"
+    FINISHED: str = "finished"
