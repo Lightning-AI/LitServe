@@ -392,3 +392,15 @@ print(f"Status: {response.status_code}\\nResponse:\\n {response.text}")"""
     LitServer.generate_client_file(8000)
     with open(tmp_path / "client.py") as fr:
         assert expected in fr.read(), "Shouldn't replace existing client.py"
+
+
+class FailFastAPI(ls.test_examples.SimpleLitAPI):
+    def setup(self, device):
+        raise ValueError("setup failed")
+
+
+def test_workers_setup_status():
+    api = FailFastAPI()
+    server = LitServer(api, devices=1)
+    with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
+        server.run()
