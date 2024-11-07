@@ -180,6 +180,7 @@ def test_mocked_accelerator():
 @patch("litserve.server.uvicorn")
 def test_server_run(mock_uvicorn):
     server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         server.run(port="invalid port")
 
