@@ -472,16 +472,11 @@ class LitServer:
             api_server_worker_type = "process"
 
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
-        ready = False
-        while not ready:
-            for k, v in self.workers_setup_status.items():
-                if v == WorkerSetupStatus.ERROR:
-                    raise RuntimeError(f"Worker {k} failed to start. Shutting down LitServe")
-
-                if v == WorkerSetupStatus.READY:
-                    logger.info("One or more workers are ready to serve requests")
-                    ready = True
-            time.sleep(0.1)
+        while not any(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()):
+            if any(v == WorkerSetupStatus.ERROR for v in self.workers_setup_status.values()):
+                raise RuntimeError("One or more workers failed to start. Shutting down LitServe")
+            time.sleep(0.05)
+        logger.debug("One or more workers are ready to serve requests")
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
