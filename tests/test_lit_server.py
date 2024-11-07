@@ -213,6 +213,7 @@ def test_start_server(mock_uvicon):
 def test_server_run_with_api_server_worker_type(mock_uvicorn):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api, devices=1)
+    server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
 
@@ -258,6 +259,7 @@ def test_server_run_windows(mock_uvicorn):
 
 def test_server_terminate():
     server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
     mock_manager = MagicMock()
 
     with patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start, patch(

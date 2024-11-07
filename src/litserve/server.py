@@ -428,6 +428,13 @@ class LitServer:
         except Exception as e:
             logger.exception(f"Error copying file: {e}")
 
+    def verify_worker_status(self):
+        while not any(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()):
+            if any(v == WorkerSetupStatus.ERROR for v in self.workers_setup_status.values()):
+                raise RuntimeError("One or more workers failed to start. Shutting down LitServe")
+            time.sleep(0.05)
+        logger.debug("One or more workers are ready to serve requests")
+
     def run(
         self,
         host: str = "0.0.0.0",
@@ -472,11 +479,8 @@ class LitServer:
             api_server_worker_type = "process"
 
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
-        while not any(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()):
-            if any(v == WorkerSetupStatus.ERROR for v in self.workers_setup_status.values()):
-                raise RuntimeError("One or more workers failed to start. Shutting down LitServe")
-            time.sleep(0.05)
-        logger.debug("One or more workers are ready to serve requests")
+
+        self.verify_worker_status()
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
