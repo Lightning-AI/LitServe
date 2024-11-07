@@ -40,9 +40,9 @@ async def test_openai_spec(openai_request_data):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
-            assert (
-                resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
-            ), "LitAPI predict response should match with the generated output"
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
+                "LitAPI predict response should match with the generated output"
+            )
 
 
 # OpenAIWithUsage
@@ -81,9 +81,9 @@ async def test_openai_spec_with_image(openai_request_data_with_image):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_image, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
-            assert (
-                resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
-            ), "LitAPI predict response should match with the generated output"
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
+                "LitAPI predict response should match with the generated output"
+            )
 
 
 @pytest.mark.asyncio
@@ -94,9 +94,9 @@ async def test_override_encode(openai_request_data):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
-            assert (
-                resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output"
-            ), "LitAPI predict response should match with the generated output"
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output", (
+                "LitAPI predict response should match with the generated output"
+            )
 
 
 @pytest.mark.asyncio
@@ -107,9 +107,9 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
-            assert (
-                resp.json()["choices"][0]["message"]["content"] == ""
-            ), "LitAPI predict response should match with the generated output"
+            assert resp.json()["choices"][0]["message"]["content"] == "", (
+                "LitAPI predict response should match with the generated output"
+            )
             assert resp.json()["choices"][0]["message"]["tool_calls"] == [
                 {
                     "id": "call_1",
@@ -182,9 +182,9 @@ async def test_oai_prepopulated_context(openai_request_data):
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
-            assert (
-                resp.json()["choices"][0]["message"]["content"] == "This is a"
-            ), "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a", (
+                "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
+            )
 
 
 class WrongLitAPI(ls.LitAPI):

@@ -92,13 +92,13 @@ def test_check_cuda_with_nvidia_smi_mock_gpu(mock_subprocess):
 def test_connector(input_accelerator, expected_accelerator, expected_devices):
     check_cuda_with_nvidia_smi.cache_clear()
     connector = _Connector(accelerator=input_accelerator)
-    assert (
-        connector.accelerator == expected_accelerator
-    ), f"accelerator mismatch - expected: {expected_accelerator}, actual: {connector.accelerator}"
+    assert connector.accelerator == expected_accelerator, (
+        f"accelerator mismatch - expected: {expected_accelerator}, actual: {connector.accelerator}"
+    )
 
-    assert (
-        connector.devices == expected_devices
-    ), f"devices mismatch - expected {expected_devices}, actual: {connector.devices}"
+    assert connector.devices == expected_devices, (
+        f"devices mismatch - expected {expected_devices}, actual: {connector.devices}"
+    )
 
     with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'"):
         _Connector(accelerator="SUPER_CHIP")
