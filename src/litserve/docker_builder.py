@@ -67,8 +67,8 @@ CMD ["python", "/app/{server_filename}"]
 """
 
 CUDA_DOCKER_TEMPLATE = """# Change CUDA and cuDNN version here
-ARG PYTHON_VERSION=3.12
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu20.04
+ARG PYTHON_VERSION=3.12
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \\

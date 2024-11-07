@@ -100,6 +100,7 @@ class FunctionCall(BaseModel):
 
 
 class ToolCall(BaseModel):
+    index: int = 0
     id: Optional[str] = None
     type: str = "function"
     function: FunctionCall

@@ -136,12 +136,12 @@ async def test_timeout():
             await asyncio.sleep(0.0001)
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
             responses = await asyncio.gather(response1, response2, return_exceptions=True)
-            assert (
-                responses[0].status_code == 200
-            ), "First request should complete since it's popped from the request queue."
-            assert (
-                responses[1].status_code == 504
-            ), "Server takes longer than specified timeout and request should timeout"
+            assert responses[0].status_code == 200, (
+                "First request should complete since it's popped from the request queue."
+            )
+            assert responses[1].status_code == 504, (
+                "Server takes longer than specified timeout and request should timeout"
+            )
 
 
 @pytest.mark.asyncio
@@ -169,12 +169,12 @@ async def test_batch_timeout():
             await asyncio.sleep(0.0001)
             response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
             responses = await asyncio.gather(response1, response2, response3, return_exceptions=True)
-            assert (
-                responses[0].status_code == 200
-            ), "Batch: First request should complete since it's popped from the request queue."
-            assert (
-                responses[1].status_code == 200
-            ), "Batch: Second request should complete since it's popped from the request queue."
+            assert responses[0].status_code == 200, (
+                "Batch: First request should complete since it's popped from the request queue."
+            )
+            assert responses[1].status_code == 200, (
+                "Batch: Second request should complete since it's popped from the request queue."
+            )
             assert responses[2].status_code == 504, "Batch: Third request was delayed and should fail"
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)

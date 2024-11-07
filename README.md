@@ -22,7 +22,7 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
 ✅ (2x)+ faster serving  ✅ Easy to use          ✅ LLMs, non LLMs and more
 ✅ Bring your own model  ✅ PyTorch/JAX/TF/...   ✅ Built on FastAPI       
 ✅ GPU autoscaling       ✅ Batching, Streaming  ✅ Self-host or ⚡️ managed 
-                         ✅ Integrate with vLLM and more                   
+✅ Compound AI           ✅ Integrate with vLLM and more                   
 </pre>
 
 <div align='center'>
@@ -135,7 +135,7 @@ litgpt serve microsoft/phi-2
 &nbsp;
 
 # Featured examples    
-Use LitServe to deploy any model or AI service: (Gen AI, classical ML, embedding servers, LLMs, vision, audio, multi-modal systems, etc...)       
+Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
 
 <div align='center'>
   <div width='200px'>
@@ -168,7 +168,7 @@ State-of-the-art features:
 
 ✅ [(2x)+ faster than plain FastAPI](#performance)      
 ✅ [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)    
-✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/features/compound-ai-systems)    
+✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)    
 ✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
@@ -181,6 +181,8 @@ State-of-the-art features:
 ✅ [OpenAPI compliant](https://www.openapis.org/)          
 ✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
 ✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
+✅ [Dockerization](https://lightning.ai/docs/litserve/features/dockerization-deployment)
+
 
 
 [10+ features...](https://lightning.ai/docs/litserve/features)    
