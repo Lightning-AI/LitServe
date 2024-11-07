@@ -26,7 +26,7 @@ from starlette.formparsers import MultiPartParser
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, PickleableHTTPException
+from litserve.utils import LitAPIStatus, PickleableHTTPException, WorkerSetupStatus
 
 mp.allow_connection_pickling()
 
@@ -399,18 +399,23 @@ def inference_worker(
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
-    workers_setup_status: Dict[str, bool],
+    workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
-    lit_api.setup(device)
+    try:
+        lit_api.setup(device)
+    except Exception:
+        logger.exception(f"Error setting up worker {worker_id}.")
+        workers_setup_status[worker_id] = WorkerSetupStatus.ERROR
+        return
     lit_api.device = device
     callback_runner.trigger_event(EventTypes.AFTER_SETUP, lit_api=lit_api)
 
-    print(f"Setup complete for worker {worker_id}.")
+    logger.info(f"Setup complete for worker {worker_id}.")
 
     if workers_setup_status:
-        workers_setup_status[worker_id] = True
+        workers_setup_status[worker_id] = WorkerSetupStatus.READY
 
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")

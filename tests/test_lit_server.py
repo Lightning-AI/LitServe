@@ -180,6 +180,7 @@ def test_mocked_accelerator():
 @patch("litserve.server.uvicorn")
 def test_server_run(mock_uvicorn):
     server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         server.run(port="invalid port")
 
@@ -213,6 +214,7 @@ def test_start_server(mock_uvicon):
 def test_server_run_with_api_server_worker_type(mock_uvicorn):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api, devices=1)
+    server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
 
@@ -247,6 +249,7 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn):
 def test_server_run_windows(mock_uvicorn):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
+    server.verify_worker_status = MagicMock()
     server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
     server._start_server = MagicMock()
 
@@ -258,6 +261,7 @@ def test_server_run_windows(mock_uvicorn):
 
 def test_server_terminate():
     server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
     mock_manager = MagicMock()
 
     with patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start, patch(
@@ -392,3 +396,15 @@ print(f"Status: {response.status_code}\\nResponse:\\n {response.text}")"""
     LitServer.generate_client_file(8000)
     with open(tmp_path / "client.py") as fr:
         assert expected in fr.read(), "Shouldn't replace existing client.py"
+
+
+class FailFastAPI(ls.test_examples.SimpleLitAPI):
+    def setup(self, device):
+        raise ValueError("setup failed")
+
+
+def test_workers_setup_status():
+    api = FailFastAPI()
+    server = LitServer(api, devices=1)
+    with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
+        server.run()
