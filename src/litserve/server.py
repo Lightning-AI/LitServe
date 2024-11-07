@@ -320,7 +320,7 @@ class LitServer:
         async def health(request: Request) -> Response:
             nonlocal workers_ready
             if not workers_ready:
-                workers_ready = all(self.workers_setup_status.values())
+                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
             if workers_ready:
                 return Response(content="ok", status_code=200)
