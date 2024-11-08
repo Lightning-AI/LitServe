@@ -16,9 +16,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-22.04, ubuntu-20.04, macOS-latest, windows-latest]
-        python-version: ["3.10", "3.11", "3.12"]
-        requires: ["latest"]
+        include:
+          - { os: "macos-latest", python-version: "3.12" }
+          - { os: "ubuntu-latest", python-version: "3.12" }
+          - { os: "ubuntu-latest", python-version: "3.11" }
+          - { os: "ubuntu-latest", python-version: "3.10" }
+          - { os: "ubuntu-latest", python-version: "3.9" }
+          - { os: "windows-latest", python-version: "3.12" }
 
     timeout-minutes: 35
     env:
