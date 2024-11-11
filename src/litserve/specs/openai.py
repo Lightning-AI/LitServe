@@ -396,7 +396,7 @@ class OpenAISpec(LitSpec):
             usage_info = sum(usage_infos)
             chunk = ChatCompletionChunk(model=model, choices=choices, usage=None)
             logger.debug(chunk)
-            yield f"data: {json.dumps(chunk.model_dump())}\n\n"
+            yield f"data: {chunk.model_dump_json()}\n\n"
 
         choices = [
             ChatCompletionStreamingChoice(
