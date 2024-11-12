@@ -370,7 +370,8 @@ def test_custom_healthcheck_path():
         # Sleep a bit to ensure the server is ready
         sleep(3)
         response = client.get(url)
-        assert response.status_code == 200, "Server response should be 200 (OK)"
+
+    assert response.status_code == 200, "Server response should be 200 (OK)"
 
 
 class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
