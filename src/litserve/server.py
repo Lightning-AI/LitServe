@@ -44,17 +44,9 @@ from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, call_after_stream
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
 
 mp.allow_connection_pickling()
-
-try:
-    import uvloop
-
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-except ImportError:
-    print("uvloop is not installed. Falling back to the default asyncio event loop.")
 
 logger = logging.getLogger(__name__)
 
@@ -241,7 +233,7 @@ class LitServer:
             if len(device) == 1:
                 device = device[0]
 
-            self.workers_setup_status[worker_id] = False
+            self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
@@ -336,7 +328,7 @@ class LitServer:
         async def health(request: Request) -> Response:
             nonlocal workers_ready
             if not workers_ready:
-                workers_ready = all(self.workers_setup_status.values())
+                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
             if workers_ready:
                 return Response(content="ok", status_code=200)
@@ -444,6 +436,13 @@ class LitServer:
         except Exception as e:
             logger.exception(f"Error copying file: {e}")
 
+    def verify_worker_status(self):
+        while not any(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()):
+            if any(v == WorkerSetupStatus.ERROR for v in self.workers_setup_status.values()):
+                raise RuntimeError("One or more workers failed to start. Shutting down LitServe")
+            time.sleep(0.05)
+        logger.debug("One or more workers are ready to serve requests")
+
     def run(
         self,
         host: str = "0.0.0.0",
@@ -481,7 +480,7 @@ class LitServer:
 
         if sys.platform == "win32":
             warnings.warn(
-                "Windows does not support forking. Using threads" " api_server_worker_type will be set to 'thread'"
+                "Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'"
             )
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
@@ -489,6 +488,7 @@ class LitServer:
 
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
+        self.verify_worker_status()
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
