@@ -105,6 +105,7 @@ class LitServer:
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
         api_path: str = "/predict",
+        healthcheck_path: str = "/health",
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
@@ -137,6 +138,12 @@ class LitServer:
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
 
+        if not healthcheck_path.startswith("/"):
+            raise ValueError(
+                "healthcheck_path must start with '/'. "
+                "Please provide a valid api path like '/health', '/healthcheck', or '/v1/health'"
+            )
+
         # Check if the batch and unbatch methods are overridden in the lit_api instance
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
         unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
@@ -148,6 +155,7 @@ class LitServer:
             )
 
         self.api_path = api_path
+        self.healthcheck_path = healthcheck_path
         self.track_requests = track_requests
         lit_api.stream = stream
         lit_api.request_timeout = timeout
@@ -316,7 +324,7 @@ class LitServer:
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
-        @self.app.get("/health", dependencies=[Depends(self.setup_auth())])
+        @self.app.get(self.healthcheck_path, dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
             nonlocal workers_ready
             if not workers_ready:

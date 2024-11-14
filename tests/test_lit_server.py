@@ -14,6 +14,7 @@
 import asyncio
 import re
 import sys
+from time import sleep
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -357,6 +358,20 @@ def test_custom_api_path():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
+
+
+def test_custom_healthcheck_path():
+    with pytest.raises(ValueError, match="healthcheck_path must start with '/'. "):
+        LitServer(ls.test_examples.SimpleLitAPI(), healthcheck_path="customhealth")
+
+    server = LitServer(ls.test_examples.SimpleLitAPI(), healthcheck_path="/v1/custom_health")
+    url = server.healthcheck_path
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Sleep a bit to ensure the server is ready
+        sleep(3)
+        response = client.get(url)
+
+    assert response.status_code == 200, "Server response should be 200 (OK)"
 
 
 class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
