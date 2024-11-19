@@ -39,3 +39,35 @@ def test_image_input_output(tmpdir):
         image_data = response.json()["image"]
         image = Image.open(io.BytesIO(base64.b64decode(image_data)))
         assert image.size == (32, 32), f"Unexpected image size: {image.size}"
+
+
+class MultiImageInputModel(ImageInput):
+    image_0: str
+    image_1: str
+    image_2: str
+
+
+class MultiImageInputAPI(ImageAPI):
+    def decode_request(self, request: MultiImageInputModel):
+        images = [request.get_image(f"image_{i}") for i in range(3)]
+        for image in images:
+            assert isinstance(image, Image.Image)
+        return images[0]
+
+
+def test_multiple_image_input(tmpdir):
+    path = os.path.join(tmpdir, "test.png")
+    server = ls.LitServer(MultiImageInputAPI(), accelerator="cpu", devices=1, workers_per_device=1)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        data = {}
+        for i in range(3):
+            Image.new("RGB", (32, 32)).save(path)
+            with open(path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+            data[f"image_{i}"] = encoded_string
+        response = client.post("/predict", json=data)
+
+        assert response.status_code == 200, f"Unexpected status code: {response.status_code}"
+        image_data = response.json()["image"]
+        image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+        assert image.size == (32, 32), f"Unexpected image size: {image.size}"

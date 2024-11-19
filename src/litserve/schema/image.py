@@ -1,36 +1,42 @@
 import base64
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional, Self
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, field_serializer, model_validator
 
 if TYPE_CHECKING:
     from PIL import Image
 
 
 class ImageInput(BaseModel):
-    image_data: str
+    image_data: Optional[str] = None
 
-    @field_validator("image_data")
-    def validate_base64(cls, value: str) -> str:  # noqa
+    @model_validator(mode="after")
+    def validate_base64(self) -> Self:
         """Ensure the string is a valid Base64."""
-        try:
-            base64.b64decode(value)
-        except base64.binascii.Error:
-            raise ValueError("Invalid Base64 string.")
-        return value
+        model_dump = self.model_dump()
+        for key, value in model_dump.items():
+            if value:
+                try:
+                    base64.b64decode(value)
+                except base64.binascii.Error:
+                    raise ValueError("Invalid Base64 string.")
+        return self
 
-    def get_image(self) -> "Image.Image":
+    def get_image(self, key: Optional[str] = None) -> "Image.Image":
         """Decode the Base64 string and return a PIL Image object."""
+        if key is None:
+            key = "image_data"
+        image_data = self.model_dump().get(key)
+        if not image_data:
+            raise ValueError(f"Missing image data for key '{key}'")
         try:
             from PIL import Image, UnidentifiedImageError
         except ImportError:
             raise ImportError("Pillow is required to use the ImageInput schema. Install it with `pip install Pillow`.")
         try:
-            decoded_data = base64.b64decode(self.image_data)
+            decoded_data = base64.b64decode(image_data)
             return Image.open(BytesIO(decoded_data))
-        except base64.binascii.Error as e:
-            raise ValueError(f"Error decoding Base64 string: {e}")
         except UnidentifiedImageError as e:
             raise ValueError(f"Error loading image from decoded data: {e}")
 
