@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, field_serializer, model_validator
 
@@ -12,7 +12,7 @@ class ImageInput(BaseModel):
     image_data: Optional[str] = None
 
     @model_validator(mode="after")
-    def validate_base64(self) -> Self:
+    def validate_base64(self) -> "ImageInput":
         """Ensure the string is a valid Base64."""
         model_dump = self.model_dump()
         for key, value in model_dump.items():
