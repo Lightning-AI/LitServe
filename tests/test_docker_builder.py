@@ -43,7 +43,7 @@ CMD ["python", "/app/app.py"]
 
 
 EXPECTED_GPU_DOCKERFILE = f"""# Change CUDA and cuDNN version here
-FROM nvidia/cuda:12.1.0-base-ubuntu22.04
+FROM nvidia/cuda:12.4.1-base-ubuntu22.04
 ARG PYTHON_VERSION=3.12
 
 ENV DEBIAN_FRONTEND=noninteractive
