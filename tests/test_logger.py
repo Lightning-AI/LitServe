@@ -101,8 +101,8 @@ class FileLogger(ls.Logger):
             f.write(f"{key}: {value:.1f}\n")
 
 
-def test_logger_with_api(tmp_path):
-    path = str(tmp_path / "test_logger_temp.txt")
+def test_logger_with_api(tmpdir):
+    path = str(tmpdir / "test_logger_temp.txt")
     api = LoggerAPI()
     server = ls.LitServer(api, loggers=[FileLogger(path)])
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
