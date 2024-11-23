@@ -64,9 +64,9 @@ def test_run_with_port():
         client_code = f.read()
         assert ":8080" in client_code, "Could not find 8080 in client.py"
     output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
-    assert (
-        '{"output":16.0}' in output
-    ), f"tests/simple_server_server_diff_port.py didn't return expected output, got {output}"
+    assert '{"output":16.0}' in output, (
+        f"tests/simple_server_server_diff_port.py didn't return expected output, got {output}"
+    )
     os.remove("client.py")
 
 
@@ -120,9 +120,9 @@ def test_openai_parity():
             {"role": "user", "content": "How are you?"},
         ],
     )
-    assert (
-        response.choices[0].message.content == "This is a generated output"
-    ), f"Server didn't return expected output\nOpenAI client output: {response}"
+    assert response.choices[0].message.content == "This is a generated output", (
+        f"Server didn't return expected output\nOpenAI client output: {response}"
+    )
 
     response = client.chat.completions.create(
         model="lit",
@@ -135,9 +135,9 @@ def test_openai_parity():
 
     expected_outputs = ["This is a generated output", None]
     for r, expected_out in zip(response, expected_outputs):
-        assert (
-            r.choices[0].delta.content == expected_out
-        ), f"Server didn't return expected output.\nOpenAI client output: {r}"
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
+        )
 
 
 @e2e_from_file("tests/e2e/default_openaispec.py")
@@ -166,9 +166,9 @@ def test_openai_parity_with_image_input():
         model="lit",
         messages=messages,
     )
-    assert (
-        response.choices[0].message.content == "This is a generated output"
-    ), f"Server didn't return expected output\nOpenAI client output: {response}"
+    assert response.choices[0].message.content == "This is a generated output", (
+        f"Server didn't return expected output\nOpenAI client output: {response}"
+    )
 
     response = client.chat.completions.create(
         model="lit",
@@ -178,9 +178,9 @@ def test_openai_parity_with_image_input():
 
     expected_outputs = ["This is a generated output", None]
     for r, expected_out in zip(response, expected_outputs):
-        assert (
-            r.choices[0].delta.content == expected_out
-        ), f"Server didn't return expected output.\nOpenAI client output: {r}"
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
+        )
 
 
 @e2e_from_file("tests/e2e/default_openaispec_tools.py")
@@ -217,12 +217,12 @@ def test_openai_parity_with_tools():
         messages=messages,
         tools=tools,
     )
-    assert (
-        response.choices[0].message.content == ""
-    ), f"Server didn't return expected output\nOpenAI client output: {response}"
-    assert (
-        response.choices[0].message.tool_calls[0].function.name == "get_current_weather"
-    ), f"Server didn't return expected output\nOpenAI client output: {response}"
+    assert response.choices[0].message.content == "", (
+        f"Server didn't return expected output\nOpenAI client output: {response}"
+    )
+    assert response.choices[0].message.tool_calls[0].function.name == "get_current_weather", (
+        f"Server didn't return expected output\nOpenAI client output: {response}"
+    )
 
     response = client.chat.completions.create(
         model="lit",
@@ -232,13 +232,13 @@ def test_openai_parity_with_tools():
 
     expected_outputs = ["", None]
     for r, expected_out in zip(response, expected_outputs):
-        assert (
-            r.choices[0].delta.content == expected_out
-        ), f"Server didn't return expected output.\nOpenAI client output: {r}"
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
+        )
         if r.choices[0].delta.tool_calls:
-            assert (
-                r.choices[0].delta.tool_calls[0].function.name == "get_current_weather"
-            ), f"Server didn't return expected output.\nOpenAI client output: {r}"
+            assert r.choices[0].delta.tool_calls[0].function.name == "get_current_weather", (
+                f"Server didn't return expected output.\nOpenAI client output: {r}"
+            )
 
 
 @e2e_from_file("tests/e2e/default_openai_with_batching.py")
@@ -292,9 +292,9 @@ def test_openai_parity_with_response_format():
         messages=messages,
         response_format=response_format,
     )
-    assert (
-        response.choices[0].message.content == output
-    ), f"Server didn't return expected output\nOpenAI client output: {response}"
+    assert response.choices[0].message.content == output, (
+        f"Server didn't return expected output\nOpenAI client output: {response}"
+    )
 
     response = client.chat.completions.create(
         model="lit",
@@ -305,9 +305,9 @@ def test_openai_parity_with_response_format():
 
     expected_outputs = [output, None]
     for r, expected_out in zip(response, expected_outputs):
-        assert (
-            r.choices[0].delta.content == expected_out
-        ), f"Server didn't return expected output.\nOpenAI client output: {r}"
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
+        )
 
 
 @e2e_from_file("tests/e2e/default_single_streaming.py")
