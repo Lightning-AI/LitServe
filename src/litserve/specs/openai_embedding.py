@@ -33,6 +33,10 @@ class EmbeddingRequest(BaseModel):
     dimensions: Optional[int] = None
     encoding_format: Literal["float"] = "float"
 
+    # TODO: Check if this might be a handy helper function
+    def get_input_as_list(self):
+        return self.input if isinstance(self.input, list) else [self.input]
+
 
 class Embedding(BaseModel):
     index: int
@@ -106,9 +110,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         print("OpenAI Embedding Spec is ready.")
 
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
-        if isinstance(request.input, str):
-            return [request.input]
-        return request.input
+        return request.get_input_as_list()
 
     def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
         return {
@@ -141,7 +143,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         logger.debug(response)
 
         # TODO: Validate response and also confirm if UsageInfo should be default or not, as None is also a valid value
-        # maybe move this validate to setup
+        # maybe move this validate to setup for early validation
         self.validate_response(response)
 
         usage = UsageInfo(**response)
