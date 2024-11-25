@@ -140,7 +140,8 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         logger.debug(response)
 
-        # TODO: Validate response and also confirm if UsageInfo shoul be default or not, as None is also a valid value
+        # TODO: Validate response and also confirm if UsageInfo should be default or not, as None is also a valid value
+        # maybe move this validate to setup
         self.validate_response(response)
 
         usage = UsageInfo(**response)
