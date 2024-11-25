@@ -351,4 +351,3 @@ def test_openai_embedding_parity():
     assert len(response.data) == 2, f"Expected 2 embeddings but got {len(response.data)}"
     for data in response.data:
         assert len(data.embedding) == 768, f"Expected 768 dimensions but got {len(data.embedding)}"
-
