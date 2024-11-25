@@ -102,6 +102,9 @@ class OpenAIEmbeddingSpec(LitSpec):
             raise response
 
         logger.debug(response)
+
+        # TODO: Validate response and also confirm if UsageInfo shoul be default or not, as None is also a valid value
+
         usage = UsageInfo(**response)
         data = [Embedding(index=i, embedding=embedding) for i, embedding in enumerate(response["embeddings"])]
 
