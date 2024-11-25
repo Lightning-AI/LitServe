@@ -8,10 +8,10 @@ class TestAPI(LitAPI):
         self.model = None
 
     def decode_request(self, request):
-        return request
+        return request.input if isinstance(request.input, list) else [request.input]
 
     def predict(self, x):
-        return [np.random.rand(768).tolist()]
+        return np.random.rand(len(x), 768).tolist()
 
     def encode_response(self, response):
         return {"embeddings": response}
