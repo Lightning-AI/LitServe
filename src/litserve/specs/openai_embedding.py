@@ -74,6 +74,18 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         print("OpenAI Embedding Spec is ready.")
 
+    def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
+        if isinstance(request.input, str):
+            return [request.input]
+        return request.input
+
+    def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
+        return {
+            "embeddings": output,
+            "prompt_tokens": context_kwargs.get("prompt_tokens", 0),
+            "total_tokens": context_kwargs.get("total_tokens", 0),
+        }
+
     async def embeddings(self, request: EmbeddingRequest):
         response_queue_id = self.response_queue_id
         logger.debug("Received embedding request: %s", request)
