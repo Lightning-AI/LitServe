@@ -22,6 +22,8 @@ from litserve.specs.openai import ChatMessage, OpenAISpec
 from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
 from litserve.test_examples.openai_embedding_spec_example import (
     TestEmbedAPI,
+    TestEmbedAPIWithMissingEmbeddings,
+    TestEmbedAPIWithNonDictOutput,
     TestEmbedAPIWithUsage,
     TestEmbedAPIWithYieldEncodeResponse,
     TestEmbedAPIWithYieldPredict,
@@ -278,6 +280,28 @@ async def test_openai_embedding_spec_with_encode_response_yield(openai_embedding
     server = ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=spec)
 
     with pytest.raises(ValueError, match="You are using yield in your encode_response method"), wrap_litserve_start(
+        server
+    ) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_request_data):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPIWithNonDictOutput(), spec=spec)
+
+    with pytest.raises(ValueError, match="The response is not a dictionary"), wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_request_data):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(), spec=spec)
+
+    with pytest.raises(ValueError, match="The response does not contain the key 'embeddings'"), wrap_litserve_start(
         server
     ) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:

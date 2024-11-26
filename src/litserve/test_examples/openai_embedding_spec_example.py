@@ -32,3 +32,13 @@ class TestEmbedAPIWithYieldPredict(TestEmbedAPI):
 class TestEmbedAPIWithYieldEncodeResponse(TestEmbedAPI):
     def encode_response(self, output):
         yield {"embeddings": output}
+
+
+class TestEmbedAPIWithNonDictOutput(TestEmbedAPI):
+    def encode_response(self, output):
+        return output
+
+
+class TestEmbedAPIWithMissingEmbeddings(TestEmbedAPI):
+    def encode_response(self, output):
+        return {"output": output}
