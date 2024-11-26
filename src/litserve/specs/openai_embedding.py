@@ -130,7 +130,6 @@ class OpenAIEmbeddingSpec(LitSpec):
         }
 
     def validate_response(self, response: dict) -> None:
-        # Consider using the pattern: "What's wrong? Why it's wrong? How can I solve it?" when crafting error messages.
         if not isinstance(response, dict):
             raise ValueError(
                 "The response is not a dictionary."
