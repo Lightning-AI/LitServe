@@ -21,9 +21,7 @@ class TestEmbedAPI(LitAPI):
 
 class TestEmbedBatchedAPI(TestEmbedAPI):
     def predict(self, batch) -> List[List[List[float]]]:
-        batch_size = len(batch)
-        num_inputs = len(batch[0])
-        return np.random.rand(batch_size, num_inputs, 768).tolist()
+        return [np.random.rand(len(x), 768).tolist() for x in batch]
 
 
 class TestEmbedAPIWithUsage(TestEmbedAPI):
