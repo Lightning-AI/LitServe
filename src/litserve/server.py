@@ -14,6 +14,7 @@
 import asyncio
 import copy
 import inspect
+import json
 import logging
 import multiprocessing as mp
 import os
@@ -22,7 +23,6 @@ import threading
 import time
 import uuid
 import warnings
-import json
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -31,7 +31,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
@@ -149,14 +149,13 @@ class LitServer:
 
         if not info_path.startswith("/"):
             raise ValueError(
-                "info_path must start with '/'. "
-                "Please provide a valid api path like '/info', '/details', or '/v1/info'"
+                "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
 
         try:
             json.dumps(model_metadata)
         except (TypeError, ValueError):
-            raise ValueError(f"model_metadata is not JSON serializable")
+            raise ValueError("model_metadata is not JSON serializable")
 
         # Check if the batch and unbatch methods are overridden in the lit_api instance
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
@@ -366,7 +365,7 @@ class LitServer:
                         "stream": self.stream,
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
-                    }
+                    },
                 }
             )
 
