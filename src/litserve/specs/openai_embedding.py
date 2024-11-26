@@ -33,8 +33,7 @@ class EmbeddingRequest(BaseModel):
     dimensions: Optional[int] = None
     encoding_format: Literal["float"] = "float"
 
-    # TODO: Check if this might be a handy helper function
-    def get_input_as_list(self):
+    def ensure_list(self):
         return self.input if isinstance(self.input, list) else [self.input]
 
 
@@ -56,35 +55,34 @@ class EmbeddingResponse(BaseModel):
     usage: UsageInfo
 
 
-LITAPI_VALIDATION_MSG = """LitAPI.predict and LitAPI.encode_response must not be a generator\
-(use return instead of yield) while using the OpenAI embedding spec.
-
-Error: {}
-
-Please follow the below example for guidance on how to use the spec:
+EMBEDDING_API_EXAMPLE = """
+Please follow the example below for guidance on how to use the OpenAI Embedding spec:
 
 ```python
 import numpy as np
 from typing import List
-from litserve.api import LitAPI
+from litserve import LitAPI, OpenAIEmbeddingSpec
 
 
 class TestAPI(LitAPI):
     def setup(self, device):
         self.model = None
 
-    def decode_request(self, request)->List[str]:
+    def decode_request(self, request) -> List[str]:
         return request.input if isinstance(request.input, list) else [request.input]
 
-    def predict(self, x)-> List[List[float]]:
+    def predict(self, x) -> List[List[float]]:
         return np.random.rand(len(x), 768).tolist()
 
-    def encode_response(self, output)-> dict:
+    def encode_response(self, output) -> dict:
         return {"embeddings": output}
+
+if __name__ == "__main__":
+    import litserve as ls
+    server = ls.LitServer(TestAPI(), spec=OpenAIEmbeddingSpec())
+    server.run()
 ```
 """
-
-RESPONSE_VALIDATION_MSG = LITAPI_VALIDATION_MSG.split("\n", 2)[-1]
 
 
 class OpenAIEmbeddingSpec(LitSpec):
@@ -101,16 +99,26 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         lit_api = self._server.lit_api
         if inspect.isgeneratorfunction(lit_api.predict):
-            raise ValueError(LITAPI_VALIDATION_MSG.format("predict is a generator"))
+            raise ValueError(
+                "You are using yield in your predict method, which is used for streaming.",
+                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings is not a sequential operation.",
+                "Please consider replacing yield with return in predict.\n",
+                EMBEDDING_API_EXAMPLE,
+            )
 
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
         if not is_encode_response_original and inspect.isgeneratorfunction(lit_api.encode_response):
-            raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is a generator"))
+            raise ValueError(
+                "You are using yield in your encode_response method, which is used for streaming.",
+                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings is not a sequential operation.",
+                "Please consider replacing yield with return in encode_response.\n",
+                EMBEDDING_API_EXAMPLE,
+            )
 
         print("OpenAI Embedding Spec is ready.")
 
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
-        return request.get_input_as_list()
+        return request.ensure_list()
 
     def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
         return {
@@ -120,10 +128,24 @@ class OpenAIEmbeddingSpec(LitSpec):
         }
 
     def validate_response(self, response: dict) -> None:
+        # Consider using the pattern: "What's wrong? Why it's wrong? How can I solve it?" when crafting error messages.
         if not isinstance(response, dict):
-            raise ValueError(RESPONSE_VALIDATION_MSG.format("response is not a dictionary"))
+            raise ValueError(
+                "The response is not a dictionary."
+                "The response should be a dictionary to ensure proper compatibility with the OpenAIEmbeddingSpec.\n\n"
+                "Please ensure that your response is a dictionary with the following keys:\n"
+                "- 'embeddings' (required)\n"
+                "- 'prompt_tokens' (optional)\n"
+                "- 'total_tokens' (optional)\n"
+                f"{EMBEDDING_API_EXAMPLE}"
+            )
         if "embeddings" not in response:
-            raise ValueError(RESPONSE_VALIDATION_MSG.format("embeddings key is missing in response"))
+            raise ValueError(
+                "The response does not contain the key 'embeddings'."
+                "The key 'embeddings' is required to ensure proper compatibility with the OpenAIEmbeddingSpec.\n"
+                "Please ensure that your response contains the key 'embeddings'.\n"
+                f"{EMBEDDING_API_EXAMPLE}"
+            )
 
     async def embeddings(self, request: EmbeddingRequest):
         response_queue_id = self.response_queue_id
