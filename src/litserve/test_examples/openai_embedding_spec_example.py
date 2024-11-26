@@ -5,7 +5,7 @@ import numpy as np
 from litserve.api import LitAPI
 
 
-class TestAPI(LitAPI):
+class TestEmbedAPI(LitAPI):
     def setup(self, device):
         self.model = None
 
@@ -17,3 +17,18 @@ class TestAPI(LitAPI):
 
     def encode_response(self, output) -> dict:
         return {"embeddings": output}
+
+
+class TestEmbedAPIWithUsage(TestEmbedAPI):
+    def encode_response(self, output) -> dict:
+        return {"embeddings": output, "prompt_tokens": 10, "total_tokens": 10}
+
+
+class TestEmbedAPIWithYieldPredict(TestEmbedAPI):
+    def predict(self, x):
+        yield from np.random.rand(768).tolist()
+
+
+class TestEmbedAPIWithYieldEncodeResponse(TestEmbedAPI):
+    def encode_response(self, output):
+        yield {"embeddings": output}

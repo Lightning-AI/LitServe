@@ -1,7 +1,7 @@
 import litserve as ls
 from litserve import OpenAIEmbeddingSpec
-from litserve.test_examples.openai_embedding_spec_example import TestAPI
+from litserve.test_examples.openai_embedding_spec_example import TestEmbedAPI
 
 if __name__ == "__main__":
-    server = ls.LitServer(TestAPI(), spec=OpenAIEmbeddingSpec())
+    server = ls.LitServer(TestEmbedAPI(), spec=OpenAIEmbeddingSpec())
     server.run()

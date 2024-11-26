@@ -265,3 +265,13 @@ def openai_request_data_with_response_format():
         "frequency_penalty": 0,
         "user": "string",
     }
+
+
+@pytest.fixture
+def openai_embedding_request_data():
+    return {"input": "A beautiful sunset over the beach.", "model": "lit", "encoding_format": "float"}
+
+
+@pytest.fixture
+def openai_embedding_request_data_array():
+    return {"input": ["A beautiful sunset over the beach."] * 4, "model": "lit", "encoding_format": "float"}

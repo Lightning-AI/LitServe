@@ -19,6 +19,13 @@ from httpx import AsyncClient
 
 import litserve as ls
 from litserve.specs.openai import ChatMessage, OpenAISpec
+from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
+from litserve.test_examples.openai_embedding_spec_example import (
+    TestEmbedAPI,
+    TestEmbedAPIWithUsage,
+    TestEmbedAPIWithYieldEncodeResponse,
+    TestEmbedAPIWithYieldPredict,
+)
 from litserve.test_examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsage,
@@ -40,9 +47,9 @@ async def test_openai_spec(openai_request_data):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
-            assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
-                "LitAPI predict response should match with the generated output"
-            )
+            assert (
+                resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
+            ), "LitAPI predict response should match with the generated output"
 
 
 # OpenAIWithUsage
@@ -81,9 +88,9 @@ async def test_openai_spec_with_image(openai_request_data_with_image):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_image, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
-            assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
-                "LitAPI predict response should match with the generated output"
-            )
+            assert (
+                resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
+            ), "LitAPI predict response should match with the generated output"
 
 
 @pytest.mark.asyncio
@@ -94,9 +101,9 @@ async def test_override_encode(openai_request_data):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
-            assert resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output", (
-                "LitAPI predict response should match with the generated output"
-            )
+            assert (
+                resp.json()["choices"][0]["message"]["content"] == "This is a custom encoded output"
+            ), "LitAPI predict response should match with the generated output"
 
 
 @pytest.mark.asyncio
@@ -107,9 +114,9 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
-            assert resp.json()["choices"][0]["message"]["content"] == "", (
-                "LitAPI predict response should match with the generated output"
-            )
+            assert (
+                resp.json()["choices"][0]["message"]["content"] == ""
+            ), "LitAPI predict response should match with the generated output"
             assert resp.json()["choices"][0]["message"]["tool_calls"] == [
                 {
                     "id": "call_1",
@@ -182,9 +189,9 @@ async def test_oai_prepopulated_context(openai_request_data):
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
-            assert resp.json()["choices"][0]["message"]["content"] == "This is a", (
-                "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
-            )
+            assert (
+                resp.json()["choices"][0]["message"]["content"] == "This is a"
+            ), "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
 
 
 class WrongLitAPI(ls.LitAPI):
@@ -204,3 +211,74 @@ async def test_fail_http(openai_request_data):
             res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert res.status_code == 501, "Server raises 501 error"
             assert res.text == '{"detail":"test LitAPI.predict error"}'
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_single_input_doc(openai_embedding_request_data):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPI(), spec=spec)
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            assert resp.json()["object"] == "list", "Object should be list"
+            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
+            assert len(resp.json()["data"]) == 1, "Length of data should be 1"
+            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_multiple_input_docs(openai_embedding_request_data_array):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPI(), spec=spec)
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            assert resp.json()["object"] == "list", "Object should be list"
+            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
+            assert len(resp.json()["data"]) == 4, "Length of data should be 1"
+            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPIWithUsage(), spec=spec)
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            assert resp.json()["object"] == "list", "Object should be list"
+            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
+            assert len(resp.json()["data"]) == 1, "Length of data should be 1"
+            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+            assert resp.json()["usage"]["prompt_tokens"] == 10, "Prompt tokens should be 10"
+            assert resp.json()["usage"]["total_tokens"] == 10, "Total tokens should be 10"
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_pred_yield(openai_embedding_request_data):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=spec)
+
+    with pytest.raises(ValueError, match="You are using yield in your predict method"), wrap_litserve_start(
+        server
+    ) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_with_encode_response_yield(openai_embedding_request_data):
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=spec)
+
+    with pytest.raises(ValueError, match="You are using yield in your encode_response method"), wrap_litserve_start(
+        server
+    ) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+            await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
