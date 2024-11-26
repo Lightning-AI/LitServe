@@ -60,7 +60,7 @@ Please follow the example below for guidance on how to use the OpenAI Embedding 
 
 ```python
 import numpy as np
-from typing import List
+from typing import List, Union
 from litserve import LitAPI, OpenAIEmbeddingSpec
 
 
@@ -68,8 +68,8 @@ class TestAPI(LitAPI):
     def setup(self, device):
         self.model = None
 
-    def decode_request(self, request) -> List[str]:
-        return request.input if isinstance(request.input, list) else [request.input]
+    def decode_request(self, request) -> Union[str, List[str]]:
+        return request.ensure_list()
 
     def predict(self, x) -> List[List[float]]:
         return np.random.rand(len(x), 768).tolist()
@@ -119,7 +119,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         print("OpenAI Embedding Spec is ready.")
 
-    def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
+    def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> Union[str, List[str]]:
         return request.ensure_list()
 
     def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
