@@ -19,6 +19,13 @@ class TestEmbedAPI(LitAPI):
         return {"embeddings": output}
 
 
+class TestEmbedBatchedAPI(TestEmbedAPI):
+    def predict(self, batch) -> List[List[List[float]]]:
+        batch_size = len(batch)
+        num_inputs = len(batch[0])
+        return np.random.rand(batch_size, num_inputs, 768).tolist()
+
+
 class TestEmbedAPIWithUsage(TestEmbedAPI):
     def encode_response(self, output) -> dict:
         return {"embeddings": output, "prompt_tokens": 10, "total_tokens": 10}
