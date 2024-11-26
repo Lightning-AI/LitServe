@@ -101,7 +101,8 @@ class OpenAIEmbeddingSpec(LitSpec):
         if inspect.isgeneratorfunction(lit_api.predict):
             raise ValueError(
                 "You are using yield in your predict method, which is used for streaming.",
-                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings is not a sequential operation.",
+                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
+                "is not a sequential operation.",
                 "Please consider replacing yield with return in predict.\n",
                 EMBEDDING_API_EXAMPLE,
             )
@@ -110,7 +111,8 @@ class OpenAIEmbeddingSpec(LitSpec):
         if not is_encode_response_original and inspect.isgeneratorfunction(lit_api.encode_response):
             raise ValueError(
                 "You are using yield in your encode_response method, which is used for streaming.",
-                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings is not a sequential operation.",
+                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
+                "is not a sequential operation.",
                 "Please consider replacing yield with return in encode_response.\n",
                 EMBEDDING_API_EXAMPLE,
             )
