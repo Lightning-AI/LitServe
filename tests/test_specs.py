@@ -306,7 +306,7 @@ async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_re
 
 class TestOpenAIWithBatching(TestEmbedAPI):
     def predict(self, batch):
-        assert len(batch) == 2, f"Batch size should be 4 but got {len(batch)}"
+        assert len(batch) == 2, f"Batch size should be 2 but got {len(batch)}"
         return [np.random.rand(len(x), 768).tolist() for x in batch]
 
 
