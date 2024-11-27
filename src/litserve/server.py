@@ -14,6 +14,7 @@
 import asyncio
 import copy
 import inspect
+import json
 import logging
 import multiprocessing as mp
 import os
@@ -30,7 +31,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
@@ -106,10 +107,12 @@ class LitServer:
         batch_timeout: float = 0.0,
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
+        info_path: str = "/info",
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         track_requests: bool = False,
+        model_metadata: Optional[dict] = None,
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
@@ -144,6 +147,16 @@ class LitServer:
                 "Please provide a valid api path like '/health', '/healthcheck', or '/v1/health'"
             )
 
+        if not info_path.startswith("/"):
+            raise ValueError(
+                "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
+            )
+
+        try:
+            json.dumps(model_metadata)
+        except (TypeError, ValueError):
+            raise ValueError("model_metadata is not JSON serializable")
+
         # Check if the batch and unbatch methods are overridden in the lit_api instance
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
         unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
@@ -156,9 +169,11 @@ class LitServer:
 
         self.api_path = api_path
         self.healthcheck_path = healthcheck_path
+        self.info_path = info_path
         self.track_requests = track_requests
+        self.timeout = timeout
         lit_api.stream = stream
-        lit_api.request_timeout = timeout
+        lit_api.request_timeout = self.timeout
         lit_api._sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
@@ -180,6 +195,7 @@ class LitServer:
         self.batch_timeout = batch_timeout
         self.stream = stream
         self.max_payload_size = max_payload_size
+        self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
 
@@ -334,6 +350,24 @@ class LitServer:
                 return Response(content="ok", status_code=200)
 
             return Response(content="not ready", status_code=503)
+
+        @self.app.get(self.info_path, dependencies=[Depends(self.setup_auth())])
+        async def info(request: Request) -> Response:
+            return JSONResponse(
+                content={
+                    "model": self.model_metadata,
+                    "server": {
+                        "devices": self.devices,
+                        "workers_per_device": self.workers_per_device,
+                        "timeout": self.timeout,
+                        "max_batch_size": self.max_batch_size,
+                        "batch_timeout": self.batch_timeout,
+                        "stream": self.stream,
+                        "max_payload_size": self.max_payload_size,
+                        "track_requests": self.track_requests,
+                    },
+                }
+            )
 
         async def predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
