@@ -8,21 +8,21 @@ from litserve.utils import wrap_litserve_start
 def test_info_route():
     model_metadata = {"name": "my-awesome-model", "version": "v1.1.0"}
     expected_response = {
-            "model": {
-                "name": "my-awesome-model",
-                "version": "v1.1.0",
-            },
-            "litserve": {
-                "devices": ["cpu"],
-                "workers_per_device": 1,
-                "timeout": 30,
-                "max_batch_size": 1,
-                "batch_timeout": 0.,
-                "stream": False,
-                "max_payload_size": None,
-                "track_requests": False,
-              }
-        }
+        "model": {
+            "name": "my-awesome-model",
+            "version": "v1.1.0",
+        },
+        "server": {
+            "devices": ["cpu"],
+            "workers_per_device": 1,
+            "timeout": 30,
+            "max_batch_size": 1,
+            "batch_timeout": 0.0,
+            "stream": False,
+            "max_payload_size": None,
+            "track_requests": False,
+        },
+    }
 
     server = ls.LitServer(ls.test_examples.SimpleLitAPI(), accelerator="cpu", model_metadata=model_metadata)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:

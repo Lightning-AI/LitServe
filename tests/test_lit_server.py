@@ -382,7 +382,7 @@ def test_custom_info_path():
     url = server.info_path
     expected_response = {
         "model": None,
-        "litserve": {
+        "server": {
             "devices": ["cpu"],
             "workers_per_device": 1,
             "timeout": 30,
