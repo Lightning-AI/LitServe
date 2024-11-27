@@ -356,7 +356,7 @@ class LitServer:
             return JSONResponse(
                 content={
                     "model": self.model_metadata,
-                    "litserve": {
+                    "server": {
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
