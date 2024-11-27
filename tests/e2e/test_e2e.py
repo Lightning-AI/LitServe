@@ -326,3 +326,28 @@ def test_e2e_single_streaming():
     expected_values = [4.0, 8.0, 12.0]
     for i, output in enumerate(outputs):
         assert output["output"] == expected_values[i], f"Intermediate output {i} is not expected value"
+
+
+@e2e_from_file("tests/e2e/default_openai_embedding_spec.py")
+def test_openai_embedding_parity():
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",
+    )
+
+    model = "lit"
+    input_text = "The food was delicious and the waiter was very friendly."
+    input_text_list = [input_text] * 2
+    response = client.embeddings.create(
+        model="lit", input="The food was delicious and the waiter...", encoding_format="float"
+    )
+    assert response.model == model, f"Expected model to be {model} but got {response.model}"
+    assert len(response.data) == 1, f"Expected 1 embeddings but got {len(response.data)}"
+    assert len(response.data[0].embedding) == 768, f"Expected 768 dimensions but got {len(response.data[0].embedding)}"
+    assert isinstance(response.data[0].embedding[0], float), "Expected float datatype but got something else"
+
+    response = client.embeddings.create(model="lit", input=input_text_list, encoding_format="float")
+    assert response.model == model, f"Expected model to be {model} but got {response.model}"
+    assert len(response.data) == 2, f"Expected 2 embeddings but got {len(response.data)}"
+    for data in response.data:
+        assert len(data.embedding) == 768, f"Expected 768 dimensions but got {len(data.embedding)}"

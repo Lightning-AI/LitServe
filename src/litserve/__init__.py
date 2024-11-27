@@ -17,6 +17,16 @@ from litserve.api import LitAPI
 from litserve.callbacks import Callback
 from litserve.loggers import Logger
 from litserve.server import LitServer, Request, Response
-from litserve.specs.openai import OpenAISpec
+from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec
 
-__all__ = ["LitAPI", "LitServer", "Request", "Response", "OpenAISpec", "test_examples", "Callback", "Logger"]
+__all__ = [
+    "LitAPI",
+    "LitServer",
+    "Request",
+    "Response",
+    "OpenAISpec",
+    "OpenAIEmbeddingSpec",
+    "test_examples",
+    "Callback",
+    "Logger",
+]
