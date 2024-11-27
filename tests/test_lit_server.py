@@ -378,14 +378,29 @@ def test_custom_info_path():
     with pytest.raises(ValueError, match="info_path must start with '/'. "):
         LitServer(ls.test_examples.SimpleLitAPI(), info_path="custominfo")
 
-    server = LitServer(ls.test_examples.SimpleLitAPI(), info_path="/v1/custom_info")
+    server = LitServer(ls.test_examples.SimpleLitAPI(), info_path="/v1/custom_info", accelerator="cpu")
     url = server.info_path
+    expected_response = {
+        "model": None,
+        "litserve": {
+            "devices": ["cpu"],
+            "workers_per_device": 1,
+            "timeout": 30,
+            "max_batch_size": 1,
+            "batch_timeout": 0.0,
+            "stream": False,
+            "max_payload_size": None,
+            "track_requests": False,
+        },
+    }
+
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         # Sleep a bit to ensure the server is ready
         sleep(3)
         response = client.get(url)
 
     assert response.status_code == 200, "Server response should be 200 (OK)"
+    assert response.json() == expected_response
 
 
 class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
