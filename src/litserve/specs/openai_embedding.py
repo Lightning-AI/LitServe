@@ -63,7 +63,6 @@ import numpy as np
 from typing import List
 from litserve import LitAPI, OpenAIEmbeddingSpec
 
-
 class TestAPI(LitAPI):
     def setup(self, device):
         self.model = None
@@ -129,7 +128,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         }
         return {"embeddings": output} | usage
 
-    def validate_response(self, response: dict) -> None:
+    def _validate_response(self, response: dict) -> None:
         if not isinstance(response, dict):
             raise ValueError(
                 f"Expected response to be a dictionary, but got type {type(response)}.",
@@ -147,10 +146,6 @@ class OpenAIEmbeddingSpec(LitSpec):
                 "Please ensure that your response contains the key 'embeddings'.\n"
                 f"{EMBEDDING_API_EXAMPLE}"
             )
-        if "prompt_tokens" not in response:
-            response["prompt_tokens"] = 0
-        if "total_tokens" not in response:
-            response["total_tokens"] = 0
 
     async def embeddings(self, request: EmbeddingRequest):
         response_queue_id = self.response_queue_id
@@ -169,7 +164,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         logger.debug(response)
 
-        self.validate_response(response)
+        self._validate_response(response)
 
         usage = UsageInfo(**response)
         data = [Embedding(index=i, embedding=embedding) for i, embedding in enumerate(response["embeddings"])]
