@@ -284,19 +284,17 @@ async def test_openai_embedding_spec_validation(openai_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_request_data):
-    spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPIWithNonDictOutput(), spec=spec)
+    server = ls.LitServer(TestEmbedAPIWithNonDictOutput(), spec=ls.OpenAIEmbeddingSpec())
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
-            with pytest.raises(ValueError, match="The response is not a dictionary"):
+            with pytest.raises(ValueError, match="Expected response to be a dictionary"):
                 await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
 
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_request_data):
-    spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(), spec=spec)
+    server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(), spec=OpenAIEmbeddingSpec())
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:

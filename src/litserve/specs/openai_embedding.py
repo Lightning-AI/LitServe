@@ -123,22 +123,22 @@ class OpenAIEmbeddingSpec(LitSpec):
         return request.ensure_list()
 
     def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
-        return {
-            "embeddings": output,
-            "prompt_tokens": context_kwargs.get("prompt_tokens", 0),
-            "total_tokens": context_kwargs.get("total_tokens", 0),
+        usage = {
+            "prompt_tokens": context_kwargs.get("prompt_tokens", 0) if context_kwargs else 0,
+            "total_tokens": context_kwargs.get("total_tokens", 0) if context_kwargs else 0,
         }
+        return {"embeddings": output} | usage
 
     def validate_response(self, response: dict) -> None:
         if not isinstance(response, dict):
             raise ValueError(
-                "The response is not a dictionary."
+                f"Expected response to be a dictionary, but got type {type(response)}.",
                 "The response should be a dictionary to ensure proper compatibility with the OpenAIEmbeddingSpec.\n\n"
                 "Please ensure that your response is a dictionary with the following keys:\n"
                 "- 'embeddings' (required)\n"
                 "- 'prompt_tokens' (optional)\n"
                 "- 'total_tokens' (optional)\n"
-                f"{EMBEDDING_API_EXAMPLE}"
+                f"{EMBEDDING_API_EXAMPLE}",
             )
         if "embeddings" not in response:
             raise ValueError(
@@ -147,6 +147,10 @@ class OpenAIEmbeddingSpec(LitSpec):
                 "Please ensure that your response contains the key 'embeddings'.\n"
                 f"{EMBEDDING_API_EXAMPLE}"
             )
+        if "prompt_tokens" not in response:
+            response["prompt_tokens"] = 0
+        if "total_tokens" not in response:
+            response["total_tokens"] = 0
 
     async def embeddings(self, request: EmbeddingRequest):
         response_queue_id = self.response_queue_id
