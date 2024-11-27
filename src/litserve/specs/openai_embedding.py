@@ -63,7 +63,6 @@ import numpy as np
 from typing import List
 from litserve import LitAPI, OpenAIEmbeddingSpec
 
-
 class TestAPI(LitAPI):
     def setup(self, device):
         self.model = None
@@ -123,22 +122,22 @@ class OpenAIEmbeddingSpec(LitSpec):
         return request.ensure_list()
 
     def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
-        return {
-            "embeddings": output,
-            "prompt_tokens": context_kwargs.get("prompt_tokens", 0),
-            "total_tokens": context_kwargs.get("total_tokens", 0),
+        usage = {
+            "prompt_tokens": context_kwargs.get("prompt_tokens", 0) if context_kwargs else 0,
+            "total_tokens": context_kwargs.get("total_tokens", 0) if context_kwargs else 0,
         }
+        return {"embeddings": output} | usage
 
-    def validate_response(self, response: dict) -> None:
+    def _validate_response(self, response: dict) -> None:
         if not isinstance(response, dict):
             raise ValueError(
-                "The response is not a dictionary."
+                f"Expected response to be a dictionary, but got type {type(response)}.",
                 "The response should be a dictionary to ensure proper compatibility with the OpenAIEmbeddingSpec.\n\n"
                 "Please ensure that your response is a dictionary with the following keys:\n"
                 "- 'embeddings' (required)\n"
                 "- 'prompt_tokens' (optional)\n"
                 "- 'total_tokens' (optional)\n"
-                f"{EMBEDDING_API_EXAMPLE}"
+                f"{EMBEDDING_API_EXAMPLE}",
             )
         if "embeddings" not in response:
             raise ValueError(
@@ -165,7 +164,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         logger.debug(response)
 
-        self.validate_response(response)
+        self._validate_response(response)
 
         usage = UsageInfo(**response)
         data = [Embedding(index=i, embedding=embedding) for i, embedding in enumerate(response["embeddings"])]
