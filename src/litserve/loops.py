@@ -502,8 +502,10 @@ def inference_worker(
         return
 
     if max_batch_size > 1:
-        BatchedStreamingLoop(
+        BatchedLoop(
             lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
         ).run()
     else:
-        SingleLoop(lit_api, lit_spec, request_queue, response_queues, callback_runner).run()
+        SingleLoop(
+            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+        ).run()
