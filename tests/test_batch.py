@@ -21,7 +21,7 @@ import torch
 import torch.nn as nn
 from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve import LitAPI, LitServer
@@ -91,7 +91,9 @@ async def test_batched():
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
@@ -105,7 +107,9 @@ async def test_unbatched():
     api = SimpleTorchAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
