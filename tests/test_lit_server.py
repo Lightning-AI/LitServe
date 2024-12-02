@@ -23,7 +23,7 @@ import torch.nn as nn
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException, Request, Response
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve import LitAPI
@@ -61,7 +61,9 @@ async def test_stream(simple_stream_api):
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)
@@ -82,7 +84,9 @@ async def test_batched_stream_server(simple_batched_stream_api):
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)
@@ -324,21 +328,27 @@ async def test_inject_context():
     api = IdentityAPI()
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
     server = LitServer(IdentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
     server = LitServer(IdentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
