@@ -506,6 +506,4 @@ def inference_worker(
             lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
         ).run()
     else:
-        StreamingLoop(
-            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-        ).run()
+        SingleLoop(lit_api, lit_spec, request_queue, response_queues, callback_runner).run()
