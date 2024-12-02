@@ -20,7 +20,7 @@ import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
@@ -149,7 +149,9 @@ async def test_timeout():
     api = SlowLitAPI()  # takes 2 seconds for each prediction
     server = LitServer(api, accelerator="cpu", devices=1, timeout=2)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             # Poll until the server is ready
             for _ in range(10):  # retry 10 times
                 try:
@@ -181,7 +183,9 @@ async def test_batch_timeout():
         batch_timeout=0.01,
     )
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             # wait for the server to be ready
             for _ in range(10):
                 try:
