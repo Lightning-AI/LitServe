@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve.specs.openai import ChatMessage, OpenAISpec
@@ -48,7 +48,9 @@ async def test_openai_spec(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPI(), spec=spec)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -70,7 +72,9 @@ async def test_openai_spec(openai_request_data):
 async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
     server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             result = resp.json()
@@ -89,7 +93,9 @@ async def test_openai_token_usage(api, batch_size, openai_request_data, openai_r
 async def test_openai_spec_with_image(openai_request_data_with_image):
     server = ls.LitServer(TestAPI(), spec=OpenAISpec())
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_image, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -102,7 +108,9 @@ async def test_openai_spec_with_image(openai_request_data_with_image):
 async def test_override_encode(openai_request_data):
     server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -116,7 +124,9 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
     spec = OpenAISpec()
     server = ls.LitServer(TestAPIWithToolCalls(), spec=spec)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["choices"][0]["message"]["content"] == "", (
@@ -137,7 +147,9 @@ async def test_openai_spec_with_response_format(openai_request_data_with_respons
     spec = OpenAISpec()
     server = ls.LitServer(TestAPIWithStructuredOutput(), spec=spec)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_response_format, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert (
@@ -192,7 +204,9 @@ async def test_oai_prepopulated_context(openai_request_data):
     spec = OpenAISpec()
     server = ls.LitServer(PrePopulatedAPI(), spec=spec)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.json()["choices"][0]["message"]["content"] == "This is a", (
                 "OpenAISpec must return only 3 tokens as specified using `max_completion_tokens` parameter"
@@ -212,7 +226,9 @@ class WrongLitAPI(ls.LitAPI):
 async def test_fail_http(openai_request_data):
     server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert res.status_code == 501, "Server raises 501 error"
             assert res.text == '{"detail":"test LitAPI.predict error"}'
@@ -224,7 +240,9 @@ async def test_openai_embedding_spec_with_single_input_doc(openai_embedding_requ
     server = ls.LitServer(TestEmbedAPI(), spec=spec)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["object"] == "list", "Object should be list"
@@ -239,7 +257,9 @@ async def test_openai_embedding_spec_with_multiple_input_docs(openai_embedding_r
     server = ls.LitServer(TestEmbedAPI(), spec=spec)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["object"] == "list", "Object should be list"
@@ -254,7 +274,9 @@ async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
     server = ls.LitServer(TestEmbedAPIWithUsage(), spec=spec)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["object"] == "list", "Object should be list"
@@ -287,7 +309,9 @@ async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_reque
     server = ls.LitServer(TestEmbedAPIWithNonDictOutput(), spec=ls.OpenAIEmbeddingSpec())
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             with pytest.raises(ValueError, match="Expected response to be a dictionary"):
                 await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
 
@@ -297,7 +321,9 @@ async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_re
     server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(), spec=OpenAIEmbeddingSpec())
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             with pytest.raises(ValueError, match="The response does not contain the key 'embeddings'"):
                 await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
 
@@ -313,7 +339,9 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
     server = ls.LitServer(TestOpenAIWithBatching(), spec=ls.OpenAIEmbeddingSpec(), max_batch_size=2, batch_timeout=10)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             # send concurrent requests
             resp1, resp2 = await asyncio.gather(
                 ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10),
