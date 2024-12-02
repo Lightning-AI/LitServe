@@ -194,13 +194,13 @@ class PrePopulatedAPI(ls.LitAPI):
     def predict(self, prompt, context):
         for count, token in enumerate(self.sentence, start=1):
             yield token
-            if count >= context["max_tokens"]:
+            if count >= context["max_completion_tokens"]:
                 return
 
 
 @pytest.mark.asyncio
 async def test_oai_prepopulated_context(openai_request_data):
-    openai_request_data["max_tokens"] = 3
+    openai_request_data["max_completion_tokens"] = 3
     spec = OpenAISpec()
     server = ls.LitServer(PrePopulatedAPI(), spec=spec)
     with wrap_litserve_start(server) as server:
@@ -209,7 +209,7 @@ async def test_oai_prepopulated_context(openai_request_data):
         ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.json()["choices"][0]["message"]["content"] == "This is a", (
-                "OpenAISpec must return only 3 tokens as specified using `max_tokens` parameter"
+                "OpenAISpec must return only 3 tokens as specified using `max_completion_tokens` parameter"
             )
 
 
