@@ -215,7 +215,6 @@ class LitServer:
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
-        print(f"accelerator: {accelerator}, devices: {devices}")
         if accelerator == "cpu":
             self.devices = [accelerator]
         elif accelerator in ["cuda", "mps"]:
