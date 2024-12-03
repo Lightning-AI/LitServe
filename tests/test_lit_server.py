@@ -53,9 +53,8 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
     assert server.devices[0][0] == "cuda:1"
     assert server.devices[1][0] == "cuda:2"
 
-@pytest.mark.parametrize(
-"devices", ["cpu", ["cpu", "cuda:0"], ["cuda:a", "cuda:1"]]
-)
+
+@pytest.mark.parametrize("devices", ["cpu", ["cpu", "cuda:0"], ["cuda:a", "cuda:1"]])
 def test_device_identifiers_error(simple_litapi, devices):
     with pytest.raises(
         ValueError, match="devices must be an integer or a list of integers when using 'cuda' or 'mps', instead got .*"
