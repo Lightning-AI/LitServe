@@ -16,20 +16,24 @@ import json
 import threading
 import time
 from queue import Queue
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 
 import litserve as ls
+from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import (
+    _BaseLoop,
     inference_worker,
     run_batched_loop,
     run_batched_streaming_loop,
     run_single_loop,
     run_streaming_loop,
 )
+from litserve.specs.base import LitSpec
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus
 
@@ -401,3 +405,54 @@ def off_test_run_batched_streaming_loop(openai_request_data):
 
     response = response_queues[0].get(timeout=5)[1]
     assert response[0] == {"role": "assistant", "content": "10 + 6 is equal to 16."}
+
+
+class TestLoop(_BaseLoop):
+    def __call__(self, *args, **kwargs):
+        try:
+            self.run(*args, **kwargs)
+        except StopIteration as e:
+            return e
+
+    def run(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
+        item = request_queue.get()
+        if item is None:
+            return
+
+        response_queue_id, uid, timestamp, x_enc = item
+        lit_api.load_cache(x_enc)
+        x = lit_api.decode_request(x_enc)
+        response = lit_api.predict(x)
+        response_enc = lit_api.encode_response(response)
+        response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
+        raise StopIteration("exit loop")
+
+
+def test_custom_loop():
+    loop = TestLoop()
+    lit_api = MagicMock(request_timeout=1)
+    lit_api.load_cache = MagicMock()
+    lit_api.encode_response = MagicMock(return_value={"output": 16.0})
+    request_queue = Queue()
+    response_queues = [Queue()]
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+
+    loop(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 1, False, {}, NOOP_CB_RUNNER)
+    response = response_queues[0].get()
+    assert response[0] == "UUID-001"
+    assert response[1][0] == {"output": 16.0}
+    lit_api.load_cache.assert_called_once()
+    lit_api.load_cache.assert_called_with({"input": 4.0})
