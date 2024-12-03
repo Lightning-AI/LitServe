@@ -54,6 +54,14 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
     assert server.devices[1][0] == "cuda:2"
 
 
+@pytest.mark.parametrize("devices", ["cpu", ["cpu", "cuda:0"], ["cuda:a", "cuda:1"]])
+def test_device_identifiers_error(simple_litapi, devices):
+    with pytest.raises(
+        ValueError, match="devices must be an integer or a list of integers when using 'cuda' or 'mps', instead got .*"
+    ):
+        LitServer(simple_litapi, accelerator="cuda", devices=devices, timeout=10)
+
+
 @pytest.mark.asyncio
 async def test_stream(simple_stream_api):
     server = LitServer(simple_stream_api, stream=True, timeout=10)
