@@ -223,8 +223,30 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
+        self.check_devices()
         self.inference_workers = self.devices * self.workers_per_device
         self.register_endpoints()
+
+    def check_devices(self):
+
+        def is_cuda_device(device):
+            import re
+            pattern = r'^cuda:\d+$'
+            return re.match(pattern, device) is not None
+
+        if not isinstance(self.devices, list):
+            devices = [self.devices]
+        else:
+            devices = self.devices
+
+        for device in devices:
+            if isinstance(device, list):
+                device = device[0]
+
+            if not isinstance(device, str):
+                raise ValueError("device must be a string")
+            elif device not in ["cpu", "cuda", "mps"] and not is_cuda_device(device):
+                raise ValueError(f"device must be one of 'cpu', 'cuda', 'mps', or 'cuda:<device_id>' but got {device}")
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
         manager = mp.Manager()
