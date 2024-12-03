@@ -21,6 +21,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 import litserve as ls
 from litserve import LitAPI
@@ -35,7 +36,7 @@ from litserve.loops import (
 )
 from litserve.specs.base import LitSpec
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, wrap_litserve_start
 
 NOOP_CB_RUNNER = CallbackRunner()
 
@@ -433,8 +434,8 @@ class TestLoop(_BaseLoop):
             return
 
         response_queue_id, uid, timestamp, x_enc = item
-        lit_api.load_cache(x_enc)
-        x = lit_api.decode_request(x_enc)
+        cache = lit_api.load_cache(x_enc)
+        x = lit_api.decode_request(x_enc) * cache
         response = lit_api.predict(x)
         response_enc = lit_api.encode_response(response)
         response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
@@ -444,7 +445,7 @@ class TestLoop(_BaseLoop):
 def test_custom_loop():
     loop = TestLoop()
     lit_api = MagicMock(request_timeout=1)
-    lit_api.load_cache = MagicMock()
+    lit_api.load_cache = MagicMock(return_value=1.0)
     lit_api.encode_response = MagicMock(return_value={"output": 16.0})
     request_queue = Queue()
     response_queues = [Queue()]
@@ -456,3 +457,18 @@ def test_custom_loop():
     assert response[1][0] == {"output": 16.0}
     lit_api.load_cache.assert_called_once()
     lit_api.load_cache.assert_called_with({"input": 4.0})
+
+
+class TestLitAPI(ls.test_examples.SimpleLitAPI):
+    def load_cache(self, x):
+        return 10
+
+
+def test_loop_with_server():
+    loop = TestLoop()
+
+    lit_api = TestLitAPI()
+    server = ls.LitServer(lit_api, loop=loop, max_batch_size=1, batch_timeout=0.1)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10
