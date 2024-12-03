@@ -400,6 +400,43 @@ class _BaseLoop(ABC):
       - unbatch
       - encode_response
 
+    To implement a custom loop, subclass this class and implement the `run` method. The `run` method should execute the
+    hooks in the desired order.
+
+    `__call__` method is the entry point for the worker process. It calls the `run` method in a loop until the worker is
+    terminated.
+
+    Example:
+
+    ```python
+    class TestLoop(_BaseLoop):
+        def run(
+            self,
+            lit_api: LitAPI,
+            lit_spec: Optional[LitSpec],
+            device: str,
+            worker_id: int,
+            request_queue: Queue,
+            response_queues: List[Queue],
+            max_batch_size: int,
+            batch_timeout: float,
+            stream: bool,
+            workers_setup_status: Dict[int, str],
+            callback_runner: CallbackRunner,
+        ):
+            item = request_queue.get()
+            if item is None:
+                return
+
+            response_queue_id, uid, timestamp, x_enc = item
+            # Expects LitAPI to implement the load_cache method
+            lit_api.load_cache(x_enc)
+            x = lit_api.decode_request(x_enc)
+            response = lit_api.predict(x)
+            response_enc = lit_api.encode_response(response)
+            response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
+    ```
+
     """
 
     def __call__(
