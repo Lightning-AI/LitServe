@@ -390,7 +390,8 @@ def run_batched_streaming_loop(
 
 
 class _BaseLoop(ABC):
-    """A loop runs certain set of hooks implemented in LitAPI.
+    """Loop runs an inference engine that executes a specific set of hooks, implemented in the LitAPI, in a predefined
+    order.
 
     For a default loop, LitAPI must implement the following hooks:
       - decode_request
@@ -399,63 +400,176 @@ class _BaseLoop(ABC):
       - unbatch
       - encode_response
 
+    To implement a custom loop, subclass this class and implement the `run` method. The `run` method should execute the
+    hooks in the desired order.
+
+    `__call__` method is the entry point for the worker process. It calls the `run` method in a loop until the worker is
+    terminated.
+
+    Example:
+
+    ```python
+    class TestLoop(_BaseLoop):
+        def run(
+            self,
+            lit_api: LitAPI,
+            lit_spec: Optional[LitSpec],
+            device: str,
+            worker_id: int,
+            request_queue: Queue,
+            response_queues: List[Queue],
+            max_batch_size: int,
+            batch_timeout: float,
+            stream: bool,
+            workers_setup_status: Dict[int, str],
+            callback_runner: CallbackRunner,
+        ):
+            item = request_queue.get()
+            if item is None:
+                return
+
+            response_queue_id, uid, timestamp, x_enc = item
+            # Expects LitAPI to implement the load_cache method
+            lit_api.load_cache(x_enc)
+            x = lit_api.decode_request(x_enc)
+            response = lit_api.predict(x)
+            response_enc = lit_api.encode_response(response)
+            response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
+    ```
+
     """
 
-    def __init__(
+    def __call__(
         self,
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
         request_queue: Queue,
         response_queues: List[Queue],
         max_batch_size: int,
         batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
-        self.lit_api = lit_api
-        self.lit_spec = lit_spec
-        self.request_queue = request_queue
-        self.response_queues = response_queues
-        self.max_batch_size = max_batch_size
-        self.batch_timeout = batch_timeout
-        self.callback_runner = callback_runner
+        while True:
+            self.run(
+                lit_api,
+                lit_spec,
+                device,
+                worker_id,
+                request_queue,
+                response_queues,
+                max_batch_size,
+                batch_timeout,
+                stream,
+                workers_setup_status,
+                callback_runner,
+            )
 
-    def run(self):
+    def run(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
         raise NotImplementedError
 
 
 class SingleLoop(_BaseLoop):
-    def run(self):
-        run_single_loop(self.lit_api, self.lit_spec, self.request_queue, self.response_queues, self.callback_runner)
+    def __call__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
+        run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
 
 
 class BatchedLoop(_BaseLoop):
-    def run(self):
+    def __call__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
         run_batched_loop(
-            self.lit_api,
-            self.lit_spec,
-            self.request_queue,
-            self.response_queues,
-            self.max_batch_size,
-            self.batch_timeout,
-            self.callback_runner,
+            lit_api,
+            lit_spec,
+            request_queue,
+            response_queues,
+            max_batch_size,
+            batch_timeout,
+            callback_runner,
         )
 
 
 class StreamingLoop(_BaseLoop):
-    def run(self):
-        run_streaming_loop(self.lit_api, self.lit_spec, self.request_queue, self.response_queues, self.callback_runner)
+    def __call__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
+        run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
 
 
 class BatchedStreamingLoop(_BaseLoop):
-    def run(self):
+    def __call__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
         run_batched_streaming_loop(
-            self.lit_api,
-            self.lit_spec,
-            self.request_queue,
-            self.response_queues,
-            self.max_batch_size,
-            self.batch_timeout,
-            self.callback_runner,
+            lit_api,
+            lit_spec,
+            request_queue,
+            response_queues,
+            max_batch_size,
+            batch_timeout,
+            callback_runner,
         )
 
 
@@ -471,6 +585,7 @@ def inference_worker(
     stream: bool,
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
+    loop: Union[str, _BaseLoop],
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
     try:
@@ -489,23 +604,28 @@ def inference_worker(
 
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
-    if stream:
-        if max_batch_size > 1:
-            BatchedStreamingLoop(
-                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-            ).run()
 
-        else:
-            StreamingLoop(
-                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-            ).run()
-        return
+    if loop == "auto":
+        loop = (
+            BatchedStreamingLoop()
+            if stream and max_batch_size > 1
+            else StreamingLoop()
+            if stream
+            else BatchedLoop()
+            if max_batch_size > 1
+            else SingleLoop()
+        )
 
-    if max_batch_size > 1:
-        BatchedLoop(
-            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-        ).run()
-    else:
-        SingleLoop(
-            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-        ).run()
+    loop(
+        lit_api,
+        lit_spec,
+        device,
+        worker_id,
+        request_queue,
+        response_queues,
+        max_batch_size,
+        batch_timeout,
+        stream,
+        workers_setup_status,
+        callback_runner,
+    )
