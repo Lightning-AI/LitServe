@@ -182,6 +182,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         stream=False,
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
+        loop="auto",
     )
     mock_batched_loop.assert_called_once()
 
@@ -192,6 +193,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         stream=False,
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
+        loop="auto",
     )
     mock_single_loop.assert_called_once()
 
