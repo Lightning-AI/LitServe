@@ -143,7 +143,6 @@ class SlowBatchAPI(SlowLitAPI):
         return list(output)
 
 
-@pytest.mark.flaky(retries=5)
 @pytest.mark.asyncio
 async def test_timeout():
     # Scenario: first request completes, second request times out in queue
@@ -173,7 +172,7 @@ async def test_timeout():
             )
 
 
-@pytest.mark.flaky(retries=5)
+@pytest.mark.flaky(retries=3)
 @pytest.mark.asyncio
 async def test_batch_timeout():
     # Scenario: first 2 requests finish as a batch and third request times out in queue
