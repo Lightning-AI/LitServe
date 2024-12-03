@@ -133,12 +133,12 @@ class LitServer:
             info_path: The path for the server and model metadata info endpoint.
             model_metadata: Metadata about the model, it will be shown via the `info_path` endpoint.
             stream: Whether to enable streaming responses.
-            spec: The specification for the API.
+            spec: The specification for the API such as OpenAISpec or OpenAIEmbeddingSpec.
             max_payload_size: The maximum payload size for requests.
             track_requests: Whether to track the number of active requests.
             loop: The inference engine runs with this loop in the worker process.
             callbacks: Callbacks to use for the server.
-            middlewares: Middlewares to use for the server.
+            middlewares: ASGI middleware for the server.
             loggers: Loggers to use for the server.
 
         """

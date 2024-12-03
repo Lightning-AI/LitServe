@@ -496,13 +496,13 @@ class BatchedStreamingLoop(_BaseLoop):
         callback_runner: CallbackRunner,
     ):
         run_batched_streaming_loop(
-            self.lit_api,
-            self.lit_spec,
-            self.request_queue,
-            self.response_queues,
-            self.max_batch_size,
-            self.batch_timeout,
-            self.callback_runner,
+            lit_api,
+            lit_spec,
+            request_queue,
+            response_queues,
+            max_batch_size,
+            batch_timeout,
+            callback_runner,
         )
 
 
