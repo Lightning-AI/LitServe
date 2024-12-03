@@ -44,8 +44,13 @@ class _Connector:
     def check_devices_and_accelerators(self):
         """Check if the devices are in a valid fomra and raise an error if they are not."""
         if self._accelerator in ["cuda", "mps"]:
-            if not isinstance(self._devices, int) and not (isinstance(self._devices, list) and all(isinstance(device, int) for device in self._devices)):
-                raise ValueError(f"devices must be an integer or a list of integers when using 'cuda' or 'mps', instead got {self._devices}")
+            if not isinstance(self._devices, int) and not (
+                isinstance(self._devices, list) and all(isinstance(device, int) for device in self._devices)
+            ):
+                raise ValueError(
+                    "devices must be an integer or a list of integers when using 'cuda' or 'mps', "
+                    f"instead got {self._devices}"
+                )
         elif self._accelerator != "cpu":
             raise ValueError(f"accelerator must be one of (cuda, mps, cpu), instead got {self._accelerator}")
 
