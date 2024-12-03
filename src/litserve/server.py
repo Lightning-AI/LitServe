@@ -40,7 +40,7 @@ from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
-from litserve.loops import inference_worker
+from litserve.loops import _BaseLoop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
@@ -108,21 +108,52 @@ class LitServer:
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
+        model_metadata: Optional[dict] = None,
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         track_requests: bool = False,
-        model_metadata: Optional[dict] = None,
+        loop: Optional[Union[str, _BaseLoop]] = "auto",
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
     ):
+        """Initialize a LitServer instance.
+
+        Args:
+            lit_api: The LitAPI instance to use for handling requests.
+            accelerator: The type of hardware accelerator to use (e.g., 'auto', 'cpu', 'cuda', 'mps').
+            devices: The number of devices to use (e.g., 'auto', 1, 2).
+            workers_per_device: The number of workers to use per device.
+            timeout: The timeout for requests in seconds.
+            max_batch_size: The maximum batch size.
+            batch_timeout: The timeout for batching requests in seconds.
+            api_path: The path for the prediction API endpoint.
+            healthcheck_path: The path for the health check endpoint.
+            info_path: The path for the server and model metadata info endpoint.
+            model_metadata: Metadata about the model, it will be shown via the `info_path` endpoint.
+            stream: Whether to enable streaming responses.
+            spec: The specification for the API such as OpenAISpec or OpenAIEmbeddingSpec.
+            max_payload_size: The maximum payload size for requests.
+            track_requests: Whether to track the number of active requests.
+            loop: The inference engine runs with this loop in the worker process.
+            callbacks: Callbacks to use for the server.
+            middlewares: ASGI middleware for the server.
+            loggers: Loggers to use for the server.
+
+        """
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
         if isinstance(spec, OpenAISpec):
             stream = True
+
+        if loop is None:
+            loop = "auto"
+
+        if isinstance(loop, str) and loop != "auto":
+            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
 
         if middlewares is None:
             middlewares = []
@@ -155,7 +186,7 @@ class LitServer:
         try:
             json.dumps(model_metadata)
         except (TypeError, ValueError):
-            raise ValueError("model_metadata is not JSON serializable")
+            raise ValueError("model_metadata must be JSON serializable.")
 
         # Check if the batch and unbatch methods are overridden in the lit_api instance
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
@@ -167,6 +198,7 @@ class LitServer:
                 "but the max_batch_size parameter was not set."
             )
 
+        self._loop = loop
         self.api_path = api_path
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path
@@ -266,6 +298,7 @@ class LitServer:
                     self.stream,
                     self.workers_setup_status,
                     self._callback_runner,
+                    self._loop,
                 ),
             )
             process.start()

@@ -440,7 +440,7 @@ def test_info_route():
 
 
 def test_model_metadata_json_error():
-    with pytest.raises(ValueError, match="model_metadata is not JSON serializable"):
+    with pytest.raises(ValueError, match="model_metadata must be JSON serializable"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), model_metadata=int)
 
 
