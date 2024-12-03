@@ -17,6 +17,7 @@ import logging
 import multiprocessing as mp
 import sys
 import time
+from abc import ABC
 from queue import Empty, Queue
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -29,7 +30,6 @@ from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, PickleableHTTPException, WorkerSetupStatus
 
 mp.allow_connection_pickling()
-
 
 try:
     import uvloop
@@ -389,6 +389,76 @@ def run_batched_streaming_loop(
             response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
+class _BaseLoop(ABC):
+    """A loop runs certain set of hooks implemented in LitAPI.
+
+    For a default loop, LitAPI must implement the following hooks:
+      - decode_request
+      - batch
+      - predict
+      - unbatch
+      - encode_response
+
+    """
+
+    def __init__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        callback_runner: CallbackRunner,
+    ):
+        self.lit_api = lit_api
+        self.lit_spec = lit_spec
+        self.request_queue = request_queue
+        self.response_queues = response_queues
+        self.max_batch_size = max_batch_size
+        self.batch_timeout = batch_timeout
+        self.callback_runner = callback_runner
+
+    def run(self):
+        raise NotImplementedError
+
+
+class SingleLoop(_BaseLoop):
+    def run(self):
+        run_single_loop(self.lit_api, self.lit_spec, self.request_queue, self.response_queues, self.callback_runner)
+
+
+class BatchedLoop(_BaseLoop):
+    def run(self):
+        run_batched_loop(
+            self.lit_api,
+            self.lit_spec,
+            self.request_queue,
+            self.response_queues,
+            self.max_batch_size,
+            self.batch_timeout,
+            self.callback_runner,
+        )
+
+
+class StreamingLoop(_BaseLoop):
+    def run(self):
+        run_streaming_loop(self.lit_api, self.lit_spec, self.request_queue, self.response_queues, self.callback_runner)
+
+
+class BatchedStreamingLoop(_BaseLoop):
+    def run(self):
+        run_batched_streaming_loop(
+            self.lit_api,
+            self.lit_spec,
+            self.request_queue,
+            self.response_queues,
+            self.max_batch_size,
+            self.batch_timeout,
+            self.callback_runner,
+        )
+
+
 def inference_worker(
     lit_api: LitAPI,
     lit_spec: Optional[LitSpec],
@@ -412,7 +482,7 @@ def inference_worker(
     lit_api.device = device
     callback_runner.trigger_event(EventTypes.AFTER_SETUP, lit_api=lit_api)
 
-    logger.info(f"Setup complete for worker {worker_id}.")
+    print(f"Setup complete for worker {worker_id}.")
 
     if workers_setup_status:
         workers_setup_status[worker_id] = WorkerSetupStatus.READY
@@ -421,16 +491,21 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
     if stream:
         if max_batch_size > 1:
-            run_batched_streaming_loop(
+            BatchedStreamingLoop(
                 lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-            )
+            ).run()
+
         else:
-            run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
+            StreamingLoop(
+                lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+            ).run()
         return
 
     if max_batch_size > 1:
-        run_batched_loop(
+        BatchedLoop(
             lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
-        )
+        ).run()
     else:
-        run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
+        SingleLoop(
+            lit_api, lit_spec, request_queue, response_queues, max_batch_size, batch_timeout, callback_runner
+        ).run()
