@@ -613,7 +613,7 @@ class LitServer:
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
-            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level,**kwargs)
+            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             if sys.platform == "win32" and num_uvicorn_servers > 1:
                 logger.info("Enable Windows explicit socket sharing...")
                 config.workers = num_uvicorn_servers
