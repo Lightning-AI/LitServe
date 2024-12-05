@@ -105,7 +105,7 @@ class LitServer:
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
-        easy_setup: bool = True,
+        easy_setup: bool = False,
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
