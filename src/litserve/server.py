@@ -616,6 +616,11 @@ class LitServer:
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             if sys.platform == "win32" and num_uvicorn_servers > 1:
                 logger.info("Enable Windows explicit socket sharing...")
+                # We make sure sockets is listening...
+                # It prevents further [WinError 10022] 
+                [sock.listen(config.backlog) for sock in sockets]
+                # We add worker to say unicorn to use a shared socket (win32)
+                # https://github.com/encode/uvicorn/pull/802
                 config.workers = num_uvicorn_servers
             server = uvicorn.Server(config=config)
             if uvicorn_worker_type == "process":
