@@ -95,7 +95,7 @@ class SimpleLitAPI(ls.LitAPI):
 # (STEP 2) - START THE SERVER
 if __name__ == "__main__":
     # scale with advanced features (batching, GPUs, etc...)
-    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", max_batch_size=1)
+    server = ls.LitServer(SimpleLitAPI(), accelerator="auto", max_batch_size=1, easy_setup=True)
     server.run(port=8000)
 ```
 
