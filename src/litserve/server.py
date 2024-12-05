@@ -105,6 +105,7 @@ class LitServer:
         timeout: Union[float, bool] = 30,
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
+        easy_setup: bool = False,
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
@@ -128,6 +129,7 @@ class LitServer:
             timeout: The timeout for requests in seconds.
             max_batch_size: The maximum batch size.
             batch_timeout: The timeout for batching requests in seconds.
+            easy_setup: Enables a beginner-friendly configuration with sensible defaults to simplify setup and usage.
             api_path: The path for the prediction API endpoint.
             healthcheck_path: The path for the health check endpoint.
             info_path: The path for the server and model metadata info endpoint.
@@ -206,6 +208,7 @@ class LitServer:
         self.timeout = timeout
         lit_api.stream = stream
         lit_api.request_timeout = self.timeout
+        self._easy_setup = easy_setup
         lit_api._sanitize(max_batch_size, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
@@ -499,6 +502,7 @@ class LitServer:
             client_code = client_template.format(PORT=port)
             with open(dest_path, "w") as f:
                 f.write(client_code)
+            print("To interact with this server, use the sample client:\n    python client.py")
 
         except Exception as e:
             logger.exception(f"Error copying file: {e}")
@@ -516,13 +520,9 @@ class LitServer:
         port: Union[str, int] = 8000,
         num_api_servers: Optional[int] = None,
         log_level: str = "info",
-        generate_client_file: bool = True,
         api_server_worker_type: Optional[str] = None,
         **kwargs,
     ):
-        if generate_client_file:
-            LitServer.generate_client_file(port=port)
-
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
             port = int(port)
@@ -556,9 +556,11 @@ class LitServer:
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
         self.verify_worker_status()
+        if self._easy_setup:
+            LitServer.generate_client_file(port=port)
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
-            print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+            print(f"API documentation (Swagger) is available at: http://0.0.0.0:{port}/docs")
             for s in servers:
                 s.join()
         finally:
