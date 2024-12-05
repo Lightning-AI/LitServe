@@ -525,10 +525,6 @@ class LitServer:
     ):
         if self._easy_setup:
             LitServer.generate_client_file(port=port)
-
-        else:
-            print("LitServe is running. Press Ctrl+C to stop.")
-
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
             port = int(port)
