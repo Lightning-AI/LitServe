@@ -502,7 +502,7 @@ class LitServer:
             client_code = client_template.format(PORT=port)
             with open(dest_path, "w") as f:
                 f.write(client_code)
-            print("To interact with this server, use the sample client: run python client.py in terminal.")
+            print("To interact with this server, use the sample client:\n    python client.py")
 
         except Exception as e:
             logger.exception(f"Error copying file: {e}")
@@ -523,8 +523,6 @@ class LitServer:
         api_server_worker_type: Optional[str] = None,
         **kwargs,
     ):
-        if self._easy_setup:
-            LitServer.generate_client_file(port=port)
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
             port = int(port)
@@ -558,6 +556,8 @@ class LitServer:
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
         self.verify_worker_status()
+        if self._easy_setup:
+            LitServer.generate_client_file(port=port)
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"API documentation (Swagger) is available at: http://0.0.0.0:{port}/docs")
