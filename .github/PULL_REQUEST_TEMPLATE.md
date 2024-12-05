@@ -1,3 +1,8 @@
+## What does this PR do?
+
+Fixes # (issue).
+
+
 <details>
   <summary><b>Before submitting</b></summary>
 
@@ -23,9 +28,6 @@ PRs without this will not be merged.
 -->
 
 
-## What does this PR do?
-
-Fixes # (issue).
 
 ## PR review
 
