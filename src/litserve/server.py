@@ -638,7 +638,7 @@ class LitServer:
             self._prepare_app_run(app)
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             if sys.platform == "win32" and num_uvicorn_servers > 1:
-                logger.info("Enable Windows explicit socket sharing...")
+                logger.debug("Enable Windows explicit socket sharing...")
                 # We make sure sockets is listening...
                 # It prevents further [WinError 10022]
                 [sock.listen(config.backlog) for sock in sockets]
