@@ -619,16 +619,16 @@ class LitLoop(_BaseLoop):
 
 class ContinuousBatchingLoop(LitLoop):
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
-        pass
+        raise NotImplementedError
 
     def step(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
-        pass
+        raise NotImplementedError
 
     def has_capacity(self, lit_api: LitAPI) -> bool:
-        pass
+        raise NotImplementedError
 
     def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> bool:
-        pass
+        raise NotImplementedError
 
     def put_responses(
         self,
