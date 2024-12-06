@@ -572,10 +572,15 @@ class BatchedStreamingLoop(_BaseLoop):
             callback_runner,
         )
 
-def notify_timed_out_requests(response_queues: List[Queue], timed_out_uids: List[Tuple[int, str]], ):
+
+def notify_timed_out_requests(
+    response_queues: List[Queue],
+    timed_out_uids: List[Tuple[int, str]],
+):
     for response_queue_id, uid in timed_out_uids:
         logger.error(f"Request {uid} was waiting in the queue for too long and has been timed out.")
         response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+
 
 class LitLoop(_BaseLoop):
     def __init__(self):
@@ -593,34 +598,44 @@ class LitLoop(_BaseLoop):
         )
         return batches, timed_out_uids
 
-    def get_request(self, request_queue: Queue, timeout: float=1.0):
+    def get_request(self, request_queue: Queue, timeout: float = 1.0):
         response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=timeout)
         return response_queue_id, uid, timestamp, x_enc
-    
+
     def populate_context(self, lit_spec: LitSpec, request: Any):
         if lit_spec and hasattr(lit_spec, "populate_context"):
             lit_spec.populate_context(self._context, request)
 
-    def put_response(self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus)->None:
+    def put_response(
+        self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
+    ) -> None:
         response_queues[response_queue_id].put((uid, (response_data, status)))
 
-    def put_error_response(self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception)->None:
+    def put_error_response(
+        self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
+    ) -> None:
         response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)))
 
+
 class ContinuousBatchingLoop(LitLoop):
-    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec])->None:
+    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         pass
 
-    def step(self, lit_api: LitAPI, lit_spec: Optional[LitSpec])-> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
-        pass
-    
-    def has_capacity(self, lit_api: LitAPI)-> bool:
+    def step(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
         pass
 
-    def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec])-> bool:
+    def has_capacity(self, lit_api: LitAPI) -> bool:
         pass
 
-    def put_responses(self, response_queues: List[Queue], response_queue_ids: List[int], responses: List[Tuple[str, Tuple[Any, LitAPIStatus]]])->None:
+    def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> bool:
+        pass
+
+    def put_responses(
+        self,
+        response_queues: List[Queue],
+        response_queue_ids: List[int],
+        responses: List[Tuple[str, Tuple[Any, LitAPIStatus]]],
+    ) -> None:
         for response_queue_id, response in zip(response_queue_ids, responses):
             uid, (response_data, status) = response
             print(f"Putting response {response_data} with status {status} for uid {uid}")
@@ -630,9 +645,23 @@ class ContinuousBatchingLoop(LitLoop):
             else:
                 self.put_response(response_queues, response_queue_id, uid, response_data, status)
 
-    
-
-    def loop(self, response_queue_ids: List[int], uids: List[str], inputs: List[Any], lit_api: LitAPI, lit_spec: Optional[LitSpec], device: str, worker_id: int, request_queue: Queue, response_queues: List[Queue], max_batch_size: int, batch_timeout: float, stream: bool, workers_setup_status: Dict[int, str], callback_runner: CallbackRunner):
+    def loop(
+        self,
+        response_queue_ids: List[int],
+        uids: List[str],
+        inputs: List[Any],
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
         while True:
             if self.has_capacity(lit_api) and len(inputs) > 0:
                 input = inputs.pop(0)
@@ -645,15 +674,42 @@ class ContinuousBatchingLoop(LitLoop):
             if self.request_finished(lit_api, lit_spec) and len(inputs) == 0:
                 break
 
-    def run(self, lit_api: LitAPI, lit_spec: Optional[LitSpec], device: str, worker_id: int, request_queue: Queue, response_queues: List[Queue], max_batch_size: int, batch_timeout: float, stream: bool, workers_setup_status: Dict[int, str], callback_runner: CallbackRunner):
+    def run(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
         batches, timed_out_uids = self.get_batch_requests(lit_api, request_queue, max_batch_size, batch_timeout)
 
         notify_timed_out_requests(response_queues, timed_out_uids)
         if batches:
             response_queue_ids, uids, inputs = zip(*batches)
             self.populate_context(lit_spec, inputs)
-            self.loop(response_queue_ids, list(uids), list(inputs), lit_api, lit_spec, device, worker_id, request_queue, response_queues, max_batch_size, batch_timeout, stream, workers_setup_status, callback_runner)
-
+            self.loop(
+                response_queue_ids,
+                list(uids),
+                list(inputs),
+                lit_api,
+                lit_spec,
+                device,
+                worker_id,
+                request_queue,
+                response_queues,
+                max_batch_size,
+                batch_timeout,
+                stream,
+                workers_setup_status,
+                callback_runner,
+            )
 
 
 def inference_worker(
