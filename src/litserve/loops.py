@@ -624,30 +624,26 @@ class ContinuousBatchingLoop(LitLoop):
         self.max_sequence_length = max_sequence_length
 
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
-        """Add a new sequence to active sequences"""
-        self.active_sequences[uid] = {
-            "input": request,
-            "current_length": 0,
-            "generated_tokens": []
-        }
+        """Add a new sequence to active sequences."""
+        self.active_sequences[uid] = {"input": request, "current_length": 0, "generated_tokens": []}
 
     def has_capacity(self, lit_api: LitAPI) -> bool:
-        """Check if we can add more sequences based on current batch"""
+        """Check if we can add more sequences based on current batch."""
         return len(self.active_sequences) < lit_api.max_batch_size
 
     def step(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
-        """Process one token generation step for all active sequences"""
+        """Process one token generation step for all active sequences."""
         if not self.active_sequences:
             return []
 
         # Batch forward pass for all active sequences
         inputs = [seq["input"] for seq in self.active_sequences.values()]
         generated = [seq["generated_tokens"] for seq in self.active_sequences.values()]
-        
+
         try:
             # Assume lit_api.predict handles batched token generation
             new_tokens = lit_api.predict(inputs, generated)
-            
+
             responses = []
             finished_uids = []
 
@@ -658,10 +654,7 @@ class ContinuousBatchingLoop(LitLoop):
                 seq["current_length"] += 1
 
                 # Check completion conditions
-                is_finished = (
-                    token == lit_api.eos_token or 
-                    seq["current_length"] >= self.max_sequence_length
-                )
+                is_finished = token == lit_api.eos_token or seq["current_length"] >= self.max_sequence_length
 
                 if is_finished:
                     # Encode final response for completed sequence
@@ -678,15 +671,12 @@ class ContinuousBatchingLoop(LitLoop):
         except Exception as e:
             logger.exception("Error during batch token generation")
             # On error, terminate all active sequences
-            responses = [
-                (uid, (e, LitAPIStatus.ERROR)) 
-                for uid in self.active_sequences.keys()
-            ]
+            responses = [(uid, (e, LitAPIStatus.ERROR)) for uid in self.active_sequences.keys()]
             self.active_sequences.clear()
             return responses
 
     def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> bool:
-        """Check if all sequences are processed"""
+        """Check if all sequences are processed."""
         return len(self.active_sequences) == 0
 
     def run(
@@ -703,41 +693,41 @@ class ContinuousBatchingLoop(LitLoop):
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
-        """Main loop that processes batches of requests"""
+        """Main loop that processes batches of requests."""
         # Get batch of requests
         batches, timed_out_uids = self.get_batch_requests(lit_api, request_queue, max_batch_size, batch_timeout)
-        
+
         # Handle timed out requests
         notify_timed_out_requests(response_queues, timed_out_uids)
-        
+
         if not batches:
             return
 
         # Unpack batch information
         response_queue_ids, uids, inputs = zip(*batches)
-        
+
         try:
             # Initialize context if needed
             self.populate_context(lit_spec, inputs)
-            
+
             # Process each request in the batch
             for uid, input in zip(uids, inputs):
                 # Decode the request
                 decoded_input = lit_api.decode_request(input)
                 # Add to active sequences
                 self.add_request(uid, decoded_input, lit_api, lit_spec)
-            
+
             # Continue processing until all sequences are finished
             while not self.request_finished(lit_api, lit_spec):
                 # Process one step for all active sequences
                 responses = self.step(lit_api, lit_spec)
-                
+
                 # Send responses for completed sequences
                 for uid, (response_data, status) in responses:
                     # Find the corresponding response queue id
                     idx = uids.index(uid)
                     response_queue_id = response_queue_ids[idx]
-                    
+
                     if status == LitAPIStatus.ERROR:
                         self.put_error_response(response_queues, response_queue_id, uid, response_data)
                     else:
