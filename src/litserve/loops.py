@@ -18,6 +18,7 @@ import multiprocessing as mp
 import sys
 import time
 from abc import ABC
+from dataclasses import dataclass
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -582,6 +583,15 @@ def notify_timed_out_requests(
         response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
 
 
+@dataclass
+class StepOutput:
+    """Outputs from a single step of the loop."""
+
+    uid: str
+    output: Any
+    status: LitAPIStatus
+
+
 class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
@@ -630,16 +640,17 @@ class ContinuousBatchingLoop(LitLoop):
 
     def mark_completed(self, uid: str) -> None:
         """Mark a sequence as completed."""
+        logger.info(f"Marking sequence {uid} as completed")
         del self.active_sequences[uid]
         del self.response_queue_ids[uid]
 
     def has_capacity(self, lit_api: LitAPI) -> bool:
         """Check if we can add more sequences based on current batch."""
-        """Check if we can add more sequences based on current batch."""
         return len(self.active_sequences) < lit_api.max_batch_size
 
-    def step(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
-        """Process one token generation step for all active sequences."""
+    def step(
+        self, prev_outputs: Optional[List[StepOutput]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
+    ) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
         """Process one token generation step for all active sequences."""
         if not self.active_sequences:
             return []
@@ -668,7 +679,8 @@ class ContinuousBatchingLoop(LitLoop):
                 if is_finished:
                     # Encode final response for completed sequence
                     response = lit_api.encode_response(seq["generated_tokens"])
-                    responses.append((uid, (response, LitAPIStatus.FINISH_STREAMING)))
+                    step_output = StepOutput(uid, response, LitAPIStatus.FINISH_STREAMING)
+                    responses.append(step_output)
                     finished_uids.append(uid)
 
             # Remove finished sequences
@@ -681,13 +693,11 @@ class ContinuousBatchingLoop(LitLoop):
         except Exception as e:
             logger.exception("Error during batch token generation")
             # On error, terminate all active sequences
-            responses = [(uid, (e, LitAPIStatus.ERROR)) for uid in self.active_sequences.keys()]
-            responses = [(uid, (e, LitAPIStatus.ERROR)) for uid in self.active_sequences.keys()]
+            responses = [(uid, (e, LitAPIStatus.ERROR)) for uid in self.active_sequences]
             self.active_sequences.clear()
             return responses
 
     def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> bool:
-        """Check if all sequences are processed."""
         """Check if all sequences are processed."""
         return len(self.active_sequences) == 0
 
@@ -718,11 +728,12 @@ class ContinuousBatchingLoop(LitLoop):
             if new_batches:
                 # Add new requests to pending_requests and try to process them
                 for response_queue_id, uid, input in new_batches:
-                    pending_requests.append((response_queue_id, uid, input))
                     if self.has_capacity(lit_api):
                         decoded_input = lit_api.decode_request(input)
                         self.add_request(uid, decoded_input, lit_api, lit_spec)
                         self.response_queue_ids[uid] = response_queue_id
+                    else:
+                        pending_requests.append((response_queue_id, uid, input))
 
         return pending_requests
 
@@ -749,10 +760,11 @@ class ContinuousBatchingLoop(LitLoop):
             return
 
         # Initialize pending_requests with response_queue_id included
-        pending_requests = [(response_queue_id, uid, input) for response_queue_id, uid, input in batches]
+        pending_requests = list(batches)
 
         try:
             self.populate_context(lit_spec, [input for _, _, input in pending_requests])
+            prev_outputs = None
 
             while pending_requests or self.active_sequences:
                 # Fill available capacity with both pending and new requests
@@ -767,19 +779,25 @@ class ContinuousBatchingLoop(LitLoop):
                 )
 
                 # Process one step for all active sequences
-                responses = self.step(lit_api, lit_spec)
+                responses = self.step(prev_outputs, lit_api, lit_spec)
+                if responses and not isinstance(responses[0], StepOutput):
+                    raise ValueError("Expected StepOutput from step()")
+
+                prev_outputs = responses
 
                 # Send responses for all sequences (both streaming and completed)
-                for uid, (response_data, status) in responses:
+                for step_output in responses:
+                    status = step_output.status
+                    response_data = step_output.output
+                    uid = step_output.uid
                     response_queue_id = self.response_queue_ids[uid]
 
                     if status == LitAPIStatus.ERROR:
                         self.put_error_response(response_queues, response_queue_id, uid, response_data)
-                        del self.response_queue_ids[uid]
+                        self.mark_completed(uid)
                     elif status == LitAPIStatus.FINISH_STREAMING:
                         self.put_response(response_queues, response_queue_id, uid, response_data, status)
-                        del self.response_queue_ids[uid]
-                        del self.active_sequences[uid]
+                        self.mark_completed(uid)
                     else:
                         self.put_response(response_queues, response_queue_id, uid, response_data, status)
 
