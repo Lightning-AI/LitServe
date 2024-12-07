@@ -635,9 +635,11 @@ class ContinuousBatchingLoop(LitLoop):
 
     def has_capacity(self, lit_api: LitAPI) -> bool:
         """Check if we can add more sequences based on current batch."""
+        """Check if we can add more sequences based on current batch."""
         return len(self.active_sequences) < lit_api.max_batch_size
 
     def step(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
+        """Process one token generation step for all active sequences."""
         """Process one token generation step for all active sequences."""
         if not self.active_sequences:
             return []
@@ -661,6 +663,7 @@ class ContinuousBatchingLoop(LitLoop):
 
                 # Check completion conditions
                 is_finished = token == lit_api.eos_token or seq["current_length"] >= self.max_sequence_length
+                is_finished = token == lit_api.eos_token or seq["current_length"] >= self.max_sequence_length
 
                 if is_finished:
                     # Encode final response for completed sequence
@@ -679,10 +682,12 @@ class ContinuousBatchingLoop(LitLoop):
             logger.exception("Error during batch token generation")
             # On error, terminate all active sequences
             responses = [(uid, (e, LitAPIStatus.ERROR)) for uid in self.active_sequences.keys()]
+            responses = [(uid, (e, LitAPIStatus.ERROR)) for uid in self.active_sequences.keys()]
             self.active_sequences.clear()
             return responses
 
     def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> bool:
+        """Check if all sequences are processed."""
         """Check if all sequences are processed."""
         return len(self.active_sequences) == 0
 
