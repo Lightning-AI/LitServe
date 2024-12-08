@@ -17,6 +17,7 @@ import inspect
 import json
 import logging
 import multiprocessing as mp
+from multiprocessing.context import Process
 import os
 import sys
 import threading
@@ -34,6 +35,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
+import uvicorn.server
 
 from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
@@ -245,6 +247,7 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
+        self._uvicorn_servers = None
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -583,19 +586,38 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
+        manager, inference_workers = self.launch_inference_worker(num_api_servers)
 
         self.verify_worker_status()
         try:
-            servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+            uvicorn_workers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            for s in servers:
-                s.join()
+            if sys.platform!="win32":
+                # On Lunux, kill signal will be captured by uvicorn.
+                # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
+                for uw in uvicorn_workers:
+                    uw:Process
+                    uw.join()
+            else:
+                # On Windows, kill signal is captured by inference workers.
+                # => They will join and raise a KeyboardInterrupt, allowing to Shutdown Server
+                for iw in inference_workers:
+                    iw:Process
+                    iw.join()
+        except (KeyboardInterrupt):
+            # KeyboardInterruption
+            # => We cleanly kill workers.
+            if sys.platform=="win32":
+                # We kindly ask uvicorn servers to exit.
+                # It will properly kill threads on windows.
+                for us in self._uvicorn_servers:
+                    us:uvicorn.Server
+                    us.should_exit=True
         finally:
             print("Shutting down LitServe")
-            for w in litserve_workers:
-                w.terminate()
-                w.join()
+            for iw in inference_workers:
+                iw.terminate()
+                iw.join()
             manager.shutdown()
 
     def _prepare_app_run(self, app: FastAPI):
@@ -605,7 +627,8 @@ class LitServer:
         app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
-        servers = []
+        workers = []
+        self._uvicorn_servers=[]
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
             if self.lit_spec:
@@ -627,12 +650,16 @@ class LitServer:
                 ctx = mp.get_context("fork")
                 w = ctx.Process(target=server.run, args=(sockets,))
             elif uvicorn_worker_type == "thread":
+                # Windows only allow spawn process
+                # => Impossible to use Pickle serialization
+                # => Falling back to threads...
                 w = threading.Thread(target=server.run, args=(sockets,))
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
-            servers.append(w)
-        return servers
+            workers.append(w)
+            self._uvicorn_servers.append(server)
+        return workers
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
