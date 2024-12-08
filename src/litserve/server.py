@@ -599,7 +599,7 @@ class LitServer:
                 # On Linux, kill signal will be captured by uvicorn.
                 # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
                 for uw in uvicorn_workers:
-                    uw: Process
+                    uw: Union[Process, Thread]
                     uw.join()
             else:
                 # On Windows, kill signal is captured by inference workers.
