@@ -652,9 +652,6 @@ class LitServer:
                 ctx = mp.get_context("fork")
                 w = ctx.Process(target=server.run, args=(sockets,))
             elif uvicorn_worker_type == "thread":
-                # Windows only allow spawn process
-                # => Impossible to use Pickle serialization
-                # => Falling back to threads...
                 w = threading.Thread(target=server.run, args=(sockets,))
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
