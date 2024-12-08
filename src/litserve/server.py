@@ -17,7 +17,6 @@ import inspect
 import json
 import logging
 import multiprocessing as mp
-from multiprocessing.context import Process
 import os
 import sys
 import threading
@@ -27,15 +26,17 @@ import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from multiprocessing.context import Process
+from queue import Empty
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
+import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
-import uvicorn.server
 
 from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
@@ -590,29 +591,31 @@ class LitServer:
 
         self.verify_worker_status()
         try:
-            uvicorn_workers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+            uvicorn_workers = self._start_server(
+                port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
+            )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            if sys.platform!="win32":
+            if sys.platform != "win32":
                 # On Lunux, kill signal will be captured by uvicorn.
                 # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
                 for uw in uvicorn_workers:
-                    uw:Process
+                    uw: Process
                     uw.join()
             else:
                 # On Windows, kill signal is captured by inference workers.
                 # => They will join and raise a KeyboardInterrupt, allowing to Shutdown Server
                 for iw in inference_workers:
-                    iw:Process
+                    iw: Process
                     iw.join()
-        except (KeyboardInterrupt):
+        except KeyboardInterrupt:
             # KeyboardInterruption
             # => We cleanly kill workers.
-            if sys.platform=="win32":
+            if sys.platform == "win32":
                 # We kindly ask uvicorn servers to exit.
                 # It will properly kill threads on windows.
                 for us in self._uvicorn_servers:
-                    us:uvicorn.Server
-                    us.should_exit=True
+                    us: uvicorn.Server
+                    us.should_exit = True
         finally:
             print("Shutting down LitServe")
             for iw in inference_workers:
@@ -628,7 +631,7 @@ class LitServer:
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         workers = []
-        self._uvicorn_servers=[]
+        self._uvicorn_servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
             if self.lit_spec:
