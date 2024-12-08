@@ -596,7 +596,7 @@ class LitServer:
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
             if sys.platform != "win32":
-                # On Lunux, kill signal will be captured by uvicorn.
+                # On Linux, kill signal will be captured by uvicorn.
                 # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
                 for uw in uvicorn_workers:
                     uw: Process
@@ -609,10 +609,9 @@ class LitServer:
                     iw.join()
         except KeyboardInterrupt:
             # KeyboardInterruption
-            # => We cleanly kill workers.
             if sys.platform == "win32":
                 # We kindly ask uvicorn servers to exit.
-                # It will properly kill threads on windows.
+                # It will properly end threads on windows.
                 for us in self._uvicorn_servers:
                     us: uvicorn.Server
                     us.should_exit = True
