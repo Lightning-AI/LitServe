@@ -26,10 +26,13 @@ import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from multiprocessing.context import Process
 from queue import Empty
+from threading import Thread
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
+import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
@@ -230,6 +233,7 @@ class LitServer:
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
+        self._uvicorn_servers = None
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -553,19 +557,40 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
+        manager, inference_workers = self.launch_inference_worker(num_api_servers)
 
         self.verify_worker_status()
         try:
-            servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
+            uvicorn_workers = self._start_server(
+                port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
+            )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            for s in servers:
-                s.join()
+            if sys.platform != "win32":
+                # On Linux, kill signal will be captured by uvicorn.
+                # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
+                for uw in uvicorn_workers:
+                    uw: Union[Process, Thread]
+                    uw.join()
+            else:
+                # On Windows, kill signal is captured by inference workers.
+                # => They will join and raise a KeyboardInterrupt, allowing to Shutdown Server
+                for iw in inference_workers:
+                    iw: Process
+                    iw.join()
+        except KeyboardInterrupt:
+            # KeyboardInterruption
+            if sys.platform == "win32":
+                # We kindly ask uvicorn servers to exit.
+                # It will properly end threads on windows.
+                for us in self._uvicorn_servers:
+                    us: uvicorn.Server
+                    us.should_exit = True
         finally:
             print("Shutting down LitServe")
-            for w in litserve_workers:
-                w.terminate()
-                w.join()
+            for iw in inference_workers:
+                iw: Process
+                iw.terminate()
+                iw.join()
             manager.shutdown()
 
     def _prepare_app_run(self, app: FastAPI):
@@ -575,7 +600,8 @@ class LitServer:
         app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
-        servers = []
+        workers = []
+        self._uvicorn_servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
             if self.lit_spec:
@@ -583,8 +609,15 @@ class LitServer:
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
-
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+            if sys.platform == "win32" and num_uvicorn_servers > 1:
+                logger.debug("Enable Windows explicit socket sharing...")
+                # We make sure sockets is listening...
+                # It prevents further [WinError 10022]
+                [sock.listen(config.backlog) for sock in sockets]
+                # We add worker to say unicorn to use a shared socket (win32)
+                # https://github.com/encode/uvicorn/pull/802
+                config.workers = num_uvicorn_servers
             server = uvicorn.Server(config=config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
@@ -594,8 +627,9 @@ class LitServer:
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
-            servers.append(w)
-        return servers
+            workers.append(w)
+            self._uvicorn_servers.append(server)
+        return workers
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
