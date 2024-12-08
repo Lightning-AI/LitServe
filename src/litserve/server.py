@@ -27,8 +27,8 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from multiprocessing.context import Process
-from threading import Thread
 from queue import Empty
+from threading import Thread
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
