@@ -427,7 +427,9 @@ class LitServer:
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
-
+            if status == LitAPIStatus.ERROR and isinstance(response, Exception):
+                logger.error("Error in request: %s", response)
+                raise response
             if status == LitAPIStatus.ERROR:
                 logger.error("Error in request: %s", response)
                 raise HTTPException(status_code=500)
