@@ -161,7 +161,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         response, status = self._server.response_buffer.pop(uid)
 
-        if status == LitAPIStatus.ERROR and isinstance(response, Exception):
+        if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
             logger.error("Error in embedding request: %s", response)
             raise response
         if status == LitAPIStatus.ERROR:

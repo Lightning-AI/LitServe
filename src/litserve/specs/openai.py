@@ -381,7 +381,7 @@ class OpenAISpec(LitSpec):
             usage_infos = []
             # iterate over n choices
             for i, (response, status) in enumerate(streaming_response):
-                if status == LitAPIStatus.ERROR and isinstance(response, Exception):
+                if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
                     raise response
                 elif status == LitAPIStatus.ERROR:
                     logger.error("Error in streaming response: %s", response)
