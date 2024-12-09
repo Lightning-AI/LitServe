@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import re
 import sys
 from time import sleep
 from unittest.mock import MagicMock, patch
@@ -361,10 +360,9 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     server = LitServer(PredictErrorAPI())
-    with wrap_litserve_start(server) as server, pytest.raises(
-        TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")
-    ), TestClient(server.app) as client:
-        client.post("/predict", json={"input": 5.0}, timeout=10)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        resp = client.post("/predict", json={"input": 5.0}, timeout=10)
+        assert resp.status_code == 500, "predict() missed 1 required positional argument: 'y'"
 
 
 def test_custom_api_path():
