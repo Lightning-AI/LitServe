@@ -428,8 +428,10 @@ class OpenAISpec(LitSpec):
             tool_calls = None
             usage = None
             async for response, status in streaming_response:
+                if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+                    raise response
                 if status == LitAPIStatus.ERROR:
-                    logger.error("Error in streaming response: %s", response)
+                    logger.error("Error in OpenAI non-streaming response: %s", response)
                     raise HTTPException(status_code=500)
 
                 # data from LitAPI.encode_response
