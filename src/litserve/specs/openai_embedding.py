@@ -28,10 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingRequest(BaseModel):
-    input: Union[str, List[str]]
+    input: Union[str, List[str], List[int], List[List[int]]]
     model: str
     dimensions: Optional[int] = None
-    encoding_format: Literal["float"] = "float"
+    encoding_format: Literal["float", "base64"] = "float"
+    user: Optional[str] = None
 
     def ensure_list(self):
         return self.input if isinstance(self.input, list) else [self.input]
@@ -147,7 +148,7 @@ class OpenAIEmbeddingSpec(LitSpec):
                 f"{EMBEDDING_API_EXAMPLE}"
             )
 
-    async def embeddings(self, request: EmbeddingRequest):
+    async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
