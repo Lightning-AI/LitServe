@@ -148,7 +148,7 @@ class OpenAIEmbeddingSpec(LitSpec):
                 f"{EMBEDDING_API_EXAMPLE}"
             )
 
-    async def embeddings(self, request: EmbeddingRequest):
+    async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
