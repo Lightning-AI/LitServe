@@ -429,7 +429,8 @@ class LitServer:
             response, status = self.response_buffer.pop(uid)
 
             if status == LitAPIStatus.ERROR:
-                raise response
+                logger.error("Error in request: %s", response)
+                raise HTTPException(status_code=500)
             self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
             return response
 

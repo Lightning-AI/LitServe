@@ -382,7 +382,8 @@ class OpenAISpec(LitSpec):
             # iterate over n choices
             for i, (response, status) in enumerate(streaming_response):
                 if status == LitAPIStatus.ERROR:
-                    raise response
+                    logger.error("Error in streaming response: %s", response)
+                    raise HTTPException(status_code=500)
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
                 chat_msg = ChoiceDelta(**encoded_response)
@@ -426,7 +427,9 @@ class OpenAISpec(LitSpec):
             usage = None
             async for response, status in streaming_response:
                 if status == LitAPIStatus.ERROR:
-                    raise response
+                    logger.error("Error in streaming response: %s", response)
+                    raise HTTPException(status_code=500)
+
                 # data from LitAPI.encode_response
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
