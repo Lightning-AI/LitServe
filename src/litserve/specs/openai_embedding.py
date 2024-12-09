@@ -18,7 +18,8 @@ import time
 import uuid
 from typing import List, Literal, Optional, Union
 
-from fastapi import Request, Response, status
+from fastapi import HTTPException, Request, Response, status
+from fastapi import status as status_code
 from pydantic import BaseModel
 
 from litserve.specs.base import LitSpec
@@ -28,10 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingRequest(BaseModel):
-    input: Union[str, List[str]]
+    input: Union[str, List[str], List[int], List[List[int]]]
     model: str
     dimensions: Optional[int] = None
-    encoding_format: Literal["float"] = "float"
+    encoding_format: Literal["float", "base64"] = "float"
+    user: Optional[str] = None
 
     def ensure_list(self):
         return self.input if isinstance(self.input, list) else [self.input]
@@ -147,7 +149,7 @@ class OpenAIEmbeddingSpec(LitSpec):
                 f"{EMBEDDING_API_EXAMPLE}"
             )
 
-    async def embeddings(self, request: EmbeddingRequest):
+    async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
@@ -159,8 +161,12 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         response, status = self._server.response_buffer.pop(uid)
 
-        if status == LitAPIStatus.ERROR:
+        if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+            logger.error("Error in embedding request: %s", response)
             raise response
+        if status == LitAPIStatus.ERROR:
+            logger.error("Error in embedding request: %s", response)
+            raise HTTPException(status_code=status_code.HTTP_500_INTERNAL_SERVER_ERROR)
 
         logger.debug(response)
 
