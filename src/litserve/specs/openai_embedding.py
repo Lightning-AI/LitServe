@@ -18,7 +18,8 @@ import time
 import uuid
 from typing import List, Literal, Optional, Union
 
-from fastapi import Request, Response, status
+from fastapi import HTTPException, Request, Response, status
+from fastapi import status as status_code
 from pydantic import BaseModel
 
 from litserve.specs.base import LitSpec
@@ -160,8 +161,12 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         response, status = self._server.response_buffer.pop(uid)
 
-        if status == LitAPIStatus.ERROR:
+        if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+            logger.error("Error in embedding request: %s", response)
             raise response
+        if status == LitAPIStatus.ERROR:
+            logger.error("Error in embedding request: %s", response)
+            raise HTTPException(status_code=status_code.HTTP_500_INTERNAL_SERVER_ERROR)
 
         logger.debug(response)
 
