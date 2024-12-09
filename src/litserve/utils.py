@@ -15,6 +15,7 @@ import asyncio
 import dataclasses
 import logging
 import pickle
+import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
@@ -87,3 +88,46 @@ class WorkerSetupStatus:
     READY: str = "ready"
     ERROR: str = "error"
     FINISHED: str = "finished"
+
+
+def configure_logging(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout
+):
+    """Configure logging for the entire library with sensible defaults.
+
+    Args:
+        level (int): Logging level (default: logging.INFO)
+        format (str): Log message format string
+        stream (file-like): Output stream for logs
+
+    """
+    # Create a library-wide handler
+    handler = logging.StreamHandler(stream)
+
+    # Set formatter with user-configurable format
+    formatter = logging.Formatter(format)
+    handler.setFormatter(formatter)
+
+    # Configure root library logger
+    library_logger = logging.getLogger("litserve")
+    library_logger.setLevel(level)
+    library_logger.addHandler(handler)
+
+    # Prevent propagation to root logger to avoid duplicate logs
+    library_logger.propagate = False
+
+
+def set_log_level(level):
+    """Allow users to set the global logging level for the library."""
+    logging.getLogger("litserve").setLevel(level)
+
+
+def add_log_handler(handler):
+    """Allow users to add custom log handlers.
+
+    Example usage:
+    file_handler = logging.FileHandler('library_logs.log')
+    add_log_handler(file_handler)
+
+    """
+    logging.getLogger("litserve").addHandler(handler)

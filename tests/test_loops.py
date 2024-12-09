@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import io
 import json
 import threading
 import time
@@ -229,7 +230,9 @@ def test_run_single_loop():
     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
 
 
-def test_run_single_loop_timeout(caplog):
+def test_run_single_loop_timeout():
+    stream = io.StringIO()
+    ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleLitAPI()
     lit_api.setup(None)
     lit_api.request_timeout = 0.0001
@@ -248,7 +251,7 @@ def test_run_single_loop_timeout(caplog):
 
     request_queue.put((None, None, None, None))
     loop_thread.join()
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
     assert isinstance(response_queues[0].get()[1][0], HTTPException), "Timeout should return an HTTPException"
 
 
@@ -284,7 +287,9 @@ def test_run_batched_loop():
     assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
 
 
-def test_run_batched_loop_timeout(caplog):
+def test_run_batched_loop_timeout():
+    stream = io.StringIO()
+    ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
     lit_api._sanitize(2, None)
@@ -309,7 +314,7 @@ def test_run_batched_loop_timeout(caplog):
     # Allow some time for the loop to process
     time.sleep(1)
 
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
     resp1 = response_queues[0].get(timeout=10)[1]
     resp2 = response_queues[0].get(timeout=10)[1]
     assert isinstance(resp1[0], HTTPException), "First request was timed out"
@@ -348,7 +353,9 @@ def test_run_streaming_loop():
         assert response == {"output": f"{i}: Hello"}
 
 
-def test_run_streaming_loop_timeout(caplog):
+def test_run_streaming_loop_timeout():
+    stream = io.StringIO()
+    ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleStreamAPI()
     lit_api.setup(None)
     lit_api.request_timeout = 0.1
@@ -370,7 +377,7 @@ def test_run_streaming_loop_timeout(caplog):
     request_queue.put((None, None, None, None))
     loop_thread.join()
 
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
     response = response_queues[0].get(timeout=10)[1]
     assert isinstance(response[0], HTTPException), "request was timed out"
 
