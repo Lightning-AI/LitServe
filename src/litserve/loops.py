@@ -648,7 +648,12 @@ class ContinuousBatchingLoop(LitLoop):
 
     def has_capacity(self, lit_api: LitAPI) -> bool:
         """Check if we can add more sequences based on current batch."""
-        return len(self.active_sequences) < lit_api.max_batch_size
+        capacity = len(self.active_sequences) < lit_api.max_batch_size
+        if not capacity:
+            logger.info(
+                f"No capacity: {len(self.active_sequences)} active sequences, max batch size: {lit_api.max_batch_size}"
+            )
+        return capacity
 
     def step(
         self, prev_outputs: Optional[List[StepOutput]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
