@@ -20,7 +20,7 @@ import time
 from abc import ABC
 from dataclasses import dataclass
 from queue import Empty, Queue
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
@@ -29,9 +29,6 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, PickleableHTTPException, WorkerSetupStatus
-
-if TYPE_CHECKING:
-    pass
 
 mp.allow_connection_pickling()
 
