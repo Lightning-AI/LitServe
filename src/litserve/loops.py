@@ -23,6 +23,7 @@ from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import HTTPException
+from rich.progress import track
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -38,10 +39,11 @@ try:
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 except ImportError:
-    print(
-        "uvloop is not installed. Falling back to the default asyncio event loop. "
-        "Please install uvloop for better performance using `pip install uvloop`."
-    )
+    if sys.platform != "win32":
+        print(
+            "uvloop is not installed. Falling back to the default asyncio event loop. "
+            "Please install uvloop for better performance using `pip install uvloop`."
+        )
 
 logger = logging.getLogger(__name__)
 
@@ -664,7 +666,6 @@ class ContinuousBatchingLoop(LitLoop):
             new_tokens = lit_api.predict(inputs, generated)
 
             responses = []
-            finished_uids = []
 
             # Process each sequence's new token
             for uid, token in zip(self.active_sequences.keys(), new_tokens):
@@ -681,12 +682,6 @@ class ContinuousBatchingLoop(LitLoop):
                     response = lit_api.encode_response(seq["generated_tokens"])
                     step_output = StepOutput(uid, response, LitAPIStatus.FINISH_STREAMING)
                     responses.append(step_output)
-                    finished_uids.append(uid)
-
-            # Remove finished sequences
-            for uid in finished_uids:
-                del self.active_sequences[uid]
-                del self.response_queue_ids[uid]
 
             return responses
 
@@ -708,7 +703,6 @@ class ContinuousBatchingLoop(LitLoop):
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
         max_batch_size: int,
-        batch_timeout: float,
         response_queues: List[Queue],
     ) -> List[Tuple[str, Any]]:
         """Fill available capacity with pending and new requests."""
@@ -721,13 +715,15 @@ class ContinuousBatchingLoop(LitLoop):
 
         # Then check for new requests if we still have capacity
         if self.has_capacity(lit_api):
-            new_batches, timed_out_uids = self.get_batch_requests(lit_api, request_queue, max_batch_size, batch_timeout)
-
+            new_batches, timed_out_uids = self.get_batch_requests(
+                lit_api, request_queue, max_batch_size, batch_timeout=0.0001
+            )
             notify_timed_out_requests(response_queues, timed_out_uids)
 
             if new_batches:
                 # Add new requests to pending_requests and try to process them
                 for response_queue_id, uid, input in new_batches:
+                    logger.info(f"New request: {uid}, {input}")
                     if self.has_capacity(lit_api):
                         decoded_input = lit_api.decode_request(input)
                         self.add_request(uid, decoded_input, lit_api, lit_spec)
@@ -752,41 +748,32 @@ class ContinuousBatchingLoop(LitLoop):
         callback_runner: CallbackRunner,
     ):
         """Main loop that processes batches of requests."""
-        batches, timed_out_uids = self.get_batch_requests(lit_api, request_queue, max_batch_size, batch_timeout)
-
-        notify_timed_out_requests(response_queues, timed_out_uids)
-
-        if not batches:
-            return
-
-        # Initialize pending_requests with response_queue_id included
-        pending_requests = list(batches)
-
+        pending_requests = self.prefill(
+            [],
+            lit_api,
+            lit_spec,
+            request_queue,
+            max_batch_size,
+            response_queues,
+        )
         try:
-            self.populate_context(lit_spec, [input for _, _, input in pending_requests])
             prev_outputs = None
-
             while pending_requests or self.active_sequences:
-                # Fill available capacity with both pending and new requests
-                pending_requests = self.prefill(
-                    pending_requests,
-                    lit_api,
-                    lit_spec,
-                    request_queue,
-                    max_batch_size,
-                    batch_timeout,
-                    response_queues,
-                )
-
                 # Process one step for all active sequences
                 responses = self.step(prev_outputs, lit_api, lit_spec)
+                logger.debug(f"Responses from step(): {responses}")
+                if len(responses) == 0:
+                    logger.error("No responses from step()")
+                    raise ValueError("No responses from step()")
                 if responses and not isinstance(responses[0], StepOutput):
+                    logger.error("Expected StepOutput from step()")
                     raise ValueError("Expected StepOutput from step()")
 
                 prev_outputs = responses
 
                 # Send responses for all sequences (both streaming and completed)
-                for step_output in responses:
+                for step_output in track(responses, description="Processing responses"):
+                    logger.debug(f"Processing response: {step_output}")
                     status = step_output.status
                     response_data = step_output.output
                     uid = step_output.uid
@@ -800,6 +787,16 @@ class ContinuousBatchingLoop(LitLoop):
                         self.mark_completed(uid)
                     else:
                         self.put_response(response_queues, response_queue_id, uid, response_data, status)
+
+                # Fill available capacity with both pending and new requests
+                pending_requests = self.prefill(
+                    pending_requests,
+                    lit_api,
+                    lit_spec,
+                    request_queue,
+                    max_batch_size,
+                    response_queues,
+                )
 
         except Exception as e:
             logger.exception("Error in continuous batching loop")
