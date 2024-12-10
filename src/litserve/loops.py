@@ -20,7 +20,7 @@ import time
 from abc import ABC
 from dataclasses import dataclass
 from queue import Empty, Queue
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
@@ -29,6 +29,9 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, PickleableHTTPException, WorkerSetupStatus
+
+if TYPE_CHECKING:
+    pass
 
 mp.allow_connection_pickling()
 
@@ -637,7 +640,8 @@ class ContinuousBatchingLoop(LitLoop):
 
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences."""
-        self.active_sequences[uid] = {"input": request, "current_length": 0, "generated_tokens": []}
+        decoded_request = lit_api.decode_request(request)
+        self.active_sequences[uid] = {"input": decoded_request, "current_length": 0, "generated_tokens": []}
 
     def mark_completed(self, uid: str) -> None:
         """Mark a sequence as completed."""
@@ -709,8 +713,7 @@ class ContinuousBatchingLoop(LitLoop):
         # First process existing pending requests
         while pending_requests and self.has_capacity(lit_api):
             response_queue_id, uid, input = pending_requests.pop(0)
-            decoded_input = lit_api.decode_request(input)
-            self.add_request(uid, decoded_input, lit_api, lit_spec)
+            self.add_request(uid, input, lit_api, lit_spec)
             self.response_queue_ids[uid] = response_queue_id
 
         # Then check for new requests if we still have capacity
@@ -725,8 +728,7 @@ class ContinuousBatchingLoop(LitLoop):
                 for response_queue_id, uid, input in new_batches:
                     logger.info(f"New request: {uid}, {input}")
                     if self.has_capacity(lit_api):
-                        decoded_input = lit_api.decode_request(input)
-                        self.add_request(uid, decoded_input, lit_api, lit_spec)
+                        self.add_request(uid, input, lit_api, lit_spec)
                         self.response_queue_ids[uid] = response_queue_id
                     else:
                         pending_requests.append((response_queue_id, uid, input))
@@ -747,6 +749,11 @@ class ContinuousBatchingLoop(LitLoop):
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
+        if not lit_api.stream:
+            raise ValueError(
+                "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
+            )
+
         """Main loop that processes batches of requests."""
         pending_requests = self.prefill(
             [],
