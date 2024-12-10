@@ -23,7 +23,6 @@ from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import HTTPException
-from rich.progress import track
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -697,10 +696,6 @@ class ContinuousBatchingLoop(LitLoop):
             self.active_sequences.clear()
             return responses
 
-    def request_finished(self, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> bool:
-        """Check if all sequences are processed."""
-        return len(self.active_sequences) == 0
-
     def prefill(
         self,
         pending_requests: List[Tuple[str, Any]],
@@ -777,7 +772,7 @@ class ContinuousBatchingLoop(LitLoop):
                 prev_outputs = responses
 
                 # Send responses for all sequences (both streaming and completed)
-                for step_output in track(responses, description="Processing responses"):
+                for step_output in responses:
                     logger.debug(f"Processing response: {step_output}")
                     status = step_output.status
                     response_data = step_output.output
