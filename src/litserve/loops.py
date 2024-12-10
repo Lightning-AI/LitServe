@@ -585,7 +585,7 @@ def notify_timed_out_requests(
 
 
 @dataclass
-class StepOutput:
+class Output:
     """Outputs from a single step of the loop."""
 
     uid: str
@@ -655,7 +655,7 @@ class ContinuousBatchingLoop(LitLoop):
         return capacity
 
     def step(
-        self, prev_outputs: Optional[List[StepOutput]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
+        self, prev_outputs: Optional[List[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
     ) -> List[Tuple[str, Tuple[Any, LitAPIStatus]]]:
         """Process one token generation step for all active sequences."""
         if not self.active_sequences:
@@ -684,7 +684,7 @@ class ContinuousBatchingLoop(LitLoop):
                 if is_finished:
                     # Encode final response for completed sequence
                     response = lit_api.encode_response(seq["generated_tokens"])
-                    step_output = StepOutput(uid, response, LitAPIStatus.FINISH_STREAMING)
+                    step_output = Output(uid, response, LitAPIStatus.FINISH_STREAMING)
                     responses.append(step_output)
 
             return responses
@@ -763,11 +763,9 @@ class ContinuousBatchingLoop(LitLoop):
                 responses = self.step(prev_outputs, lit_api, lit_spec)
                 logger.debug(f"Responses from step(): {responses}")
                 if len(responses) == 0:
-                    logger.error("No responses from step()")
-                    raise ValueError("No responses from step()")
-                if responses and not isinstance(responses[0], StepOutput):
-                    logger.error("Expected StepOutput from step()")
-                    raise ValueError("Expected StepOutput from step()")
+                    raise HTTPException(500, "No responses from step()")
+                if responses and not isinstance(responses[0], Output):
+                    raise HTTPException(500, "Expected StepOutput from step()")
 
                 prev_outputs = responses
 
