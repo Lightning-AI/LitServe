@@ -75,6 +75,8 @@ class ImageContentURL(BaseModel):
 class ImageContent(BaseModel):
     type: str
     image_url: Union[str, ImageContentURL]
+    resized_height: Optional[int] = None
+    resized_width: Optional[int] = None
 
 
 class Function(BaseModel):
