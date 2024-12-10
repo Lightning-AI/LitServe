@@ -680,7 +680,6 @@ class ContinuousBatchingLoop(LitLoop):
 
                 # Check completion conditions
                 is_finished = token == lit_api.eos_token or seq["current_length"] >= self.max_sequence_length
-                is_finished = token == lit_api.eos_token or seq["current_length"] >= self.max_sequence_length
 
                 if is_finished:
                     # Encode final response for completed sequence
