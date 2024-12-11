@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import json
 import warnings
 from abc import ABC, abstractmethod
@@ -113,76 +112,15 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
-    def _sanitize(self, max_batch_size: int, spec: Optional[LitSpec]):
+    def pre_setup(self, max_batch_size: int, spec: Optional[LitSpec]):
         self.max_batch_size = max_batch_size
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
             self._default_unbatch = self._unbatch_no_stream
 
-        # we will sanitize regularly if no spec
-        # in case, we have spec then:
-        # case 1: spec implements a streaming API
-        # Case 2: spec implements a non-streaming API
         if spec:
-            # TODO: Implement sanitization
             self._spec = spec
-            return
-
-        original = self.unbatch.__code__ is LitAPI.unbatch.__code__
-        if (
-            self.stream
-            and max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(self.predict),
-                inspect.isgeneratorfunction(self.encode_response),
-                (original or inspect.isgeneratorfunction(self.unbatch)),
-            ])
-        ):
-            raise ValueError(
-                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
-                `lit_api.unbatch` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-
-                def unbatch(self, outputs):
-                    for output in outputs:
-                        unbatched_output = ...
-                        yield unbatched_output
-             """
-            )
-
-        if self.stream and not all([
-            inspect.isgeneratorfunction(self.predict),
-            inspect.isgeneratorfunction(self.encode_response),
-        ]):
-            raise ValueError(
-                """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-             """
-            )
 
     def set_logger_queue(self, queue: Queue):
         """Set the queue for logging events."""

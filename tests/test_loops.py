@@ -258,7 +258,7 @@ def test_run_single_loop_timeout():
 def test_run_batched_loop():
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api._sanitize(2, None)
+    lit_api.pre_setup(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 1
 
@@ -292,7 +292,7 @@ def test_run_batched_loop_timeout():
     ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api._sanitize(2, None)
+    lit_api.pre_setup(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 0.1
 
@@ -388,7 +388,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     lit_api.request_timeout = 1
     lit_api.stream = True
     spec = ls.OpenAISpec()
-    lit_api._sanitize(2, spec)
+    lit_api.pre_setup(2, spec)
 
     request_queue = Queue()
     # response_queue_id, uid, timestamp, x_enc
@@ -479,3 +479,19 @@ def test_loop_with_server():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10
+
+
+def test_get_default_loop():
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=1)
+    assert isinstance(loop, ls.loops.SingleLoop), "SingleLoop must be returned when stream=False"
+
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=4)
+    assert isinstance(loop, ls.loops.BatchedLoop), "BatchedLoop must be returned when stream=False and max_batch_size>1"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=1)
+    assert isinstance(loop, ls.loops.StreamingLoop), "StreamingLoop must be returned when stream=True"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=4)
+    assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
+        "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
+    )

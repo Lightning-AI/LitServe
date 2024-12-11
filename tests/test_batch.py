@@ -154,7 +154,7 @@ def test_max_batch_size_warning():
 
 def test_batch_predict_string_warning():
     api = ls.test_examples.SimpleBatchedAPI()
-    api._sanitize(2, None)
+    api.pre_setup(2, None)
     api.predict = MagicMock(return_value="This is a string")
 
     mock_input = torch.tensor([[1.0], [2.0]])
