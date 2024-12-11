@@ -492,6 +492,15 @@ class _BaseLoop(ABC):
 
 class DefaultLoop(_BaseLoop):
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+        # we will sanitize regularly if no spec
+        # in case, we have spec then:
+        # case 1: spec implements a streaming API
+        # Case 2: spec implements a non-streaming API
+        if spec:
+            # TODO: Implement sanitization
+            lit_api._spec = spec
+            return
+
         original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
         if (
             lit_api.stream

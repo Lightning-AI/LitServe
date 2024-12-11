@@ -119,15 +119,6 @@ class LitAPI(ABC):
         else:
             self._default_unbatch = self._unbatch_no_stream
 
-        # we will sanitize regularly if no spec
-        # in case, we have spec then:
-        # case 1: spec implements a streaming API
-        # Case 2: spec implements a non-streaming API
-        if spec:
-            # TODO: Implement sanitization
-            self._spec = spec
-            return
-
     def set_logger_queue(self, queue: Queue):
         """Set the queue for logging events."""
 

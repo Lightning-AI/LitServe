@@ -479,3 +479,19 @@ def test_loop_with_server():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10
+
+
+def test_get_default_loop():
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=1)
+    assert isinstance(loop, ls.loops.SingleLoop), "SingleLoop must be returned when stream=False"
+
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=4)
+    assert isinstance(loop, ls.loops.BatchedLoop), "BatchedLoop must be returned when stream=False and max_batch_size>1"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=1)
+    assert isinstance(loop, ls.loops.StreamingLoop), "StreamingLoop must be returned when stream=True"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=4)
+    assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
+        "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
+    )
