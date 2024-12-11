@@ -719,6 +719,29 @@ class ContinuousBatchingLoop(LitLoop):
         self.max_sequence_length = max_sequence_length
         self.response_queue_ids: Dict[str, int] = {}  # uid -> response_queue_id
 
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+        if not lit_api.stream:
+            raise ValueError(
+                "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
+            )
+
+        if lit_api.max_batch_size <= 1:
+            raise ValueError(
+                "Continuous batching loop requires max_batch_size to be greater than 1. "
+                "Please set LitServe(..., max_batch_size=2)"
+            )
+
+        if not hasattr(lit_api, "step") and not hasattr(lit_api, "has_finished"):
+            raise ValueError("""Using the default step method with Continuous batching loop
+requires the lit_api to have a has_finished method. Please implement the has_finished method in the lit_api.
+
+    class ExampleAPI(LitAPI):
+        ...
+        def has_finished(self, uid: str, token: str, max_sequence_length: int) -> bool:
+            # implement has_finished logic
+            return False
+        """)
+
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
         decoded_request = lit_api.decode_request(request)
@@ -833,12 +856,6 @@ class ContinuousBatchingLoop(LitLoop):
         callback_runner: CallbackRunner,
     ):
         """Main loop that processes batches of requests."""
-
-        if not lit_api.stream:
-            raise ValueError(
-                "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
-            )
-
         pending_requests = self.prefill(
             [],
             lit_api,

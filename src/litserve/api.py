@@ -120,6 +120,7 @@ class LitAPI(ABC):
 
         if spec:
             self._spec = spec
+            spec.pre_setup(self)
 
     def set_logger_queue(self, queue: Queue):
         """Set the queue for logging events."""
