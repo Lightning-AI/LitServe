@@ -56,10 +56,9 @@ class LitAPI(ABC):
 
         return inputs
 
-    @abstractmethod
     def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output."""
-        pass
+        raise NotImplementedError("predict is not implemented")
 
     def _unbatch_no_stream(self, output):
         if isinstance(output, str):
