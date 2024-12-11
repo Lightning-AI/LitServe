@@ -176,15 +176,11 @@ class IncorrectAPI2(IncorrectAPI1):
 
 @pytest.mark.asyncio
 async def test_openai_spec_validation(openai_request_data):
-    server = ls.LitServer(IncorrectAPI1(), spec=OpenAISpec())
-    with pytest.raises(ValueError, match="predict is not a generator"), wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager:
-            await manager.shutdown()
+    with pytest.raises(ValueError, match="predict is not a generator"):
+        ls.LitServer(IncorrectAPI1(), spec=OpenAISpec())
 
-    server = ls.LitServer(IncorrectAPI2(), spec=OpenAISpec())
-    with pytest.raises(ValueError, match="encode_response is not a generator"), wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager:
-            await manager.shutdown()
+    with pytest.raises(ValueError, match="encode_response is not a generator"):
+        ls.LitServer(IncorrectAPI2(), spec=OpenAISpec())
 
 
 class PrePopulatedAPI(ls.LitAPI):
