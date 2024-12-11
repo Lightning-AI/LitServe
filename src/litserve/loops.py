@@ -490,7 +490,42 @@ class _BaseLoop(ABC):
         raise NotImplementedError
 
 
-class DefaultLoop(_BaseLoop):
+class LitLoop(_BaseLoop):
+    def __init__(self):
+        self._context = {}
+
+    def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
+        if max_batch_size <= 1:
+            raise ValueError("max_batch_size must be greater than 1")
+
+        batches, timed_out_uids = collate_requests(
+            lit_api,
+            request_queue,
+            max_batch_size,
+            batch_timeout,
+        )
+        return batches, timed_out_uids
+
+    def get_request(self, request_queue: Queue, timeout: float = 1.0):
+        response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=timeout)
+        return response_queue_id, uid, timestamp, x_enc
+
+    def populate_context(self, lit_spec: LitSpec, request: Any):
+        if lit_spec and hasattr(lit_spec, "populate_context"):
+            lit_spec.populate_context(self._context, request)
+
+    def put_response(
+        self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
+    ) -> None:
+        response_queues[response_queue_id].put((uid, (response_data, status)))
+
+    def put_error_response(
+        self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
+    ) -> None:
+        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)))
+
+
+class DefaultLoop(LitLoop):
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
         # we will sanitize regularly if no spec
         # in case, we have spec then:
@@ -661,41 +696,6 @@ class Output:
     uid: str
     output: Any
     status: LitAPIStatus
-
-
-class LitLoop(_BaseLoop):
-    def __init__(self):
-        self._context = {}
-
-    def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
-        if max_batch_size <= 1:
-            raise ValueError("max_batch_size must be greater than 1")
-
-        batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
-            max_batch_size,
-            batch_timeout,
-        )
-        return batches, timed_out_uids
-
-    def get_request(self, request_queue: Queue, timeout: float = 1.0):
-        response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=timeout)
-        return response_queue_id, uid, timestamp, x_enc
-
-    def populate_context(self, lit_spec: LitSpec, request: Any):
-        if lit_spec and hasattr(lit_spec, "populate_context"):
-            lit_spec.populate_context(self._context, request)
-
-    def put_response(
-        self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
-    ) -> None:
-        response_queues[response_queue_id].put((uid, (response_data, status)))
-
-    def put_error_response(
-        self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
-    ) -> None:
-        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)))
 
 
 class ContinuousBatchingLoop(LitLoop):

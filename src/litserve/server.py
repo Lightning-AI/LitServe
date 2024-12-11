@@ -40,7 +40,7 @@ from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
-from litserve.loops import _BaseLoop, get_default_loop, inference_worker
+from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
@@ -113,7 +113,7 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         track_requests: bool = False,
-        loop: Optional[Union[str, _BaseLoop]] = "auto",
+        loop: Optional[Union[str, LitLoop]] = "auto",
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
@@ -200,7 +200,7 @@ class LitServer:
                 "but the max_batch_size parameter was not set."
             )
 
-        self._loop = loop
+        self._loop: LitLoop = loop
         self.api_path = api_path
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path

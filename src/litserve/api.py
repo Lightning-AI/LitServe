@@ -24,6 +24,7 @@ from litserve.specs.base import LitSpec
 
 class LitAPI(ABC):
     _stream: bool = False
+    _max_batch_size: int = 1
     _default_unbatch: callable = None
     _spec: LitSpec = None
     _device: Optional[str] = None
@@ -112,12 +113,23 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
+    @property
+    def max_batch_size(self):
+        return self._max_batch_size
+
+    @max_batch_size.setter
+    def max_batch_size(self, value):
+        self._max_batch_size = value
+
     def pre_setup(self, max_batch_size: int, spec: Optional[LitSpec]):
         self.max_batch_size = max_batch_size
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
             self._default_unbatch = self._unbatch_no_stream
+
+        if spec:
+            self._spec = spec
 
     def set_logger_queue(self, queue: Queue):
         """Set the queue for logging events."""
