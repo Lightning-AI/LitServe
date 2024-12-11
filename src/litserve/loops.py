@@ -441,6 +441,9 @@ class _BaseLoop(ABC):
 
     """
 
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+        pass
+
     def __call__(
         self,
         lit_api: LitAPI,
@@ -487,7 +490,65 @@ class _BaseLoop(ABC):
         raise NotImplementedError
 
 
-class SingleLoop(_BaseLoop):
+class DefaultLoop(_BaseLoop):
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+        original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
+        if (
+            lit_api.stream
+            and lit_api.max_batch_size > 1
+            and not all([
+                inspect.isgeneratorfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response),
+                (original or inspect.isgeneratorfunction(lit_api.unbatch)),
+            ])
+        ):
+            raise ValueError(
+                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
+                `lit_api.unbatch` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+
+                def unbatch(self, outputs):
+                    for output in outputs:
+                        unbatched_output = ...
+                        yield unbatched_output
+             """
+            )
+
+        if lit_api.stream and not all([
+            inspect.isgeneratorfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response),
+        ]):
+            raise ValueError(
+                """When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )
+
+
+class SingleLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
@@ -505,7 +566,7 @@ class SingleLoop(_BaseLoop):
         run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
 
 
-class BatchedLoop(_BaseLoop):
+class BatchedLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
@@ -531,7 +592,7 @@ class BatchedLoop(_BaseLoop):
         )
 
 
-class StreamingLoop(_BaseLoop):
+class StreamingLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
@@ -549,7 +610,7 @@ class StreamingLoop(_BaseLoop):
         run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
 
 
-class BatchedStreamingLoop(_BaseLoop):
+class BatchedStreamingLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
@@ -840,15 +901,7 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
 
     if loop == "auto":
-        loop = (
-            BatchedStreamingLoop()
-            if stream and max_batch_size > 1
-            else StreamingLoop()
-            if stream
-            else BatchedLoop()
-            if max_batch_size > 1
-            else SingleLoop()
-        )
+        loop = get_default_loop(stream, max_batch_size)
 
     loop(
         lit_api,
@@ -862,4 +915,16 @@ def inference_worker(
         stream,
         workers_setup_status,
         callback_runner,
+    )
+
+
+def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:
+    return (
+        BatchedStreamingLoop()
+        if stream and max_batch_size > 1
+        else StreamingLoop()
+        if stream
+        else BatchedLoop()
+        if max_batch_size > 1
+        else SingleLoop()
     )

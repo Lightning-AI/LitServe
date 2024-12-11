@@ -40,7 +40,7 @@ from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
-from litserve.loops import _BaseLoop, inference_worker
+from litserve.loops import _BaseLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs import OpenAISpec
@@ -154,6 +154,8 @@ class LitServer:
 
         if isinstance(loop, str) and loop != "auto":
             raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
+        if loop == "auto":
+            loop = get_default_loop(stream, max_batch_size)
 
         if middlewares is None:
             middlewares = []
@@ -206,7 +208,8 @@ class LitServer:
         self.timeout = timeout
         lit_api.stream = stream
         lit_api.request_timeout = self.timeout
-        lit_api._sanitize(max_batch_size, spec=spec)
+        lit_api.pre_setup(max_batch_size, spec=spec)
+        self._loop.pre_setup(lit_api, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None

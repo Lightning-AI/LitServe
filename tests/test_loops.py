@@ -258,7 +258,7 @@ def test_run_single_loop_timeout():
 def test_run_batched_loop():
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api._sanitize(2, None)
+    lit_api.pre_setup(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 1
 
@@ -292,7 +292,7 @@ def test_run_batched_loop_timeout():
     ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api._sanitize(2, None)
+    lit_api.pre_setup(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 0.1
 
@@ -388,7 +388,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     lit_api.request_timeout = 1
     lit_api.stream = True
     spec = ls.OpenAISpec()
-    lit_api._sanitize(2, spec)
+    lit_api.pre_setup(2, spec)
 
     request_queue = Queue()
     # response_queue_id, uid, timestamp, x_enc
