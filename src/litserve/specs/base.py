@@ -15,7 +15,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Callable, List
 
 if TYPE_CHECKING:
-    from litserve import LitServer
+    from litserve import LitAPI, LitServer
 
 
 class LitSpec:
@@ -25,6 +25,9 @@ class LitSpec:
         self._endpoints = []
 
         self._server: LitServer = None
+
+    def pre_setup(self, lit_api: "LitAPI"):
+        pass
 
     def setup(self, server: "LitServer"):
         self._server = server

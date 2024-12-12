@@ -175,7 +175,7 @@ def test_encode_response_with_openai_spec_dict_token_usage():
 
 
 def test_encode_response_with_custom_spec_api():
-    class CustomSpecAPI(ls.test_examples.TestAPI):
+    class CustomSpecAPI(ls.OpenAISpec):
         def encode_response(self, output_stream):
             for output in output_stream:
                 yield {"content": output}
