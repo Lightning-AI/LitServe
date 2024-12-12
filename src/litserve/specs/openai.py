@@ -30,7 +30,7 @@ from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
-    from litserve import LitServer
+    from litserve import LitAPI, LitServer
 
 logger = logging.getLogger(__name__)
 
@@ -262,18 +262,18 @@ class OpenAISpec(LitSpec):
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
         self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
 
-    def setup(self, server: "LitServer"):
+    def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
-        super().setup(server)
-
-        lit_api = self._server.lit_api
         if not inspect.isgeneratorfunction(lit_api.predict):
             raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
         if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
             raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+
+    def setup(self, server: "LitServer"):
+        super().setup(server)
         print("OpenAI spec setup complete")
 
     def populate_context(self, context, request):
