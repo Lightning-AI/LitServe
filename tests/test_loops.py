@@ -28,6 +28,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import (
+    LitLoop,
     _BaseLoop,
     inference_worker,
     run_batched_loop,
@@ -495,3 +496,41 @@ def test_get_default_loop():
     assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
         "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
     )
+
+
+@pytest.fixture
+def lit_loop_setup():
+    lit_loop = LitLoop()
+    lit_api = MagicMock(request_timeout=0.1)
+    request_queue = Queue()
+    return lit_loop, lit_api, request_queue
+
+
+def test_lit_loop_get_batch_requests(lit_loop_setup):
+    lit_loop, lit_api, request_queue = lit_loop_setup
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
+    batches, timed_out_uids = lit_loop.get_batch_requests(lit_api, request_queue, 2, 0.001)
+    assert len(batches) == 2
+    assert batches == [(0, "UUID-001", {"input": 4.0}), (0, "UUID-002", {"input": 5.0})]
+    assert timed_out_uids == []
+
+
+def test_lit_loop_get_request(lit_loop_setup):
+    lit_loop, _, request_queue = lit_loop_setup
+    t = time.monotonic()
+    request_queue.put((0, "UUID-001", t, {"input": 4.0}))
+    response_queue_id, uid, timestamp, x_enc = lit_loop.get_request(request_queue, timeout=1)
+    assert uid == "UUID-001"
+    assert response_queue_id == 0
+    assert timestamp == t
+    assert x_enc == {"input": 4.0}
+    assert lit_loop.get_request(request_queue, timeout=0.001) is None
+
+
+def test_lit_loop_put_response(lit_loop_setup):
+    lit_loop, _, request_queue = lit_loop_setup
+    response_queues = [Queue()]
+    lit_loop.put_response(response_queues, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK)
+    response = response_queues[0].get()
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
