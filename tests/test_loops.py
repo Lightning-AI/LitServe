@@ -31,6 +31,7 @@ from litserve.loops import (
     LitLoop,
     _BaseLoop,
     inference_worker,
+    notify_timed_out_requests,
     run_batched_loop,
     run_batched_streaming_loop,
     run_single_loop,
@@ -534,3 +535,24 @@ def test_lit_loop_put_response(lit_loop_setup):
     lit_loop.put_response(response_queues, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK)
     response = response_queues[0].get()
     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+
+
+def test_notify_timed_out_requests():
+    response_queues = [Queue()]
+
+    # Simulate timed out requests
+    timed_out_uids = [(0, "UUID-001"), (0, "UUID-002")]
+
+    # Call the function to notify timed out requests
+    notify_timed_out_requests(response_queues, timed_out_uids)
+
+    # Check the responses in the response queue
+    response_1 = response_queues[0].get()
+    response_2 = response_queues[0].get()
+
+    assert response_1[0] == "UUID-001"
+    assert response_1[1][1] == LitAPIStatus.ERROR
+    assert isinstance(response_1[1][0], HTTPException)
+    assert response_2[0] == "UUID-002"
+    assert isinstance(response_2[1][0], HTTPException)
+    assert response_2[1][1] == LitAPIStatus.ERROR
