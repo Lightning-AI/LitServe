@@ -14,6 +14,7 @@
 import inspect
 import io
 import json
+import re
 import threading
 import time
 from queue import Queue
@@ -29,6 +30,7 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import (
     ContinuousBatchingLoop,
+    DefaultLoop,
     LitLoop,
     Output,
     _BaseLoop,
@@ -588,6 +590,22 @@ class ContinuousBatchingAPI(ls.LitAPI):
         return outputs
 
 
+@pytest.mark.parametrize(
+    ("stream", "max_batch_size", "error_msg"),
+    [
+        (True, 4, "`lit_api.unbatch` must generate values using `yield`."),
+        (True, 1, "`lit_api.encode_response` must generate values using `yield`."),
+    ],
+)
+def test_default_loop_pre_setup_error(stream, max_batch_size, error_msg):
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.stream = stream
+    lit_api.max_batch_size = max_batch_size
+    loop = DefaultLoop()
+    with pytest.raises(ValueError, match=error_msg):
+        loop.pre_setup(lit_api, None)
+
+
 @pytest.fixture
 def continuous_batching_setup():
     lit_api = ContinuousBatchingAPI()
@@ -602,6 +620,18 @@ def continuous_batching_setup():
 
 
 def test_continuous_batching_pre_setup(continuous_batching_setup):
+    lit_api, loop, request_queue, response_queues = continuous_batching_setup
+    lit_api.stream = False
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
+        ),
+    ):
+        loop.pre_setup(lit_api, None)
+
+
+def test_continuous_batching_run(continuous_batching_setup):
     lit_api, loop, request_queue, response_queues = continuous_batching_setup
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
     loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
