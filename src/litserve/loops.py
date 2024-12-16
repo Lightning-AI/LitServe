@@ -505,8 +505,7 @@ class LitLoop(_BaseLoop):
 
     def get_request(self, request_queue: Queue, timeout: float = 1.0):
         try:
-            response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=timeout)
-            return response_queue_id, uid, timestamp, x_enc
+            return request_queue.get(timeout=timeout)
         except Empty:
             return None
 
