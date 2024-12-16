@@ -756,7 +756,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
     def mark_completed(self, uid: str) -> None:
         """Mark a request as completed and remove it from the tracked state."""
-        logger.info(f"Marking sequence {uid} as completed")
+        logger.debug(f"Marking sequence {uid} as completed")
         del self.active_sequences[uid]
         del self.response_queue_ids[uid]
 
@@ -839,7 +839,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             if new_batches:
                 # Add new requests to pending_requests and try to process them
                 for response_queue_id, uid, input in new_batches:
-                    logger.info(f"New request: {uid}, {input}")
+                    logger.debug(f"New request: {uid}, {input}")
                     if self.has_capacity(lit_api):
                         self.add_request(uid, input, lit_api, lit_spec)
                         self.response_queue_ids[uid] = response_queue_id
@@ -892,6 +892,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     uid = step_output.uid
                     response_queue_id = self.response_queue_ids[uid]
 
+                    response_data = lit_api.format_encoded_response(response_data)
                     if status == LitAPIStatus.ERROR:
                         self.put_error_response(response_queues, response_queue_id, uid, response_data)
                         self.mark_completed(uid)
