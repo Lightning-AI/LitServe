@@ -28,7 +28,9 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import (
+    ContinuousBatchingLoop,
     LitLoop,
+    Output,
     _BaseLoop,
     inference_worker,
     notify_timed_out_requests,
@@ -556,3 +558,66 @@ def test_notify_timed_out_requests():
     assert response_2[0] == "UUID-002"
     assert isinstance(response_2[1][0], HTTPException)
     assert response_2[1][1] == LitAPIStatus.ERROR
+
+
+class ContinuousBatchingAPI(ls.LitAPI):
+    def setup(self, spec: Optional[LitSpec]):
+        self.model = {}
+
+    def add_request(self, uid: str, request):
+        self.model[uid] = {"outputs": list(range(5))}
+
+    def decode_request(self, input: str):
+        return input
+
+    def encode_response(self, output: str):
+        return {"output": output}
+
+    def step(self, prev_outputs: Optional[List[Output]]) -> List[Output]:
+        outputs = []
+        for k in self.model:
+            v = self.model[k]
+            if v["outputs"]:
+                o = v["outputs"].pop(0)
+                outputs.append(Output(k, o, LitAPIStatus.OK))
+        keys = list(self.model.keys())
+        for k in keys:
+            if k not in [o.uid for o in outputs]:
+                outputs.append(Output(k, "", LitAPIStatus.FINISH_STREAMING))
+                del self.model[k]
+        return outputs
+
+
+@pytest.fixture
+def continuous_batching_setup():
+    lit_api = ContinuousBatchingAPI()
+    lit_api.stream = True
+    lit_api.request_timeout = 0.1
+    lit_api.pre_setup(2, None)
+    lit_api.setup(None)
+    request_queue = Queue()
+    response_queues = [Queue()]
+    loop = ContinuousBatchingLoop()
+    return lit_api, loop, request_queue, response_queues
+
+
+def test_continuous_batching_pre_setup(continuous_batching_setup):
+    lit_api, loop, request_queue, response_queues = continuous_batching_setup
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
+    loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
+
+    results = []
+    for i in range(5):
+        response = response_queues[0].get()
+        uid, (response_data, status) = response
+        o = json.loads(response_data)["output"]
+        assert o == i
+        assert status == LitAPIStatus.OK
+        assert uid == "UUID-001"
+        results.append(o)
+    assert results == list(range(5)), "API must return a sequence of numbers from 0 to 4"
+    response = response_queues[0].get()
+    uid, (response_data, status) = response
+    o = json.loads(response_data)["output"]
+    assert o == ""
+    assert status == LitAPIStatus.FINISH_STREAMING
