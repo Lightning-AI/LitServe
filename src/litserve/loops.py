@@ -495,9 +495,6 @@ class LitLoop(_BaseLoop):
         self._context = {}
 
     def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
-        if max_batch_size <= 1:
-            raise ValueError("max_batch_size must be greater than 1")
-
         batches, timed_out_uids = collate_requests(
             lit_api,
             request_queue,
@@ -507,8 +504,10 @@ class LitLoop(_BaseLoop):
         return batches, timed_out_uids
 
     def get_request(self, request_queue: Queue, timeout: float = 1.0):
-        response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=timeout)
-        return response_queue_id, uid, timestamp, x_enc
+        try:
+            return request_queue.get(timeout=timeout)
+        except Empty:
+            return None
 
     def populate_context(self, lit_spec: LitSpec, request: Any):
         if lit_spec and hasattr(lit_spec, "populate_context"):
@@ -751,6 +750,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
+        if hasattr(lit_api, "add_request"):
+            lit_api.add_request(uid, request)
         decoded_request = lit_api.decode_request(request)
         self.active_sequences[uid] = {"input": decoded_request, "current_length": 0, "generated_sequence": []}
 
