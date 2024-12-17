@@ -43,7 +43,6 @@ from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
-from litserve.specs import OpenAISpec
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
 
@@ -146,8 +145,8 @@ class LitServer:
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
-        if isinstance(spec, OpenAISpec):
-            stream = True
+        if isinstance(spec, LitSpec):
+            spec.set_stream(self)
 
         if loop is None:
             loop = "auto"
