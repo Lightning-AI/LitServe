@@ -262,8 +262,9 @@ class OpenAISpec(LitSpec):
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
         self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
 
-    def set_stream(self, lit_server: "LitServer"):
-        lit_server.stream = True
+    @property
+    def stream(self):
+        return True
 
     def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI

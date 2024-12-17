@@ -146,7 +146,7 @@ class LitServer:
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
         if isinstance(spec, LitSpec):
-            spec.set_stream(self)
+            stream = spec.stream
 
         if loop is None:
             loop = "auto"
