@@ -26,6 +26,10 @@ class LitSpec:
 
         self._server: LitServer = None
 
+    @property
+    def stream(self):
+        return False
+
     def pre_setup(self, lit_api: "LitAPI"):
         pass
 
