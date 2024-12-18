@@ -698,7 +698,7 @@ class Output:
 
 
 class ContinuousBatchingLoop(LitLoop):
-    def __init__(self, max_sequence_length: int = 2048):
+    def __init__(self, prefill_after_n_steps: int = 1, max_sequence_length: int = 2048):
         """Runs continuous batching loop. This loop handles adding new requests, processing them in batches, and
         managing the state of active sequences.
 
@@ -714,6 +714,7 @@ class ContinuousBatchingLoop(LitLoop):
 
         """
         super().__init__()
+        self.prefill_after_n_steps = prefill_after_n_steps
         self.active_sequences: Dict[str, Dict] = {}  # uid -> {input, current_length, generated_sequence}
         self.max_sequence_length = max_sequence_length
         self.response_queue_ids: Dict[str, int] = {}  # uid -> response_queue_id
@@ -821,6 +822,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
         max_batch_size: int,
+        batch_timeout: float,
         response_queues: List[Queue],
     ) -> List[Tuple[str, Any]]:
         """Fill available capacity with pending and new requests."""
@@ -830,11 +832,12 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             self.add_request(uid, input, lit_api, lit_spec)
             self.response_queue_ids[uid] = response_queue_id
 
+        if request_queue.empty() and pending_requests:
+            return pending_requests
+
         # Then check for new requests if we still have capacity
         if self.has_capacity(lit_api):
-            new_batches, timed_out_uids = self.get_batch_requests(
-                lit_api, request_queue, max_batch_size, batch_timeout=0.0001
-            )
+            new_batches, timed_out_uids = self.get_batch_requests(lit_api, request_queue, max_batch_size, batch_timeout)
             notify_timed_out_requests(response_queues, timed_out_uids)
 
             if new_batches:
@@ -870,10 +873,12 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             lit_spec,
             request_queue,
             max_batch_size,
+            batch_timeout,
             response_queues,
         )
         try:
             prev_outputs = None
+            n_steps = 0
             while pending_requests or self.active_sequences:
                 # Process one step for all active sequences
                 responses = self.step(prev_outputs, lit_api, lit_spec)
@@ -884,7 +889,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     raise HTTPException(500, "Expected StepOutput from step()")
 
                 prev_outputs = responses
-
+                n_steps += 1
                 # Send responses for all sequences (both streaming and completed)
                 for step_output in responses:
                     logger.debug(f"Processing response: {step_output}")
@@ -904,14 +909,17 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                         self.put_response(response_queues, response_queue_id, uid, response_data, status)
 
                 # Fill available capacity with both pending and new requests
-                pending_requests = self.prefill(
-                    pending_requests,
-                    lit_api,
-                    lit_spec,
-                    request_queue,
-                    max_batch_size,
-                    response_queues,
-                )
+                if n_steps > self.prefill_after_n_steps:
+                    pending_requests = self.prefill(
+                        pending_requests,
+                        lit_api,
+                        lit_spec,
+                        request_queue,
+                        max_batch_size,
+                        batch_timeout,
+                        response_queues,
+                    )
+                    n_steps = 0
 
         except Exception as e:
             logger.exception(f"Error in continuous batching loop: {e}")
