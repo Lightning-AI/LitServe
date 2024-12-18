@@ -919,6 +919,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             for uid, response_queue_id in self.response_queue_ids.items():
                 self.put_error_response(response_queues, response_queue_id, uid, e)
             self.response_queue_ids.clear()
+            self.active_sequences.clear()
 
 
 def inference_worker(
