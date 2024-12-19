@@ -476,7 +476,7 @@ class _BaseLoop(ABC):
                             workers_setup_status,
                             callback_runner,
                         )
-                        await asyncio.sleep(0.00001)
+                        await asyncio.sleep(0)
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
                         # Optionally, break the loop or handle the error as needed

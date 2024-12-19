@@ -157,7 +157,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         try:
             pending_requests = []
             while True:
-                await asyncio.sleep(0.001)
                 pending_requests = await self.prefill(
                     pending_requests,
                     lit_api,
@@ -167,6 +166,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     batch_timeout,
                     response_queues,
                 )
+                await asyncio.sleep(0)
         except Exception as e:
             logger.exception("An error occurred in run_in_background: %s", e)
         finally:
@@ -194,7 +194,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         """Main loop that processes batches of requests."""
         try:
             prev_outputs = None
-            while await lit_api.has_active_requests():
+            while lit_api.has_active_requests():
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
