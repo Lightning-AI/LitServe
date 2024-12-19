@@ -100,10 +100,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
-        if hasattr(lit_api, "add_request"):
-            lit_api.add_request(uid, request)
-        decoded_request = lit_api.decode_request(request)
-        self.active_sequences[uid] = {"input": decoded_request, "current_length": 0, "generated_sequence": []}
+        lit_api.add_request(uid, request)
+        self.active_sequences[uid] = {"input": request}
 
     def mark_completed(self, uid: str) -> None:
         """Mark a request as completed and remove it from the tracked state."""
@@ -143,6 +141,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 response_queue_id, uid, _, input = request
                 pending_requests.append((response_queue_id, uid, input))
                 break
+        logger.info(f"Prefill finished, {len(lit_api.uids)} active requests.")
         return pending_requests
 
     async def run_in_background(
@@ -195,7 +194,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         """Main loop that processes batches of requests."""
         try:
             prev_outputs = None
-            n_steps = 0
             while await lit_api.has_active_requests():
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
@@ -205,7 +203,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     raise HTTPException(500, "Expected StepOutput from step()")
 
                 prev_outputs = responses
-                n_steps += 1
                 # Send responses for all sequences (both streaming and completed)
                 for step_output in responses:
                     status = step_output.status
@@ -233,13 +230,15 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
 
 class DefaultContinuousBatchingLoop(ContinuousBatchingLoop):
+    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
+        """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
+        decoded_request = lit_api.decode_request(request)
+        self.active_sequences[uid] = {"input": decoded_request, "current_length": 0, "generated_sequence": []}
+
     async def step(
         self, prev_outputs: Optional[List[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
     ) -> List[Output]:
         """Process one token generation step for all active sequences."""
-        if hasattr(lit_api, "step"):
-            return await asyncio.to_thread(lit_api.step, prev_outputs)
-
         if not self.active_sequences:
             return []
 
