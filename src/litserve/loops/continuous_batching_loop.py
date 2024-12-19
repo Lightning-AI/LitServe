@@ -68,6 +68,7 @@ class ContinuousBatchingLoop(LitLoop):
         self.response_queue_ids: Dict[str, int] = {}  # uid -> response_queue_id
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+        """Check if the lit_api has the necessary methods and if streaming is enabled."""
         if not lit_api.stream:
             raise ValueError(
                 "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
@@ -155,13 +156,11 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         batch_timeout: float,
         response_queues: List[Queue],
     ):
-        print("Entered run_in_background in continuous_batching_loop")
+        logger.info("Running prefill in background")
         try:
-            print("Running prefill in background")
             pending_requests = []
             while True:
                 await asyncio.sleep(0.001)
-                print("prefilling...")
                 pending_requests = await self.prefill(
                     pending_requests,
                     lit_api,
@@ -172,10 +171,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     response_queues,
                 )
         except Exception as e:
-            print("Error in run_in_background", e)
             logger.exception("An error occurred in run_in_background: %s", e)
         finally:
-            print("Exiting run_in_background in continuous_batching_loop")
+            logger.info("Exiting run_in_background in continuous_batching_loop")
 
     async def step(
         self, prev_outputs: Optional[List[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
