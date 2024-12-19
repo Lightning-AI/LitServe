@@ -113,9 +113,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
     def has_capacity(self, lit_api: LitAPI) -> bool:
         """Check if we can add more sequences based on current batch."""
-        if hasattr(lit_api, "has_capacity"):
-            return lit_api.has_capacity()
-        raise NotImplementedError("LitAPI does not have a has_capacity method")
+        return lit_api.has_capacity()
 
     async def prefill(
         self,
@@ -201,7 +199,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             while await lit_api.has_active_requests():
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
-                logger.debug(f"Responses from step(): {responses}")
                 if len(responses) == 0:
                     raise HTTPException(500, "No responses from step()")
                 if responses and not isinstance(responses[0], Output):
@@ -211,7 +208,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 n_steps += 1
                 # Send responses for all sequences (both streaming and completed)
                 for step_output in responses:
-                    logger.debug(f"Processing response: {step_output}")
                     status = step_output.status
                     response_data = lit_api.encode_response(step_output.output)
                     uid = step_output.uid
