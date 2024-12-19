@@ -177,6 +177,11 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         finally:
             print("Exiting run_in_background in continuous_batching_loop")
 
+    async def step(
+        self, prev_outputs: Optional[List[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
+    ) -> List[Output]:
+        return await asyncio.to_thread(lit_api.step, prev_outputs)
+
     async def run(
         self,
         lit_api: LitAPI,
