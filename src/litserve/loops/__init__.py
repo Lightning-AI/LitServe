@@ -1,7 +1,7 @@
 import multiprocessing as mp
 
-from litserve.loops.base import LitLoop, get_default_loop, inference_worker
-from litserve.loops.loops import ContinuousBatchingLoop, Output
+from litserve.loops.continuous_batching_loop import ContinuousBatchingLoop, Output
+from litserve.loops.loops import LitLoop, get_default_loop, inference_worker
 
 mp.allow_connection_pickling()
 
