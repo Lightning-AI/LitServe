@@ -528,7 +528,7 @@ class LitLoop(_BaseLoop):
         )
         return batches, timed_out_uids
 
-    def get_request(self, request_queue: Queue, block: bool = True, timeout: float = 1.0):
+    def get_request(self, request_queue: Queue, block: bool = True, timeout: Optional[float] = None):
         try:
             return request_queue.get(block=block, timeout=timeout)
         except Empty:
