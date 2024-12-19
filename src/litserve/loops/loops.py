@@ -541,12 +541,12 @@ class LitLoop(_BaseLoop):
     def put_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
-        response_queues[response_queue_id].put((uid, (response_data, status)))
+        response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
     def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
-        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)))
+        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
 
 
 class DefaultLoop(LitLoop):
