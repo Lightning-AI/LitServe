@@ -503,9 +503,9 @@ class LitLoop(_BaseLoop):
         )
         return batches, timed_out_uids
 
-    def get_request(self, request_queue: Queue, timeout: float = 1.0):
+    def get_request(self, request_queue: Queue, block: bool = True, timeout: float = 1.0):
         try:
-            return request_queue.get(timeout=timeout)
+            return request_queue.get(block=block, timeout=timeout)
         except Empty:
             return None
 
@@ -698,7 +698,7 @@ class Output:
 
 
 class ContinuousBatchingLoop(LitLoop):
-    def __init__(self, prefill_after_n_steps: int = 1, max_sequence_length: int = 2048):
+    def __init__(self, prefill_after_n_steps: int = 10, max_sequence_length: int = 2048):
         """Runs continuous batching loop. This loop handles adding new requests, processing them in batches, and
         managing the state of active sequences.
 
@@ -832,13 +832,16 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             self.add_request(uid, input, lit_api, lit_spec)
             self.response_queue_ids[uid] = response_queue_id
 
-        if request_queue.empty() and pending_requests:
-            return pending_requests
-
         # Then check for new requests if we still have capacity
         if self.has_capacity(lit_api):
-            new_batches, timed_out_uids = self.get_batch_requests(lit_api, request_queue, max_batch_size, batch_timeout)
-            notify_timed_out_requests(response_queues, timed_out_uids)
+            new_batches = []
+            while True:
+                batch = self.get_request(request_queue, timeout=0, block=False)
+                if batch:
+                    response_queue_id, uid, _, x_enc = batch
+                    new_batches.append((response_queue_id, uid, x_enc))
+                else:
+                    break
 
             if new_batches:
                 # Add new requests to pending_requests and try to process them
