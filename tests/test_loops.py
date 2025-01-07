@@ -29,18 +29,17 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import (
-    ContinuousBatchingLoop,
     DefaultLoop,
     LitLoop,
     Output,
     _BaseLoop,
     inference_worker,
-    notify_timed_out_requests,
     run_batched_loop,
     run_batched_streaming_loop,
     run_single_loop,
     run_streaming_loop,
 )
+from litserve.loops.continuous_batching_loop import DefaultContinuousBatchingLoop, notify_timed_out_requests
 from litserve.specs.base import LitSpec
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus, wrap_litserve_start
@@ -184,8 +183,8 @@ def test_batched_streaming_loop():
     fake_stream_api.encode_response.assert_called_once()
 
 
-@patch("litserve.loops.run_batched_loop")
-@patch("litserve.loops.run_single_loop")
+@patch("litserve.loops.loops.run_batched_loop")
+@patch("litserve.loops.loops.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
     inference_worker(
         *[MagicMock()] * 6,
@@ -615,7 +614,7 @@ def continuous_batching_setup():
     lit_api.setup(None)
     request_queue = Queue()
     response_queues = [Queue()]
-    loop = ContinuousBatchingLoop()
+    loop = DefaultContinuousBatchingLoop()
     return lit_api, loop, request_queue, response_queues
 
 
