@@ -563,7 +563,6 @@ def test_notify_timed_out_requests():
 class ContinuousBatchingAPI(ls.LitAPI):
     def setup(self, spec: Optional[LitSpec]):
         self.model = {}
-        self.capacity = True
 
     def add_request(self, uid: str, request):
         print(f"Adding to request_queue at {time.monotonic()}")
@@ -576,10 +575,7 @@ class ContinuousBatchingAPI(ls.LitAPI):
         return {"output": output}
 
     def has_capacity(self) -> bool:
-        if self.capacity:
-            self.capacity = False
-            return True
-        return False
+        return True
 
     def has_active_requests(self) -> bool:
         return bool(self.model)
