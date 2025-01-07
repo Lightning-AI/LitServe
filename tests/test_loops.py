@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncio
 import inspect
 import io
 import json
@@ -564,8 +563,10 @@ def test_notify_timed_out_requests():
 class ContinuousBatchingAPI(ls.LitAPI):
     def setup(self, spec: Optional[LitSpec]):
         self.model = {}
+        self.capacity = True
 
     def add_request(self, uid: str, request):
+        print(f"Adding to request_queue at {time.monotonic()}")
         self.model[uid] = {"outputs": list(range(5))}
 
     def decode_request(self, input: str):
@@ -575,7 +576,10 @@ class ContinuousBatchingAPI(ls.LitAPI):
         return {"output": output}
 
     def has_capacity(self) -> bool:
-        return True
+        if self.capacity:
+            self.capacity = False
+            return True
+        return False
 
     def has_active_requests(self) -> bool:
         return bool(self.model)
@@ -639,9 +643,9 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
 @pytest.mark.asyncio
 async def test_continuous_batching_run(continuous_batching_setup):
     lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
-    task = asyncio.create_task(lit_loop.prefill([], lit_api, None, request_queue, 2, 0, response_queues))
-    await asyncio.sleep(1)
+    response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
+    lit_loop.add_request(uid, input, lit_api, None)
+    lit_loop.response_queue_ids[uid] = response_queue_id
     await lit_loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
 
     results = []
@@ -659,5 +663,3 @@ async def test_continuous_batching_run(continuous_batching_setup):
     o = json.loads(response_data)["output"]
     assert o == ""
     assert status == LitAPIStatus.FINISH_STREAMING
-    task.cancel()
-    await asyncio.sleep(1)

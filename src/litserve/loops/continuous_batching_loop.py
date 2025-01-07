@@ -141,7 +141,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 response_queue_id, uid, _, input = request
                 pending_requests.append((response_queue_id, uid, input))
                 break
-        logger.info(f"Prefill finished, {len(lit_api.uids)} active requests.")
         return pending_requests
 
     async def schedule_task(
