@@ -20,13 +20,12 @@ from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
-from litserve.callbacks import CallbackRunner, EventTypes
+from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, PickleableHTTPException
+from litserve.utils import LitAPIStatus
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -77,301 +76,6 @@ def collate_requests(
             continue
 
     return payloads, timed_out_uids
-
-
-def run_single_loop(
-    lit_api: LitAPI,
-    lit_spec: LitSpec,
-    request_queue: Queue,
-    response_queues: List[Queue],
-    callback_runner: CallbackRunner,
-):
-    while True:
-        try:
-            response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
-        except (Empty, ValueError):
-            continue
-
-        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
-            time.monotonic() - timestamp > lit_api.request_timeout
-        ):
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-            continue
-        try:
-            context = {}
-            if hasattr(lit_spec, "populate_context"):
-                lit_spec.populate_context(context, x_enc)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = _inject_context(
-                context,
-                lit_api.decode_request,
-                x_enc,
-            )
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-            y = _inject_context(
-                context,
-                lit_api.predict,
-                x,
-            )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
-            y_enc = _inject_context(
-                context,
-                lit_api.encode_response,
-                y,
-            )
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
-
-            response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-
-        except HTTPException as e:
-            response_queues[response_queue_id].put((
-                uid,
-                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-            ))
-
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the request uid=%s.\n"
-                "Please check the error trace for more details.",
-                uid,
-            )
-            response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
-
-
-def run_batched_loop(
-    lit_api: LitAPI,
-    lit_spec: LitSpec,
-    request_queue: Queue,
-    response_queues: List[Queue],
-    max_batch_size: int,
-    batch_timeout: float,
-    callback_runner: CallbackRunner,
-):
-    while True:
-        batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
-            max_batch_size,
-            batch_timeout,
-        )
-
-        for response_queue_id, uid in timed_out_uids:
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-
-        if not batches:
-            continue
-        logger.debug(f"{len(batches)} batched requests received")
-        response_queue_ids, uids, inputs = zip(*batches)
-        try:
-            contexts = [{}] * len(inputs)
-            if hasattr(lit_spec, "populate_context"):
-                for input, context in zip(inputs, contexts):
-                    lit_spec.populate_context(context, input)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = [
-                _inject_context(
-                    context,
-                    lit_api.decode_request,
-                    input,
-                )
-                for input, context in zip(inputs, contexts)
-            ]
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
-
-            x = lit_api.batch(x)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-            y = _inject_context(contexts, lit_api.predict, x)
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-
-            outputs = lit_api.unbatch(y)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
-            y_enc_list = []
-            for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
-                y_enc = _inject_context(context, lit_api.encode_response, y)
-                y_enc_list.append((response_queue_id, uid, y_enc))
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
-
-            for response_queue_id, uid, y_enc in y_enc_list:
-                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-
-        except HTTPException as e:
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((
-                    uid,
-                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                ))
-
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the batched request.\n"
-                "Please check the error trace for more details."
-            )
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
-
-
-def run_streaming_loop(
-    lit_api: LitAPI,
-    lit_spec: LitSpec,
-    request_queue: Queue,
-    response_queues: List[Queue],
-    callback_runner: CallbackRunner,
-):
-    while True:
-        try:
-            response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
-            logger.debug("uid=%s", uid)
-        except (Empty, ValueError):
-            continue
-
-        if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
-            time.monotonic() - timestamp > lit_api.request_timeout
-        ):
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-            continue
-
-        try:
-            context = {}
-            if hasattr(lit_spec, "populate_context"):
-                lit_spec.populate_context(context, x_enc)
-            x = _inject_context(
-                context,
-                lit_api.decode_request,
-                x_enc,
-            )
-
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-            y_gen = _inject_context(
-                context,
-                lit_api.predict,
-                x,
-            )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-
-            y_enc_gen = _inject_context(
-                context,
-                lit_api.encode_response,
-                y_gen,
-            )
-            for y_enc in y_enc_gen:
-                y_enc = lit_api.format_encoded_response(y_enc)
-                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-            response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
-
-        except HTTPException as e:
-            response_queues[response_queue_id].put((
-                uid,
-                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-            ))
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the streaming request uid=%s.\n"
-                "Please check the error trace for more details.",
-                uid,
-            )
-            response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
-
-
-def run_batched_streaming_loop(
-    lit_api: LitAPI,
-    lit_spec: LitSpec,
-    request_queue: Queue,
-    response_queues: List[Queue],
-    max_batch_size: int,
-    batch_timeout: float,
-    callback_runner: CallbackRunner,
-):
-    while True:
-        batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
-            max_batch_size,
-            batch_timeout,
-        )
-        for response_queue_id, uid in timed_out_uids:
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-
-        if not batches:
-            continue
-        response_queue_ids, uids, inputs = zip(*batches)
-        try:
-            contexts = [{}] * len(inputs)
-            if hasattr(lit_spec, "populate_context"):
-                for input, context in zip(inputs, contexts):
-                    lit_spec.populate_context(context, input)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = [
-                _inject_context(
-                    context,
-                    lit_api.decode_request,
-                    input,
-                )
-                for input, context in zip(inputs, contexts)
-            ]
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
-
-            x = lit_api.batch(x)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-            y_iter = _inject_context(contexts, lit_api.predict, x)
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-
-            unbatched_iter = lit_api.unbatch(y_iter)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
-            y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
-
-            # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
-            for y_batch in y_enc_iter:
-                for response_queue_id, y_enc, uid in zip(response_queue_ids, y_batch, uids):
-                    y_enc = lit_api.format_encoded_response(y_enc)
-                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
-
-        except HTTPException as e:
-            response_queues[response_queue_id].put((
-                uid,
-                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-            ))
-
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the streaming batched request.\n"
-                "Please check the error trace for more details."
-            )
-            response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 class _BaseLoop(ABC):
@@ -546,3 +250,70 @@ class LitLoop(_BaseLoop):
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
         response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
+
+
+class DefaultLoop(LitLoop):
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+        # we will sanitize regularly if no spec
+        # in case, we have spec then:
+        # case 1: spec implements a streaming API
+        # Case 2: spec implements a non-streaming API
+        if spec:
+            # TODO: Implement sanitization
+            lit_api._spec = spec
+            return
+
+        original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
+        if (
+            lit_api.stream
+            and lit_api.max_batch_size > 1
+            and not all([
+                inspect.isgeneratorfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response),
+                (original or inspect.isgeneratorfunction(lit_api.unbatch)),
+            ])
+        ):
+            raise ValueError(
+                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
+                `lit_api.unbatch` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+
+                def unbatch(self, outputs):
+                    for output in outputs:
+                        unbatched_output = ...
+                        yield unbatched_output
+             """
+            )
+
+        if lit_api.stream and not all([
+            inspect.isgeneratorfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response),
+        ]):
+            raise ValueError(
+                """When `stream=True` both `lit_api.predict` and
+             `lit_api.encode_response` must generate values using `yield`.
+
+             Example:
+
+                def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        yield prediction
+
+                def encode_response(self, outputs):
+                    for output in outputs:
+                        encoded_output = ...
+                        yield encoded_output
+             """
+            )

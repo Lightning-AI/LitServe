@@ -29,20 +29,16 @@ from fastapi.testclient import TestClient
 import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
-from litserve.loops import (
-    DefaultLoop,
-    LitLoop,
-    Output,
-    _BaseLoop,
-    inference_worker,
-    run_batched_loop,
-    run_batched_streaming_loop,
-    run_single_loop,
-    run_streaming_loop,
-)
+from litserve.loops import LitLoop, Output, _BaseLoop, inference_worker
+from litserve.loops.base import DefaultLoop
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
     notify_timed_out_requests,
+)
+from litserve.loops.simple_loops import run_batched_loop, run_single_loop
+from litserve.loops.streaming_loops import (
+    run_batched_streaming_loop,
+    run_streaming_loop,
 )
 from litserve.specs.base import LitSpec
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
@@ -187,8 +183,8 @@ def test_batched_streaming_loop():
     fake_stream_api.encode_response.assert_called_once()
 
 
-@patch("litserve.loops.loops.run_batched_loop")
-@patch("litserve.loops.loops.run_single_loop")
+@patch("litserve.loops.simple_loops.run_batched_loop")
+@patch("litserve.loops.simple_loops.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
     inference_worker(
         *[MagicMock()] * 6,

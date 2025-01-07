@@ -13,41 +13,26 @@
 # limitations under the License.
 import multiprocessing as mp
 
-from litserve.loops.base import (
-    _BaseLoop,
-    run_batched_loop,
-    run_batched_streaming_loop,
-    run_single_loop,
-    run_streaming_loop,
-)
+from litserve.loops.base import LitLoop, _BaseLoop
 from litserve.loops.continuous_batching_loop import ContinuousBatchingLoop, Output
 from litserve.loops.loops import (
-    BatchedLoop,
-    BatchedStreamingLoop,
-    DefaultLoop,
-    LitLoop,
-    SingleLoop,
-    StreamingLoop,
     get_default_loop,
     inference_worker,
 )
+from litserve.loops.simple_loops import BatchedLoop, SingleLoop
+from litserve.loops.streaming_loops import BatchedStreamingLoop, StreamingLoop
 
 mp.allow_connection_pickling()
 
 __all__ = [
     "_BaseLoop",
-    "DefaultLoop",
-    "SingleLoop",
-    "StreamingLoop",
-    "BatchedLoop",
-    "BatchedStreamingLoop",
-    "ContinuousBatchingLoop",
     "LitLoop",
-    "run_batched_loop",
-    "run_streaming_loop",
-    "run_batched_streaming_loop",
-    "run_single_loop",
     "get_default_loop",
     "inference_worker",
     "Output",
+    "SingleLoop",
+    "BatchedLoop",
+    "StreamingLoop",
+    "BatchedStreamingLoop",
+    "ContinuousBatchingLoop",
 ]

@@ -11,180 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 from queue import Queue
 from typing import Dict, List, Optional, Union
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.loops.base import (
-    LitLoop,
-    _BaseLoop,
-    run_batched_loop,
-    run_batched_streaming_loop,
-    run_single_loop,
-    run_streaming_loop,
-)
+from litserve.loops.base import _BaseLoop
+from litserve.loops.simple_loops import BatchedLoop, SingleLoop
+from litserve.loops.streaming_loops import BatchedStreamingLoop, StreamingLoop
 from litserve.specs.base import LitSpec
 from litserve.utils import WorkerSetupStatus
 
 logger = logging.getLogger(__name__)
-
-
-class DefaultLoop(LitLoop):
-    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
-        # we will sanitize regularly if no spec
-        # in case, we have spec then:
-        # case 1: spec implements a streaming API
-        # Case 2: spec implements a non-streaming API
-        if spec:
-            # TODO: Implement sanitization
-            lit_api._spec = spec
-            return
-
-        original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
-        if (
-            lit_api.stream
-            and lit_api.max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response),
-                (original or inspect.isgeneratorfunction(lit_api.unbatch)),
-            ])
-        ):
-            raise ValueError(
-                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
-                `lit_api.unbatch` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-
-                def unbatch(self, outputs):
-                    for output in outputs:
-                        unbatched_output = ...
-                        yield unbatched_output
-             """
-            )
-
-        if lit_api.stream and not all([
-            inspect.isgeneratorfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response),
-        ]):
-            raise ValueError(
-                """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-             """
-            )
-
-
-class SingleLoop(DefaultLoop):
-    def __call__(
-        self,
-        lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
-        device: str,
-        worker_id: int,
-        request_queue: Queue,
-        response_queues: List[Queue],
-        max_batch_size: int,
-        batch_timeout: float,
-        stream: bool,
-        workers_setup_status: Dict[int, str],
-        callback_runner: CallbackRunner,
-    ):
-        run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
-
-
-class BatchedLoop(DefaultLoop):
-    def __call__(
-        self,
-        lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
-        device: str,
-        worker_id: int,
-        request_queue: Queue,
-        response_queues: List[Queue],
-        max_batch_size: int,
-        batch_timeout: float,
-        stream: bool,
-        workers_setup_status: Dict[int, str],
-        callback_runner: CallbackRunner,
-    ):
-        run_batched_loop(
-            lit_api,
-            lit_spec,
-            request_queue,
-            response_queues,
-            max_batch_size,
-            batch_timeout,
-            callback_runner,
-        )
-
-
-class StreamingLoop(DefaultLoop):
-    def __call__(
-        self,
-        lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
-        device: str,
-        worker_id: int,
-        request_queue: Queue,
-        response_queues: List[Queue],
-        max_batch_size: int,
-        batch_timeout: float,
-        stream: bool,
-        workers_setup_status: Dict[int, str],
-        callback_runner: CallbackRunner,
-    ):
-        run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
-
-
-class BatchedStreamingLoop(DefaultLoop):
-    def __call__(
-        self,
-        lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
-        device: str,
-        worker_id: int,
-        request_queue: Queue,
-        response_queues: List[Queue],
-        max_batch_size: int,
-        batch_timeout: float,
-        stream: bool,
-        workers_setup_status: Dict[int, str],
-        callback_runner: CallbackRunner,
-    ):
-        run_batched_streaming_loop(
-            lit_api,
-            lit_spec,
-            request_queue,
-            response_queues,
-            max_batch_size,
-            batch_timeout,
-            callback_runner,
-        )
 
 
 def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:

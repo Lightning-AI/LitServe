@@ -21,7 +21,7 @@ from fastapi import HTTPException
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
-from litserve.loops.loops import LitLoop
+from litserve.loops.base import LitLoop
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
