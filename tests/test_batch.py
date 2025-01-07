@@ -26,7 +26,8 @@ from httpx import ASGITransport, AsyncClient
 import litserve as ls
 from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
-from litserve.loops import collate_requests, run_batched_loop
+from litserve.loops import run_batched_loop
+from litserve.loops.base import collate_requests
 from litserve.utils import wrap_litserve_start
 
 NOOP_CB_RUNNER = CallbackRunner()

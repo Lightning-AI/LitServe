@@ -664,3 +664,4 @@ async def test_continuous_batching_run(continuous_batching_setup):
     assert o == ""
     assert status == LitAPIStatus.FINISH_STREAMING
     task.cancel()
+    await asyncio.sleep(1)
