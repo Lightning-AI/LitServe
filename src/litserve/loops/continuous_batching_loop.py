@@ -119,9 +119,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        max_batch_size: int,
-        batch_timeout: float,
-        response_queues: List[Queue],
+        max_batch_size: Optional[int] = None,
+        batch_timeout: Optional[float] = None,
+        response_queues: List[Queue] = None,
     ) -> List[Tuple[str, Any]]:
         """Fill available capacity with pending and new requests."""
         # First process existing pending requests
@@ -131,7 +131,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             self.response_queue_ids[uid] = response_queue_id
 
         while True:
-            request = await asyncio.to_thread(self.get_request, request_queue, timeout=None)
+            request = await asyncio.to_thread(self.get_request, request_queue, timeout=None, block=True)
             if self.has_capacity(lit_api):
                 response_queue_id, uid, _, input = request
                 logger.debug(f"New request: {uid}, {input}")
@@ -144,7 +144,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         logger.info(f"Prefill finished, {len(lit_api.uids)} active requests.")
         return pending_requests
 
-    async def run_in_background(
+    async def schedule_task(
         self,
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],

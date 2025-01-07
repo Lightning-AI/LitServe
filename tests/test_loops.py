@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import inspect
 import io
 import json
@@ -39,7 +40,10 @@ from litserve.loops import (
     run_single_loop,
     run_streaming_loop,
 )
-from litserve.loops.continuous_batching_loop import DefaultContinuousBatchingLoop, notify_timed_out_requests
+from litserve.loops.continuous_batching_loop import (
+    ContinuousBatchingLoop,
+    notify_timed_out_requests,
+)
 from litserve.specs.base import LitSpec
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.utils import LitAPIStatus, wrap_litserve_start
@@ -574,6 +578,12 @@ class ContinuousBatchingAPI(ls.LitAPI):
     def encode_response(self, output: str):
         return {"output": output}
 
+    def has_capacity(self) -> bool:
+        return True
+
+    def has_active_requests(self) -> bool:
+        return bool(self.model)
+
     def step(self, prev_outputs: Optional[List[Output]]) -> List[Output]:
         outputs = []
         for k in self.model:
@@ -614,12 +624,12 @@ def continuous_batching_setup():
     lit_api.setup(None)
     request_queue = Queue()
     response_queues = [Queue()]
-    loop = DefaultContinuousBatchingLoop()
-    return lit_api, loop, request_queue, response_queues
+    lit_loop = ContinuousBatchingLoop()
+    return lit_api, lit_loop, request_queue, response_queues
 
 
 def test_continuous_batching_pre_setup(continuous_batching_setup):
-    lit_api, loop, request_queue, response_queues = continuous_batching_setup
+    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
     lit_api.stream = False
     with pytest.raises(
         ValueError,
@@ -627,13 +637,16 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
             "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
         ),
     ):
-        loop.pre_setup(lit_api, None)
+        lit_loop.pre_setup(lit_api, None)
 
 
-def test_continuous_batching_run(continuous_batching_setup):
-    lit_api, loop, request_queue, response_queues = continuous_batching_setup
+@pytest.mark.asyncio
+async def test_continuous_batching_run(continuous_batching_setup):
+    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
-    loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
+    task = asyncio.create_task(lit_loop.prefill([], lit_api, None, request_queue, 2, 0, response_queues))
+    await asyncio.sleep(1)
+    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
 
     results = []
     for i in range(5):
@@ -650,3 +663,4 @@ def test_continuous_batching_run(continuous_batching_setup):
     o = json.loads(response_data)["output"]
     assert o == ""
     assert status == LitAPIStatus.FINISH_STREAMING
+    task.cancel()

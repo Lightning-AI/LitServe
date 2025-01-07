@@ -18,7 +18,7 @@ import sys
 import time
 from abc import ABC
 from queue import Empty, Queue
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import HTTPException
 from starlette.formparsers import MultiPartParser
@@ -427,7 +427,7 @@ class _BaseLoop(ABC):
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
         pass
 
-    async def run_in_background(
+    async def schedule_task(
         self,
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
@@ -453,14 +453,14 @@ class _BaseLoop(ABC):
         callback_runner: CallbackRunner,
     ):
         if asyncio.iscoroutinefunction(self.run):
-            loop = asyncio.new_event_loop()
+            event_loop = asyncio.new_event_loop()
 
             async def _wrapper():
-                print("Running LitLoop in a asyncio event loop")
-                future = self.run_in_background(
+                logger.info("Running LitLoop in a asyncio event loop")
+                future = self.schedule_task(
                     lit_api, lit_spec, request_queue, max_batch_size, batch_timeout, response_queues
                 )
-                loop.create_task(future)
+                _ = event_loop.create_task(future)
                 while True:
                     try:
                         await self.run(
@@ -479,9 +479,8 @@ class _BaseLoop(ABC):
                         await asyncio.sleep(0)
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
-                        # Optionally, break the loop or handle the error as needed
 
-            loop.run_until_complete(_wrapper())
+            event_loop.run_until_complete(_wrapper())
         else:
             while True:
                 self.run(
@@ -513,3 +512,37 @@ class _BaseLoop(ABC):
         callback_runner: CallbackRunner,
     ):
         raise NotImplementedError
+
+
+class LitLoop(_BaseLoop):
+    def __init__(self):
+        self._context = {}
+
+    def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
+        batches, timed_out_uids = collate_requests(
+            lit_api,
+            request_queue,
+            max_batch_size,
+            batch_timeout,
+        )
+        return batches, timed_out_uids
+
+    def get_request(self, request_queue: Queue, block: bool = True, timeout: Optional[float] = None):
+        try:
+            return request_queue.get(block=block, timeout=timeout)
+        except Empty:
+            return None
+
+    def populate_context(self, lit_spec: LitSpec, request: Any):
+        if lit_spec and hasattr(lit_spec, "populate_context"):
+            lit_spec.populate_context(self._context, request)
+
+    def put_response(
+        self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
+    ) -> None:
+        response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
+
+    def put_error_response(
+        self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
+    ) -> None:
+        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
