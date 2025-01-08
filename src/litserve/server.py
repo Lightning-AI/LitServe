@@ -274,8 +274,7 @@ class LitServer:
 
         self._logger_connector.run(self)
 
-        # self.response_queues = [_ for _ in range(num_uvicorn_servers)]
-        self.response_queues = None
+        self.response_queues = list(range(num_uvicorn_servers))
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)

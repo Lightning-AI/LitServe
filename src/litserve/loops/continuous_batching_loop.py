@@ -156,7 +156,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     batch_timeout,
                     response_queues,
                 )
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.001)
         except Exception as e:
             logger.exception("An error occurred in run_in_background: %s", e)
         finally:
@@ -202,13 +202,14 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
                     response_data = lit_api.format_encoded_response(response_data)
                     if status == LitAPIStatus.ERROR:
-                        self.put_error_response(response_queues, response_queue_id, uid, response_data)
+                        await self.put_error_response(response_queues, response_queue_id, uid, response_data)
                         self.mark_completed(uid)
                     elif status == LitAPIStatus.FINISH_STREAMING:
-                        self.put_response(response_queues, response_queue_id, uid, response_data, status)
+                        await self.put_response(response_queues, response_queue_id, uid, response_data, status)
                         self.mark_completed(uid)
                     else:
-                        self.put_response(response_queues, response_queue_id, uid, response_data, status)
+                        # await self.socket.send_pyobj((uid, (response_data, status)))
+                        await self.put_response(response_queues, response_queue_id, uid, response_data, status)
 
         except Exception as e:
             logger.exception(f"Error in continuous batching loop: {e}")
