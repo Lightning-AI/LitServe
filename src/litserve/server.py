@@ -26,10 +26,11 @@ import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from queue import Empty
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
+import zmq
+import zmq.asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
@@ -75,12 +76,16 @@ async def response_queue_to_buffer(
     threadpool: ThreadPoolExecutor,
 ):
     loop = asyncio.get_running_loop()
+    context = zmq.asyncio.Context()
+    socket = context.socket(zmq.SUB)
+    socket.connect("tcp://127.0.0.1:5558")
+    socket.setsockopt_string(zmq.SUBSCRIBE, "")
     if stream:
         while True:
             try:
-                uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-            except Empty:
-                await asyncio.sleep(0.0001)
+                uid, response = await socket.recv_pyobj()
+            except zmq.ZMQError:
+                await asyncio.sleep(0)
                 continue
             stream_response_buffer, event = response_buffer[uid]
             stream_response_buffer.append(response)
@@ -269,7 +274,8 @@ class LitServer:
 
         self._logger_connector.run(self)
 
-        self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
+        # self.response_queues = [_ for _ in range(num_uvicorn_servers)]
+        self.response_queues = None
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)

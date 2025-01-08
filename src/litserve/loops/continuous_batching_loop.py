@@ -28,15 +28,6 @@ from litserve.utils import LitAPIStatus
 logger = logging.getLogger(__name__)
 
 
-def notify_timed_out_requests(
-    response_queues: List[Queue],
-    timed_out_uids: List[Tuple[int, str]],
-):
-    for response_queue_id, uid in timed_out_uids:
-        logger.error(f"Request {uid} was waiting in the queue for too long and has been timed out.")
-        response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-
-
 @dataclass
 class Output:
     """Outputs from a single step of the loop."""

@@ -20,6 +20,7 @@ from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import zmq
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -156,6 +157,9 @@ class _BaseLoop(ABC):
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
+        context = zmq.Context()
+        self.socket = context.socket(zmq.PUB)
+        self.socket.bind("tcp://*:5558")
         if asyncio.iscoroutinefunction(self.run):
             event_loop = asyncio.new_event_loop()
 
@@ -244,12 +248,14 @@ class LitLoop(_BaseLoop):
     def put_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
-        response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
+        self.socket.send_pyobj((uid, (response_data, status)))
+        # response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
     def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
-        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
+        self.socket.send_pyobj((uid, (error, LitAPIStatus.ERROR)))
+        # response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
 
 
 class DefaultLoop(LitLoop):
