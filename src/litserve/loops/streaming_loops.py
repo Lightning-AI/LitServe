@@ -21,7 +21,7 @@ from fastapi import HTTPException
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.loops.base import LitLoop, _inject_context, collate_requests
+from litserve.loops.base import DefaultLoop, LitLoop, _inject_context, collate_requests
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, PickleableHTTPException
 
@@ -172,73 +172,6 @@ def run_batched_streaming_loop(
                 "Please check the error trace for more details."
             )
             response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
-
-
-class DefaultLoop(LitLoop):
-    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
-        # we will sanitize regularly if no spec
-        # in case, we have spec then:
-        # case 1: spec implements a streaming API
-        # Case 2: spec implements a non-streaming API
-        if spec:
-            # TODO: Implement sanitization
-            lit_api._spec = spec
-            return
-
-        original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
-        if (
-            lit_api.stream
-            and lit_api.max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response),
-                (original or inspect.isgeneratorfunction(lit_api.unbatch)),
-            ])
-        ):
-            raise ValueError(
-                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
-                `lit_api.unbatch` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-
-                def unbatch(self, outputs):
-                    for output in outputs:
-                        unbatched_output = ...
-                        yield unbatched_output
-             """
-            )
-
-        if lit_api.stream and not all([
-            inspect.isgeneratorfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response),
-        ]):
-            raise ValueError(
-                """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-             """
-            )
 
 
 class StreamingLoop(DefaultLoop):
