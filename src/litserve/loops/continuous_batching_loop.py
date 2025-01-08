@@ -89,9 +89,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             return False
         """)
 
-    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
+    async def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
-        lit_api.add_request(uid, request)
+        await lit_api.add_request(uid, request)
         self.active_sequences[uid] = {"input": request}
 
     def mark_completed(self, uid: str) -> None:
@@ -118,7 +118,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         # First process existing pending requests
         while pending_requests and self.has_capacity(lit_api):
             response_queue_id, uid, input = pending_requests.pop(0)
-            self.add_request(uid, input, lit_api, lit_spec)
+            await self.add_request(uid, input, lit_api, lit_spec)
             self.response_queue_ids[uid] = response_queue_id
 
         while True:
@@ -126,7 +126,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             if self.has_capacity(lit_api):
                 response_queue_id, uid, _, input = request
                 logger.debug(f"New request: {uid}, {input}")
-                self.add_request(uid, input, lit_api, lit_spec)
+                await self.add_request(uid, input, lit_api, lit_spec)
                 self.response_queue_ids[uid] = response_queue_id
             else:
                 response_queue_id, uid, _, input = request
@@ -156,7 +156,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     batch_timeout,
                     response_queues,
                 )
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0)
         except Exception as e:
             logger.exception("An error occurred in run_in_background: %s", e)
         finally:
@@ -200,8 +200,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     response_data = lit_api.encode_response(step_output.output)
                     uid = step_output.uid
                     response_queue_id = self.response_queue_ids[uid]
-
                     response_data = lit_api.format_encoded_response(response_data)
+
                     if status == LitAPIStatus.ERROR:
                         await self.put_error_response(response_queues, response_queue_id, uid, response_data)
                         self.mark_completed(uid)
@@ -211,12 +211,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     else:
                         prepared_responses.append((uid, (response_data, status)))
 
-                # convert each value (uid, (response_data, status)) to pickle
-                logger.info(f"Sending {len(prepared_responses)} responses")
-                prepared_responses = [
-                    (uid, (response_data, status)) for uid, (response_data, status) in prepared_responses
-                ]
-                self.socket.send_pyobj(prepared_responses)
+                if prepared_responses:
+                    await self.socket.send_pyobj(prepared_responses)
 
         except Exception as e:
             logger.exception(f"Error in continuous batching loop: {e}")

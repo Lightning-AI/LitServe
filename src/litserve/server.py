@@ -88,7 +88,8 @@ async def response_queue_to_buffer(
                     stream_response_buffer, event = response_buffer[uid]
                     stream_response_buffer.append(response)
                     event.set()
-            except zmq.ZMQError:
+            except zmq.ZMQError as e:
+                logger.error(f"ZMQError {e!r}")
                 await asyncio.sleep(0)
                 continue
 

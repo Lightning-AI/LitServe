@@ -158,7 +158,7 @@ class _BaseLoop(ABC):
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
-        context = zmq.asyncio.Context()
+        context = zmq.asyncio.Context(io_threads=2)
         self.socket = context.socket(zmq.PUB)
         self.socket.bind("tcp://*:5558")
         if asyncio.iscoroutinefunction(self.run):
