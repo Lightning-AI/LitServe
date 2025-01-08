@@ -21,6 +21,7 @@ from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import zmq
+import zmq.asyncio
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -157,7 +158,7 @@ class _BaseLoop(ABC):
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
-        context = zmq.Context()
+        context = zmq.asyncio.Context()
         self.socket = context.socket(zmq.PUB)
         self.socket.bind("tcp://*:5558")
         if asyncio.iscoroutinefunction(self.run):
@@ -245,16 +246,16 @@ class LitLoop(_BaseLoop):
         if lit_spec and hasattr(lit_spec, "populate_context"):
             lit_spec.populate_context(self._context, request)
 
-    def put_response(
+    async def put_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
-        self.socket.send_pyobj((uid, (response_data, status)))
+        await self.socket.send_pyobj((uid, (response_data, status)))
         # response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
-    def put_error_response(
+    async def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
-        self.socket.send_pyobj((uid, (error, LitAPIStatus.ERROR)))
+        await self.socket.send_pyobj((uid, (error, LitAPIStatus.ERROR)))
         # response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
 
 
