@@ -83,13 +83,14 @@ async def response_queue_to_buffer(
     if stream:
         while True:
             try:
-                uid, response = await socket.recv_pyobj()
+                responses = await socket.recv_pyobj()
+                for uid, response in responses:
+                    stream_response_buffer, event = response_buffer[uid]
+                    stream_response_buffer.append(response)
+                    event.set()
             except zmq.ZMQError:
                 await asyncio.sleep(0)
                 continue
-            stream_response_buffer, event = response_buffer[uid]
-            stream_response_buffer.append(response)
-            event.set()
 
     else:
         while True:

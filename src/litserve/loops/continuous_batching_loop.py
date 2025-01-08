@@ -194,6 +194,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
                 prev_outputs = responses
                 # Send responses for all sequences (both streaming and completed)
+                prepared_responses = []
                 for step_output in responses:
                     status = step_output.status
                     response_data = lit_api.encode_response(step_output.output)
@@ -205,11 +206,17 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                         await self.put_error_response(response_queues, response_queue_id, uid, response_data)
                         self.mark_completed(uid)
                     elif status == LitAPIStatus.FINISH_STREAMING:
-                        await self.put_response(response_queues, response_queue_id, uid, response_data, status)
+                        prepared_responses.append((uid, (response_data, status)))
                         self.mark_completed(uid)
                     else:
-                        # await self.socket.send_pyobj((uid, (response_data, status)))
-                        await self.put_response(response_queues, response_queue_id, uid, response_data, status)
+                        prepared_responses.append((uid, (response_data, status)))
+
+                # convert each value (uid, (response_data, status)) to pickle
+                logger.info(f"Sending {len(prepared_responses)} responses")
+                prepared_responses = [
+                    (uid, (response_data, status)) for uid, (response_data, status) in prepared_responses
+                ]
+                self.socket.send_pyobj(prepared_responses)
 
         except Exception as e:
             logger.exception(f"Error in continuous batching loop: {e}")
