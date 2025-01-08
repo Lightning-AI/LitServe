@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 import time
 from queue import Empty, Queue
@@ -21,7 +20,7 @@ from fastapi import HTTPException
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.loops.base import DefaultLoop, LitLoop, _inject_context, collate_requests
+from litserve.loops.base import DefaultLoop, _inject_context, collate_requests
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, PickleableHTTPException
 
