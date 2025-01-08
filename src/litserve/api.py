@@ -137,3 +137,9 @@ class LitAPI(ABC):
             )
             return
         self._logger_queue.put((key, value))
+
+    def has_active_requests(self) -> bool:
+        raise NotImplementedError("has_active_requests is not implemented")
+
+    def has_capacity(self) -> bool:
+        raise NotImplementedError("has_capacity is not implemented")

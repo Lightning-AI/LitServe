@@ -28,17 +28,15 @@ from fastapi.testclient import TestClient
 import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
-from litserve.loops import (
+from litserve.loops import LitLoop, Output, _BaseLoop, inference_worker
+from litserve.loops.base import DefaultLoop
+from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
-    DefaultLoop,
-    LitLoop,
-    Output,
-    _BaseLoop,
-    inference_worker,
     notify_timed_out_requests,
-    run_batched_loop,
+)
+from litserve.loops.simple_loops import run_batched_loop, run_single_loop
+from litserve.loops.streaming_loops import (
     run_batched_streaming_loop,
-    run_single_loop,
     run_streaming_loop,
 )
 from litserve.specs.base import LitSpec
@@ -184,8 +182,8 @@ def test_batched_streaming_loop():
     fake_stream_api.encode_response.assert_called_once()
 
 
-@patch("litserve.loops.run_batched_loop")
-@patch("litserve.loops.run_single_loop")
+@patch("litserve.loops.simple_loops.run_batched_loop")
+@patch("litserve.loops.simple_loops.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
     inference_worker(
         *[MagicMock()] * 6,
@@ -567,6 +565,7 @@ class ContinuousBatchingAPI(ls.LitAPI):
         self.model = {}
 
     def add_request(self, uid: str, request):
+        print(f"Adding to request_queue at {time.monotonic()}")
         self.model[uid] = {"outputs": list(range(5))}
 
     def decode_request(self, input: str):
@@ -574,6 +573,12 @@ class ContinuousBatchingAPI(ls.LitAPI):
 
     def encode_response(self, output: str):
         return {"output": output}
+
+    def has_capacity(self) -> bool:
+        return True
+
+    def has_active_requests(self) -> bool:
+        return bool(self.model)
 
     def step(self, prev_outputs: Optional[List[Output]]) -> List[Output]:
         outputs = []
@@ -615,12 +620,12 @@ def continuous_batching_setup():
     lit_api.setup(None)
     request_queue = Queue()
     response_queues = [Queue()]
-    loop = ContinuousBatchingLoop()
-    return lit_api, loop, request_queue, response_queues
+    lit_loop = ContinuousBatchingLoop()
+    return lit_api, lit_loop, request_queue, response_queues
 
 
 def test_continuous_batching_pre_setup(continuous_batching_setup):
-    lit_api, loop, request_queue, response_queues = continuous_batching_setup
+    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
     lit_api.stream = False
     with pytest.raises(
         ValueError,
@@ -628,13 +633,16 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
             "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
         ),
     ):
-        loop.pre_setup(lit_api, None)
+        lit_loop.pre_setup(lit_api, None)
 
 
-def test_continuous_batching_run(continuous_batching_setup):
-    lit_api, loop, request_queue, response_queues = continuous_batching_setup
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
-    loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
+@pytest.mark.asyncio
+async def test_continuous_batching_run(continuous_batching_setup):
+    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
+    response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
+    lit_loop.add_request(uid, input, lit_api, None)
+    lit_loop.response_queue_ids[uid] = response_queue_id
+    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
 
     results = []
     for i in range(5):
