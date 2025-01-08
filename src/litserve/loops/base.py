@@ -265,10 +265,10 @@ class DefaultLoop(LitLoop):
 
         original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
         if not lit_api.stream and any([
-                inspect.isgeneratorfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response),
-                (original or inspect.isgeneratorfunction(lit_api.unbatch)),
-            ]):
+            inspect.isgeneratorfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response),
+            (original or inspect.isgeneratorfunction(lit_api.unbatch)),
+        ]):
             raise ValueError(
                 """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` and `lit_api.unbatch` must not be
                 generator functions.
