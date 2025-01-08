@@ -26,10 +26,11 @@ import warnings
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from queue import Empty
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
+import zmq
+import zmq.asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
@@ -73,22 +74,32 @@ async def response_queue_to_buffer(
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
     threadpool: ThreadPoolExecutor,
+    use_zmq: bool,
 ):
     loop = asyncio.get_running_loop()
+    socket = None
+    if use_zmq:
+        ctx = zmq.asyncio.Context()
+        socket = ctx.socket(zmq.SUB)
+        # TODO: Make the address configurable or select random available port
+        socket.connect("tcp://127.0.0.1:5558")
+        socket.setsockopt_string(zmq.SUBSCRIBE, "")
+
+    async def _get_response():
+        if use_zmq:
+            return await socket.recv_pyobj()
+        return await loop.run_in_executor(threadpool, response_queue.get)
+
     if stream:
         while True:
-            try:
-                uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-            except Empty:
-                await asyncio.sleep(0.0001)
-                continue
+            uid, response = await _get_response()
             stream_response_buffer, event = response_buffer[uid]
             stream_response_buffer.append(response)
             event.set()
 
     else:
         while True:
-            uid, response = await loop.run_in_executor(threadpool, response_queue.get)
+            uid, response = await _get_response()
             event = response_buffer.pop(uid)
             response_buffer[uid] = response
             event.set()
@@ -116,6 +127,7 @@ class LitServer:
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
+        use_zmq: bool = False,
     ):
         """Initialize a LitServer instance.
 
@@ -232,6 +244,7 @@ class LitServer:
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
+        self.use_zmq = use_zmq
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -301,6 +314,7 @@ class LitServer:
                     self.workers_setup_status,
                     self._callback_runner,
                     self._loop,
+                    self.use_zmq,
                 ),
             )
             process.start()
@@ -320,7 +334,9 @@ class LitServer:
 
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
-        future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
+        future = response_queue_to_buffer(
+            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq
+        )
         task = loop.create_task(future)
 
         yield
