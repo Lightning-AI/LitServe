@@ -34,7 +34,7 @@ def run_streaming_loop(
     request_queue: Queue,
     response_queues: List[Queue],
     callback_runner: CallbackRunner,
-    socket: zmq.Socket | None,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         try:
@@ -207,7 +207,7 @@ class StreamingLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: zmq.Socket | None,
+        socket: Optional[zmq.Socket],
     ):
         run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner, socket)
 
@@ -226,7 +226,7 @@ class BatchedStreamingLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: zmq.Socket | None,
+        socket: Optional[zmq.Socket],
     ):
         run_batched_streaming_loop(
             lit_api,

@@ -85,7 +85,7 @@ def run_single_loop(
     request_queue: Queue,
     response_queues: List[Queue],
     callback_runner: CallbackRunner,
-    socket: zmq.Socket | None,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         try:
@@ -165,7 +165,7 @@ def run_batched_loop(
     max_batch_size: int,
     batch_timeout: float,
     callback_runner: CallbackRunner,
-    socket: zmq.Socket | None,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         batches, timed_out_uids = collate_requests(
@@ -264,7 +264,7 @@ class SingleLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: zmq.Socket | None,
+        socket: Optional[zmq.Socket],
     ):
         run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner, socket)
 
@@ -283,7 +283,7 @@ class BatchedLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: zmq.Socket | None,
+        socket: Optional[zmq.Socket],
     ):
         run_batched_loop(
             lit_api,
