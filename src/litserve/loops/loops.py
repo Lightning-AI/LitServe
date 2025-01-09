@@ -55,6 +55,7 @@ def inference_worker(
     callback_runner: CallbackRunner,
     loop: Union[str, _BaseLoop],
     use_zmq: bool,
+    zmq_port: Optional[int],
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
     try:
@@ -81,8 +82,8 @@ def inference_worker(
     if use_zmq:
         ctx = zmq.Context()
         socket = ctx.socket(zmq.PUB)
-        # TODO: Make this configurable
-        socket.bind("tcp://*:5558")
+        logger.debug(f"Inference worker binding to port {zmq_port}")
+        socket.bind(f"tcp://*:{zmq_port}")
 
     loop(
         lit_api,

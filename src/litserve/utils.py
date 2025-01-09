@@ -15,6 +15,7 @@ import asyncio
 import dataclasses
 import logging
 import pickle
+import socket
 import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
@@ -131,3 +132,15 @@ def add_log_handler(handler):
 
     """
     logging.getLogger("litserve").addHandler(handler)
+
+
+def get_random_port(min_port=49152, max_port=65535):
+    """Get a random available open port on the local machine within a specified range."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        for port in range(min_port, max_port):
+            try:
+                s.bind(("", port))
+            except OSError:
+                continue
+            return port
+    raise ValueError("No open ports available")

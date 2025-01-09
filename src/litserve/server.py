@@ -45,7 +45,7 @@ from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, get_random_port
 
 mp.allow_connection_pickling()
 
@@ -75,6 +75,7 @@ async def response_queue_to_buffer(
     stream: bool,
     threadpool: ThreadPoolExecutor,
     use_zmq: bool,
+    port: Optional[int] = None,
 ):
     loop = asyncio.get_running_loop()
     socket = None
@@ -82,7 +83,7 @@ async def response_queue_to_buffer(
         ctx = zmq.asyncio.Context()
         socket = ctx.socket(zmq.SUB)
         # TODO: Make the address configurable or select random available port
-        socket.connect("tcp://127.0.0.1:5558")
+        socket.connect(f"tcp://127.0.0.1:{port}")
         socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
     async def _get_response():
@@ -245,6 +246,8 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = use_zmq
+        self._zmq_port = get_random_port() if use_zmq else None
+        logger.debug(f"ZMQ port: {self._zmq_port}")
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -315,6 +318,7 @@ class LitServer:
                     self._callback_runner,
                     self._loop,
                     self.use_zmq,
+                    self._zmq_port,
                 ),
             )
             process.start()
@@ -335,7 +339,7 @@ class LitServer:
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(
-            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq
+            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq, self._zmq_port
         )
         task = loop.create_task(future)
 
@@ -552,6 +556,10 @@ class LitServer:
 
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
+
+        if self.use_zmq and num_api_servers is not None and num_api_servers > 1:
+            # TODO: Support multiple API servers with ZMQ
+            raise ValueError("ZMQ is not supported with multiple API servers yet.")
 
         host_msg = f"host must be '0.0.0.0', '127.0.0.1', or '::' but got {host}"
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:

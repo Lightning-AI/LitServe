@@ -52,8 +52,11 @@ class SlowSetupLitAPI(SimpleLitAPI):
         time.sleep(2)
 
 
-def test_workers_health():
-    server = LitServer(SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2)
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_health(use_zmq):
+    server = LitServer(
+        SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2, use_zmq=use_zmq
+    )
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.get("/health")
@@ -71,7 +74,8 @@ def test_workers_health():
         assert response.text == "ok"
 
 
-def test_workers_health_custom_path():
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_health_custom_path(use_zmq):
     server = LitServer(
         SlowSetupLitAPI(),
         accelerator="cpu",
@@ -79,6 +83,7 @@ def test_workers_health_custom_path():
         devices=1,
         timeout=5,
         workers_per_device=2,
+        use_zmq=use_zmq,
     )
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
@@ -148,7 +153,7 @@ class SlowBatchAPI(SlowLitAPI):
 async def test_timeout():
     # Scenario: first request completes, second request times out in queue
     api = SlowLitAPI()  # takes 2 seconds for each prediction
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=2)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, use_zmq=True)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
