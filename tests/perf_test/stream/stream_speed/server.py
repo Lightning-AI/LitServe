@@ -21,6 +21,5 @@ if __name__ == "__main__":
     server = ls.LitServer(
         api,
         stream=True,
-        use_zmq=True,
     )
     server.run(port=8000, generate_client_file=False)
