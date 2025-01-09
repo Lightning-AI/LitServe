@@ -158,7 +158,7 @@ class _BaseLoop(ABC):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: zmq.Socket,
+        socket: Optional[zmq.Socket],
     ):
         self.socket = socket
         if asyncio.iscoroutinefunction(self.run):

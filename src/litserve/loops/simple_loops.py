@@ -101,7 +101,13 @@ def run_single_loop(
                 "has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
             continue
         try:
             context = {}
