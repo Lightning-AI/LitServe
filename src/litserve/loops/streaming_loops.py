@@ -69,12 +69,15 @@ def run_streaming_loop(
                 x,
             )
             callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-
+            
+            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
             y_enc_gen = _inject_context(
                 context,
                 lit_api.encode_response,
                 y_gen,
             )
+            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+
             for y_enc in y_enc_gen:
                 y_enc = lit_api.format_encoded_response(y_enc)
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
