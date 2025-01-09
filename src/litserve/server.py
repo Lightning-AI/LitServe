@@ -211,6 +211,10 @@ class LitServer:
                 "but the max_batch_size parameter was not set."
             )
 
+        if sys.platform == "win32" and use_zmq:
+            warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
+            use_zmq = False
+
         self._loop: LitLoop = loop
         self.api_path = api_path
         self.healthcheck_path = healthcheck_path

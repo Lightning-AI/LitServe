@@ -1,7 +1,7 @@
 import os
 import pickle
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -50,20 +50,3 @@ def test_generate_random_zmq_address_non_windows(tmpdir):
     # Verify the path exists within the specified temp_dir
     assert os.path.commonpath([temp_dir, address1[6:]]) == temp_dir
     assert os.path.commonpath([temp_dir, address2[6:]]) == temp_dir
-
-
-@patch("sys.platform", "win32")
-@patch("zmq.Context")
-def test_generate_random_zmq_address_windows(mock_ctx):
-    """Test generate_random_zmq_address on Windows platforms."""
-    mock_socket = mock_ctx.return_value.socket.return_value
-    mock_socket.bind_to_random_port.return_value = 5555
-
-    address = generate_random_zmq_address()
-    assert address == "tcp://localhost:5555"
-
-    # Verify socket and context were properly used
-    mock_ctx.return_value.socket.assert_called_once()
-    mock_socket.bind_to_random_port.assert_called_once_with("localhost")
-    mock_socket.close.assert_called_once()
-    mock_ctx.return_value.term.assert_called_once()
