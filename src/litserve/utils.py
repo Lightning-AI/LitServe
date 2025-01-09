@@ -21,6 +21,7 @@ import uuid
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
+import zmq
 from fastapi import HTTPException
 
 if TYPE_CHECKING:
@@ -135,7 +136,7 @@ def add_log_handler(handler):
     logging.getLogger("litserve").addHandler(handler)
 
 
-def generate_random_ipc_address(temp_dir="/tmp"):
+def generate_random_zmq_address(temp_dir="/tmp"):
     """Generate a random IPC address in the /tmp directory.
 
     Ensures the address is unique.
@@ -143,6 +144,14 @@ def generate_random_ipc_address(temp_dir="/tmp"):
         str: A random IPC address suitable for ZeroMQ.
 
     """
+    if sys.platform == "win32":
+        ctx = zmq.Context()
+        socket = ctx.socket(zmq.REQ)
+        port = socket.bind_to_random_port("localhost")
+        socket.close()
+        ctx.term()
+        return f"tcp://localhost:{port}"
+
     unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
     ipc_path = os.path.join(temp_dir, unique_name)
     return f"ipc://{ipc_path}"

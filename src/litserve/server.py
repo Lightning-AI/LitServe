@@ -45,7 +45,7 @@ from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_ipc_address
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_zmq_address
 
 mp.allow_connection_pickling()
 
@@ -246,7 +246,7 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = use_zmq
-        self._zmq_addr = generate_random_ipc_address() if use_zmq else None
+        self._zmq_addr = generate_random_zmq_address() if use_zmq else None
         logger.debug(f"ZMQ port: {self._zmq_addr}")
 
         specs = spec if spec is not None else []
