@@ -262,6 +262,10 @@ class LitLoop(_BaseLoop):
         else:
             response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
 
+    def __del__(self):
+        if self.socket:
+            self.socket.close()
+
 
 class DefaultLoop(LitLoop):
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
