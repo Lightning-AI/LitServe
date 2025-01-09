@@ -74,7 +74,7 @@ async def test_stream(simple_stream_api, use_zmq):
         ) as ac:
             # TODO: remove this sleep when we have a better way to check if the server is ready
             # TODO: main process can only consume when response_queue_to_buffer is ready
-            await asyncio.sleep(1)
+            await asyncio.sleep(4)
             resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)

@@ -82,7 +82,6 @@ async def response_queue_to_buffer(
     if use_zmq:
         ctx = zmq.asyncio.Context()
         socket = ctx.socket(zmq.SUB)
-        # TODO: Make the address configurable or select random available port
         socket.connect(addr)
         socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
