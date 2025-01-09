@@ -13,14 +13,17 @@
 # limitations under the License.
 import asyncio
 import dataclasses
+import errno
 import logging
 import pickle
-import socket
+import random
 import sys
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
+import zmq
 from fastapi import HTTPException
+from zmq import ZMQBindError, ZMQError
 
 if TYPE_CHECKING:
     from litserve.server import LitServer
@@ -134,13 +137,27 @@ def add_log_handler(handler):
     logging.getLogger("litserve").addHandler(handler)
 
 
-def get_random_port(min_port=49152, max_port=65535):
+def get_random_port(min_port=49152, max_port=65535, max_tries=100):
     """Get a random available open port on the local machine within a specified range."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        for port in range(min_port, max_port):
-            try:
-                s.bind(("", port))
-            except OSError:
+    for i in range(max_tries):
+        ctx = None
+        sock = None
+        port = None
+        try:
+            port = random.randrange(min_port, max_port)
+            ctx = zmq.Context()
+            sock = ctx.socket(zmq.REP)
+            sock.bind(f"tcp://localhost:{port}")
+        except ZMQError as exception:
+            en = exception.errno
+            if en == zmq.EADDRINUSE or sys.platform == "win32" and en == errno.EACCES:
                 continue
+            raise
+        else:
             return port
-    raise ValueError("No open ports available")
+        finally:
+            if sock:
+                sock.unbind(f"tcp://localhost:{port}")
+                sock.close()
+                ctx.term()
+    raise ZMQBindError("Could not find random port.")
