@@ -283,13 +283,13 @@ class DefaultLoop(LitLoop):
                 """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` must not be
                 generator functions.
 
-                Correct example:
+                Correct usage:
 
                     def predict(self, inputs):
                         ...
                         return {"output": output}
 
-                Incorrect example:
+                Incorrect usage:
 
                     def predict(self, inputs):
                         ...
