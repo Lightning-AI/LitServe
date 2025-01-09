@@ -129,6 +129,7 @@ class _BaseLoop(ABC):
 
     """
 
+    zmq_ctx: Optional[zmq.Context] = None
     socket: Optional[zmq.Socket] = None
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
@@ -265,6 +266,7 @@ class LitLoop(_BaseLoop):
     def __del__(self):
         if self.socket:
             self.socket.close()
+            self.zmq_ctx.term()
 
 
 class DefaultLoop(LitLoop):

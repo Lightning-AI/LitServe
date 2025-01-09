@@ -84,6 +84,7 @@ def inference_worker(
         socket = ctx.socket(zmq.PUB)
         logger.debug(f"Inference worker binding to port {zmq_port}")
         socket.bind(f"tcp://*:{zmq_port}")
+        loop.zmq_context = ctx
 
     loop(
         lit_api,
@@ -101,4 +102,4 @@ def inference_worker(
     )
     if use_zmq:
         socket.close()
-        ctx.destroy()
+        loop.zmq_context.term()
