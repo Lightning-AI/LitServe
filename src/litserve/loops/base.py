@@ -129,7 +129,7 @@ class _BaseLoop(ABC):
 
     """
 
-    socket: zmq.Socket | None = None
+    socket: Optional[zmq.Socket] = None
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
         pass
