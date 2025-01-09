@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from litserve.utils import call_after_stream, dump_exception, get_random_port
+from litserve.utils import call_after_stream, dump_exception
 
 
 def test_dump_exception():
@@ -31,9 +31,3 @@ async def test_call_after_stream():
         pass
     callback.assert_called()
     callback.assert_called_with("first_arg", random_arg="second_arg")
-
-
-def test_get_random_port():
-    port = get_random_port()
-    assert 1024 <= port <= 65535
-    assert isinstance(port, int)

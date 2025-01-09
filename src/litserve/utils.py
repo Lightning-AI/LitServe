@@ -13,17 +13,15 @@
 # limitations under the License.
 import asyncio
 import dataclasses
-import errno
 import logging
+import os
 import pickle
-import random
 import sys
+import uuid
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
-import zmq
 from fastapi import HTTPException
-from zmq import ZMQBindError, ZMQError
 
 if TYPE_CHECKING:
     from litserve.server import LitServer
@@ -137,27 +135,14 @@ def add_log_handler(handler):
     logging.getLogger("litserve").addHandler(handler)
 
 
-def get_random_port(min_port=49152, max_port=65535, max_tries=100):
-    """Get a random available open port on the local machine within a specified range."""
-    for i in range(max_tries):
-        ctx = None
-        sock = None
-        port = None
-        try:
-            port = random.randrange(min_port, max_port)
-            ctx = zmq.Context()
-            sock = ctx.socket(zmq.REP)
-            sock.bind(f"tcp://localhost:{port}")
-        except ZMQError as exception:
-            en = exception.errno
-            if en == zmq.EADDRINUSE or sys.platform == "win32" and en == errno.EACCES:
-                continue
-            raise
-        else:
-            return port
-        finally:
-            if sock:
-                sock.unbind(f"tcp://localhost:{port}")
-                sock.close()
-                ctx.term()
-    raise ZMQBindError("Could not find random port.")
+def generate_random_ipc_address(temp_dir="/tmp"):
+    """Generate a random IPC address in the /tmp directory.
+
+    Ensures the address is unique.
+    Returns:
+        str: A random IPC address suitable for ZeroMQ.
+
+    """
+    unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
+    ipc_path = os.path.join(temp_dir, unique_name)
+    return f"ipc://{ipc_path}"

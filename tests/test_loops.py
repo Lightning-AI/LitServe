@@ -203,7 +203,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         callback_runner=NOOP_CB_RUNNER,
         loop="auto",
         use_zmq=False,
-        zmq_port=None,
+        zmq_addr=None,
     )
     mock_batched_loop.assert_called_once()
 
@@ -216,7 +216,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         callback_runner=NOOP_CB_RUNNER,
         loop="auto",
         use_zmq=False,
-        zmq_port=None,
+        zmq_addr=None,
     )
     mock_single_loop.assert_called_once()
 

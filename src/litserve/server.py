@@ -45,7 +45,7 @@ from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, get_random_port
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_ipc_address
 
 mp.allow_connection_pickling()
 
@@ -75,7 +75,7 @@ async def response_queue_to_buffer(
     stream: bool,
     threadpool: ThreadPoolExecutor,
     use_zmq: bool,
-    port: Optional[int] = None,
+    addr: Optional[str] = None,
 ):
     loop = asyncio.get_running_loop()
     socket = None
@@ -83,7 +83,7 @@ async def response_queue_to_buffer(
         ctx = zmq.asyncio.Context()
         socket = ctx.socket(zmq.SUB)
         # TODO: Make the address configurable or select random available port
-        socket.connect(f"tcp://127.0.0.1:{port}")
+        socket.connect(addr)
         socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
     async def _get_response():
@@ -246,8 +246,8 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = use_zmq
-        self._zmq_port = get_random_port() if use_zmq else None
-        logger.debug(f"ZMQ port: {self._zmq_port}")
+        self._zmq_addr = generate_random_ipc_address() if use_zmq else None
+        logger.debug(f"ZMQ port: {self._zmq_addr}")
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -318,7 +318,7 @@ class LitServer:
                     self._callback_runner,
                     self._loop,
                     self.use_zmq,
-                    self._zmq_port,
+                    self._zmq_addr,
                 ),
             )
             process.start()
@@ -339,7 +339,7 @@ class LitServer:
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(
-            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq, self._zmq_port
+            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq, self._zmq_addr
         )
         task = loop.create_task(future)
 
