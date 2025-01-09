@@ -61,9 +61,10 @@ def test_device_identifiers_error(simple_litapi, devices):
         LitServer(simple_litapi, accelerator="cuda", devices=devices, timeout=10)
 
 
+@pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_stream(simple_stream_api):
-    server = LitServer(simple_stream_api, stream=True, timeout=10)
+async def test_stream(simple_stream_api, use_zmq):
+    server = LitServer(simple_stream_api, stream=True, timeout=10, use_zmq=use_zmq)
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
@@ -84,9 +85,12 @@ async def test_stream(simple_stream_api):
             )
 
 
+@pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_batched_stream_server(simple_batched_stream_api):
-    server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
+async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
+    server = LitServer(
+        simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30, use_zmq=use_zmq
+    )
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
