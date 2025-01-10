@@ -197,7 +197,7 @@ def run_batched_loop(
 
             callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
             y = _inject_context(contexts, lit_api.predict, x)
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
 
             outputs = lit_api.unbatch(y)
 
