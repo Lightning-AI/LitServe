@@ -16,6 +16,7 @@ import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional
 
+import zmq
 from fastapi import HTTPException
 
 from litserve import LitAPI
@@ -33,6 +34,7 @@ def run_single_loop(
     request_queue: Queue,
     response_queues: List[Queue],
     callback_runner: CallbackRunner,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         try:
@@ -48,7 +50,13 @@ def run_single_loop(
                 "has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
             continue
         try:
             context = {}
@@ -78,14 +86,19 @@ def run_single_loop(
                 y,
             )
             callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
-
-            response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+            if socket:
+                socket.send_pyobj((uid, (y_enc, LitAPIStatus.OK)))
+            else:
+                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
         except HTTPException as e:
-            response_queues[response_queue_id].put((
-                uid,
-                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-            ))
+            if socket:
+                socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                ))
 
         except Exception as e:
             logger.exception(
@@ -93,7 +106,10 @@ def run_single_loop(
                 "Please check the error trace for more details.",
                 uid,
             )
-            response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 def run_batched_loop(
@@ -104,6 +120,7 @@ def run_batched_loop(
     max_batch_size: int,
     batch_timeout: float,
     callback_runner: CallbackRunner,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         batches, timed_out_uids = collate_requests(
@@ -119,7 +136,13 @@ def run_batched_loop(
                 "has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
 
         if not batches:
             continue
@@ -170,10 +193,13 @@ def run_batched_loop(
 
         except HTTPException as e:
             for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((
-                    uid,
-                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                ))
+                if socket:
+                    socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
+                else:
+                    response_queues[response_queue_id].put((
+                        uid,
+                        (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                    ))
 
         except Exception as e:
             logger.exception(
@@ -181,7 +207,10 @@ def run_batched_loop(
                 "Please check the error trace for more details."
             )
             for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+                if socket:
+                    socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
+                else:
+                    response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 class SingleLoop(DefaultLoop):
@@ -198,8 +227,9 @@ class SingleLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
     ):
-        run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
+        run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner, socket)
 
 
 class BatchedLoop(DefaultLoop):
@@ -216,6 +246,7 @@ class BatchedLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
     ):
         run_batched_loop(
             lit_api,
@@ -225,4 +256,5 @@ class BatchedLoop(DefaultLoop):
             max_batch_size,
             batch_timeout,
             callback_runner,
+            socket,
         )

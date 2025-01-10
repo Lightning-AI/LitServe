@@ -15,6 +15,9 @@ import logging
 from queue import Queue
 from typing import Dict, List, Optional, Union
 
+import zmq
+import zmq.asyncio
+
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import _BaseLoop
@@ -51,6 +54,8 @@ def inference_worker(
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
     loop: Union[str, _BaseLoop],
+    use_zmq: bool,
+    zmq_addr: Optional[str],
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
     try:
@@ -73,6 +78,14 @@ def inference_worker(
     if loop == "auto":
         loop = get_default_loop(stream, max_batch_size)
 
+    socket = None
+    if use_zmq:
+        ctx = zmq.Context()
+        socket = ctx.socket(zmq.PUB)
+        logger.debug(f"Inference worker binding to {zmq_addr}")
+        socket.bind(zmq_addr)
+        loop.zmq_context = ctx
+
     loop(
         lit_api,
         lit_spec,
@@ -85,4 +98,8 @@ def inference_worker(
         stream,
         workers_setup_status,
         callback_runner,
+        socket,
     )
+    if use_zmq:
+        socket.close()
+        loop.zmq_context.term()

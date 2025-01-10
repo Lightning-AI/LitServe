@@ -16,6 +16,7 @@ import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional
 
+import zmq
 from fastapi import HTTPException
 
 from litserve import LitAPI
@@ -33,6 +34,7 @@ def run_streaming_loop(
     request_queue: Queue,
     response_queues: List[Queue],
     callback_runner: CallbackRunner,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         try:
@@ -49,7 +51,13 @@ def run_streaming_loop(
                 "has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
             continue
 
         try:
@@ -77,21 +85,33 @@ def run_streaming_loop(
             )
             for y_enc in y_enc_gen:
                 y_enc = lit_api.format_encoded_response(y_enc)
-                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-            response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+                if socket:
+                    socket.send_pyobj((uid, (y_enc, LitAPIStatus.OK)))
+                else:
+                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+            if socket:
+                socket.send_pyobj((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+            else:
+                response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
 
         except HTTPException as e:
-            response_queues[response_queue_id].put((
-                uid,
-                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-            ))
+            if socket:
+                socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                ))
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming request uid=%s.\n"
                 "Please check the error trace for more details.",
                 uid,
             )
-            response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 def run_batched_streaming_loop(
@@ -102,6 +122,7 @@ def run_batched_streaming_loop(
     max_batch_size: int,
     batch_timeout: float,
     callback_runner: CallbackRunner,
+    socket: Optional[zmq.Socket],
 ):
     while True:
         batches, timed_out_uids = collate_requests(
@@ -116,7 +137,13 @@ def run_batched_streaming_loop(
                 "has been timed out. "
                 "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
             )
-            response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+            else:
+                response_queues[response_queue_id].put((
+                    uid,
+                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
+                ))
 
         if not batches:
             continue
@@ -155,25 +182,37 @@ def run_batched_streaming_loop(
             for y_batch in y_enc_iter:
                 for response_queue_id, y_enc, uid in zip(response_queue_ids, y_batch, uids):
                     y_enc = lit_api.format_encoded_response(y_enc)
-                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+                    if socket:
+                        socket.send_pyobj((uid, (y_enc, LitAPIStatus.OK)))
+                    else:
+                        response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
             for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+                if socket:
+                    socket.send_pyobj((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+                else:
+                    response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
 
         except HTTPException as e:
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((
-                    uid,
-                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                ))
+            if socket:
+                socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
+            else:
+                for response_queue_id, uid in zip(response_queue_ids, uids):
+                    response_queues[response_queue_id].put((
+                        uid,
+                        (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                    ))
 
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming batched request.\n"
                 "Please check the error trace for more details."
             )
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+            if socket:
+                socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
+            else:
+                for response_queue_id, uid in zip(response_queue_ids, uids):
+                    response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 class StreamingLoop(DefaultLoop):
@@ -190,8 +229,9 @@ class StreamingLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
     ):
-        run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
+        run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner, socket)
 
 
 class BatchedStreamingLoop(DefaultLoop):
@@ -208,6 +248,7 @@ class BatchedStreamingLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
     ):
         run_batched_streaming_loop(
             lit_api,
@@ -217,4 +258,5 @@ class BatchedStreamingLoop(DefaultLoop):
             max_batch_size,
             batch_timeout,
             callback_runner,
+            socket,
         )
