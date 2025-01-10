@@ -148,8 +148,9 @@ def run_batched_streaming_loop(
         if not batches:
             continue
         response_queue_ids, uids, inputs = zip(*batches)
+        num_inputs = len(inputs)
         try:
-            contexts = [{}] * len(inputs)
+            contexts = [{}] * num_inputs
             if hasattr(lit_spec, "populate_context"):
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
@@ -196,10 +197,11 @@ def run_batched_streaming_loop(
             if socket:
                 socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
             else:
-                response_queues[response_queue_id].put((
-                    uid,
-                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                ))
+                for response_queue_id, uid in zip(response_queue_ids, uids):
+                    response_queues[response_queue_id].put((
+                        uid,
+                        (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                    ))
 
         except Exception as e:
             logger.exception(
@@ -209,7 +211,8 @@ def run_batched_streaming_loop(
             if socket:
                 socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
             else:
-                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+                for response_queue_id, uid in zip(response_queue_ids, uids):
+                    response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 class StreamingLoop(DefaultLoop):
