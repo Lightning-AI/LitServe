@@ -121,8 +121,9 @@ def run_batched_streaming_loop(
         if not batches:
             continue
         response_queue_ids, uids, inputs = zip(*batches)
+        num_inputs = len(inputs)
         try:
-            contexts = [{}] * len(inputs)
+            contexts = [{}] * num_inputs
             if hasattr(lit_spec, "populate_context"):
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
@@ -160,17 +161,19 @@ def run_batched_streaming_loop(
                 response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
 
         except HTTPException as e:
-            response_queues[response_queue_id].put((
-                uid,
-                (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-            ))
+            for response_queue_id, uid in zip(response_queue_ids, uids):
+                response_queues[response_queue_id].put((
+                    uid,
+                    (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                ))
 
         except Exception as e:
             logger.exception(
                 "LitAPI ran into an error while processing the streaming batched request.\n"
                 "Please check the error trace for more details."
             )
-            response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+            for response_queue_id, uid in zip(response_queue_ids, uids):
+                response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
 
 
 class StreamingLoop(DefaultLoop):

@@ -176,8 +176,9 @@ def run_batched_loop(
             continue
         logger.debug(f"{len(batches)} batched requests received")
         response_queue_ids, uids, inputs = zip(*batches)
+        num_inputs = len(inputs)
         try:
-            contexts = [{}] * len(inputs)
+            contexts = [{}] * num_inputs
             if hasattr(lit_spec, "populate_context"):
                 for input, context in zip(inputs, contexts):
                     lit_spec.populate_context(context, input)
@@ -201,15 +202,22 @@ def run_batched_loop(
 
             outputs = lit_api.unbatch(y)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
-            y_enc_list = []
-            for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
-                y_enc = _inject_context(context, lit_api.encode_response, y)
-                y_enc_list.append((response_queue_id, uid, y_enc))
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+            if len(outputs) != num_inputs:
+                logger.error(
+                    "LitAPI.predict/unbatch returned {len(outputs)} outputs, but expected {num_inputs}. "
+                    "Please check the predict/unbatch method of the LitAPI implementation."
+                )
+                raise HTTPException(500, "Batch size mismatch")
 
-            for response_queue_id, uid, y_enc in y_enc_list:
-                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+                y_enc_list = []
+                for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
+                    y_enc = _inject_context(context, lit_api.encode_response, y)
+                y_enc_list.append((response_queue_id, uid, y_enc))
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+
+                for response_queue_id, uid, y_enc in y_enc_list:
+                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
         except HTTPException as e:
             for response_queue_id, uid in zip(response_queue_ids, uids):
