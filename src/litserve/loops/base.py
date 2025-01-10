@@ -265,7 +265,7 @@ class LitLoop(_BaseLoop):
 
     def __del__(self):
         if self.socket:
-            self.socket.close()
+            self.socket.close(linger=0)
             self.zmq_ctx.term()
 
 
