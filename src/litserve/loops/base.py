@@ -253,7 +253,7 @@ class LitLoop(_BaseLoop):
         if self.socket:
             self.socket.send_pyobj((uid, (response_data, status)))
         else:
-            response_queues[response_queue_id].put((uid, (response_data, status)))
+            response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
     def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception

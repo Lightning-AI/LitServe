@@ -84,6 +84,7 @@ def inference_worker(
         socket = ctx.socket(zmq.PUB)
         logger.debug(f"Inference worker binding to {zmq_addr}")
         socket.bind(zmq_addr)
+        loop.socket = socket
         loop.zmq_context = ctx
 
     loop(

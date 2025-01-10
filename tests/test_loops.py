@@ -56,7 +56,7 @@ def loop_args():
 
 
 class FakeResponseQueue:
-    def put(self, item):
+    def put(self, item, block=True, timeout=None):
         raise StopIteration("exit loop")
 
 
