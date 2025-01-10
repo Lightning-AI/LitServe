@@ -230,10 +230,10 @@ def test_collate_requests(batch_timeout, batch_size):
 class BatchSizeMismatchAPI(SimpleBatchLitAPI):
     def predict(self, x):
         assert len(x) == 2, "Expected two concurrent inputs to be batched"
-        return self.model(x)
+        return self.model(x)  # returns a list of length same as len(x)
 
     def unbatch(self, output):
-        return [output]
+        return [output]  # returns a list of length 1
 
 
 @pytest.mark.asyncio
@@ -249,6 +249,6 @@ async def test_batch_size_mismatch():
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
         assert response1.status_code == 500
-        assert response1.json() == {"detail": "Batch size mismatch"}
         assert response2.status_code == 500
-        assert response2.json() == {"detail": "Batch size mismatch"}
+        assert response1.json() == {"detail": "Batch size mismatch"}, "unbatch a list of length 1 when batch size is 2"
+        assert response2.json() == {"detail": "Batch size mismatch"}, "unbatch a list of length 1 when batch size is 2"
