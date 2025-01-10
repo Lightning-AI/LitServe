@@ -213,7 +213,7 @@ def run_batched_loop(
             y_enc_list = []
             for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
                 y_enc = _inject_context(context, lit_api.encode_response, y)
-            y_enc_list.append((response_queue_id, uid, y_enc))
+                y_enc_list.append((response_queue_id, uid, y_enc))
             callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
 
             for response_queue_id, uid, y_enc in y_enc_list:
