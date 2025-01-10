@@ -193,7 +193,8 @@ class SingleLoop(DefaultLoop):
                     response_queues=response_queues,
                     response_queue_id=response_queue_id,
                     uid=uid,
-                    response_data=(y_enc, LitAPIStatus.OK),
+                    response_data=y_enc,
+                    status=LitAPIStatus.OK,
                 )
 
             except HTTPException as e:
@@ -201,7 +202,8 @@ class SingleLoop(DefaultLoop):
                     response_queues=response_queues,
                     response_queue_id=response_queue_id,
                     uid=uid,
-                    response_data=(PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
+                    response_data=PickleableHTTPException.from_exception(e),
+                    status=LitAPIStatus.ERROR,
                 )
 
             except Exception as e:
@@ -214,7 +216,8 @@ class SingleLoop(DefaultLoop):
                     response_queues=response_queues,
                     response_queue_id=response_queue_id,
                     uid=uid,
-                    response_data=(e, LitAPIStatus.ERROR),
+                    response_data=e,
+                    status=LitAPIStatus.ERROR,
                 )
 
     def __call__(
