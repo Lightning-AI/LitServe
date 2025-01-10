@@ -209,15 +209,15 @@ def run_batched_loop(
                 )
                 raise HTTPException(500, "Batch size mismatch")
 
-                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
-                y_enc_list = []
-                for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
-                    y_enc = _inject_context(context, lit_api.encode_response, y)
-                y_enc_list.append((response_queue_id, uid, y_enc))
-                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+            y_enc_list = []
+            for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
+                y_enc = _inject_context(context, lit_api.encode_response, y)
+            y_enc_list.append((response_queue_id, uid, y_enc))
+            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
 
-                for response_queue_id, uid, y_enc in y_enc_list:
-                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+            for response_queue_id, uid, y_enc in y_enc_list:
+                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
 
         except HTTPException as e:
             for response_queue_id, uid in zip(response_queue_ids, uids):
