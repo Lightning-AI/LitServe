@@ -537,9 +537,9 @@ def test_run_all_litservers(mock_uvicorn):
     run_all([server1, server2, server3], port="8001")
     mock_uvicorn.Config.assert_called()
 
+
 def test_workers_setup_status():
     api = FailFastAPI()
     server = LitServer(api, devices=1)
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
         server.run()
-

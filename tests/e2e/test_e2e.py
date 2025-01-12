@@ -63,9 +63,9 @@ def test_e2e_combined_multiple_litserver():
     for i in range(1, 5):
         resp = requests.post(f"http://127.0.0.1:8000/predict-{i}", json={"input": 4.0}, headers=None)
         assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
-        assert resp.json() == {
-            "output": 4.0**i
-        }, "tests/simple_server_with_multi_endpoints.py didn't return expected output"
+        assert resp.json() == {"output": 4.0**i}, (
+            "tests/simple_server_with_multi_endpoints.py didn't return expected output"
+        )
 
 
 @e2e_from_file("tests/simple_server_diff_port.py")
