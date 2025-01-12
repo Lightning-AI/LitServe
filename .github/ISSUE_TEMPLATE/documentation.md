@@ -10,8 +10,7 @@ assignees: ''
 
 For typos and doc fixes, please go ahead and:
 
-1. Create an issue.
-1. Fix the typo.
-1. Submit a PR.
+- For a simple typo or fix, please send directly a PR (no need to create an issue)
+- If you are not sure about the proper solution, please describe here your finding...
 
 Thanks!

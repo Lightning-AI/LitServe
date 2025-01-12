@@ -12,26 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import io
 import json
+import re
 import threading
-
 import time
 from queue import Queue
-
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
-import pytest
-from fastapi import HTTPException
 
-from litserve.loops import (
-    run_single_loop,
-    run_streaming_loop,
-    run_batched_streaming_loop,
-    inference_worker,
-    run_batched_loop,
-)
-from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
-from litserve.utils import LitAPIStatus
+import pytest
+import zmq
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
+
 import litserve as ls
+from litserve import LitAPI
+from litserve.callbacks import CallbackRunner
+from litserve.loops import LitLoop, Output, inference_worker
+from litserve.loops.base import DefaultLoop
+from litserve.loops.continuous_batching_loop import (
+    ContinuousBatchingLoop,
+    notify_timed_out_requests,
+)
+from litserve.loops.simple_loops import run_batched_loop, run_single_loop
+from litserve.loops.streaming_loops import (
+    run_batched_streaming_loop,
+    run_streaming_loop,
+)
+from litserve.specs.base import LitSpec
+from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
+from litserve.utils import LitAPIStatus, wrap_litserve_start
+
+NOOP_CB_RUNNER = CallbackRunner()
 
 
 @pytest.fixture
@@ -57,7 +70,9 @@ def test_single_loop(loop_args):
     response_queues = [FakeResponseQueue()]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, response_queues)
+        run_single_loop(
+            lit_api_mock, None, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER, socket=None
+        )
 
 
 class FakeStreamResponseQueue:
@@ -98,7 +113,14 @@ def test_streaming_loop():
     response_queues = [FakeStreamResponseQueue(num_streamed_outputs)]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_streaming_loop(fake_stream_api, fake_stream_api, requests_queue, response_queues)
+        run_streaming_loop(
+            fake_stream_api,
+            fake_stream_api,
+            requests_queue,
+            response_queues,
+            callback_runner=NOOP_CB_RUNNER,
+            socket=None,
+        )
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
@@ -114,15 +136,15 @@ class FakeBatchStreamResponseQueue:
         response, status = args
         if status == LitAPIStatus.FINISH_STREAMING:
             raise StopIteration("interrupt iteration")
-        if status == LitAPIStatus.ERROR and b"interrupt iteration" in response:
+        if status == LitAPIStatus.ERROR and isinstance(response, StopIteration):
             assert self.count // 2 == self.num_streamed_outputs, (
-                f"Loop count must have incremented for " f"{self.num_streamed_outputs} times."
+                f"Loop count must have incremented for {self.num_streamed_outputs} times."
             )
             raise StopIteration("finish streaming")
 
-        assert (
-            response == f"{self.count // 2}"
-        ), f"streaming loop generates number from 0 to 9 which is sent via Queue. {args}, count:{self.count}"
+        assert response == f"{self.count // 2}", (
+            f"streaming loop generates number from 0 to 9 which is sent via Queue. {args}, count:{self.count}"
+        )
         self.count += 1
 
 
@@ -156,19 +178,46 @@ def test_batched_streaming_loop():
 
     with pytest.raises(StopIteration, match="finish streaming"):
         run_batched_streaming_loop(
-            fake_stream_api, fake_stream_api, requests_queue, response_queues, max_batch_size=2, batch_timeout=2
+            fake_stream_api,
+            fake_stream_api,
+            requests_queue,
+            response_queues,
+            max_batch_size=2,
+            batch_timeout=2,
+            callback_runner=NOOP_CB_RUNNER,
+            socket=None,
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
 
 
-@patch("litserve.loops.run_batched_loop")
-@patch("litserve.loops.run_single_loop")
+@patch("litserve.loops.simple_loops.run_batched_loop")
+@patch("litserve.loops.simple_loops.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
-    inference_worker(*[MagicMock()] * 6, max_batch_size=2, batch_timeout=0, stream=False)
+    inference_worker(
+        *[MagicMock()] * 6,
+        max_batch_size=2,
+        batch_timeout=0,
+        stream=False,
+        workers_setup_status={},
+        callback_runner=NOOP_CB_RUNNER,
+        loop="auto",
+        use_zmq=False,
+        zmq_addr=None,
+    )
     mock_batched_loop.assert_called_once()
 
-    inference_worker(*[MagicMock()] * 6, max_batch_size=1, batch_timeout=0, stream=False)
+    inference_worker(
+        *[MagicMock()] * 6,
+        max_batch_size=1,
+        batch_timeout=0,
+        stream=False,
+        workers_setup_status={},
+        callback_runner=NOOP_CB_RUNNER,
+        loop="auto",
+        use_zmq=False,
+        zmq_addr=None,
+    )
     mock_single_loop.assert_called_once()
 
 
@@ -182,7 +231,9 @@ def test_run_single_loop():
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -196,7 +247,9 @@ def test_run_single_loop():
     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
 
 
-def test_run_single_loop_timeout(caplog):
+def test_run_single_loop_timeout():
+    stream = io.StringIO()
+    ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleLitAPI()
     lit_api.setup(None)
     lit_api.request_timeout = 0.0001
@@ -208,19 +261,21 @@ def test_run_single_loop_timeout(caplog):
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_single_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+    )
     loop_thread.start()
 
     request_queue.put((None, None, None, None))
     loop_thread.join()
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
     assert isinstance(response_queues[0].get()[1][0], HTTPException), "Timeout should return an HTTPException"
 
 
 def test_run_batched_loop():
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api._sanitize(2, None)
+    lit_api.pre_setup(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 1
 
@@ -231,7 +286,9 @@ def test_run_batched_loop():
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1))
+    loop_thread = threading.Thread(
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1, NOOP_CB_RUNNER, None)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -247,10 +304,12 @@ def test_run_batched_loop():
     assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
 
 
-def test_run_batched_loop_timeout(caplog):
+def test_run_batched_loop_timeout():
+    stream = io.StringIO()
+    ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api._sanitize(2, None)
+    lit_api.pre_setup(2, None)
     assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 0.1
 
@@ -265,14 +324,14 @@ def test_run_batched_loop_timeout(caplog):
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001)
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
     # Allow some time for the loop to process
     time.sleep(1)
 
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
     resp1 = response_queues[0].get(timeout=10)[1]
     resp2 = response_queues[0].get(timeout=10)[1]
     assert isinstance(resp1[0], HTTPException), "First request was timed out"
@@ -293,7 +352,9 @@ def test_run_streaming_loop():
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -309,7 +370,9 @@ def test_run_streaming_loop():
         assert response == {"output": f"{i}: Hello"}
 
 
-def test_run_streaming_loop_timeout(caplog):
+def test_run_streaming_loop_timeout():
+    stream = io.StringIO()
+    ls.configure_logging(stream=stream)
     lit_api = ls.test_examples.SimpleStreamAPI()
     lit_api.setup(None)
     lit_api.request_timeout = 0.1
@@ -319,7 +382,9 @@ def test_run_streaming_loop_timeout(caplog):
     response_queues = [Queue()]
 
     # Run the loop in a separate thread to allow it to be stopped
-    loop_thread = threading.Thread(target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues))
+    loop_thread = threading.Thread(
+        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+    )
     loop_thread.start()
 
     # Allow some time for the loop to process
@@ -329,7 +394,7 @@ def test_run_streaming_loop_timeout(caplog):
     request_queue.put((None, None, None, None))
     loop_thread.join()
 
-    assert "Request UUID-001 was waiting in the queue for too long" in caplog.text
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
     response = response_queues[0].get(timeout=10)[1]
     assert isinstance(response[0], HTTPException), "request was timed out"
 
@@ -340,7 +405,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     lit_api.request_timeout = 1
     lit_api.stream = True
     spec = ls.OpenAISpec()
-    lit_api._sanitize(2, spec)
+    lit_api.pre_setup(2, spec)
 
     request_queue = Queue()
     # response_queue_id, uid, timestamp, x_enc
@@ -352,7 +417,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_batched_streaming_loop, args=(lit_api, spec, request_queue, response_queues, 2, 0.1)
+        target=run_batched_streaming_loop, args=(lit_api, spec, request_queue, response_queues, 2, 0.1, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -365,3 +430,271 @@ def off_test_run_batched_streaming_loop(openai_request_data):
 
     response = response_queues[0].get(timeout=5)[1]
     assert response[0] == {"role": "assistant", "content": "10 + 6 is equal to 16."}
+
+
+class TestLoop(LitLoop):
+    def __call__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
+    ):
+        try:
+            self.run(
+                lit_api,
+                lit_spec,
+                device,
+                worker_id,
+                request_queue,
+                response_queues,
+                max_batch_size,
+                batch_timeout,
+                stream,
+                workers_setup_status,
+                callback_runner,
+            )
+        except StopIteration as e:
+            return e
+
+    def run(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+    ):
+        item = request_queue.get()
+        if item is None:
+            return
+
+        response_queue_id, uid, timestamp, x_enc = item
+        cache = lit_api.load_cache(x_enc)
+        x = lit_api.decode_request(x_enc) * cache
+        response = lit_api.predict(x)
+        response_enc = lit_api.encode_response(response)
+        response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
+        raise StopIteration("exit loop")
+
+
+def test_custom_loop():
+    loop = TestLoop()
+    lit_api = MagicMock(request_timeout=1)
+    lit_api.load_cache = MagicMock(return_value=1.0)
+    lit_api.encode_response = MagicMock(return_value={"output": 16.0})
+    request_queue = Queue()
+    response_queues = [Queue()]
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+
+    loop(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 1, False, {}, NOOP_CB_RUNNER, None)
+    response = response_queues[0].get()
+    assert response[0] == "UUID-001"
+    assert response[1][0] == {"output": 16.0}
+    lit_api.load_cache.assert_called_once()
+    lit_api.load_cache.assert_called_with({"input": 4.0})
+
+
+class TestLitAPI(ls.test_examples.SimpleLitAPI):
+    def load_cache(self, x):
+        return 10
+
+
+def test_loop_with_server():
+    loop = TestLoop()
+    lit_api = TestLitAPI()
+    server = ls.LitServer(lit_api, loop=loop)
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0}, timeout=1)
+        assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10
+
+
+def test_get_default_loop():
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=1)
+    assert isinstance(loop, ls.loops.SingleLoop), "SingleLoop must be returned when stream=False"
+
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=4)
+    assert isinstance(loop, ls.loops.BatchedLoop), "BatchedLoop must be returned when stream=False and max_batch_size>1"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=1)
+    assert isinstance(loop, ls.loops.StreamingLoop), "StreamingLoop must be returned when stream=True"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=4)
+    assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
+        "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
+    )
+
+
+@pytest.fixture
+def lit_loop_setup():
+    lit_loop = LitLoop()
+    lit_api = MagicMock(request_timeout=0.1)
+    request_queue = Queue()
+    return lit_loop, lit_api, request_queue
+
+
+def test_lit_loop_get_batch_requests(lit_loop_setup):
+    lit_loop, lit_api, request_queue = lit_loop_setup
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
+    batches, timed_out_uids = lit_loop.get_batch_requests(lit_api, request_queue, 2, 0.001)
+    assert len(batches) == 2
+    assert batches == [(0, "UUID-001", {"input": 4.0}), (0, "UUID-002", {"input": 5.0})]
+    assert timed_out_uids == []
+
+
+def test_lit_loop_get_request(lit_loop_setup):
+    lit_loop, _, request_queue = lit_loop_setup
+    t = time.monotonic()
+    request_queue.put((0, "UUID-001", t, {"input": 4.0}))
+    response_queue_id, uid, timestamp, x_enc = lit_loop.get_request(request_queue, timeout=1)
+    assert uid == "UUID-001"
+    assert response_queue_id == 0
+    assert timestamp == t
+    assert x_enc == {"input": 4.0}
+    assert lit_loop.get_request(request_queue, timeout=0.001) is None
+
+
+def test_lit_loop_put_response(lit_loop_setup):
+    lit_loop, _, request_queue = lit_loop_setup
+    response_queues = [Queue()]
+    lit_loop.put_response(response_queues, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK)
+    response = response_queues[0].get()
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+
+
+def test_notify_timed_out_requests():
+    response_queues = [Queue()]
+
+    # Simulate timed out requests
+    timed_out_uids = [(0, "UUID-001"), (0, "UUID-002")]
+
+    # Call the function to notify timed out requests
+    notify_timed_out_requests(response_queues, timed_out_uids)
+
+    # Check the responses in the response queue
+    response_1 = response_queues[0].get()
+    response_2 = response_queues[0].get()
+
+    assert response_1[0] == "UUID-001"
+    assert response_1[1][1] == LitAPIStatus.ERROR
+    assert isinstance(response_1[1][0], HTTPException)
+    assert response_2[0] == "UUID-002"
+    assert isinstance(response_2[1][0], HTTPException)
+    assert response_2[1][1] == LitAPIStatus.ERROR
+
+
+class ContinuousBatchingAPI(ls.LitAPI):
+    def setup(self, spec: Optional[LitSpec]):
+        self.model = {}
+
+    def add_request(self, uid: str, request):
+        print(f"Adding to request_queue at {time.monotonic()}")
+        self.model[uid] = {"outputs": list(range(5))}
+
+    def decode_request(self, input: str):
+        return input
+
+    def encode_response(self, output: str):
+        return {"output": output}
+
+    def has_capacity(self) -> bool:
+        return True
+
+    def has_active_requests(self) -> bool:
+        return bool(self.model)
+
+    def step(self, prev_outputs: Optional[List[Output]]) -> List[Output]:
+        outputs = []
+        for k in self.model:
+            v = self.model[k]
+            if v["outputs"]:
+                o = v["outputs"].pop(0)
+                outputs.append(Output(k, o, LitAPIStatus.OK))
+        keys = list(self.model.keys())
+        for k in keys:
+            if k not in [o.uid for o in outputs]:
+                outputs.append(Output(k, "", LitAPIStatus.FINISH_STREAMING))
+                del self.model[k]
+        return outputs
+
+
+@pytest.mark.parametrize(
+    ("stream", "max_batch_size", "error_msg"),
+    [
+        (True, 4, "`lit_api.unbatch` must generate values using `yield`."),
+        (True, 1, "`lit_api.encode_response` must generate values using `yield`."),
+    ],
+)
+def test_default_loop_pre_setup_error(stream, max_batch_size, error_msg):
+    lit_api = ls.test_examples.SimpleLitAPI()
+    lit_api.stream = stream
+    lit_api.max_batch_size = max_batch_size
+    loop = DefaultLoop()
+    with pytest.raises(ValueError, match=error_msg):
+        loop.pre_setup(lit_api, None)
+
+
+@pytest.fixture
+def continuous_batching_setup():
+    lit_api = ContinuousBatchingAPI()
+    lit_api.stream = True
+    lit_api.request_timeout = 0.1
+    lit_api.pre_setup(2, None)
+    lit_api.setup(None)
+    request_queue = Queue()
+    response_queues = [Queue()]
+    lit_loop = ContinuousBatchingLoop()
+    return lit_api, lit_loop, request_queue, response_queues
+
+
+def test_continuous_batching_pre_setup(continuous_batching_setup):
+    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
+    lit_api.stream = False
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Continuous batching loop requires streaming to be enabled. Please set LitServe(..., stream=True)"
+        ),
+    ):
+        lit_loop.pre_setup(lit_api, None)
+
+
+@pytest.mark.asyncio
+async def test_continuous_batching_run(continuous_batching_setup):
+    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
+    response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
+    lit_loop.add_request(uid, input, lit_api, None)
+    lit_loop.response_queue_ids[uid] = response_queue_id
+    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
+
+    results = []
+    for i in range(5):
+        response = response_queues[0].get()
+        uid, (response_data, status) = response
+        o = json.loads(response_data)["output"]
+        assert o == i
+        assert status == LitAPIStatus.OK
+        assert uid == "UUID-001"
+        results.append(o)
+    assert results == list(range(5)), "API must return a sequence of numbers from 0 to 4"
+    response = response_queues[0].get()
+    uid, (response_data, status) = response
+    o = json.loads(response_data)["output"]
+    assert o == ""
+    assert status == LitAPIStatus.FINISH_STREAMING

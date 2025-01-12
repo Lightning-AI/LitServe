@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from litserve.server import LitServer
-from litserve.api import LitAPI
 from fastapi import Request, Response
+
+from litserve.api import LitAPI
+from litserve.server import LitServer
 
 
 class SimpleLitAPI(LitAPI):

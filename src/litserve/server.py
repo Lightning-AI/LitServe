@@ -14,10 +14,10 @@
 import asyncio
 import copy
 import inspect
+import json
 import logging
 import multiprocessing as mp
 import os
-import shutil
 import sys
 import threading
 import time
@@ -30,28 +30,25 @@ from queue import Empty
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
+import zmq
+import zmq.asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
+from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
-from litserve.loops import inference_worker
-from litserve.specs import OpenAISpec
+from litserve.loggers import Logger, _LoggerConnector
+from litserve.loops import LitLoop, get_default_loop, inference_worker
+from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
+from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, MaxSizeMiddleware, load_and_raise
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_zmq_address
 
 mp.allow_connection_pickling()
-
-try:
-    import uvloop
-
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-except ImportError:
-    print("uvloop is not installed. Falling back to the default asyncio event loop.")
 
 logger = logging.getLogger(__name__)
 
@@ -78,22 +75,32 @@ async def response_queue_to_buffer(
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
     threadpool: ThreadPoolExecutor,
+    use_zmq: bool,
+    addr: Optional[str] = None,
 ):
     loop = asyncio.get_running_loop()
+    socket = None
+    if use_zmq:
+        ctx = zmq.asyncio.Context()
+        socket = ctx.socket(zmq.SUB)
+        socket.connect(addr)
+        socket.setsockopt_string(zmq.SUBSCRIBE, "")
+
+    async def _get_response():
+        if use_zmq:
+            return await socket.recv_pyobj()
+        return await loop.run_in_executor(threadpool, response_queue.get)
+
     if stream:
         while True:
-            try:
-                uid, response = await loop.run_in_executor(threadpool, response_queue.get)
-            except Empty:
-                await asyncio.sleep(0.0001)
-                continue
+            uid, response = await _get_response()
             stream_response_buffer, event = response_buffer[uid]
             stream_response_buffer.append(response)
             event.set()
 
     else:
         while True:
-            uid, response = await loop.run_in_executor(threadpool, response_queue.get)
+            uid, response = await _get_response()
             event = response_buffer.pop(uid)
             response_buffer[uid] = response
             event.set()
@@ -110,17 +117,57 @@ class LitServer:
         max_batch_size: int = 1,
         batch_timeout: float = 0.0,
         api_path: str = "/predict",
+        healthcheck_path: str = "/health",
+        info_path: str = "/info",
+        model_metadata: Optional[dict] = None,
         stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
+        track_requests: bool = False,
+        loop: Optional[Union[str, LitLoop]] = "auto",
+        callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
+        loggers: Optional[Union[Logger, List[Logger]]] = None,
+        use_zmq: bool = False,
     ):
+        """Initialize a LitServer instance.
+
+        Args:
+            lit_api: The LitAPI instance to use for handling requests.
+            accelerator: The type of hardware accelerator to use (e.g., 'auto', 'cpu', 'cuda', 'mps').
+            devices: The number of devices to use (e.g., 'auto', 1, 2).
+            workers_per_device: The number of workers to use per device.
+            timeout: The timeout for requests in seconds.
+            max_batch_size: The maximum batch size.
+            batch_timeout: The timeout for batching requests in seconds.
+            api_path: The path for the prediction API endpoint.
+            healthcheck_path: The path for the health check endpoint.
+            info_path: The path for the server and model metadata info endpoint.
+            model_metadata: Metadata about the model, it will be shown via the `info_path` endpoint.
+            stream: Whether to enable streaming responses.
+            spec: The specification for the API such as OpenAISpec or OpenAIEmbeddingSpec.
+            max_payload_size: The maximum payload size for requests.
+            track_requests: Whether to track the number of active requests.
+            loop: The inference engine runs with this loop in the worker process.
+            callbacks: Callbacks to use for the server.
+            middlewares: ASGI middleware for the server.
+            loggers: Loggers to use for the server.
+
+        """
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
-        if isinstance(spec, OpenAISpec):
-            stream = True
+        if isinstance(spec, LitSpec):
+            stream = spec.stream
+
+        if loop is None:
+            loop = "auto"
+
+        if isinstance(loop, str) and loop != "auto":
+            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
+        if loop == "auto":
+            loop = get_default_loop(stream, max_batch_size)
 
         if middlewares is None:
             middlewares = []
@@ -139,6 +186,22 @@ class LitServer:
                 "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
             )
 
+        if not healthcheck_path.startswith("/"):
+            raise ValueError(
+                "healthcheck_path must start with '/'. "
+                "Please provide a valid api path like '/health', '/healthcheck', or '/v1/health'"
+            )
+
+        if not info_path.startswith("/"):
+            raise ValueError(
+                "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
+            )
+
+        try:
+            json.dumps(model_metadata)
+        except (TypeError, ValueError):
+            raise ValueError("model_metadata must be JSON serializable.")
+
         # Check if the batch and unbatch methods are overridden in the lit_api instance
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
         unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
@@ -149,10 +212,20 @@ class LitServer:
                 "but the max_batch_size parameter was not set."
             )
 
+        if sys.platform == "win32" and use_zmq:
+            warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
+            use_zmq = False
+
+        self._loop: LitLoop = loop
         self.api_path = api_path
+        self.healthcheck_path = healthcheck_path
+        self.info_path = info_path
+        self.track_requests = track_requests
+        self.timeout = timeout
         lit_api.stream = stream
-        lit_api.request_timeout = timeout
-        lit_api._sanitize(max_batch_size, spec=spec)
+        lit_api.request_timeout = self.timeout
+        lit_api.pre_setup(max_batch_size, spec=spec)
+        self._loop.pre_setup(lit_api, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None
@@ -162,7 +235,10 @@ class LitServer:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
+        self.active_counters: List[mp.Value] = []
         self.middlewares = middlewares
+        self._logger_connector = _LoggerConnector(self, loggers)
+        self.logger_queue = None
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
@@ -170,7 +246,12 @@ class LitServer:
         self.batch_timeout = batch_timeout
         self.stream = stream
         self.max_payload_size = max_payload_size
+        self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
+        self._callback_runner = CallbackRunner(callbacks)
+        self.use_zmq = use_zmq
+        self._zmq_addr = generate_random_zmq_address() if use_zmq else None
+        logger.debug(f"ZMQ port: {self._zmq_addr}")
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -197,12 +278,16 @@ class LitServer:
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
         self.inference_workers = self.devices * self.workers_per_device
-        self.setup_server()
+        self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
+        if self._logger_connector._loggers:
+            self.logger_queue = manager.Queue()
+
+        self._logger_connector.run(self)
 
         self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 
@@ -218,7 +303,7 @@ class LitServer:
             if len(device) == 1:
                 device = device[0]
 
-            self.workers_setup_status[worker_id] = False
+            self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
@@ -234,6 +319,10 @@ class LitServer:
                     self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
+                    self._callback_runner,
+                    self._loop,
+                    self.use_zmq,
+                    self._zmq_addr,
                 ),
             )
             process.start()
@@ -253,11 +342,14 @@ class LitServer:
 
         response_queue = self.response_queues[self.app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
-        future = response_queue_to_buffer(response_queue, self.response_buffer, self.stream, response_executor)
+        future = response_queue_to_buffer(
+            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq, self._zmq_addr
+        )
         task = loop.create_task(future)
 
         yield
 
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
         task.cancel()
         logger.debug("Shutting down response queue to buffer task")
 
@@ -288,30 +380,65 @@ class LitServer:
                     yield data
             data_available.clear()
 
-    def setup_server(self):
+    @property
+    def active_requests(self):
+        if self.track_requests and self.active_counters:
+            return sum(counter.value for counter in self.active_counters)
+        warnings.warn(
+            "Active request counter is not enabled while using `on_request` callback hook. "
+            "Please set track_requests=True in the LitServer."
+        )
+        return None
+
+    def register_endpoints(self):
+        """Register endpoint routes for the FastAPI app and setup middlewares."""
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START, litserver=self)
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
-        @self.app.get("/health", dependencies=[Depends(self.setup_auth())])
+        @self.app.get(self.healthcheck_path, dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
             nonlocal workers_ready
             if not workers_ready:
-                workers_ready = all(self.workers_setup_status.values())
+                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
             if workers_ready:
                 return Response(content="ok", status_code=200)
 
             return Response(content="not ready", status_code=503)
 
+        @self.app.get(self.info_path, dependencies=[Depends(self.setup_auth())])
+        async def info(request: Request) -> Response:
+            return JSONResponse(
+                content={
+                    "model": self.model_metadata,
+                    "server": {
+                        "devices": self.devices,
+                        "workers_per_device": self.workers_per_device,
+                        "timeout": self.timeout,
+                        "max_batch_size": self.max_batch_size,
+                        "batch_timeout": self.batch_timeout,
+                        "stream": self.stream,
+                        "max_payload_size": self.max_payload_size,
+                        "track_requests": self.track_requests,
+                    },
+                }
+            )
+
         async def predict(request: self.request_type) -> self.response_type:
+            self._callback_runner.trigger_event(
+                EventTypes.ON_REQUEST,
+                active_requests=self.active_requests,
+                litserver=self,
+            )
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
-            logger.info(f"Received request uid={uid}")
+            logger.debug(f"Received request uid={uid}")
 
             payload = request
             if self.request_type == Request:
@@ -326,12 +453,21 @@ class LitServer:
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
-
+            if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+                logger.error("Error in request: %s", response)
+                raise response
             if status == LitAPIStatus.ERROR:
-                load_and_raise(response)
+                logger.error("Error in request: %s", response)
+                raise HTTPException(status_code=500)
+            self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
             return response
 
         async def stream_predict(request: self.request_type) -> self.response_type:
+            self._callback_runner.trigger_event(
+                EventTypes.ON_REQUEST,
+                active_requests=self.active_requests,
+                litserver=self,
+            )
             response_queue_id = self.app.response_queue_id
             uid = uuid.uuid4()
             event = asyncio.Event()
@@ -344,7 +480,13 @@ class LitServer:
                 payload = await request.json()
             self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
-            return StreamingResponse(self.data_streamer(q, data_available=event))
+            response = call_after_stream(
+                self.data_streamer(q, data_available=event),
+                self._callback_runner.trigger_event,
+                EventTypes.ON_RESPONSE,
+                litserver=self,
+            )
+            return StreamingResponse(response)
 
         if not self._specs:
             stream = self.lit_api.stream
@@ -375,22 +517,31 @@ class LitServer:
                 self.app.add_middleware(middleware)
 
     @staticmethod
-    def generate_client_file():
-        src_path = os.path.join(os.path.dirname(__file__), "python_client.py")
+    def generate_client_file(port: Union[str, int] = 8000):
         dest_path = os.path.join(os.getcwd(), "client.py")
 
         if os.path.exists(dest_path):
+            logger.debug("client.py already exists in the current directory. Skipping generation.")
             return
 
-        # Copy the file to the destination directory
         try:
-            shutil.copy(src_path, dest_path)
-            print(f"File '{src_path}' copied to '{dest_path}'")
+            client_code = client_template.format(PORT=port)
+            with open(dest_path, "w") as f:
+                f.write(client_code)
+
         except Exception as e:
-            print(f"Error copying file: {e}")
+            logger.exception(f"Error copying file: {e}")
+
+    def verify_worker_status(self):
+        while not any(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()):
+            if any(v == WorkerSetupStatus.ERROR for v in self.workers_setup_status.values()):
+                raise RuntimeError("One or more workers failed to start. Shutting down LitServe")
+            time.sleep(0.05)
+        logger.debug("One or more workers are ready to serve requests")
 
     def run(
         self,
+        host: str = "0.0.0.0",
         port: Union[str, int] = 8000,
         num_api_servers: Optional[int] = None,
         log_level: str = "info",
@@ -399,7 +550,7 @@ class LitServer:
         **kwargs,
     ):
         if generate_client_file:
-            LitServer.generate_client_file()
+            LitServer.generate_client_file(port=port)
 
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
@@ -410,7 +561,17 @@ class LitServer:
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
 
-        config = uvicorn.Config(app=self.app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+        # TODO: Support multiple API servers and workers with ZMQ
+        if self.use_zmq and num_api_servers is not None and num_api_servers > 1:
+            raise ValueError("ZMQ is not supported with multiple API servers yet.")
+        if self.use_zmq and len(self.inference_workers) > 1:
+            raise ValueError("ZMQ is not supported with multiple workers per device yet.")
+
+        host_msg = f"host must be '0.0.0.0', '127.0.0.1', or '::' but got {host}"
+        if host not in ["0.0.0.0", "127.0.0.1", "::"]:
+            raise ValueError(host_msg)
+
+        config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
@@ -421,7 +582,7 @@ class LitServer:
 
         if sys.platform == "win32":
             warnings.warn(
-                "Windows does not support forking. Using threads" " api_server_worker_type will be set to 'thread'"
+                "Windows does not support forking. Using threads api_server_worker_type will be set to 'thread'"
             )
             api_server_worker_type = "thread"
         elif api_server_worker_type is None:
@@ -429,6 +590,7 @@ class LitServer:
 
         manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
+        self.verify_worker_status()
         try:
             servers = self._start_server(port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs)
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
@@ -441,13 +603,21 @@ class LitServer:
                 w.join()
             manager.shutdown()
 
+    def _prepare_app_run(self, app: FastAPI):
+        # Add middleware to count active requests
+        active_counter = mp.Value("i", 0, lock=True)
+        self.active_counters.append(active_counter)
+        app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         servers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
             if self.lit_spec:
                 self.lit_spec.response_queue_id = response_queue_id
-            app = copy.copy(self.app)
+            app: FastAPI = copy.copy(self.app)
+
+            self._prepare_app_run(app)
 
             config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
             server = uvicorn.Server(config=config)

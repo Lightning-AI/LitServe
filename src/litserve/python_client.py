@@ -1,3 +1,4 @@
+client_template = """
 # Copyright The Lightning AI team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,5 +14,6 @@
 # limitations under the License.
 import requests
 
-response = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
-print(f"Status: {response.status_code}\nResponse:\n {response.text}")
+response = requests.post("http://127.0.0.1:{PORT}/predict", json={{"input": 4.0}})
+print(f"Status: {{response.status_code}}\\nResponse:\\n {{response.text}}")
+"""

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -19,12 +20,9 @@ import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
-import time
-
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from litserve import LitAPI, LitServer
-
 from litserve.utils import wrap_litserve_start
 
 
@@ -54,8 +52,11 @@ class SlowSetupLitAPI(SimpleLitAPI):
         time.sleep(2)
 
 
-def test_workers_health():
-    server = LitServer(SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2)
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_health(use_zmq):
+    server = LitServer(
+        SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2, use_zmq=use_zmq
+    )
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.get("/health")
@@ -69,6 +70,34 @@ def test_workers_health():
 
         time.sleep(3)
         response = client.get("/health")
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_health_custom_path(use_zmq):
+    server = LitServer(
+        SlowSetupLitAPI(),
+        accelerator="cpu",
+        healthcheck_path="/my_server/health",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        use_zmq=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.get("/my_server/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(1)
+        response = client.get("/my_server/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(3)
+        response = client.get("/my_server/health")
         assert response.status_code == 200
         assert response.text == "ok"
 
@@ -119,13 +148,16 @@ class SlowBatchAPI(SlowLitAPI):
         return list(output)
 
 
+@pytest.mark.flaky(retries=3)
 @pytest.mark.asyncio
 async def test_timeout():
     # Scenario: first request completes, second request times out in queue
     api = SlowLitAPI()  # takes 2 seconds for each prediction
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=2)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, use_zmq=True)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             # Poll until the server is ready
             for _ in range(10):  # retry 10 times
                 try:
@@ -138,14 +170,15 @@ async def test_timeout():
             await asyncio.sleep(0.0001)
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
             responses = await asyncio.gather(response1, response2, return_exceptions=True)
-            assert (
-                responses[0].status_code == 200
-            ), "First request should complete since it's popped from the request queue."
-            assert (
-                responses[1].status_code == 504
-            ), "Server takes longer than specified timeout and request should timeout"
+            assert responses[0].status_code == 200, (
+                "First request should complete since it's popped from the request queue."
+            )
+            assert responses[1].status_code == 504, (
+                "Server takes longer than specified timeout and request should timeout"
+            )
 
 
+@pytest.mark.flaky(retries=3)
 @pytest.mark.asyncio
 async def test_batch_timeout():
     # Scenario: first 2 requests finish as a batch and third request times out in queue
@@ -157,7 +190,9 @@ async def test_batch_timeout():
         batch_timeout=0.01,
     )
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             # wait for the server to be ready
             for _ in range(10):
                 try:
@@ -171,12 +206,12 @@ async def test_batch_timeout():
             await asyncio.sleep(0.0001)
             response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
             responses = await asyncio.gather(response1, response2, response3, return_exceptions=True)
-            assert (
-                responses[0].status_code == 200
-            ), "Batch: First request should complete since it's popped from the request queue."
-            assert (
-                responses[1].status_code == 200
-            ), "Batch: Second request should complete since it's popped from the request queue."
+            assert responses[0].status_code == 200, (
+                "Batch: First request should complete since it's popped from the request queue."
+            )
+            assert responses[1].status_code == 200, (
+                "Batch: Second request should complete since it's popped from the request queue."
+            )
             assert responses[2].status_code == 504, "Batch: Third request was delayed and should fail"
 
     server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)

@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import pickle
-import re
 import sys
+from time import sleep
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,17 +22,12 @@ import torch.nn as nn
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException, Request, Response
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-from starlette.types import ASGIApp
+from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import LitServer, multi_server_lifespan, run_all
-from litserve.test_examples.openai_spec_example import TestAPI
 from litserve.utils import wrap_litserve_start
 
 
@@ -59,46 +53,65 @@ def test_device_identifiers(lifespan_mock, simple_litapi):
     assert server.devices[1][0] == "cuda:2"
 
 
+@pytest.mark.parametrize("devices", ["cpu", ["cpu", "cuda:0"], ["cuda:a", "cuda:1"]])
+def test_device_identifiers_error(simple_litapi, devices):
+    with pytest.raises(
+        ValueError, match="devices must be an integer or a list of integers when using 'cuda' or 'mps', instead got .*"
+    ):
+        LitServer(simple_litapi, accelerator="cuda", devices=devices, timeout=10)
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_stream(simple_stream_api):
-    server = LitServer(simple_stream_api, stream=True, timeout=10)
+async def test_stream(simple_stream_api, use_zmq):
+    server = LitServer(simple_stream_api, stream=True, timeout=10, use_zmq=use_zmq)
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            # TODO: remove this sleep when we have a better way to check if the server is ready
+            # TODO: main process can only consume when response_queue_to_buffer is ready
+            await asyncio.sleep(4)
             resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)
             assert resp1.status_code == 200, "Check if server is running and the request format is valid."
-            assert (
-                resp1.text == expected_output1
-            ), "Server returns input prompt and generated output which didn't match."
+            assert resp1.text == expected_output1, (
+                "Server returns input prompt and generated output which didn't match."
+            )
             assert resp2.status_code == 200, "Check if server is running and the request format is valid."
-            assert (
-                resp2.text == expected_output2
-            ), "Server returns input prompt and generated output which didn't match."
+            assert resp2.text == expected_output2, (
+                "Server returns input prompt and generated output which didn't match."
+            )
 
 
+@pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_batched_stream_server(simple_batched_stream_api):
-    server = LitServer(simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30)
+async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
+    server = LitServer(
+        simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30, use_zmq=use_zmq
+    )
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)
             assert resp1.status_code == 200, "Check if server is running and the request format is valid."
             assert resp2.status_code == 200, "Check if server is running and the request format is valid."
-            assert (
-                resp1.text == expected_output1
-            ), "Server returns input prompt and generated output which didn't match."
-            assert (
-                resp2.text == expected_output2
-            ), "Server returns input prompt and generated output which didn't match."
+            assert resp1.text == expected_output1, (
+                "Server returns input prompt and generated output which didn't match."
+            )
+            assert resp2.text == expected_output2, (
+                "Server returns input prompt and generated output which didn't match."
+            )
 
 
 def test_litapi_with_stream(simple_litapi):
@@ -186,16 +199,22 @@ def test_mocked_accelerator():
 @patch("litserve.server.uvicorn")
 def test_server_run(mock_uvicorn):
     server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         server.run(port="invalid port")
 
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
         server.run(port=65536)
 
+    with pytest.raises(ValueError, match="host must be '0.0.0.0', '127.0.0.1', or '::' but got"):
+        server.run(host="127.0.0.2")
+
     server.run(port=8000)
     mock_uvicorn.Config.assert_called()
     mock_uvicorn.reset_mock()
     server.run(port="8001")
+    mock_uvicorn.Config.assert_called()
+    server.run(host="::", port="8000")
     mock_uvicorn.Config.assert_called()
 
 
@@ -214,6 +233,7 @@ def test_start_server(mock_uvicon):
 def test_server_run_with_api_server_worker_type(mock_uvicorn):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api, devices=1)
+    server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
 
@@ -248,6 +268,7 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn):
 def test_server_run_windows(mock_uvicorn):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
+    server.verify_worker_status = MagicMock()
     server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
     server._start_server = MagicMock()
 
@@ -259,6 +280,7 @@ def test_server_run_windows(mock_uvicorn):
 
 def test_server_terminate():
     server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
     mock_manager = MagicMock()
 
     with patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start, patch(
@@ -315,40 +337,39 @@ class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
 
 
 @pytest.mark.asyncio
-@patch("litserve.server.load_and_raise")
-async def test_inject_context(mocked_load_and_raise):
-    def dummy_load_and_raise(resp):
-        raise pickle.loads(resp)
-
-    mocked_load_and_raise.side_effect = dummy_load_and_raise
-
+async def test_inject_context():
     # Test context injection with single loop
     api = IdentityAPI()
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
     server = LitServer(IdentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
     server = LitServer(IdentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     server = LitServer(PredictErrorAPI())
-    with wrap_litserve_start(server) as server, pytest.raises(
-        TypeError, match=re.escape("predict() missing 1 required positional argument: 'y'")
-    ), TestClient(server.app) as client:
-        client.post("/predict", json={"input": 5.0}, timeout=10)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        resp = client.post("/predict", json={"input": 5.0}, timeout=10)
+        assert resp.status_code == 500, "predict() missed 1 required positional argument: 'y'"
 
 
 def test_custom_api_path():
@@ -362,9 +383,88 @@ def test_custom_api_path():
         assert response.status_code == 200, "Server response should be 200 (OK)"
 
 
+def test_custom_healthcheck_path():
+    with pytest.raises(ValueError, match="healthcheck_path must start with '/'. "):
+        LitServer(ls.test_examples.SimpleLitAPI(), healthcheck_path="customhealth")
+
+    server = LitServer(ls.test_examples.SimpleLitAPI(), healthcheck_path="/v1/custom_health")
+    url = server.healthcheck_path
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Sleep a bit to ensure the server is ready
+        sleep(3)
+        response = client.get(url)
+
+    assert response.status_code == 200, "Server response should be 200 (OK)"
+
+
+def test_custom_info_path():
+    with pytest.raises(ValueError, match="info_path must start with '/'. "):
+        LitServer(ls.test_examples.SimpleLitAPI(), info_path="custominfo")
+
+    server = LitServer(ls.test_examples.SimpleLitAPI(), info_path="/v1/custom_info", accelerator="cpu")
+    url = server.info_path
+    expected_response = {
+        "model": None,
+        "server": {
+            "devices": ["cpu"],
+            "workers_per_device": 1,
+            "timeout": 30,
+            "max_batch_size": 1,
+            "batch_timeout": 0.0,
+            "stream": False,
+            "max_payload_size": None,
+            "track_requests": False,
+        },
+    }
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Sleep a bit to ensure the server is ready
+        sleep(3)
+        response = client.get(url)
+
+    assert response.status_code == 200, "Server response should be 200 (OK)"
+    assert response.json() == expected_response, "server didn't return expected output"
+
+
+def test_info_route():
+    model_metadata = {"name": "my-awesome-model", "version": "v1.1.0"}
+    expected_response = {
+        "model": {
+            "name": "my-awesome-model",
+            "version": "v1.1.0",
+        },
+        "server": {
+            "devices": ["cpu"],
+            "workers_per_device": 1,
+            "timeout": 30,
+            "max_batch_size": 1,
+            "batch_timeout": 0.0,
+            "stream": False,
+            "max_payload_size": None,
+            "track_requests": False,
+        },
+    }
+
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), accelerator="cpu", model_metadata=model_metadata)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.get("/info", headers={"Host": "localhost"})
+        assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
+        assert response.json() == expected_response, "server didn't return expected output"
+
+
+def test_model_metadata_json_error():
+    with pytest.raises(ValueError, match="model_metadata must be JSON serializable"):
+        ls.LitServer(ls.test_examples.SimpleLitAPI(), model_metadata=int)
+
+
 class TestHTTPExceptionAPI(ls.test_examples.SimpleLitAPI):
     def decode_request(self, request):
         raise HTTPException(501, "decode request is bad")
+
+
+class TestHTTPExceptionAPI2(ls.test_examples.SimpleLitAPI):
+    def decode_request(self, request):
+        raise HTTPException(status_code=400, detail="decode request is bad")
 
 
 def test_http_exception():
@@ -374,60 +474,31 @@ def test_http_exception():
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
 
-
-class RequestIdMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, length: int) -> None:
-        self.app = app
-        self.length = length
-        super().__init__(app)
-
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        response.headers["X-Request-Id"] = "0" * self.length
-        return response
-
-
-def test_custom_middleware():
-    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=[(RequestIdMiddleware, {"length": 5})])
+    server = LitServer(TestHTTPExceptionAPI2())
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
-        assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
-        assert response.json() == {"output": 16.0}, "server didn't return expected output"
-        assert response.headers["X-Request-Id"] == "00000"
+        assert response.status_code == 400, "Server raises 400 error"
+        assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
 
 
-def test_starlette_middlewares():
-    middlewares = [
-        (
-            TrustedHostMiddleware,
-            {
-                "allowed_hosts": ["localhost", "127.0.0.1"],
-            },
-        ),
-        HTTPSRedirectMiddleware,
-    ]
-    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=middlewares)
-    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post("/predict", json={"input": 4.0}, headers={"Host": "localhost"})
-        assert response.status_code == 200, f"Expected response to be 200 but got {response.status_code}"
-        assert response.json() == {"output": 16.0}, "server didn't return expected output"
+def test_generate_client_file(tmp_path, monkeypatch):
+    expected = """import requests
 
-        response = client.post("/predict", json={"input": 4.0}, headers={"Host": "not-trusted-host"})
-        assert response.status_code == 400, f"Expected response to be 400 but got {response.status_code}"
+response = requests.post("http://127.0.0.1:8123/predict", json={"input": 4.0})
+print(f"Status: {response.status_code}\\nResponse:\\n {response.text}")"""
+    monkeypatch.chdir(tmp_path)
+    LitServer.generate_client_file(8123)
+    with open(tmp_path / "client.py") as fr:
+        assert expected in fr.read(), f"Expected {expected} in client.py"
+
+    LitServer.generate_client_file(8000)
+    with open(tmp_path / "client.py") as fr:
+        assert expected in fr.read(), "Shouldn't replace existing client.py"
 
 
-def test_middlewares_inputs():
-    server = ls.LitServer(SimpleLitAPI(), middlewares=[])
-    assert len(server.middlewares) == 1, "Default middleware should be present"
-
-    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=[], max_payload_size=1000)
-    assert len(server.middlewares) == 2, "Default middleware should be present"
-
-    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=None)
-    assert len(server.middlewares) == 1, "Default middleware should be present"
-
-    with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
-        ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+class FailFastAPI(ls.test_examples.SimpleLitAPI):
+    def setup(self, device):
+        raise ValueError("setup failed")
 
 
 @pytest.mark.asyncio
@@ -465,3 +536,10 @@ def test_run_all_litservers(mock_uvicorn):
     mock_uvicorn.reset_mock()
     run_all([server1, server2, server3], port="8001")
     mock_uvicorn.Config.assert_called()
+
+def test_workers_setup_status():
+    api = FailFastAPI()
+    server = LitServer(api, devices=1)
+    with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
+        server.run()
+

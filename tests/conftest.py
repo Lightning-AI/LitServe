@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
-import psutil
 from typing import Generator
 
-from litserve.server import LitServer
+import psutil
 import pytest
-from litserve.api import LitAPI
-from litserve.utils import wrap_litserve_start
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
+
+from litserve.api import LitAPI
+from litserve.server import LitServer
+from litserve.utils import wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):
@@ -130,7 +131,7 @@ def openai_request_data():
         "temperature": 0.7,
         "top_p": 1,
         "n": 1,
-        "max_tokens": 0,
+        "max_completion_tokens": 0,
         "stop": "string",
         "stream": False,
         "presence_penalty": 0,
@@ -183,7 +184,7 @@ def openai_request_data_with_image():
         "temperature": 0.7,
         "top_p": 1,
         "n": 1,
-        "max_tokens": 0,
+        "max_completion_tokens": 0,
         "stop": "string",
         "stream": False,
         "presence_penalty": 0,
@@ -217,7 +218,7 @@ def openai_request_data_with_tools():
         "temperature": 0.7,
         "top_p": 1,
         "n": 1,
-        "max_tokens": 0,
+        "max_completion_tokens": 0,
         "stop": "string",
         "stream": False,
         "presence_penalty": 0,
@@ -257,10 +258,20 @@ def openai_request_data_with_response_format():
         "temperature": 0.7,
         "top_p": 1,
         "n": 1,
-        "max_tokens": 0,
+        "max_completion_tokens": 0,
         "stop": "string",
         "stream": False,
         "presence_penalty": 0,
         "frequency_penalty": 0,
         "user": "string",
     }
+
+
+@pytest.fixture
+def openai_embedding_request_data():
+    return {"input": "A beautiful sunset over the beach.", "model": "lit", "encoding_format": "float"}
+
+
+@pytest.fixture
+def openai_embedding_request_data_array():
+    return {"input": ["A beautiful sunset over the beach."] * 4, "model": "lit", "encoding_format": "float"}

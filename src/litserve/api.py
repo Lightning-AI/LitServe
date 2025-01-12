@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import json
+import warnings
 from abc import ABC, abstractmethod
+from queue import Queue
 from typing import Optional
 
 from pydantic import BaseModel
@@ -26,10 +27,11 @@ class LitAPI(ABC):
     _default_unbatch: callable = None
     _spec: LitSpec = None
     _device: Optional[str] = None
+    _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
 
     @abstractmethod
-    def setup(self, devices):
+    def setup(self, device):
         """Setup the model so it can be called in `predict`."""
         pass
 
@@ -54,12 +56,18 @@ class LitAPI(ABC):
 
         return inputs
 
-    @abstractmethod
     def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output."""
-        pass
+        raise NotImplementedError("predict is not implemented")
 
     def _unbatch_no_stream(self, output):
+        if isinstance(output, str):
+            warnings.warn(
+                "The 'predict' method returned a string instead of a list of predictions. "
+                "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
+                "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
+                UserWarning,
+            )
         return list(output)
 
     def _unbatch_stream(self, output_stream):
@@ -103,72 +111,35 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
-    def _sanitize(self, max_batch_size: int, spec: Optional[LitSpec]):
+    def pre_setup(self, max_batch_size: int, spec: Optional[LitSpec]):
+        self.max_batch_size = max_batch_size
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
             self._default_unbatch = self._unbatch_no_stream
 
-        # we will sanitize regularly if no spec
-        # in case, we have spec then:
-        # case 1: spec implements a streaming API
-        # Case 2: spec implements a non-streaming API
         if spec:
-            # TODO: Implement sanitization
             self._spec = spec
+            spec.pre_setup(self)
+
+    def set_logger_queue(self, queue: Queue):
+        """Set the queue for logging events."""
+
+        self._logger_queue = queue
+
+    def log(self, key, value):
+        """Log a key-value pair to the server."""
+        if self._logger_queue is None:
+            warnings.warn(
+                f"Logging event ('{key}', '{value}') attempted without a configured logger. "
+                "To track and visualize metrics, please initialize and attach a logger. "
+                "If this is intentional, you can safely ignore this message."
+            )
             return
+        self._logger_queue.put((key, value))
 
-        original = self.unbatch.__code__ is LitAPI.unbatch.__code__
-        if (
-            self.stream
-            and max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(self.predict),
-                inspect.isgeneratorfunction(self.encode_response),
-                (original or inspect.isgeneratorfunction(self.unbatch)),
-            ])
-        ):
-            raise ValueError(
-                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
-                `lit_api.unbatch` must generate values using `yield`.
+    def has_active_requests(self) -> bool:
+        raise NotImplementedError("has_active_requests is not implemented")
 
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-
-                def unbatch(self, outputs):
-                    for output in outputs:
-                        unbatched_output = ...
-                        yield unbatched_output
-             """
-            )
-
-        if self.stream and not all([
-            inspect.isgeneratorfunction(self.predict),
-            inspect.isgeneratorfunction(self.encode_response),
-        ]):
-            raise ValueError(
-                """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
-
-             Example:
-
-                def predict(self, inputs):
-                    ...
-                    for i in range(max_token_length):
-                        yield prediction
-
-                def encode_response(self, outputs):
-                    for output in outputs:
-                        encoded_output = ...
-                        yield encoded_output
-             """
-            )
+    def has_capacity(self) -> bool:
+        raise NotImplementedError("has_capacity is not implemented")

@@ -21,12 +21,16 @@ import torch
 import torch.nn as nn
 from asgi_lifespan import LifespanManager
 from fastapi import Request, Response
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
-from litserve import LitAPI, LitServer
-from litserve.loops import run_batched_loop, collate_requests
-from litserve.utils import wrap_litserve_start
 import litserve as ls
+from litserve import LitAPI, LitServer
+from litserve.callbacks import CallbackRunner
+from litserve.loops.base import collate_requests
+from litserve.loops.simple_loops import run_batched_loop
+from litserve.utils import wrap_litserve_start
+
+NOOP_CB_RUNNER = CallbackRunner()
 
 
 class Linear(nn.Module):
@@ -88,7 +92,9 @@ async def test_batched():
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
@@ -102,7 +108,9 @@ async def test_unbatched():
     api = SimpleTorchAPI()
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(app=manager.app, base_url="http://test") as ac:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
@@ -145,9 +153,25 @@ def test_max_batch_size_warning():
         LitServer(SimpleTorchAPI(), accelerator="cpu", devices=1, timeout=2)
 
 
+def test_batch_predict_string_warning():
+    api = ls.test_examples.SimpleBatchedAPI()
+    api.pre_setup(2, None)
+    api.predict = MagicMock(return_value="This is a string")
+
+    mock_input = torch.tensor([[1.0], [2.0]])
+
+    with pytest.warns(
+        UserWarning,
+        match="When batching is enabled, 'predict' must return a list to handle multiple inputs correctly.",
+    ):
+        # Simulate the behavior in run_batched_loop
+        y = api.predict(mock_input)
+        api.unbatch(y)
+
+
 class FakeResponseQueue:
     def put(self, *args):
-        raise Exception("Exit loop")
+        raise StopIteration("exit loop")
 
 
 def test_batched_loop():
@@ -166,7 +190,14 @@ def test_batched_loop():
 
     with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
         run_batched_loop(
-            lit_api_mock, lit_api_mock, requests_queue, FakeResponseQueue(), max_batch_size=2, batch_timeout=4
+            lit_api_mock,
+            lit_api_mock,
+            requests_queue,
+            [FakeResponseQueue()],
+            max_batch_size=2,
+            batch_timeout=4,
+            callback_runner=NOOP_CB_RUNNER,
+            socket=None,
         )
 
     lit_api_mock.batch.assert_called_once()
@@ -195,3 +226,30 @@ def test_collate_requests(batch_timeout, batch_size):
     )
     assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
+
+
+class BatchSizeMismatchAPI(SimpleBatchLitAPI):
+    def predict(self, x):
+        assert len(x) == 2, "Expected two concurrent inputs to be batched"
+        return self.model(x)  # returns a list of length same as len(x)
+
+    def unbatch(self, output):
+        return [output]  # returns a list of length 1
+
+
+@pytest.mark.asyncio
+async def test_batch_size_mismatch():
+    api = BatchSizeMismatchAPI()
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            response1 = ac.post("/predict", json={"input": 4.0})
+            response2 = ac.post("/predict", json={"input": 5.0})
+            response1, response2 = await asyncio.gather(response1, response2)
+        assert response1.status_code == 500
+        assert response2.status_code == 500
+        assert response1.json() == {"detail": "Batch size mismatch"}, "unbatch a list of length 1 when batch size is 2"
+        assert response2.json() == {"detail": "Batch size mismatch"}, "unbatch a list of length 1 when batch size is 2"

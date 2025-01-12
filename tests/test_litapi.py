@@ -16,10 +16,11 @@ import json
 import numpy as np
 import pytest
 import torch
-from pydantic import BaseModel
 from fastapi import HTTPException
-from litserve.specs.openai import ChatCompletionRequest
+from pydantic import BaseModel
+
 import litserve as ls
+from litserve.specs.openai import ChatCompletionRequest
 
 
 class TestDefaultBatchedAPI(ls.LitAPI):
@@ -64,7 +65,7 @@ class TestStreamAPI(ls.LitAPI):
 
 def test_default_batch_unbatch():
     api = TestDefaultBatchedAPI()
-    api._sanitize(max_batch_size=4, spec=None)
+    api.pre_setup(max_batch_size=4, spec=None)
     inputs = [1, 2, 3, 4]
     output = api.batch(inputs)
     assert output == inputs, "Default batch should not change input"
@@ -80,7 +81,7 @@ class TestStreamAPIBatched(TestStreamAPI):
 def test_default_batch_unbatch_stream():
     api = TestStreamAPIBatched()
     api.stream = True
-    api._sanitize(max_batch_size=4, spec=None)
+    api.pre_setup(max_batch_size=4, spec=None)
     inputs = [1, 2, 3, 4]
     expected_output = [[0, 0, 0, 0], [1, 2, 3, 4], [2, 4, 6, 8], [3, 6, 9, 12]]
     output = api.batch(inputs)
@@ -92,7 +93,7 @@ def test_default_batch_unbatch_stream():
 
 def test_custom_batch_unbatch():
     api = TestCustomBatchedAPI()
-    api._sanitize(max_batch_size=4, spec=None)
+    api.pre_setup(max_batch_size=4, spec=None)
     inputs = [1, 2, 3, 4]
     output = api.batch(inputs)
     assert np.all(output == np.array(inputs)), "Custom batch stacks input as numpy array"
@@ -101,7 +102,7 @@ def test_custom_batch_unbatch():
 
 def test_batch_unbatch_stream():
     api = TestStreamAPI()
-    api._sanitize(max_batch_size=4, spec=None)
+    api.pre_setup(max_batch_size=4, spec=None)
     inputs = [1, 2, 3, 4]
     output = api.batch(inputs)
     output = api.predict(output)
@@ -127,7 +128,7 @@ def test_decode_request():
 
 def test_decode_request_with_openai_spec():
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
     request = ChatCompletionRequest(messages=[{"role": "system", "content": "Hello"}])
     decoded_request = api.decode_request(request)
     assert decoded_request[0]["content"] == "Hello", "Decode request should return the input message"
@@ -135,7 +136,7 @@ def test_decode_request_with_openai_spec():
 
 def test_decode_request_with_openai_spec_wrong_request():
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
     with pytest.raises(AttributeError, match="object has no attribute 'messages'"):
         api.decode_request({"input": "Hello"})
 
@@ -148,7 +149,7 @@ def test_encode_response():
 
 def test_encode_response_with_openai_spec():
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
     response = "This is a LLM generated text".split()
     generated_tokens = []
     for output in api.encode_response(response):
@@ -165,7 +166,7 @@ def test_encode_response_with_openai_spec_dict_token_usage():
 
     generated_tokens = []
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
 
     for output in api.encode_response(predict()):
         assert output["role"] == "assistant", "Role should be assistant"
@@ -174,13 +175,13 @@ def test_encode_response_with_openai_spec_dict_token_usage():
 
 
 def test_encode_response_with_custom_spec_api():
-    class CustomSpecAPI(ls.test_examples.TestAPI):
+    class CustomSpecAPI(ls.OpenAISpec):
         def encode_response(self, output_stream):
             for output in output_stream:
                 yield {"content": output}
 
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=CustomSpecAPI())
+    api.pre_setup(max_batch_size=1, spec=CustomSpecAPI())
     response = "This is a LLM generated text".split()
     generated_tokens = []
     for output in api.encode_response(response):
@@ -190,7 +191,7 @@ def test_encode_response_with_custom_spec_api():
 
 def test_encode_response_with_openai_spec_invalid_input():
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
     response = 10
     with pytest.raises(TypeError, match="object is not iterable"):
         next(api.encode_response(response))
@@ -201,7 +202,7 @@ def test_encode_response_with_openai_spec_invalid_predict_output():
         yield {"hello": "world"}
 
     api = ls.test_examples.TestAPI()
-    api._sanitize(max_batch_size=1, spec=ls.OpenAISpec())
+    api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
     with pytest.raises(HTTPException, match=r"Malformed output from LitAPI.predict"):
         next(api.encode_response(predict()))
 
@@ -240,3 +241,23 @@ def test_device_property():
     api = ls.test_examples.SimpleLitAPI()
     api.device = "cpu"
     assert api.device == "cpu"
+
+
+class TestLogger(ls.Logger):
+    def process(self, key, value):
+        self.processed_data = (key, value)
+
+
+def test_log():
+    api = ls.test_examples.SimpleLitAPI()
+    assert api._logger_queue is None, "Logger queue should be None"
+    assert api.log("time", 0.1) is None, "Log should return None"
+    with pytest.warns(UserWarning, match="attempted without a configured logger"):
+        api.log("time", 0.1)
+
+    api = ls.test_examples.SimpleLitAPI()
+    assert api._logger_queue is None, "Logger queue should be None"
+    server = ls.LitServer(api, loggers=TestLogger())
+    server.launch_inference_worker(1)
+    api.log("time", 0.1)
+    assert server.logger_queue.get() == ("time", 0.1)

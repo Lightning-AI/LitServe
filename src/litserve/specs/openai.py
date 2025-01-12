@@ -26,11 +26,11 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ..utils import LitAPIStatus, azip, load_and_raise
-from .base import LitSpec
+from litserve.specs.base import LitSpec
+from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
-    from litserve import LitServer
+    from litserve import LitAPI, LitServer
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +100,7 @@ class FunctionCall(BaseModel):
 
 
 class ToolCall(BaseModel):
+    index: int = 0
     id: Optional[str] = None
     type: str = "function"
     function: FunctionCall
@@ -155,7 +156,8 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 1.0
     n: Optional[int] = 1
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = None  # Kept for backward compatibility
+    max_completion_tokens: Optional[int] = None
     stop: Optional[Union[str, List[str]]] = None
     stream: Optional[bool] = False
     presence_penalty: Optional[float] = 0.0
@@ -260,18 +262,22 @@ class OpenAISpec(LitSpec):
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
         self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
 
-    def setup(self, server: "LitServer"):
+    @property
+    def stream(self):
+        return True
+
+    def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
-        super().setup(server)
-
-        lit_api = self._server.lit_api
         if not inspect.isgeneratorfunction(lit_api.predict):
             raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
         if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
             raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+
+    def setup(self, server: "LitServer"):
+        super().setup(server)
         print("OpenAI spec setup complete")
 
     def populate_context(self, context, request):
@@ -364,7 +370,7 @@ class OpenAISpec(LitSpec):
         if request.stream:
             return StreamingResponse(
                 self.streaming_completion(request, responses),
-                media_type="application/x-ndjson",
+                media_type="text/event-stream",
                 background=background_tasks,
             )
 
@@ -379,8 +385,11 @@ class OpenAISpec(LitSpec):
             usage_infos = []
             # iterate over n choices
             for i, (response, status) in enumerate(streaming_response):
-                if status == LitAPIStatus.ERROR:
-                    load_and_raise(response)
+                if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+                    raise response
+                elif status == LitAPIStatus.ERROR:
+                    logger.error("Error in streaming response: %s", response)
+                    raise HTTPException(status_code=500)
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
                 chat_msg = ChoiceDelta(**encoded_response)
@@ -393,9 +402,9 @@ class OpenAISpec(LitSpec):
 
             # Only use the last item from encode_response
             usage_info = sum(usage_infos)
-            chunk = ChatCompletionChunk(model=model, choices=choices, usage=None).json()
+            chunk = ChatCompletionChunk(model=model, choices=choices, usage=None)
             logger.debug(chunk)
-            yield f"data: {chunk}\n\n"
+            yield f"data: {chunk.model_dump_json()}\n\n"
 
         choices = [
             ChatCompletionStreamingChoice(
@@ -409,8 +418,8 @@ class OpenAISpec(LitSpec):
             model=model,
             choices=choices,
             usage=usage_info,
-        ).json()
-        yield f"data: {last_chunk}\n\n"
+        )
+        yield f"data: {last_chunk.model_dump_json()}\n\n"
         yield "data: [DONE]\n\n"
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
@@ -423,13 +432,18 @@ class OpenAISpec(LitSpec):
             tool_calls = None
             usage = None
             async for response, status in streaming_response:
+                if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+                    raise response
                 if status == LitAPIStatus.ERROR:
-                    load_and_raise(response)
+                    logger.error("Error in OpenAI non-streaming response: %s", response)
+                    raise HTTPException(status_code=500)
+
                 # data from LitAPI.encode_response
                 encoded_response = json.loads(response)
                 logger.debug(encoded_response)
                 chat_msg = ChatMessage(**encoded_response)
                 usage = UsageInfo(**encoded_response)
+                usage_infos.append(usage)  # Aggregate usage info across all choices
                 msgs.append(chat_msg.content)
                 if chat_msg.tool_calls:
                     tool_calls = chat_msg.tool_calls
@@ -438,6 +452,5 @@ class OpenAISpec(LitSpec):
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
-            usage_infos.append(usage)  # Only use the last item from encode_response
 
         return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))

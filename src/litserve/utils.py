@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import dataclasses
 import logging
+import os
 import pickle
-from typing import Optional
+import sys
+import uuid
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator
 
 from fastapi import HTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
-
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 if TYPE_CHECKING:
     from litserve.server import LitServer
@@ -35,16 +35,21 @@ class LitAPIStatus:
     FINISH_STREAMING = "FINISH_STREAMING"
 
 
-def load_and_raise(response):
-    try:
-        exception = pickle.loads(response) if isinstance(response, bytes) else response
-        raise exception
-    except pickle.PickleError:
-        logger.exception(
-            f"main process failed to load the exception from the parallel worker process. "
-            f"{response} couldn't be unpickled."
-        )
-        raise
+class PickleableHTTPException(HTTPException):
+    @staticmethod
+    def from_exception(exc: HTTPException):
+        status_code = exc.status_code
+        detail = exc.detail
+        return PickleableHTTPException(status_code, detail)
+
+    def __reduce__(self):
+        return (HTTPException, (self.status_code, self.detail))
+
+
+def dump_exception(exception):
+    if isinstance(exception, HTTPException):
+        exception = PickleableHTTPException.from_exception(exception)
+    return pickle.dumps(exception)
 
 
 async def azip(*async_iterables):
@@ -62,36 +67,82 @@ def wrap_litserve_start(server: "LitServer"):
     if server.lit_spec:
         server.lit_spec.response_queue_id = 0
     manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
+    server._prepare_app_run(server.app)
     yield server
     for p in processes:
         p.terminate()
     manager.shutdown()
 
 
-class MaxSizeMiddleware(BaseHTTPMiddleware):
-    def __init__(
-        self,
-        app: ASGIApp,
-        *,
-        max_size: Optional[int] = None,
-    ) -> None:
-        self.app = app
-        self.max_size = max_size
+async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
+    try:
+        async for item in streamer:
+            yield item
+    except Exception as e:
+        logger.exception(f"Error in streamer: {e}")
+    finally:
+        callback(*args, **kwargs)
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
 
-        total_size = 0
+@dataclasses.dataclass
+class WorkerSetupStatus:
+    STARTING: str = "starting"
+    READY: str = "ready"
+    ERROR: str = "error"
+    FINISHED: str = "finished"
 
-        async def rcv() -> Message:
-            nonlocal total_size
-            message = await receive()
-            chunk_size = len(message.get("body", b""))
-            total_size += chunk_size
-            if self.max_size is not None and total_size > self.max_size:
-                raise HTTPException(413, "Payload too large")
-            return message
 
-        await self.app(scope, rcv, send)
+def configure_logging(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout
+):
+    """Configure logging for the entire library with sensible defaults.
+
+    Args:
+        level (int): Logging level (default: logging.INFO)
+        format (str): Log message format string
+        stream (file-like): Output stream for logs
+
+    """
+    # Create a library-wide handler
+    handler = logging.StreamHandler(stream)
+
+    # Set formatter with user-configurable format
+    formatter = logging.Formatter(format)
+    handler.setFormatter(formatter)
+
+    # Configure root library logger
+    library_logger = logging.getLogger("litserve")
+    library_logger.setLevel(level)
+    library_logger.addHandler(handler)
+
+    # Prevent propagation to root logger to avoid duplicate logs
+    library_logger.propagate = False
+
+
+def set_log_level(level):
+    """Allow users to set the global logging level for the library."""
+    logging.getLogger("litserve").setLevel(level)
+
+
+def add_log_handler(handler):
+    """Allow users to add custom log handlers.
+
+    Example usage:
+    file_handler = logging.FileHandler('library_logs.log')
+    add_log_handler(file_handler)
+
+    """
+    logging.getLogger("litserve").addHandler(handler)
+
+
+def generate_random_zmq_address(temp_dir="/tmp"):
+    """Generate a random IPC address in the /tmp directory.
+
+    Ensures the address is unique.
+    Returns:
+        str: A random IPC address suitable for ZeroMQ.
+
+    """
+    unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
+    ipc_path = os.path.join(temp_dir, unique_name)
+    return f"ipc://{ipc_path}"

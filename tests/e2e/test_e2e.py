@@ -13,13 +13,13 @@
 # limitations under the License.
 import json
 import os
-import psutil
-import requests
 import subprocess
 import time
-
-from openai import OpenAI
 from functools import wraps
+
+import psutil
+import requests
+from openai import OpenAI
 
 
 def e2e_from_file(filename):
@@ -66,6 +66,19 @@ def test_e2e_combined_multiple_litserver():
         assert resp.json() == {
             "output": 4.0**i
         }, "tests/simple_server_with_multi_endpoints.py didn't return expected output"
+
+
+@e2e_from_file("tests/simple_server_diff_port.py")
+def test_run_with_port():
+    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
+    with open(os.path.join(os.getcwd(), "client.py")) as f:
+        client_code = f.read()
+        assert ":8080" in client_code, "Could not find 8080 in client.py"
+    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+    assert '{"output":16.0}' in output, (
+        f"tests/simple_server_server_diff_port.py didn't return expected output, got {output}"
+    )
+    os.remove("client.py")
 
 
 @e2e_from_file("tests/e2e/default_api.py")
@@ -119,7 +132,7 @@ def test_openai_parity():
         ],
     )
     assert response.choices[0].message.content == "This is a generated output", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        f"Server didn't return expected output\nOpenAI client output: {response}"
     )
 
     response = client.chat.completions.create(
@@ -134,7 +147,7 @@ def test_openai_parity():
     expected_outputs = ["This is a generated output", None]
     for r, expected_out in zip(response, expected_outputs):
         assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
         )
 
 
@@ -165,7 +178,7 @@ def test_openai_parity_with_image_input():
         messages=messages,
     )
     assert response.choices[0].message.content == "This is a generated output", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        f"Server didn't return expected output\nOpenAI client output: {response}"
     )
 
     response = client.chat.completions.create(
@@ -177,7 +190,7 @@ def test_openai_parity_with_image_input():
     expected_outputs = ["This is a generated output", None]
     for r, expected_out in zip(response, expected_outputs):
         assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
         )
 
 
@@ -216,10 +229,10 @@ def test_openai_parity_with_tools():
         tools=tools,
     )
     assert response.choices[0].message.content == "", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        f"Server didn't return expected output\nOpenAI client output: {response}"
     )
     assert response.choices[0].message.tool_calls[0].function.name == "get_current_weather", (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        f"Server didn't return expected output\nOpenAI client output: {response}"
     )
 
     response = client.chat.completions.create(
@@ -231,11 +244,11 @@ def test_openai_parity_with_tools():
     expected_outputs = ["", None]
     for r, expected_out in zip(response, expected_outputs):
         assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
         )
         if r.choices[0].delta.tool_calls:
             assert r.choices[0].delta.tool_calls[0].function.name == "get_current_weather", (
-                f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+                f"Server didn't return expected output.\nOpenAI client output: {r}"
             )
 
 
@@ -253,7 +266,7 @@ def test_e2e_openai_with_batching(openai_request_data):
         ],
     )
     assert response.choices[0].message.content == (
-        "Hi! It's nice to meet you. Is there something I can " "help you with or would you like to chat? "
+        "Hi! It's nice to meet you. Is there something I can help you with or would you like to chat? "
     ), f"Server didn't return expected output OpenAI client output: {response}"
 
 
@@ -291,7 +304,7 @@ def test_openai_parity_with_response_format():
         response_format=response_format,
     )
     assert response.choices[0].message.content == output, (
-        f"Server didn't return expected output" f"\nOpenAI client output: {response}"
+        f"Server didn't return expected output\nOpenAI client output: {response}"
     )
 
     response = client.chat.completions.create(
@@ -304,7 +317,7 @@ def test_openai_parity_with_response_format():
     expected_outputs = [output, None]
     for r, expected_out in zip(response, expected_outputs):
         assert r.choices[0].delta.content == expected_out, (
-            f"Server didn't return expected output.\n" f"OpenAI client output: {r}"
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
         )
 
 
@@ -324,3 +337,28 @@ def test_e2e_single_streaming():
     expected_values = [4.0, 8.0, 12.0]
     for i, output in enumerate(outputs):
         assert output["output"] == expected_values[i], f"Intermediate output {i} is not expected value"
+
+
+@e2e_from_file("tests/e2e/default_openai_embedding_spec.py")
+def test_openai_embedding_parity():
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",
+    )
+
+    model = "lit"
+    input_text = "The food was delicious and the waiter was very friendly."
+    input_text_list = [input_text] * 2
+    response = client.embeddings.create(
+        model="lit", input="The food was delicious and the waiter...", encoding_format="float"
+    )
+    assert response.model == model, f"Expected model to be {model} but got {response.model}"
+    assert len(response.data) == 1, f"Expected 1 embeddings but got {len(response.data)}"
+    assert len(response.data[0].embedding) == 768, f"Expected 768 dimensions but got {len(response.data[0].embedding)}"
+    assert isinstance(response.data[0].embedding[0], float), "Expected float datatype but got something else"
+
+    response = client.embeddings.create(model="lit", input=input_text_list, encoding_format="float")
+    assert response.model == model, f"Expected model to be {model} but got {response.model}"
+    assert len(response.data) == 2, f"Expected 2 embeddings but got {len(response.data)}"
+    for data in response.data:
+        assert len(data.embedding) == 768, f"Expected 768 dimensions but got {len(data.embedding)}"

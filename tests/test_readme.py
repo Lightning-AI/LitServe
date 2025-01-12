@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # Code extraction adapted from https://github.com/tassaron/get_code_from_markdown
-import subprocess
-from typing import List
-import sys
 import re
-import pytest
 import selectors
+import subprocess
+import sys
 import time
+from typing import List
 
+import pytest
 from tqdm import tqdm
 
 uvicorn_msg = "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"
@@ -115,13 +115,10 @@ def test_readme(tmp_path, killall):
         returncode, stdout, stderr = run_script_with_timeout(file, timeout=5, extra_time=extra_time, killall=killall)
 
         if "server.run" in code:
-            assert uvicorn_msg in stderr, (
-                f"Expected to run uvicorn server.\n" f"Code:\n {code}\n\nCode output: {stderr}"
-            )
+            assert uvicorn_msg in stderr, f"Expected to run uvicorn server.\nCode:\n {code}\n\nCode output: {stderr}"
         elif "requests.post" in code:
             assert "ConnectionError" in stderr, (
-                f"Client examples should fail with a ConnectionError because there is no server running."
-                f"\nCode:\n{code}"
+                f"Client examples should fail with a ConnectionError because there is no server running.\nCode:\n{code}"
             )
         else:
             assert returncode == 0, (
