@@ -28,6 +28,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import LitServer, multi_server_lifespan, run_all
+from litserve.test_examples.openai_spec_example import TestAPI
 from litserve.utils import wrap_litserve_start
 
 
