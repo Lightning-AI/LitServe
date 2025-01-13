@@ -77,7 +77,7 @@ class FakeStreamResponseQueue:
         self.num_streamed_outputs = num_streamed_outputs
         self.count = 0
 
-    def put(self, item):
+    def put(self, item, block=False, timeout=None):
         uid, args = item
         response, status = args
         if self.count >= self.num_streamed_outputs:
@@ -129,7 +129,7 @@ class FakeBatchStreamResponseQueue:
         self.num_streamed_outputs = num_streamed_outputs
         self.count = 0
 
-    def put(self, item):
+    def put(self, item, block=False, timeout=None):
         uid, args = item
         response, status = args
         if status == LitAPIStatus.FINISH_STREAMING:

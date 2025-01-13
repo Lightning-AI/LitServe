@@ -53,13 +53,9 @@ class StreamingLoop(DefaultLoop):
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                if socket:
-                    socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((
-                        uid,
-                        (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
-                    ))
+                self.put_response(
+                    response_queues, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                )
                 continue
 
             try:
@@ -87,33 +83,24 @@ class StreamingLoop(DefaultLoop):
                 )
                 for y_enc in y_enc_gen:
                     y_enc = lit_api.format_encoded_response(y_enc)
-                    if socket:
-                        socket.send_pyobj((uid, (y_enc, LitAPIStatus.OK)))
-                    else:
-                        response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-                if socket:
-                    socket.send_pyobj((uid, ("", LitAPIStatus.FINISH_STREAMING)))
-                else:
-                    response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+                    self.put_response(response_queues, response_queue_id, uid, y_enc, LitAPIStatus.OK)
+                self.put_response(response_queues, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
 
             except HTTPException as e:
-                if socket:
-                    socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((
-                        uid,
-                        (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                    ))
+                self.put_response(
+                    response_queues,
+                    response_queue_id,
+                    uid,
+                    PickleableHTTPException.from_exception(e),
+                    LitAPIStatus.ERROR,
+                )
             except Exception as e:
                 logger.exception(
                     "LitAPI ran into an error while processing the streaming request uid=%s.\n"
                     "Please check the error trace for more details.",
                     uid,
                 )
-                if socket:
-                    socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+                self.put_response(response_queues, response_queue_id, uid, e, LitAPIStatus.ERROR)
 
     def __call__(
         self,
@@ -158,13 +145,9 @@ class BatchedStreamingLoop(DefaultLoop):
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                if socket:
-                    socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((
-                        uid,
-                        (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
-                    ))
+                self.put_response(
+                    response_queues, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                )
 
             if not batches:
                 continue
@@ -203,37 +186,28 @@ class BatchedStreamingLoop(DefaultLoop):
                 for y_batch in y_enc_iter:
                     for response_queue_id, y_enc, uid in zip(response_queue_ids, y_batch, uids):
                         y_enc = lit_api.format_encoded_response(y_enc)
-                        if socket:
-                            socket.send_pyobj((uid, (y_enc, LitAPIStatus.OK)))
-                        else:
-                            response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+                        self.put_response(response_queues, response_queue_id, uid, y_enc, LitAPIStatus.OK)
 
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    if socket:
-                        socket.send_pyobj((uid, ("", LitAPIStatus.FINISH_STREAMING)))
-                    else:
-                        response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
+                    self.put_response(response_queues, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
 
             except HTTPException as e:
-                if socket:
-                    socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
-                else:
-                    for response_queue_id, uid in zip(response_queue_ids, uids):
-                        response_queues[response_queue_id].put((
-                            uid,
-                            (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                        ))
+                for response_queue_id, uid in zip(response_queue_ids, uids):
+                    self.put_response(
+                        response_queues,
+                        response_queue_id,
+                        uid,
+                        PickleableHTTPException.from_exception(e),
+                        LitAPIStatus.ERROR,
+                    )
 
             except Exception as e:
                 logger.exception(
                     "LitAPI ran into an error while processing the streaming batched request.\n"
                     "Please check the error trace for more details."
                 )
-                if socket:
-                    socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
-                else:
-                    for response_queue_id, uid in zip(response_queue_ids, uids):
-                        response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+                for response_queue_id, uid in zip(response_queue_ids, uids):
+                    self.put_response(response_queues, response_queue_id, uid, e, LitAPIStatus.ERROR)
 
     def __call__(
         self,

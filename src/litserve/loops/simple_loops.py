@@ -28,107 +28,6 @@ from litserve.utils import LitAPIStatus, PickleableHTTPException
 logger = logging.getLogger(__name__)
 
 
-def run_batched_loop(
-    lit_api: LitAPI,
-    lit_spec: LitSpec,
-    request_queue: Queue,
-    response_queues: List[Queue],
-    max_batch_size: int,
-    batch_timeout: float,
-    callback_runner: CallbackRunner,
-    socket: Optional[zmq.Socket],
-):
-    while True:
-        batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
-            max_batch_size,
-            batch_timeout,
-        )
-
-        for response_queue_id, uid in timed_out_uids:
-            logger.error(
-                f"Request {uid} was waiting in the queue for too long ({lit_api.request_timeout} seconds) and "
-                "has been timed out. "
-                "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
-            )
-            if socket:
-                socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-            else:
-                response_queues[response_queue_id].put((
-                    uid,
-                    (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
-                ))
-
-        if not batches:
-            continue
-        logger.debug(f"{len(batches)} batched requests received")
-        response_queue_ids, uids, inputs = zip(*batches)
-        num_inputs = len(inputs)
-        try:
-            contexts = [{}] * num_inputs
-            if hasattr(lit_spec, "populate_context"):
-                for input, context in zip(inputs, contexts):
-                    lit_spec.populate_context(context, input)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
-            x = [
-                _inject_context(
-                    context,
-                    lit_api.decode_request,
-                    input,
-                )
-                for input, context in zip(inputs, contexts)
-            ]
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
-
-            x = lit_api.batch(x)
-
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
-            y = _inject_context(contexts, lit_api.predict, x)
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-
-            outputs = lit_api.unbatch(y)
-
-            if len(outputs) != num_inputs:
-                logger.error(
-                    "LitAPI.predict/unbatch returned {len(outputs)} outputs, but expected {num_inputs}. "
-                    "Please check the predict/unbatch method of the LitAPI implementation."
-                )
-                raise HTTPException(500, "Batch size mismatch")
-
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
-            y_enc_list = []
-            for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
-                y_enc = _inject_context(context, lit_api.encode_response, y)
-                y_enc_list.append((response_queue_id, uid, y_enc))
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
-
-            for response_queue_id, uid, y_enc in y_enc_list:
-                response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
-
-        except HTTPException as e:
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                if socket:
-                    socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((
-                        uid,
-                        (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                    ))
-
-        except Exception as e:
-            logger.exception(
-                "LitAPI ran into an error while processing the batched request.\n"
-                "Please check the error trace for more details."
-            )
-            for response_queue_id, uid in zip(response_queue_ids, uids):
-                if socket:
-                    socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
-
-
 class SingleLoop(DefaultLoop):
     def run_single_loop(
         self,
@@ -264,13 +163,9 @@ class BatchedLoop(DefaultLoop):
                     "has been timed out. "
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
-                if socket:
-                    socket.send_pyobj((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
-                else:
-                    response_queues[response_queue_id].put((
-                        uid,
-                        (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR),
-                    ))
+                self.put_response(
+                    response_queues, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                )
 
             if not batches:
                 continue
@@ -317,17 +212,17 @@ class BatchedLoop(DefaultLoop):
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
 
                 for response_queue_id, uid, y_enc in y_enc_list:
-                    response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
+                    self.put_response(response_queues, response_queue_id, uid, y_enc, LitAPIStatus.OK)
 
             except HTTPException as e:
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    if socket:
-                        socket.send_pyobj((uid, (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR)))
-                    else:
-                        response_queues[response_queue_id].put((
-                            uid,
-                            (PickleableHTTPException.from_exception(e), LitAPIStatus.ERROR),
-                        ))
+                    self.put_response(
+                        response_queues,
+                        response_queue_id,
+                        uid,
+                        PickleableHTTPException.from_exception(e),
+                        LitAPIStatus.ERROR,
+                    )
 
             except Exception as e:
                 logger.exception(
@@ -335,10 +230,7 @@ class BatchedLoop(DefaultLoop):
                     "Please check the error trace for more details."
                 )
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    if socket:
-                        socket.send_pyobj((uid, (e, LitAPIStatus.ERROR)))
-                    else:
-                        response_queues[response_queue_id].put((uid, (e, LitAPIStatus.ERROR)))
+                    self.put_response(response_queues, response_queue_id, uid, e, LitAPIStatus.ERROR)
 
     def __call__(
         self,
