@@ -251,17 +251,14 @@ class LitLoop(_BaseLoop):
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
         if self.producer:
-            self.producer.put((uid, (response_data, status)))
+            self.producer.put((uid, (response_data, status)), consumer_id=response_queue_id)
         else:
             response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
     def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
-        if self.producer:
-            self.producer.put((uid, (error, LitAPIStatus.ERROR)))
-        else:
-            response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
+        self.put_response(response_queues, response_queue_id, uid, error, LitAPIStatus.ERROR)
 
     def __del__(self):
         if self.producer:

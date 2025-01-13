@@ -69,20 +69,25 @@ class Broker:
 
 
 class Producer:
-    """Producer class for sending messages to a specific consumer."""
+    """Producer class for sending messages to consumers."""
 
-    def __init__(self, consumer_id: int, address: str = None):
-        self.consumer_id = consumer_id
+    def __init__(self, address: str = None):
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.PUB)
         self._socket.connect(address)
 
-    def put(self, item: Any) -> None:
-        """Send an item to the consumer."""
+    def put(self, item: Any, consumer_id: int) -> None:
+        """Send an item to a specific consumer.
+
+        Args:
+            item: The data to send
+            consumer_id: The ID of the consumer to send to
+
+        """
         try:
             # Serialize the item using pickle
             pickled_item = pickle.dumps(item)
-            message = f"{self.consumer_id}|".encode() + pickled_item
+            message = f"{consumer_id}|".encode() + pickled_item
             self._socket.send(message)
         except zmq.ZMQError as e:
             logger.error(f"Error sending item: {e}")
@@ -189,13 +194,13 @@ def example_usage():
     broker.start()
 
     # Create producer and sync consumer
-    producer = Producer(consumer_id=0, address=broker.backend_address)
+    producer = Producer(address=broker.backend_address)
     consumer = Consumer(consumer_id=0, address=broker.frontend_address)
     time.sleep(2)  # Give the producer and consumer time to connect
     try:
         # Send some complex Python objects
-        producer.put({"hello": "world", "data": [1, 2, 3]})
-        producer.put(("tuple", 123, {"nested": True}))
+        producer.put({"hello": "world", "data": [1, 2, 3]}, 0)
+        producer.put(("tuple", 123, {"nested": True}), 0)
 
         # Receive messages synchronously
         try:
@@ -220,15 +225,15 @@ async def async_example():
     broker.start()
 
     # Create producer and async consumer
-    producer = Producer(consumer_id=0, address=broker.backend_address)
+    producer = Producer(address=broker.backend_address)
     consumer = AsyncConsumer(consumer_id=0, address=broker.frontend_address)
 
     await asyncio.sleep(0.1)  # Give time to connect
 
     try:
         # Send some messages
-        producer.put("Hello")
-        producer.put("World")
+        producer.put("Hello", 0)
+        producer.put("World", 0)
 
         # Receive messages asynchronously
         try:

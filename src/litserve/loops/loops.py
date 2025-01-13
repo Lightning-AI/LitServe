@@ -77,10 +77,8 @@ def inference_worker(
         loop = get_default_loop(stream, max_batch_size)
 
     if use_zmq:
-        producer = Producer(consumer_id=0, address=zmq_addr)
+        producer = Producer(address=zmq_addr)
         loop.producer = producer
-        # loop.socket = socket
-        # loop.zmq_context = ctx
 
     loop(
         lit_api,

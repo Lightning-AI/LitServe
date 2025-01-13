@@ -563,8 +563,6 @@ class LitServer:
         # TODO: Support multiple API servers and workers with ZMQ
         if self.use_zmq and num_api_servers is not None and num_api_servers > 1:
             raise ValueError("ZMQ is not supported with multiple API servers yet.")
-        if self.use_zmq and len(self.inference_workers) > 1:
-            raise ValueError("ZMQ is not supported with multiple workers per device yet.")
 
         host_msg = f"host must be '0.0.0.0', '127.0.0.1', or '::' but got {host}"
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:
