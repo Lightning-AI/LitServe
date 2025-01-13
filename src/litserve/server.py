@@ -43,7 +43,7 @@ from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_zmq_address
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
 from litserve.zmq_queue import AsyncConsumer, Broker
 
 mp.allow_connection_pickling()
@@ -122,7 +122,7 @@ class LitServer:
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
-        use_zmq: bool = False,
+        fast_queue: bool = False,
     ):
         """Initialize a LitServer instance.
 
@@ -206,9 +206,9 @@ class LitServer:
                 "but the max_batch_size parameter was not set."
             )
 
-        if sys.platform == "win32" and use_zmq:
+        if sys.platform == "win32" and fast_queue:
             warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
-            use_zmq = False
+            fast_queue = False
 
         self._loop: LitLoop = loop
         self.api_path = api_path
@@ -243,9 +243,7 @@ class LitServer:
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
-        self.use_zmq = use_zmq
-        self._zmq_addr = generate_random_zmq_address() if use_zmq else None
-        logger.debug(f"ZMQ port: {self._zmq_addr}")
+        self.use_zmq = fast_queue
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -291,7 +289,7 @@ class LitServer:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
-            del server_copy.app
+            del server_copy.app, server_copy.broker
             spec.setup(server_copy)
 
         process_list = []

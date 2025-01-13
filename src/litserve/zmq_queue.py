@@ -139,7 +139,7 @@ class Consumer(BaseConsumer):
         self._socket.connect(self.address)
         self._socket.setsockopt_string(zmq.SUBSCRIBE, str(self.consumer_id))
 
-    def get(self, timeout: Optional[float] = None) -> Any:
+    def get(self, timeout: Optional[int] = None) -> Any:
         """Get an item from the queue."""
         if timeout is not None and not self._socket.poll(timeout * 1000):
             raise Empty
