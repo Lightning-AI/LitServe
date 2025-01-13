@@ -101,8 +101,9 @@ def test_producer_wait_for_subscribers(mock_context):
     assert not producer.wait_for_subscribers(timeout=0.1)
 
 
+@pytest.mark.parametrize("timeout", [1.0, None])
 @pytest.mark.asyncio
-async def test_async_consumer(mock_async_context):
+async def test_async_consumer(mock_async_context, timeout):
     _, socket = mock_async_context
     consumer = AsyncConsumer(consumer_id=1, address="test_addr")
 
@@ -112,13 +113,13 @@ async def test_async_consumer(mock_async_context):
     socket.recv.return_value = message
 
     # Test receiving
-    received = await consumer.get(timeout=1.0)
+    received = await consumer.get(timeout=timeout)
     assert received == test_data
 
     # Test timeout
     socket.recv.side_effect = asyncio.TimeoutError()
     with pytest.raises(Empty):
-        await consumer.get(timeout=1.0)
+        await consumer.get(timeout=timeout)
 
 
 @pytest.mark.asyncio

@@ -141,11 +141,12 @@ class LitServer:
             stream: Whether to enable streaming responses.
             spec: The specification for the API such as OpenAISpec or OpenAIEmbeddingSpec.
             max_payload_size: The maximum payload size for requests.
-            track_requests: Whether to track the number of active requests.
+            track_requests: Whether to track the number of active requests using callback.
             loop: The inference engine runs with this loop in the worker process.
             callbacks: Callbacks to use for the server.
             middlewares: ASGI middleware for the server.
             loggers: Loggers to use for the server.
+            fast_queue=True: Whether to use ZMQ for faster queueing.
 
         """
         if batch_timeout > timeout and timeout not in (False, -1):
