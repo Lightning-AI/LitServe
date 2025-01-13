@@ -14,13 +14,13 @@
 import asyncio
 import inspect
 import logging
+import signal
 import sys
 import time
 from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import zmq
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -130,10 +130,6 @@ class _BaseLoop(ABC):
 
     """
 
-    zmq_ctx: Optional[zmq.Context] = None
-    socket: Optional[zmq.Socket] = None
-    producer: Optional[Producer] = None
-
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
         pass
 
@@ -226,7 +222,9 @@ class _BaseLoop(ABC):
 
 class LitLoop(_BaseLoop):
     def __init__(self):
+        self.producer: Optional[Producer] = None
         self._context = {}
+        self._setup_signal_handlers()
 
     def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
         batches, timed_out_uids = collate_requests(
@@ -263,6 +261,16 @@ class LitLoop(_BaseLoop):
     def __del__(self):
         if self.producer:
             self.producer.close()
+
+    def _setup_signal_handlers(self):
+        def cleanup_handler(signum=None, frame=None):
+            logging.debug("Worker process received shutdown signal")
+            if self.producer:
+                self.producer.close()
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, cleanup_handler)
+        signal.signal(signal.SIGTERM, cleanup_handler)
 
 
 class DefaultLoop(LitLoop):
