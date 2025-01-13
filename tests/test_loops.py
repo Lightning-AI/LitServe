@@ -22,13 +22,14 @@ from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
+import zmq
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
-from litserve.loops import LitLoop, Output, _BaseLoop, inference_worker
+from litserve.loops import LitLoop, Output, inference_worker
 from litserve.loops.base import DefaultLoop
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
@@ -69,7 +70,9 @@ def test_single_loop(loop_args):
     response_queues = [FakeResponseQueue()]
 
     with pytest.raises(StopIteration, match="exit loop"):
-        run_single_loop(lit_api_mock, None, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER)
+        run_single_loop(
+            lit_api_mock, None, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER, socket=None
+        )
 
 
 class FakeStreamResponseQueue:
@@ -111,7 +114,12 @@ def test_streaming_loop():
 
     with pytest.raises(StopIteration, match="exit loop"):
         run_streaming_loop(
-            fake_stream_api, fake_stream_api, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER
+            fake_stream_api,
+            fake_stream_api,
+            requests_queue,
+            response_queues,
+            callback_runner=NOOP_CB_RUNNER,
+            socket=None,
         )
 
     fake_stream_api.predict.assert_called_once_with("Hello")
@@ -177,6 +185,7 @@ def test_batched_streaming_loop():
             max_batch_size=2,
             batch_timeout=2,
             callback_runner=NOOP_CB_RUNNER,
+            socket=None,
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
@@ -193,6 +202,8 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
         loop="auto",
+        use_zmq=False,
+        zmq_addr=None,
     )
     mock_batched_loop.assert_called_once()
 
@@ -204,6 +215,8 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
         loop="auto",
+        use_zmq=False,
+        zmq_addr=None,
     )
     mock_single_loop.assert_called_once()
 
@@ -219,7 +232,7 @@ def test_run_single_loop():
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
@@ -249,7 +262,7 @@ def test_run_single_loop_timeout():
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+        target=run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
@@ -274,7 +287,7 @@ def test_run_batched_loop():
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1, NOOP_CB_RUNNER)
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 1, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
@@ -311,7 +324,7 @@ def test_run_batched_loop_timeout():
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001, NOOP_CB_RUNNER)
+        target=run_batched_loop, args=(lit_api, None, request_queue, response_queues, 2, 0.001, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
@@ -340,7 +353,7 @@ def test_run_streaming_loop():
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
@@ -370,7 +383,7 @@ def test_run_streaming_loop_timeout():
 
     # Run the loop in a separate thread to allow it to be stopped
     loop_thread = threading.Thread(
-        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
+        target=run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
     )
     loop_thread.start()
 
@@ -419,10 +432,36 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     assert response[0] == {"role": "assistant", "content": "10 + 6 is equal to 16."}
 
 
-class TestLoop(_BaseLoop):
-    def __call__(self, *args, **kwargs):
+class TestLoop(LitLoop):
+    def __call__(
+        self,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        device: str,
+        worker_id: int,
+        request_queue: Queue,
+        response_queues: List[Queue],
+        max_batch_size: int,
+        batch_timeout: float,
+        stream: bool,
+        workers_setup_status: Dict[int, str],
+        callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
+    ):
         try:
-            self.run(*args, **kwargs)
+            self.run(
+                lit_api,
+                lit_spec,
+                device,
+                worker_id,
+                request_queue,
+                response_queues,
+                max_batch_size,
+                batch_timeout,
+                stream,
+                workers_setup_status,
+                callback_runner,
+            )
         except StopIteration as e:
             return e
 
@@ -462,7 +501,7 @@ def test_custom_loop():
     response_queues = [Queue()]
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
 
-    loop(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 1, False, {}, NOOP_CB_RUNNER)
+    loop(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 1, False, {}, NOOP_CB_RUNNER, None)
     response = response_queues[0].get()
     assert response[0] == "UUID-001"
     assert response[1][0] == {"output": 16.0}
@@ -477,11 +516,11 @@ class TestLitAPI(ls.test_examples.SimpleLitAPI):
 
 def test_loop_with_server():
     loop = TestLoop()
-
     lit_api = TestLitAPI()
-    server = ls.LitServer(lit_api, loop=loop, max_batch_size=1, batch_timeout=0.1)
+    server = ls.LitServer(lit_api, loop=loop)
+
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post("/predict", json={"input": 4.0})
+        response = client.post("/predict", json={"input": 4.0}, timeout=1)
         assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10
 
 

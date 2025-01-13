@@ -20,6 +20,7 @@ from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import zmq
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -128,6 +129,9 @@ class _BaseLoop(ABC):
 
     """
 
+    zmq_ctx: Optional[zmq.Context] = None
+    socket: Optional[zmq.Socket] = None
+
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
         pass
 
@@ -155,7 +159,9 @@ class _BaseLoop(ABC):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        socket: Optional[zmq.Socket],
     ):
+        self.socket = socket
         if asyncio.iscoroutinefunction(self.run):
             event_loop = asyncio.new_event_loop()
 
@@ -244,12 +250,23 @@ class LitLoop(_BaseLoop):
     def put_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
-        response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
+        if self.socket:
+            self.socket.send_pyobj((uid, (response_data, status)))
+        else:
+            response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
     def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
-        response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
+        if self.socket:
+            self.socket.send_pyobj((uid, (error, LitAPIStatus.ERROR)))
+        else:
+            response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
+
+    def __del__(self):
+        if self.socket:
+            self.socket.close()
+            self.zmq_ctx.term()
 
 
 class DefaultLoop(LitLoop):

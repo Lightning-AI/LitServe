@@ -14,8 +14,10 @@
 import asyncio
 import dataclasses
 import logging
+import os
 import pickle
 import sys
+import uuid
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
@@ -131,3 +133,16 @@ def add_log_handler(handler):
 
     """
     logging.getLogger("litserve").addHandler(handler)
+
+
+def generate_random_zmq_address(temp_dir="/tmp"):
+    """Generate a random IPC address in the /tmp directory.
+
+    Ensures the address is unique.
+    Returns:
+        str: A random IPC address suitable for ZeroMQ.
+
+    """
+    unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
+    ipc_path = os.path.join(temp_dir, unique_name)
+    return f"ipc://{ipc_path}"
