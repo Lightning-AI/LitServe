@@ -69,7 +69,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 
 async def response_queue_to_buffer(
-    response_queue: mp.Queue,
+    consumer: [int, mp.Queue],
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
     threadpool: ThreadPoolExecutor,
@@ -78,12 +78,12 @@ async def response_queue_to_buffer(
 ):
     loop = asyncio.get_running_loop()
     if use_zmq:
-        consumer = AsyncConsumer(consumer_id=0, address=addr)
+        consumer = AsyncConsumer(consumer_id=consumer, address=addr)
 
     async def _get_response():
         if use_zmq:
             return await consumer.get()
-        return await loop.run_in_executor(threadpool, response_queue.get)
+        return await loop.run_in_executor(threadpool, consumer.get)
 
     if stream:
         while True:
@@ -335,7 +335,7 @@ class LitServer:
                 "the LitServer class to initialize the response queues."
             )
 
-        response_queue = self.response_queues[app.response_queue_id]
+        response_queue = app.response_queue_id if self.use_zmq else self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(
             response_queue,
@@ -345,7 +345,7 @@ class LitServer:
             self.use_zmq,
             self.broker.frontend_address,
         )
-        task = loop.create_task(future)
+        task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
 
         yield
 
@@ -560,10 +560,6 @@ class LitServer:
 
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
-
-        # TODO: Support multiple API servers and workers with ZMQ
-        if self.use_zmq and num_api_servers is not None and num_api_servers > 1:
-            raise ValueError("ZMQ is not supported with multiple API servers yet.")
 
         host_msg = f"host must be '0.0.0.0', '127.0.0.1', or '::' but got {host}"
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:
