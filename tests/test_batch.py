@@ -27,7 +27,7 @@ import litserve as ls
 from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
 from litserve.loops.base import collate_requests
-from litserve.loops.simple_loops import run_batched_loop
+from litserve.loops.simple_loops import BatchedLoop
 from litserve.utils import wrap_litserve_start
 
 NOOP_CB_RUNNER = CallbackRunner()
@@ -170,7 +170,7 @@ def test_batch_predict_string_warning():
 
 
 class FakeResponseQueue:
-    def put(self, *args):
+    def put(self, *args, **kwargs):
         raise StopIteration("exit loop")
 
 
@@ -188,8 +188,9 @@ def test_batched_loop():
     lit_api_mock.unbatch = MagicMock(side_effect=lambda x: x)
     lit_api_mock.encode_response = MagicMock(side_effect=lambda x: {"output": x})
 
+    loop = BatchedLoop()
     with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
-        run_batched_loop(
+        loop.run_batched_loop(
             lit_api_mock,
             lit_api_mock,
             requests_queue,
