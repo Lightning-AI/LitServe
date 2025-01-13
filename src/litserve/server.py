@@ -127,26 +127,26 @@ class LitServer:
         """Initialize a LitServer instance.
 
         Args:
-            lit_api: The LitAPI instance to use for handling requests.
-            accelerator: The type of hardware accelerator to use (e.g., 'auto', 'cpu', 'cuda', 'mps').
-            devices: The number of devices to use (e.g., 'auto', 1, 2).
-            workers_per_device: The number of workers to use per device.
-            timeout: The timeout for requests in seconds.
-            max_batch_size: The maximum batch size.
-            batch_timeout: The timeout for batching requests in seconds.
-            api_path: The path for the prediction API endpoint.
-            healthcheck_path: The path for the health check endpoint.
-            info_path: The path for the server and model metadata info endpoint.
-            model_metadata: Metadata about the model, it will be shown via the `info_path` endpoint.
+            lit_api: The API instance that handles requests and responses.
+            accelerator: Type of hardware to use, like 'cpu', 'cuda', or 'mps'. 'auto' selects the best available.
+            devices: Number of devices to use, or 'auto' to select automatically.
+            workers_per_device: Number of worker processes per device.
+            timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
+            max_batch_size: Maximum number of requests to process in a batch.
+            batch_timeout: Maximum time to wait for a batch to fill before processing.
+            api_path: URL path for the prediction endpoint.
+            healthcheck_path: URL path for the health check endpoint.
+            info_path: URL path for the server and model information endpoint.
+            model_metadata: Metadata about the model, shown at the info endpoint.
             stream: Whether to enable streaming responses.
-            spec: The specification for the API such as OpenAISpec or OpenAIEmbeddingSpec.
-            max_payload_size: The maximum payload size for requests.
-            track_requests: Whether to track the number of active requests using callback.
-            loop: The inference engine runs with this loop in the worker process.
-            callbacks: Callbacks to use for the server.
-            middlewares: ASGI middleware for the server.
-            loggers: Loggers to use for the server.
-            fast_queue=True: Whether to use ZMQ for faster queueing.
+            spec: Specification for the API, such as OpenAISpec or custom specs.
+            max_payload_size: Maximum size of request payloads.
+            track_requests: Whether to track the number of active requests.
+            loop: Inference loop to use, or 'auto' to select based on settings.
+            callbacks: List of callback classes to execute at various stages.
+            middlewares: List of middleware classes to apply to the server.
+            loggers: List of loggers to use for recording server activity.
+            fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
         if batch_timeout > timeout and timeout not in (False, -1):
