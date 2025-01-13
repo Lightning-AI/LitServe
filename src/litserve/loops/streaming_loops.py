@@ -74,6 +74,7 @@ class StreamingLoop(DefaultLoop):
                 )
                 callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
 
+                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
                 y_enc_gen = _inject_context(
                     context,
                     lit_api.encode_response,
@@ -83,6 +84,9 @@ class StreamingLoop(DefaultLoop):
                     y_enc = lit_api.format_encoded_response(y_enc)
                     self.put_response(response_queues, response_queue_id, uid, y_enc, LitAPIStatus.OK)
                 self.put_response(response_queues, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
+
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
 
             except HTTPException as e:
                 self.put_response(
