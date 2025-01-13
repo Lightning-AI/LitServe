@@ -16,7 +16,6 @@ import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional
 
-import zmq
 from fastapi import HTTPException
 
 from litserve import LitAPI
@@ -36,7 +35,6 @@ class StreamingLoop(DefaultLoop):
         request_queue: Queue,
         response_queues: List[Queue],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         while True:
             try:
@@ -115,9 +113,8 @@ class StreamingLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
-        self.run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner, socket)
+        self.run_streaming_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
 
 
 class BatchedStreamingLoop(DefaultLoop):
@@ -130,7 +127,6 @@ class BatchedStreamingLoop(DefaultLoop):
         max_batch_size: int,
         batch_timeout: float,
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         while True:
             batches, timed_out_uids = collate_requests(
@@ -222,7 +218,6 @@ class BatchedStreamingLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         self.run_batched_streaming_loop(
             lit_api,
@@ -232,5 +227,4 @@ class BatchedStreamingLoop(DefaultLoop):
             max_batch_size,
             batch_timeout,
             callback_runner,
-            socket,
         )

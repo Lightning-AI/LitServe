@@ -27,6 +27,7 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
+from litserve.zmq_queue import Producer
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -131,6 +132,7 @@ class _BaseLoop(ABC):
 
     zmq_ctx: Optional[zmq.Context] = None
     socket: Optional[zmq.Socket] = None
+    producer: Optional[Producer] = None
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
         pass
@@ -159,9 +161,7 @@ class _BaseLoop(ABC):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
-        self.socket = socket
         if asyncio.iscoroutinefunction(self.run):
             event_loop = asyncio.new_event_loop()
 
@@ -250,23 +250,22 @@ class LitLoop(_BaseLoop):
     def put_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
-        if self.socket:
-            self.socket.send_pyobj((uid, (response_data, status)))
+        if self.producer:
+            self.producer.put((uid, (response_data, status)))
         else:
             response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
 
     def put_error_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
     ) -> None:
-        if self.socket:
-            self.socket.send_pyobj((uid, (error, LitAPIStatus.ERROR)))
+        if self.producer:
+            self.producer.put((uid, (error, LitAPIStatus.ERROR)))
         else:
             response_queues[response_queue_id].put((uid, (error, LitAPIStatus.ERROR)), block=False)
 
     def __del__(self):
-        if self.socket:
-            self.socket.close(linger=0)
-            self.zmq_ctx.term()
+        if self.producer:
+            self.producer.close()
 
 
 class DefaultLoop(LitLoop):

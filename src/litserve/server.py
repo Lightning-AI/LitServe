@@ -29,8 +29,6 @@ from contextlib import asynccontextmanager
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
-import zmq
-import zmq.asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
@@ -46,6 +44,7 @@ from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_zmq_address
+from litserve.zmq_queue import AsyncConsumer, Broker
 
 mp.allow_connection_pickling()
 
@@ -78,16 +77,12 @@ async def response_queue_to_buffer(
     addr: Optional[str] = None,
 ):
     loop = asyncio.get_running_loop()
-    socket = None
     if use_zmq:
-        ctx = zmq.asyncio.Context()
-        socket = ctx.socket(zmq.SUB)
-        socket.connect(addr)
-        socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        consumer = AsyncConsumer(consumer_id=0, address=addr)
 
     async def _get_response():
         if use_zmq:
-            return await socket.recv_pyobj()
+            return await consumer.get()
         return await loop.run_in_executor(threadpool, response_queue.get)
 
     if stream:
@@ -280,6 +275,8 @@ class LitServer:
         self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
+        self.broker = Broker()
+        self.broker.start()
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
@@ -321,7 +318,7 @@ class LitServer:
                     self._callback_runner,
                     self._loop,
                     self.use_zmq,
-                    self._zmq_addr,
+                    self.broker.backend_address,
                 ),
             )
             process.start()
@@ -342,7 +339,12 @@ class LitServer:
         response_queue = self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(
-            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq, self._zmq_addr
+            response_queue,
+            self.response_buffer,
+            self.stream,
+            response_executor,
+            self.use_zmq,
+            self.broker.frontend_address,
         )
         task = loop.create_task(future)
 

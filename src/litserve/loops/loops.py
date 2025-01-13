@@ -15,9 +15,6 @@ import logging
 from queue import Queue
 from typing import Dict, List, Optional, Union
 
-import zmq
-import zmq.asyncio
-
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import _BaseLoop
@@ -25,6 +22,7 @@ from litserve.loops.simple_loops import BatchedLoop, SingleLoop
 from litserve.loops.streaming_loops import BatchedStreamingLoop, StreamingLoop
 from litserve.specs.base import LitSpec
 from litserve.utils import WorkerSetupStatus
+from litserve.zmq_queue import Producer
 
 logger = logging.getLogger(__name__)
 
@@ -78,14 +76,11 @@ def inference_worker(
     if loop == "auto":
         loop = get_default_loop(stream, max_batch_size)
 
-    socket = None
     if use_zmq:
-        ctx = zmq.Context()
-        socket = ctx.socket(zmq.PUB)
-        logger.debug(f"Inference worker binding to {zmq_addr}")
-        socket.bind(zmq_addr)
-        loop.socket = socket
-        loop.zmq_context = ctx
+        producer = Producer(consumer_id=0, address=zmq_addr)
+        loop.producer = producer
+        # loop.socket = socket
+        # loop.zmq_context = ctx
 
     loop(
         lit_api,
@@ -99,8 +94,4 @@ def inference_worker(
         stream,
         workers_setup_status,
         callback_runner,
-        socket,
     )
-    if use_zmq:
-        socket.close()
-        loop.zmq_context.term()

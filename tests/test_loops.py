@@ -22,7 +22,6 @@ from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
-import zmq
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -55,7 +54,7 @@ def loop_args():
     return lit_api_mock, requests_queue
 
 
-class FakeResponseQueue:
+class FakeResponseQueue(Queue):
     def put(self, item, block=True, timeout=None):
         raise StopIteration("exit loop")
 
@@ -67,13 +66,12 @@ def test_single_loop(loop_args):
 
     lit_loop = SingleLoop()
     with pytest.raises(StopIteration, match="exit loop"):
-        lit_loop.run_single_loop(
-            lit_api_mock, None, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER, socket=None
-        )
+        lit_loop.run_single_loop(lit_api_mock, None, requests_queue, response_queues, callback_runner=NOOP_CB_RUNNER)
 
 
-class FakeStreamResponseQueue:
+class FakeStreamResponseQueue(Queue):
     def __init__(self, num_streamed_outputs):
+        super().__init__()
         self.num_streamed_outputs = num_streamed_outputs
         self.count = 0
 
@@ -117,15 +115,15 @@ def test_streaming_loop():
             requests_queue,
             response_queues,
             callback_runner=NOOP_CB_RUNNER,
-            socket=None,
         )
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
 
 
-class FakeBatchStreamResponseQueue:
+class FakeBatchStreamResponseQueue(Queue):
     def __init__(self, num_streamed_outputs):
+        super().__init__()
         self.num_streamed_outputs = num_streamed_outputs
         self.count = 0
 
@@ -184,7 +182,6 @@ def test_batched_streaming_loop():
             max_batch_size=2,
             batch_timeout=2,
             callback_runner=NOOP_CB_RUNNER,
-            socket=None,
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
     fake_stream_api.encode_response.assert_called_once()
@@ -232,7 +229,7 @@ def test_run_single_loop():
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -263,7 +260,7 @@ def test_run_single_loop_timeout():
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -290,7 +287,7 @@ def test_run_batched_loop():
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, response_queues, 2, 1, NOOP_CB_RUNNER, None),
+        args=(lit_api, None, request_queue, response_queues, 2, 1, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -329,7 +326,7 @@ def test_run_batched_loop_timeout():
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, response_queues, 2, 0.001, NOOP_CB_RUNNER, None),
+        args=(lit_api, None, request_queue, response_queues, 2, 0.001, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -359,7 +356,7 @@ def test_run_streaming_loop():
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -390,7 +387,7 @@ def test_run_streaming_loop_timeout():
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER, None)
+        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -455,7 +452,6 @@ class TestLoop(LitLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         try:
             self.run(
@@ -510,7 +506,7 @@ def test_custom_loop():
     response_queues = [Queue()]
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
 
-    loop(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 1, False, {}, NOOP_CB_RUNNER, None)
+    loop(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 1, False, {}, NOOP_CB_RUNNER)
     response = response_queues[0].get()
     assert response[0] == "UUID-001"
     assert response[1][0] == {"output": 16.0}

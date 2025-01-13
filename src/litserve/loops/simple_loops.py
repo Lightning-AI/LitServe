@@ -16,7 +16,6 @@ import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional
 
-import zmq
 from fastapi import HTTPException
 
 from litserve import LitAPI
@@ -32,11 +31,10 @@ class SingleLoop(DefaultLoop):
     def run_single_loop(
         self,
         lit_api: LitAPI,
-        lit_spec: LitSpec,
+        lit_spec: Optional[LitSpec],
         request_queue: Queue,
         response_queues: List[Queue],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         while True:
             try:
@@ -132,9 +130,8 @@ class SingleLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
-        self.run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner, socket)
+        self.run_single_loop(lit_api, lit_spec, request_queue, response_queues, callback_runner)
 
 
 class BatchedLoop(DefaultLoop):
@@ -147,7 +144,6 @@ class BatchedLoop(DefaultLoop):
         max_batch_size: int,
         batch_timeout: float,
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         while True:
             batches, timed_out_uids = collate_requests(
@@ -245,7 +241,6 @@ class BatchedLoop(DefaultLoop):
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
-        socket: Optional[zmq.Socket],
     ):
         self.run_batched_loop(
             lit_api,
@@ -255,5 +250,4 @@ class BatchedLoop(DefaultLoop):
             max_batch_size,
             batch_timeout,
             callback_runner,
-            socket,
         )

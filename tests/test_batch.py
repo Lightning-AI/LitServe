@@ -170,7 +170,7 @@ def test_batch_predict_string_warning():
 
 
 class FakeResponseQueue:
-    def put(self, *args, **kwargs):
+    def put(self, *args, block=True, timeout=None):
         raise StopIteration("exit loop")
 
 
@@ -198,7 +198,6 @@ def test_batched_loop():
             max_batch_size=2,
             batch_timeout=4,
             callback_runner=NOOP_CB_RUNNER,
-            socket=None,
         )
 
     lit_api_mock.batch.assert_called_once()
