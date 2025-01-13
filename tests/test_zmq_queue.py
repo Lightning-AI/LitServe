@@ -1,7 +1,7 @@
 import asyncio
 import pickle
 from queue import Empty
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import zmq
@@ -11,7 +11,6 @@ from litserve.zmq_queue import AsyncConsumer, Broker, Producer
 
 @pytest.fixture
 def mock_context():
-    """Mock ZMQ context and socket."""
     with patch("zmq.Context") as mock_ctx:
         socket = Mock()
         mock_ctx.return_value.socket.return_value = socket
@@ -20,16 +19,13 @@ def mock_context():
 
 @pytest.fixture
 def mock_async_context():
-    """Mock async ZMQ context and socket."""
     with patch("zmq.asyncio.Context") as mock_ctx:
-        socket = Mock()
-        socket.recv  # this should be a coroutine
+        socket = AsyncMock()  # Use AsyncMock for async methods
         mock_ctx.return_value.socket.return_value = socket
         yield mock_ctx, socket
 
 
 def test_broker_start_stop(mock_context):
-    """Test broker startup and shutdown."""
     _, socket = mock_context
     broker = Broker(use_process=False)
 
@@ -55,7 +51,6 @@ def test_broker_error_handling(mock_context):
 
 
 def test_producer_send(mock_context):
-    """Test producer sending messages."""
     _, socket = mock_context
     producer = Producer(address="test_addr")
 
@@ -76,7 +71,6 @@ def test_producer_send(mock_context):
 
 
 def test_producer_error_handling(mock_context):
-    """Test producer error handling."""
     _, socket = mock_context
     producer = Producer(address="test_addr")
 
@@ -95,7 +89,6 @@ def test_producer_error_handling(mock_context):
 
 
 def test_producer_wait_for_subscribers(mock_context):
-    """Test producer's subscriber wait functionality."""
     _, socket = mock_context
     producer = Producer(address="test_addr")
 
@@ -110,7 +103,6 @@ def test_producer_wait_for_subscribers(mock_context):
 
 @pytest.mark.asyncio
 async def test_async_consumer(mock_async_context):
-    """Test async consumer functionality."""
     _, socket = mock_async_context
     consumer = AsyncConsumer(consumer_id=1, address="test_addr")
 
@@ -131,9 +123,8 @@ async def test_async_consumer(mock_async_context):
 
 @pytest.mark.asyncio
 async def test_async_consumer_cleanup():
-    """Test async consumer cleanup."""
     with patch("zmq.asyncio.Context") as mock_ctx:
-        socket = Mock()
+        socket = AsyncMock()
         mock_ctx.return_value.socket.return_value = socket
 
         consumer = AsyncConsumer(consumer_id=1, address="test_addr")
@@ -144,7 +135,6 @@ async def test_async_consumer_cleanup():
 
 
 def test_producer_cleanup():
-    """Test producer cleanup."""
     with patch("zmq.Context") as mock_ctx:
         socket = Mock()
         mock_ctx.return_value.socket.return_value = socket
