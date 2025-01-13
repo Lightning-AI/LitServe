@@ -75,7 +75,6 @@ def run_streaming_loop(
                 lit_api.encode_response,
                 y_gen,
             )
-
             for y_enc in y_enc_gen:
                 y_enc = lit_api.format_encoded_response(y_enc)
                 response_queues[response_queue_id].put((uid, (y_enc, LitAPIStatus.OK)))
