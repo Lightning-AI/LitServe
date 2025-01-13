@@ -77,7 +77,6 @@ def run_streaming_loop(
                 x,
             )
 
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
             y_enc_gen = _inject_context(
                 context,
                 lit_api.encode_response,
@@ -93,9 +92,6 @@ def run_streaming_loop(
                 socket.send_pyobj((uid, ("", LitAPIStatus.FINISH_STREAMING)))
             else:
                 response_queues[response_queue_id].put((uid, ("", LitAPIStatus.FINISH_STREAMING)))
-
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
 
         except HTTPException as e:
             if socket:
