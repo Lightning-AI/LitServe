@@ -78,6 +78,7 @@ def inference_worker(
 
     if use_zmq:
         producer = Producer(address=zmq_addr)
+        producer.wait_for_subscribers(timeout=5)
         loop.producer = producer
 
     loop(

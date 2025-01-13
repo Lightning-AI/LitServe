@@ -33,5 +33,5 @@ class SimpleStreamAPI(ls.LitAPI):
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(SimpleStreamAPI(), stream=True, max_batch_size=4, batch_timeout=0.2)
+    server = ls.LitServer(SimpleStreamAPI(), stream=True, max_batch_size=4, batch_timeout=0.2, fast_queue=True)
     server.run(port=8000)

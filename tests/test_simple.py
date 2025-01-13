@@ -104,8 +104,8 @@ def test_workers_health_custom_path(use_zmq):
 
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
-        for _ in range(100):
-            response = client.post("/predict", json={"input": 4.0})
+        for i in range(100):
+            response = client.post("/predict", json={"input": i})
             outputs.append(response.json())
 
 
@@ -121,8 +121,8 @@ def test_load(lit_server):
 
     for t, outputs in threads:
         t.join()
-        for el in outputs:
-            assert el == {"output": 16.0}
+        for i, el in enumerate(outputs):
+            assert el == {"output": i**2}
 
 
 class SlowLitAPI(LitAPI):
@@ -149,11 +149,12 @@ class SlowBatchAPI(SlowLitAPI):
 
 
 @pytest.mark.flaky(retries=3)
+@pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_timeout():
+async def test_timeout(use_zmq):
     # Scenario: first request completes, second request times out in queue
     api = SlowLitAPI()  # takes 2 seconds for each prediction
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, fast_queue=True)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=2, fast_queue=use_zmq)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -179,8 +180,9 @@ async def test_timeout():
 
 
 @pytest.mark.flaky(retries=3)
+@pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_batch_timeout():
+async def test_batch_timeout(use_zmq):
     # Scenario: first 2 requests finish as a batch and third request times out in queue
     server = LitServer(
         SlowBatchAPI(),
@@ -188,6 +190,7 @@ async def test_batch_timeout():
         timeout=2,
         max_batch_size=2,
         batch_timeout=0.01,
+        fast_queue=use_zmq,
     )
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -223,14 +226,10 @@ async def test_batch_timeout():
         timeout=False,
         max_batch_size=2,
         batch_timeout=2,
+        fast_queue=use_zmq,
     )
     server4 = LitServer(
-        SlowBatchAPI(),
-        accelerator="cpu",
-        devices=1,
-        timeout=-1,
-        max_batch_size=2,
-        batch_timeout=2,
+        SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=2, fast_queue=use_zmq
     )
 
     with wrap_litserve_start(server1) as server1, wrap_litserve_start(server2) as server2, wrap_litserve_start(

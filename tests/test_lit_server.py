@@ -468,13 +468,13 @@ class TestHTTPExceptionAPI2(ls.test_examples.SimpleLitAPI):
 
 
 def test_http_exception():
-    server = LitServer(TestHTTPExceptionAPI())
+    server = LitServer(TestHTTPExceptionAPI(), fast_queue=True)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
 
-    server = LitServer(TestHTTPExceptionAPI2())
+    server = LitServer(TestHTTPExceptionAPI2(), fast_queue=True)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 400, "Server raises 400 error"
@@ -501,8 +501,9 @@ class FailFastAPI(ls.test_examples.SimpleLitAPI):
         raise ValueError("setup failed")
 
 
-def test_workers_setup_status():
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_setup_status(use_zmq):
     api = FailFastAPI()
-    server = LitServer(api, devices=1)
+    server = LitServer(api, devices=1, fast_queue=use_zmq)
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
         server.run()

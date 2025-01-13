@@ -12,7 +12,6 @@ import zmq.asyncio
 
 from litserve.utils import generate_random_zmq_address
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -57,8 +56,8 @@ class Broker:
         except zmq.ZMQError as e:
             logger.error(f"Broker error: {e}")
         finally:
-            frontend.close()
-            backend.close()
+            frontend.close(linger=0)
+            backend.close(linger=0)
             context.term()
 
     def stop(self):
@@ -76,16 +75,30 @@ class Producer:
         self._socket = self._context.socket(zmq.PUB)
         self._socket.connect(address)
 
-    def put(self, item: Any, consumer_id: int) -> None:
-        """Send an item to a specific consumer.
+    def wait_for_subscribers(self, timeout: float = 1.0) -> bool:
+        """Wait for at least one subscriber to be ready.
 
         Args:
-            item: The data to send
-            consumer_id: The ID of the consumer to send to
+            timeout: Maximum time to wait in seconds
+
+        Returns:
+            bool: True if subscribers are ready, False if timeout occurred
 
         """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            # Send a ping message to consumer 0 (special system messages)
+            try:
+                self._socket.send(b"0|__ping__", zmq.NOBLOCK)
+                time.sleep(0.1)  # Give time for subscription to propagate
+                return True
+            except zmq.ZMQError:
+                continue
+        return False
+
+    def put(self, item: Any, consumer_id: int) -> None:
+        """Send an item to a specific consumer."""
         try:
-            # Serialize the item using pickle
             pickled_item = pickle.dumps(item)
             message = f"{consumer_id}|".encode() + pickled_item
             self._socket.send(message)
@@ -135,27 +148,6 @@ class BaseConsumer:
             self._context.term()
 
 
-class Consumer(BaseConsumer):
-    """Synchronous consumer class for receiving messages."""
-
-    def _setup_socket(self):
-        self._context = zmq.Context()
-        self._socket = self._context.socket(zmq.SUB)
-        self._socket.connect(self.address)
-        self._socket.setsockopt_string(zmq.SUBSCRIBE, str(self.consumer_id))
-
-    def get(self, timeout: Optional[int] = None) -> Any:
-        """Get an item from the queue."""
-        if timeout is not None and not self._socket.poll(timeout * 1000):
-            raise Empty
-
-        try:
-            message = self._socket.recv()
-            return self._parse_message(message)
-        except zmq.ZMQError:
-            raise Empty
-
-
 class AsyncConsumer(BaseConsumer):
     """Async consumer class for receiving messages using asyncio."""
 
@@ -182,80 +174,6 @@ class AsyncConsumer(BaseConsumer):
     async def aclose(self) -> None:
         """Clean up resources asynchronously."""
         if self._socket:
-            self._socket.close()
+            self._socket.close(linger=0)
         if self._context:
-            await self._context.term()
-
-
-# Example usage
-def example_usage():
-    # Start the broker
-    broker = Broker(use_process=False)
-    broker.start()
-
-    # Create producer and sync consumer
-    producer = Producer(address=broker.backend_address)
-    consumer = Consumer(consumer_id=0, address=broker.frontend_address)
-    time.sleep(2)  # Give the producer and consumer time to connect
-    try:
-        # Send some complex Python objects
-        producer.put({"hello": "world", "data": [1, 2, 3]}, 0)
-        producer.put(("tuple", 123, {"nested": True}), 0)
-
-        # Receive messages synchronously
-        try:
-            data = consumer.get(timeout=1.0)
-            print(f"Received sync: {data}")  # Will print the dict
-
-            data = consumer.get(timeout=1.0)
-            print(f"Received sync: {data}")  # Will print the tuple
-
-        except Empty:
-            print("No data available")
-
-    finally:
-        producer.close()
-        consumer.close()
-        broker.stop()
-
-
-async def async_example():
-    # Start the broker
-    broker = Broker()
-    broker.start()
-
-    # Create producer and async consumer
-    producer = Producer(address=broker.backend_address)
-    consumer = AsyncConsumer(consumer_id=0, address=broker.frontend_address)
-
-    await asyncio.sleep(0.1)  # Give time to connect
-
-    try:
-        # Send some messages
-        producer.put("Hello", 0)
-        producer.put("World", 0)
-
-        # Receive messages asynchronously
-        try:
-            data = await consumer.get(timeout=1.0)
-            print(f"Received async: {data}")
-
-            data = await consumer.get(timeout=1.0)
-            print(f"Received async: {data}")
-
-        except Empty:
-            print("No data available")
-
-    finally:
-        producer.close()
-        await consumer.aclose()
-        broker.stop()
-
-
-if __name__ == "__main__":
-    # Run both examples
-    print("Running sync example:")
-    example_usage()
-
-    print("\nRunning async example:")
-    asyncio.run(async_example())
+            self._context.term()
