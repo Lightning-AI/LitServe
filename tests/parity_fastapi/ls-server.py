@@ -64,6 +64,7 @@ def main(batch_size: int, workers_per_device: int):
         batch_timeout=0.01,
         timeout=10,
         workers_per_device=workers_per_device,
+        fast_queue=True,
     )
     server.run(port=8000, log_level="warning")
 

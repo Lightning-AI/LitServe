@@ -29,8 +29,6 @@ from contextlib import asynccontextmanager
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
-import zmq
-import zmq.asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
@@ -45,7 +43,8 @@ from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream, generate_random_zmq_address
+from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
+from litserve.zmq_queue import AsyncConsumer, Broker
 
 mp.allow_connection_pickling()
 
@@ -70,7 +69,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 
 async def response_queue_to_buffer(
-    response_queue: mp.Queue,
+    consumer: [int, mp.Queue],
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
     threadpool: ThreadPoolExecutor,
@@ -78,17 +77,13 @@ async def response_queue_to_buffer(
     addr: Optional[str] = None,
 ):
     loop = asyncio.get_running_loop()
-    socket = None
     if use_zmq:
-        ctx = zmq.asyncio.Context()
-        socket = ctx.socket(zmq.SUB)
-        socket.connect(addr)
-        socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        consumer = AsyncConsumer(consumer_id=consumer, address=addr)
 
     async def _get_response():
         if use_zmq:
-            return await socket.recv_pyobj()
-        return await loop.run_in_executor(threadpool, response_queue.get)
+            return await consumer.get()
+        return await loop.run_in_executor(threadpool, consumer.get)
 
     if stream:
         while True:
@@ -127,30 +122,31 @@ class LitServer:
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
-        use_zmq: bool = False,
+        fast_queue: bool = False,
     ):
         """Initialize a LitServer instance.
 
         Args:
-            lit_api: The LitAPI instance to use for handling requests.
-            accelerator: The type of hardware accelerator to use (e.g., 'auto', 'cpu', 'cuda', 'mps').
-            devices: The number of devices to use (e.g., 'auto', 1, 2).
-            workers_per_device: The number of workers to use per device.
-            timeout: The timeout for requests in seconds.
-            max_batch_size: The maximum batch size.
-            batch_timeout: The timeout for batching requests in seconds.
-            api_path: The path for the prediction API endpoint.
-            healthcheck_path: The path for the health check endpoint.
-            info_path: The path for the server and model metadata info endpoint.
-            model_metadata: Metadata about the model, it will be shown via the `info_path` endpoint.
+            lit_api: The API instance that handles requests and responses.
+            accelerator: Type of hardware to use, like 'cpu', 'cuda', or 'mps'. 'auto' selects the best available.
+            devices: Number of devices to use, or 'auto' to select automatically.
+            workers_per_device: Number of worker processes per device.
+            timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
+            max_batch_size: Maximum number of requests to process in a batch.
+            batch_timeout: Maximum time to wait for a batch to fill before processing.
+            api_path: URL path for the prediction endpoint.
+            healthcheck_path: URL path for the health check endpoint.
+            info_path: URL path for the server and model information endpoint.
+            model_metadata: Metadata about the model, shown at the info endpoint.
             stream: Whether to enable streaming responses.
-            spec: The specification for the API such as OpenAISpec or OpenAIEmbeddingSpec.
-            max_payload_size: The maximum payload size for requests.
+            spec: Specification for the API, such as OpenAISpec or custom specs.
+            max_payload_size: Maximum size of request payloads.
             track_requests: Whether to track the number of active requests.
-            loop: The inference engine runs with this loop in the worker process.
-            callbacks: Callbacks to use for the server.
-            middlewares: ASGI middleware for the server.
-            loggers: Loggers to use for the server.
+            loop: Inference loop to use, or 'auto' to select based on settings.
+            callbacks: List of callback classes to execute at various stages.
+            middlewares: List of middleware classes to apply to the server.
+            loggers: List of loggers to use for recording server activity.
+            fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
         if batch_timeout > timeout and timeout not in (False, -1):
@@ -211,9 +207,9 @@ class LitServer:
                 "but the max_batch_size parameter was not set."
             )
 
-        if sys.platform == "win32" and use_zmq:
+        if sys.platform == "win32" and fast_queue:
             warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
-            use_zmq = False
+            fast_queue = False
 
         self._loop: LitLoop = loop
         self.api_path = api_path
@@ -248,9 +244,7 @@ class LitServer:
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
-        self.use_zmq = use_zmq
-        self._zmq_addr = generate_random_zmq_address() if use_zmq else None
-        logger.debug(f"ZMQ port: {self._zmq_addr}")
+        self.use_zmq = fast_queue
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -280,6 +274,8 @@ class LitServer:
         self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
+        self.broker = Broker()
+        self.broker.start()
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
@@ -294,7 +290,7 @@ class LitServer:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
-            del server_copy.app
+            del server_copy.app, server_copy.broker
             spec.setup(server_copy)
 
         process_list = []
@@ -321,7 +317,7 @@ class LitServer:
                     self._callback_runner,
                     self._loop,
                     self.use_zmq,
-                    self._zmq_addr,
+                    self.broker.backend_address,
                 ),
             )
             process.start()
@@ -339,12 +335,17 @@ class LitServer:
                 "the LitServer class to initialize the response queues."
             )
 
-        response_queue = self.response_queues[app.response_queue_id]
+        response_queue = app.response_queue_id if self.use_zmq else self.response_queues[app.response_queue_id]
         response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
         future = response_queue_to_buffer(
-            response_queue, self.response_buffer, self.stream, response_executor, self.use_zmq, self._zmq_addr
+            response_queue,
+            self.response_buffer,
+            self.stream,
+            response_executor,
+            self.use_zmq,
+            self.broker.frontend_address,
         )
-        task = loop.create_task(future)
+        task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
 
         yield
 
@@ -559,12 +560,6 @@ class LitServer:
 
         if not (1024 <= port <= 65535):
             raise ValueError(port_msg)
-
-        # TODO: Support multiple API servers and workers with ZMQ
-        if self.use_zmq and num_api_servers is not None and num_api_servers > 1:
-            raise ValueError("ZMQ is not supported with multiple API servers yet.")
-        if self.use_zmq and len(self.inference_workers) > 1:
-            raise ValueError("ZMQ is not supported with multiple workers per device yet.")
 
         host_msg = f"host must be '0.0.0.0', '127.0.0.1', or '::' but got {host}"
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:

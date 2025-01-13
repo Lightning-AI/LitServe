@@ -64,7 +64,7 @@ def test_device_identifiers_error(simple_litapi, devices):
 @pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
 async def test_stream(simple_stream_api, use_zmq):
-    server = LitServer(simple_stream_api, stream=True, timeout=10, use_zmq=use_zmq)
+    server = LitServer(simple_stream_api, stream=True, timeout=10, fast_queue=use_zmq)
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
@@ -92,7 +92,7 @@ async def test_stream(simple_stream_api, use_zmq):
 @pytest.mark.asyncio
 async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
     server = LitServer(
-        simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30, use_zmq=use_zmq
+        simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30, fast_queue=use_zmq
     )
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
@@ -468,13 +468,13 @@ class TestHTTPExceptionAPI2(ls.test_examples.SimpleLitAPI):
 
 
 def test_http_exception():
-    server = LitServer(TestHTTPExceptionAPI())
+    server = LitServer(TestHTTPExceptionAPI(), fast_queue=True)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 501, "Server raises 501 error"
         assert response.text == '{"detail":"decode request is bad"}', "decode request is bad"
 
-    server = LitServer(TestHTTPExceptionAPI2())
+    server = LitServer(TestHTTPExceptionAPI2(), fast_queue=True)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 400, "Server raises 400 error"
@@ -501,8 +501,9 @@ class FailFastAPI(ls.test_examples.SimpleLitAPI):
         raise ValueError("setup failed")
 
 
-def test_workers_setup_status():
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_setup_status(use_zmq):
     api = FailFastAPI()
-    server = LitServer(api, devices=1)
+    server = LitServer(api, devices=1, fast_queue=use_zmq)
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
         server.run()
