@@ -59,6 +59,7 @@ def main(
         devices=devices,
         batch_timeout=batch_timeout,
         timeout=200,
+        fast_queue=True,
     )
     server.run(log_level="warning", num_api_servers=4, generate_client_file=False)
 
