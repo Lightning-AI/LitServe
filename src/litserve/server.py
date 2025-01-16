@@ -275,7 +275,8 @@ class LitServer:
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
         self.broker = Broker()
-        self.broker.start()
+        if self.use_zmq:
+            self.broker.start()
         manager = mp.Manager()
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
