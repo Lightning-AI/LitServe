@@ -247,7 +247,7 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_wor
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
-@pytest.mark.parametrize(("api_server_worker_type", "num_api_workers"), [("process", 1), (None, 1)])
+@pytest.mark.parametrize(("api_server_worker_type", "num_api_workers"), [(None, 1), ("process", 1)])
 @patch("litserve.server.uvicorn")
 def test_server_run_with_process_api_worker(
     mock_uvicorn, api_server_worker_type, num_api_workers, server_for_api_worker_test
