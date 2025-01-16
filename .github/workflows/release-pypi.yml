@@ -22,7 +22,7 @@ jobs:
       - name: Pull reusable 🤖 actions️
         uses: actions/checkout@v4
         with:
-          ref: v0.11.3.post0
+          ref: main
           path: .cicd
           repository: Lightning-AI/utilities
       - uses: actions/setup-python@v5
