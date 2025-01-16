@@ -24,7 +24,7 @@ jobs:
   check-package:
     uses: Lightning-AI/utilities/.github/workflows/check-package.yml@v0.11.9
     with:
-      actions-ref: v0.11.7
+      actions-ref: v0.11.9
       import-name: "litserve"
       artifact-name: dist-packages-${{ github.sha }}
       testing-matrix: |
