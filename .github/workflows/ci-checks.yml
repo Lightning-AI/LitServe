@@ -17,14 +17,14 @@ jobs:
   #      actions-ref: main
 
   check-schema:
-    uses: Lightning-AI/utilities/.github/workflows/check-schema.yml@v0.11.9
+    uses: Lightning-AI/utilities/.github/workflows/check-schema.yml@main
     with:
       azure-dir: ""
 
   check-package:
-    uses: Lightning-AI/utilities/.github/workflows/check-package.yml@v0.11.9
+    uses: Lightning-AI/utilities/.github/workflows/check-package.yml@main
     with:
-      actions-ref: v0.11.9
+      actions-ref: main
       import-name: "litserve"
       artifact-name: dist-packages-${{ github.sha }}
       testing-matrix: |
@@ -34,6 +34,6 @@ jobs:
         }
 
 #  check-docs:
-#    uses: Lightning-AI/utilities/.github/workflows/check-docs.yml@v0.10.1
+#    uses: Lightning-AI/utilities/.github/workflows/check-docs.yml@main
 #    with:
 #      requirements-file: "_requirements/docs.txt"
