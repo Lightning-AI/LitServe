@@ -19,14 +19,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
       - name: Pull reusable 🤖 actions️
         uses: actions/checkout@v4
         with:
+          ref: main
           path: .cicd
           repository: Lightning-AI/utilities
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.9
 
       - name: Prepare build env.
         run: pip install -r ./.cicd/requirements/gha-package.txt
