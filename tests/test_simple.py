@@ -14,6 +14,7 @@
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 
 import numpy as np
 import pytest
@@ -159,14 +160,6 @@ async def test_timeout(use_zmq):
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            # Poll until the server is ready
-            for _ in range(10):  # retry 10 times
-                try:
-                    await ac.get("/health")
-                    break
-                except Exception:
-                    await asyncio.sleep(0.2)
-
             response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
             await asyncio.sleep(0.0001)
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
@@ -182,8 +175,7 @@ async def test_timeout(use_zmq):
 @pytest.mark.flaky(retries=3)
 @pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
-async def test_batch_timeout(use_zmq):
-    # Scenario: first 2 requests finish as a batch and third request times out in queue
+async def test_batch_timeout_with_concurrent_requests(use_zmq):
     server = LitServer(
         SlowBatchAPI(),
         accelerator="cpu",
@@ -196,58 +188,50 @@ async def test_batch_timeout(use_zmq):
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            # wait for the server to be ready
-            for _ in range(10):
-                try:
-                    await ac.get("/health")
-                    break
-                except Exception:
-                    await asyncio.sleep(0.2)
-
             response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
             await asyncio.sleep(0.0001)
             response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
             responses = await asyncio.gather(response1, response2, response3, return_exceptions=True)
-            assert responses[0].status_code == 200, (
-                "Batch: First request should complete since it's popped from the request queue."
-            )
-            assert responses[1].status_code == 200, (
-                "Batch: Second request should complete since it's popped from the request queue."
-            )
-            assert responses[2].status_code == 504, "Batch: Third request was delayed and should fail"
 
-    server1 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1)
-    server2 = LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False)
-    server3 = LitServer(
-        SlowBatchAPI(),
-        accelerator="cpu",
-        devices=1,
-        timeout=False,
-        max_batch_size=2,
-        batch_timeout=2,
-        fast_queue=use_zmq,
-    )
-    server4 = LitServer(
-        SlowBatchAPI(), accelerator="cpu", devices=1, timeout=-1, max_batch_size=2, batch_timeout=2, fast_queue=use_zmq
-    )
+            assert responses[0].status_code == 200, "First request in batch should complete"
+            assert responses[1].status_code == 200, "Second request in batch should complete"
+            assert responses[2].status_code == 504, "Third request should timeout"
 
-    with wrap_litserve_start(server1) as server1, wrap_litserve_start(server2) as server2, wrap_litserve_start(
-        server3
-    ) as server3, wrap_litserve_start(server4) as server4, TestClient(server1.app) as client1, TestClient(
-        server2.app
-    ) as client2, TestClient(server3.app) as client3, TestClient(server4.app) as client4:
-        response1 = client1.post("/predict", json={"input": 4.0})
-        assert response1.status_code == 200, "Expected slow server to respond since timeout was disabled"
 
-        response2 = client2.post("/predict", json={"input": 4.0})
-        assert response2.status_code == 200, "Expected slow server to respond since timeout was disabled"
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_server_with_disabled_timeout(use_zmq):
+    servers = [
+        LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1),
+        LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False),
+        LitServer(
+            SlowBatchAPI(),
+            accelerator="cpu",
+            devices=1,
+            timeout=False,
+            max_batch_size=2,
+            batch_timeout=2,
+            fast_queue=use_zmq,
+        ),
+        LitServer(
+            SlowBatchAPI(),
+            accelerator="cpu",
+            devices=1,
+            timeout=-1,
+            max_batch_size=2,
+            batch_timeout=2,
+            fast_queue=use_zmq,
+        ),
+    ]
 
-        response3 = client3.post("/predict", json={"input": 4.0})
-        assert response3.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+    with ExitStack() as stack:
+        clients = [
+            stack.enter_context(TestClient(stack.enter_context(wrap_litserve_start(server)).app)) for server in servers
+        ]
 
-        response4 = client4.post("/predict", json={"input": 4.0})
-        assert response4.status_code == 200, "Expected slow batch server to respond since timeout was disabled"
+        for i, client in enumerate(clients, 1):
+            response = client.post("/predict", json={"input": 4.0})
+            assert response.status_code == 200, f"Server {i} should complete request with disabled timeout"
 
 
 def test_concurrent_requests(lit_server):
