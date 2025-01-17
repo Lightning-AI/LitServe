@@ -271,6 +271,7 @@ def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_t
     mock_uvicorn.Config.assert_called()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 def test_server_run_with_invalid_api_worker(simple_litapi):
     server = ls.LitServer(simple_litapi, devices=1)
     server.verify_worker_status = MagicMock()
