@@ -319,7 +319,7 @@ def test_run_batched_loop_timeout():
     request_queue = Queue()
     response_queues = [Queue()]
 
-    # First request will timeout, second will succeed
+    # First request will time out, second will succeed
     requests = [
         (0, "UUID-001", time.monotonic() - 0.2, {"input": 4.0}),  # Old request
         (0, "UUID-002", time.monotonic(), {"input": 5.0}),  # Fresh request
