@@ -247,43 +247,46 @@ def test_run_single_loop():
 def test_run_single_loop_timeout():
     stream = io.StringIO()
     ls.configure_logging(stream=stream)
+
     lit_api = ls.test_examples.SimpleLitAPI()
     lit_api.setup(None)
     lit_api.request_timeout = 0.0001
 
     request_queue = Queue()
-    request = (0, "UUID-001", time.monotonic(), {"input": 4.0})
-    time.sleep(0.1)
-    request_queue.put(request)
     response_queues = [Queue()]
+    old_request = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    time.sleep(0.1)  # Age the request
+    request_queue.put(old_request)
 
-    # Run the loop in a separate thread to allow it to be stopped
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, response_queues, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
+    response_queue = response_queues[0]
+    _, (response, status) = response_queue.get()
+    assert isinstance(response, HTTPException)
+    assert response.status_code == 504
+    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
+
     request_queue.put((None, None, None, None))
     loop_thread.join()
-    assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
-    assert isinstance(response_queues[0].get()[1][0], HTTPException), "Timeout should return an HTTPException"
 
 
 def test_run_batched_loop():
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
     lit_api.pre_setup(2, None)
-    assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 1
 
     request_queue = Queue()
-    # response_queue_id, uid, timestamp, x_enc
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
-    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
     response_queues = [Queue()]
 
-    # Run the loop in a separate thread to allow it to be stopped
+    requests = [(0, "UUID-001", time.monotonic(), {"input": 4.0}), (0, "UUID-002", time.monotonic(), {"input": 5.0})]
+    for req in requests:
+        request_queue.put(req)
+
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
@@ -291,38 +294,39 @@ def test_run_batched_loop():
     )
     loop_thread.start()
 
-    # Allow some time for the loop to process
-    time.sleep(1)
+    expected_responses = [
+        ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK)),
+        ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK)),
+    ]
 
-    # Stop the loop by putting a sentinel value in the queue
+    for expected in expected_responses:
+        actual = response_queues[0].get(timeout=10)
+        assert actual == expected, f"Expected {expected}, got {actual}"
+
     request_queue.put((None, None, None, None))
     loop_thread.join()
-
-    response_1 = response_queues[0].get(timeout=10)
-    response_2 = response_queues[0].get(timeout=10)
-    assert response_1 == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
-    assert response_2 == ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK))
 
 
 def test_run_batched_loop_timeout():
     stream = io.StringIO()
     ls.configure_logging(stream=stream)
+
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
     lit_api.pre_setup(2, None)
-    assert lit_api.model is not None, "Setup must initialize the model"
     lit_api.request_timeout = 0.1
 
     request_queue = Queue()
-    # response_queue_id, uid, timestamp, x_enc
-    r1 = (0, "UUID-001", time.monotonic(), {"input": 4.0})
-    time.sleep(0.1)
-    request_queue.put(r1)
-    r2 = (0, "UUID-002", time.monotonic(), {"input": 5.0})
-    request_queue.put(r2)
     response_queues = [Queue()]
 
-    # Run the loop in a separate thread to allow it to be stopped
+    # First request will time out, second will succeed
+    requests = [
+        (0, "UUID-001", time.monotonic() - 0.2, {"input": 4.0}),  # Old request
+        (0, "UUID-002", time.monotonic(), {"input": 5.0}),  # Fresh request
+    ]
+    for req in requests:
+        request_queue.put(req)
+
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
@@ -330,16 +334,17 @@ def test_run_batched_loop_timeout():
     )
     loop_thread.start()
 
-    # Allow some time for the loop to process
-    time.sleep(1)
+    response_queue = response_queues[0]
 
+    # First response should be timeout error
+    _, (response1, _) = response_queue.get(timeout=10)
+    assert isinstance(response1, HTTPException)
     assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
-    resp1 = response_queues[0].get(timeout=10)[1]
-    resp2 = response_queues[0].get(timeout=10)[1]
-    assert isinstance(resp1[0], HTTPException), "First request was timed out"
-    assert resp2[0] == {"output": 25.0}, "Second request wasn't timed out"
 
-    # Stop the loop by putting a sentinel value in the queue
+    # Second response should succeed
+    _, (response2, _) = response_queue.get(timeout=10)
+    assert response2 == {"output": 25.0}
+
     request_queue.put((None, None, None, None))
     loop_thread.join()
 

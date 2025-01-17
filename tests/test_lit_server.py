@@ -228,39 +228,58 @@ def test_start_server(mock_uvicon):
     assert server.lit_spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
+@pytest.fixture
+def server_for_api_worker_test(simple_litapi):
+    server = ls.LitServer(simple_litapi, devices=1)
+    server.verify_worker_status = MagicMock()
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._start_server = MagicMock()
+    return server
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
-def test_server_run_with_api_server_worker_type(mock_uvicorn):
-    api = ls.test_examples.SimpleLitAPI()
-    server = ls.LitServer(api, devices=1)
+def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_worker_test):
+    server = server_for_api_worker_test
+
+    server.run(api_server_worker_type="process", num_api_servers=10)
+    server.launch_inference_worker.assert_called_with(10)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@pytest.mark.parametrize(("api_server_worker_type", "num_api_workers"), [(None, 1), ("process", 1)])
+@patch("litserve.server.uvicorn")
+def test_server_run_with_process_api_worker(
+    mock_uvicorn, api_server_worker_type, num_api_workers, server_for_api_worker_test
+):
+    server = server_for_api_worker_test
+
+    server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
+    server.launch_inference_worker.assert_called_with(num_api_workers)
+    actual = server._start_server.call_args
+    assert actual[0][4] == "process", "Server should run in process mode"
+    mock_uvicorn.Config.assert_called()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@patch("litserve.server.uvicorn")
+def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test):
+    server = server_for_api_worker_test
+    server.run(api_server_worker_type="thread")
+    server.launch_inference_worker.assert_called_with(1)
+    assert server._start_server.call_args[0][4] == "thread", "Server should run in thread mode"
+    mock_uvicorn.Config.assert_called()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+def test_server_run_with_invalid_api_worker(simple_litapi):
+    server = ls.LitServer(simple_litapi, devices=1)
     server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match=r"Must be 'process' or 'thread'"):
         server.run(api_server_worker_type="invalid")
 
     with pytest.raises(ValueError, match=r"must be greater than 0"):
         server.run(num_api_servers=0)
-
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
-    server._start_server = MagicMock()
-
-    # Running the method to test
-    server.run(api_server_worker_type=None)
-    server.launch_inference_worker.assert_called_with(1)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "process", "Server should run in process mode"
-
-    server.run(api_server_worker_type="thread")
-    server.launch_inference_worker.assert_called_with(1)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "thread", "Server should run in thread mode"
-
-    server.run(api_server_worker_type="process")
-    server.launch_inference_worker.assert_called_with(1)
-    actual = server._start_server.call_args
-    assert actual[0][4] == "process", "Server should run in process mode"
-
-    server.run(api_server_worker_type="process", num_api_servers=10)
-    server.launch_inference_worker.assert_called_with(10)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
@@ -272,7 +291,6 @@ def test_server_run_windows(mock_uvicorn):
     server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
     server._start_server = MagicMock()
 
-    # Running the method to test
     server.run(api_server_worker_type=None)
     actual = server._start_server.call_args
     assert actual[0][4] == "thread", "Windows only supports thread mode"
