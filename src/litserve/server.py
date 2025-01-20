@@ -24,7 +24,6 @@ import time
 import uuid
 import warnings
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -43,8 +42,9 @@ from litserve.loops import LitLoop, get_default_loop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
+from litserve.transport.base import MessageTransport
+from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
-from litserve.zmq_queue import AsyncConsumer, Broker
 
 mp.allow_connection_pickling()
 
@@ -69,32 +69,21 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 
 async def response_queue_to_buffer(
-    consumer: [int, mp.Queue],
+    transport: MessageTransport,
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
     stream: bool,
-    threadpool: ThreadPoolExecutor,
-    use_zmq: bool,
-    addr: Optional[str] = None,
+    consumer_id: int = 0,
 ):
-    loop = asyncio.get_running_loop()
-    if use_zmq:
-        consumer = AsyncConsumer(consumer_id=consumer, address=addr)
-
-    async def _get_response():
-        if use_zmq:
-            return await consumer.get()
-        return await loop.run_in_executor(threadpool, consumer.get)
-
     if stream:
         while True:
-            uid, response = await _get_response()
+            uid, response = await transport.areceive(consumer_id)
             stream_response_buffer, event = response_buffer[uid]
             stream_response_buffer.append(response)
             event.set()
 
     else:
         while True:
-            uid, response = await _get_response()
+            uid, response = await transport.areceive(consumer_id)
             event = response_buffer.pop(uid)
             response_buffer[uid] = response
             event.set()
@@ -149,6 +138,7 @@ class LitServer:
             fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
+        self.transport_config = None
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
@@ -271,27 +261,25 @@ class LitServer:
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
         self.inference_workers = self.devices * self.workers_per_device
+        self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
-        self.broker = Broker()
-        if self.use_zmq:
-            self.broker.start()
-        manager = mp.Manager()
-        self.workers_setup_status = manager.dict()
-        self.request_queue = manager.Queue()
+        self.transport_config.num_consumers = num_uvicorn_servers
+        self.transport_config.manager = mp.Manager()
+        self._transport = create_transport_from_config(self.transport_config)
+        self.workers_setup_status = self.transport_config.manager.dict()
+        self.request_queue = self.transport_config.manager.Queue()
         if self._logger_connector._loggers:
-            self.logger_queue = manager.Queue()
+            self.logger_queue = self.transport_config.manager.Queue()
 
         self._logger_connector.run(self)
-
-        self.response_queues = [manager.Queue() for _ in range(num_uvicorn_servers)]
 
         for spec in self._specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
-            del server_copy.app, server_copy.broker
+            del server_copy.app
             spec.setup(server_copy)
 
         process_list = []
@@ -310,41 +298,36 @@ class LitServer:
                     device,
                     worker_id,
                     self.request_queue,
-                    self.response_queues,
+                    self._transport,
                     self.max_batch_size,
                     self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
                     self._callback_runner,
                     self._loop,
-                    self.use_zmq,
-                    self.broker.backend_address,
                 ),
             )
             process.start()
             process_list.append(process)
-        return manager, process_list
+        return self.transport_config.manager, process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
 
-        if not hasattr(self, "response_queues") or not self.response_queues:
+        if not hasattr(self, "_transport") or not self._transport:
             raise RuntimeError(
                 "Response queues have not been initialized. "
                 "Please make sure to call the 'launch_inference_worker' method of "
                 "the LitServer class to initialize the response queues."
             )
 
-        response_queue = app.response_queue_id if self.use_zmq else self.response_queues[app.response_queue_id]
-        response_executor = ThreadPoolExecutor(max_workers=len(self.inference_workers))
+        transport = self._transport
         future = response_queue_to_buffer(
-            response_queue,
+            transport,
             self.response_buffer,
             self.stream,
-            response_executor,
-            self.use_zmq,
-            self.broker.frontend_address,
+            app.response_queue_id,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
 

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 import zmq
 
-from litserve.zmq_queue import AsyncConsumer, Broker, Producer
+from litserve.transport.zmq_queue import AsyncConsumer, Broker, Producer
 
 
 @pytest.fixture
