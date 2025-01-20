@@ -150,7 +150,7 @@ class _BaseLoop(ABC):
         device: str,
         worker_id: int,
         request_queue: Queue,
-        response_queues: List[Queue],
+        transport: MessageTransport,
         max_batch_size: int,
         batch_timeout: float,
         stream: bool,
@@ -162,9 +162,7 @@ class _BaseLoop(ABC):
 
             async def _wrapper():
                 logger.info("Running LitLoop in a asyncio event loop")
-                future = self.schedule_task(
-                    lit_api, lit_spec, request_queue, max_batch_size, batch_timeout, response_queues
-                )
+                future = self.schedule_task(lit_api, lit_spec, request_queue, max_batch_size, batch_timeout, transport)
                 _ = event_loop.create_task(future)
                 while True:
                     try:
@@ -174,7 +172,7 @@ class _BaseLoop(ABC):
                             device,
                             worker_id,
                             request_queue,
-                            response_queues,
+                            transport,
                             max_batch_size,
                             batch_timeout,
                             stream,
@@ -194,7 +192,7 @@ class _BaseLoop(ABC):
                     device,
                     worker_id,
                     request_queue,
-                    response_queues,
+                    transport,
                     max_batch_size,
                     batch_timeout,
                     stream,
@@ -209,7 +207,7 @@ class _BaseLoop(ABC):
         device: str,
         worker_id: int,
         request_queue: Queue,
-        response_queues: List[Queue],
+        transport: MessageTransport,
         max_batch_size: int,
         batch_timeout: float,
         stream: bool,

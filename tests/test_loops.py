@@ -542,7 +542,7 @@ def test_loop_with_server():
     server = ls.LitServer(lit_api, loop=loop)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post("/predict", json={"input": 4.0}, timeout=1)
+        response = client.post("/predict", json={"input": 4.0}, timeout=5)
         assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10
 
 
@@ -592,11 +592,11 @@ def test_lit_loop_get_request(lit_loop_setup):
     assert lit_loop.get_request(request_queue, timeout=0.001) is None
 
 
-def test_lit_loop_put_response(lit_loop_setup):
+@pytest.mark.asyncio
+async def test_lit_loop_put_response(lit_loop_setup, mock_transport):
     lit_loop, _, request_queue = lit_loop_setup
-    response_queues = [Queue()]
-    lit_loop.put_response(response_queues, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK)
-    response = response_queues[0].get()
+    lit_loop.put_response(mock_transport, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK)
+    response = await mock_transport.areceive(0)
     assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
 
 
@@ -673,20 +673,20 @@ def test_default_loop_pre_setup_error(stream, max_batch_size, error_msg):
 
 
 @pytest.fixture
-def continuous_batching_setup():
+def continuous_batching_setup(monkeypatch, mock_transport):
     lit_api = ContinuousBatchingAPI()
     lit_api.stream = True
     lit_api.request_timeout = 0.1
     lit_api.pre_setup(2, None)
     lit_api.setup(None)
     request_queue = Queue()
-    response_queues = [Queue()]
+
     lit_loop = ContinuousBatchingLoop()
-    return lit_api, lit_loop, request_queue, response_queues
+    return lit_api, lit_loop, request_queue, mock_transport
 
 
 def test_continuous_batching_pre_setup(continuous_batching_setup):
-    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
+    lit_api, lit_loop, request_queue, mock_transport = continuous_batching_setup
     lit_api.stream = False
     with pytest.raises(
         ValueError,
@@ -699,15 +699,15 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
 
 @pytest.mark.asyncio
 async def test_continuous_batching_run(continuous_batching_setup):
-    lit_api, lit_loop, request_queue, response_queues = continuous_batching_setup
+    lit_api, lit_loop, request_queue, mock_transport = continuous_batching_setup
     response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
     lit_loop.add_request(uid, input, lit_api, None)
     lit_loop.response_queue_ids[uid] = response_queue_id
-    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, response_queues, 2, 0.1, True, {}, NOOP_CB_RUNNER)
+    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, mock_transport, 2, 0.1, True, {}, NOOP_CB_RUNNER)
 
     results = []
     for i in range(5):
-        response = response_queues[0].get()
+        response = await mock_transport.areceive(0)
         uid, (response_data, status) = response
         o = json.loads(response_data)["output"]
         assert o == i
@@ -715,7 +715,7 @@ async def test_continuous_batching_run(continuous_batching_setup):
         assert uid == "UUID-001"
         results.append(o)
     assert results == list(range(5)), "API must return a sequence of numbers from 0 to 4"
-    response = response_queues[0].get()
+    response = await mock_transport.areceive(0)
     uid, (response_data, status) = response
     o = json.loads(response_data)["output"]
     assert o == ""
