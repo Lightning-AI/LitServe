@@ -22,8 +22,10 @@ from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
+from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve import LitAPI
@@ -536,11 +538,25 @@ class TestLitAPI(ls.test_examples.SimpleLitAPI):
         return 10
 
 
-def test_loop_with_server():
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fast_queue", [True, False])
+async def test_loop_with_server_async(fast_queue):
     loop = TestLoop()
     lit_api = TestLitAPI()
-    server = ls.LitServer(lit_api, loop=loop)
+    server = ls.LitServer(lit_api, loop=loop, fast_queue=fast_queue)
 
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            response = await ac.post("/predict", json={"input": 4.0}, timeout=5)
+            assert response.json() == {"output": 1600.0}
+
+
+def test_loop_with_server_sync():
+    loop = TestLoop()
+    lit_api = TestLitAPI()
+    server = ls.LitServer(lit_api, loop=loop, fast_queue=True)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0}, timeout=5)
         assert response.json() == {"output": 1600.0}  # use LitAPI.load_cache to multiply the input by 10

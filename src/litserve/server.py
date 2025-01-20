@@ -234,7 +234,6 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
-        self._transport = None
         self.transport_config = None
 
         specs = spec if spec is not None else []

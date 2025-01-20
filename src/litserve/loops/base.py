@@ -250,10 +250,6 @@ class LitLoop(_BaseLoop):
     ) -> None:
         self.put_response(transport, response_queue_id, uid, error, LitAPIStatus.ERROR)
 
-    def __del__(self):
-        pass
-        # self.transport.close()
-
 
 class DefaultLoop(LitLoop):
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):

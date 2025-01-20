@@ -299,17 +299,18 @@ def test_server_run_windows(mock_uvicorn):
 def test_server_terminate():
     server = LitServer(SimpleLitAPI())
     server.verify_worker_status = MagicMock()
-    mock_manager = MagicMock()
+    server._transport = MagicMock()
 
-    with patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start, patch(
-        "litserve.server.LitServer.launch_inference_worker", return_value=[mock_manager, [MagicMock()]]
-    ) as mock_launch:
+    with (
+        patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start,
+        patch("litserve.server.LitServer.launch_inference_worker", return_value=[MagicMock()]) as mock_launch,
+    ):
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
 
         mock_launch.assert_called()
         mock_start.assert_called()
-        mock_manager.shutdown.assert_called()
+        server._transport.close.assert_called()
 
 
 class IdentityAPI(ls.test_examples.SimpleLitAPI):
