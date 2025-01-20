@@ -142,7 +142,7 @@ class FakeBatchStreamTransport(DummyMessageTransport):
         self.num_streamed_outputs = num_streamed_outputs
         self.count = 0
 
-    def send(self, item, consumer_id, block=False, timeout=None):
+    def send(self, item, consumer_id=0, block=False, timeout=None):
         uid, args = item
         response, status = args
         if status == LitAPIStatus.FINISH_STREAMING:
@@ -187,12 +187,13 @@ def test_batched_streaming_loop(mock_transport):
     requests_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}))
 
     lit_loop = BatchedStreamingLoop()
+    transport = FakeBatchStreamTransport(num_streamed_outputs)
     with pytest.raises(StopIteration, match="finish streaming"):
         lit_loop.run_batched_streaming_loop(
             fake_stream_api,
             fake_stream_api,
             requests_queue,
-            transport=mock_transport,
+            transport=transport,
             max_batch_size=2,
             batch_timeout=2,
             callback_runner=NOOP_CB_RUNNER,
