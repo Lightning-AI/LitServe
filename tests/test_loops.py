@@ -185,7 +185,6 @@ def test_batched_streaming_loop(mock_transport):
     requests_queue = Queue()
     requests_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
     requests_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}))
-    transport = mock_transport
 
     lit_loop = BatchedStreamingLoop()
     with pytest.raises(StopIteration, match="finish streaming"):
@@ -193,7 +192,7 @@ def test_batched_streaming_loop(mock_transport):
             fake_stream_api,
             fake_stream_api,
             requests_queue,
-            transport,
+            transport=mock_transport,
             max_batch_size=2,
             batch_timeout=2,
             callback_runner=NOOP_CB_RUNNER,
