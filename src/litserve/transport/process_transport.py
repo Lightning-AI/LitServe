@@ -13,7 +13,7 @@ class MPQueueTransport(MessageTransport):
         return self._queues[consumer_id].put(item)
 
     async def areceive(self, consumer_id: int, timeout: Optional[float] = None) -> dict:
-        return await asyncio.to_thread(self._queues[consumer_id].get, block=True)
+        return await asyncio.to_thread(self._queues[consumer_id].get, timeout=timeout, block=True)
 
     def close(self) -> None:
         pass

@@ -13,7 +13,6 @@ class MessageTransport(ABC):
         """Receive a message from model workers or any publisher."""
         pass
 
-    @abstractmethod
     def close(self) -> None:
         """Clean up resources if needed (e.g., sockets, processes)."""
         pass
