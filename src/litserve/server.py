@@ -138,7 +138,6 @@ class LitServer:
             fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
-        self.transport_config = None
         if batch_timeout > timeout and timeout not in (False, -1):
             raise ValueError("batch_timeout must be less than timeout")
         if max_batch_size <= 0:
@@ -235,6 +234,8 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
+        self._transport = None
+        self.transport_config = None
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -279,7 +280,7 @@ class LitServer:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
-            del server_copy.app
+            del server_copy.app, server_copy.transport_config
             spec.setup(server_copy)
 
         process_list = []
@@ -309,7 +310,7 @@ class LitServer:
             )
             process.start()
             process_list.append(process)
-        return self.transport_config.manager, process_list
+        return process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -566,7 +567,7 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
+        litserve_workers = self.launch_inference_worker(num_api_servers)
 
         self.verify_worker_status()
         try:
@@ -579,7 +580,7 @@ class LitServer:
             for w in litserve_workers:
                 w.terminate()
                 w.join()
-            manager.shutdown()
+            self._transport.close()
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests

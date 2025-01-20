@@ -26,7 +26,8 @@ def _create_zmq_transport(config: TransportConfig):
 
 
 def _create_mp_transport(config: TransportConfig):
-    return MPQueueTransport(config.manager, config.num_consumers)
+    queues = [config.manager.Queue() for _ in range(config.num_consumers)]
+    return MPQueueTransport(config.manager, queues)
 
 
 def create_transport_from_config(config: TransportConfig):

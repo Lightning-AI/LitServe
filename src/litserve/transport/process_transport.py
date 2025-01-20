@@ -1,13 +1,14 @@
 import asyncio
-from multiprocessing import Manager
-from typing import Any, Optional
+from multiprocessing import Manager, Queue
+from typing import Any, List, Optional
 
 from litserve.transport.base import MessageTransport
 
 
 class MPQueueTransport(MessageTransport):
-    def __init__(self, manager: Manager, num_consumers: int):
-        self._queues = [manager.Queue() for _ in range(num_consumers)]
+    def __init__(self, manager: Manager, queues: List[Queue]):
+        self._manager = manager
+        self._queues = queues
 
     def send(self, item: Any, consumer_id: int) -> None:
         return self._queues[consumer_id].put(item)
@@ -16,4 +17,7 @@ class MPQueueTransport(MessageTransport):
         return await asyncio.to_thread(self._queues[consumer_id].get, timeout=timeout, block=True)
 
     def close(self) -> None:
-        pass
+        self._manager.shutdown()
+
+    def __reduce__(self):
+        return (MPQueueTransport, (None, self._queues))

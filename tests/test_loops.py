@@ -510,7 +510,7 @@ class TestLoop(LitLoop):
         x = lit_api.decode_request(x_enc) * cache
         response = lit_api.predict(x)
         response_enc = lit_api.encode_response(response)
-        transport.send((uid, (response_enc, LitAPIStatus.OK)), response_queue_id)
+        transport.send((uid, (response_enc, LitAPIStatus.OK)), consumer_id=response_queue_id)
         raise StopIteration("exit loop")
 
 
