@@ -66,12 +66,13 @@ def wrap_litserve_start(server: "LitServer"):
     server.app.response_queue_id = 0
     if server.lit_spec:
         server.lit_spec.response_queue_id = 0
-    processes = server.launch_inference_worker(num_uvicorn_servers=1)
+    manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
     server._prepare_app_run(server.app)
     yield server
     for p in processes:
         p.terminate()
     server._transport.close()
+    manager.shutdown()
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):

@@ -266,12 +266,12 @@ class LitServer:
 
     def launch_inference_worker(self, num_uvicorn_servers: int):
         self.transport_config.num_consumers = num_uvicorn_servers
-        self.transport_config.manager = mp.Manager()
+        manager = self.transport_config.manager = mp.Manager()
         self._transport = create_transport_from_config(self.transport_config)
-        self.workers_setup_status = self.transport_config.manager.dict()
-        self.request_queue = self.transport_config.manager.Queue()
+        self.workers_setup_status = manager.dict()
+        self.request_queue = manager.Queue()
         if self._logger_connector._loggers:
-            self.logger_queue = self.transport_config.manager.Queue()
+            self.logger_queue = manager.Queue()
 
         self._logger_connector.run(self)
 
@@ -309,7 +309,7 @@ class LitServer:
             )
             process.start()
             process_list.append(process)
-        return process_list
+        return manager, process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -566,7 +566,7 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        litserve_workers = self.launch_inference_worker(num_api_servers)
+        manager, litserve_workers = self.launch_inference_worker(num_api_servers)
 
         self.verify_worker_status()
         try:
@@ -579,6 +579,7 @@ class LitServer:
             for w in litserve_workers:
                 w.terminate()
                 w.join()
+            manager.shutdown()
             self._transport.close()
 
     def _prepare_app_run(self, app: FastAPI):

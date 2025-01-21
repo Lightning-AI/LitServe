@@ -7,7 +7,6 @@ from litserve.transport.base import MessageTransport
 
 class MPQueueTransport(MessageTransport):
     def __init__(self, manager: Manager, queues: List[Queue]):
-        self._manager = manager
         self._queues = queues
 
     def send(self, item: Any, consumer_id: int) -> None:
@@ -17,7 +16,7 @@ class MPQueueTransport(MessageTransport):
         return await asyncio.to_thread(self._queues[consumer_id].get, timeout=timeout, block=True)
 
     def close(self) -> None:
-        self._manager.shutdown()
+        pass
 
     def __reduce__(self):
         return (MPQueueTransport, (None, self._queues))
