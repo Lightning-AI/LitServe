@@ -644,7 +644,8 @@ class LitServer:
                 logger.debug("Enable Windows explicit socket sharing...")
                 # We make sure sockets is listening...
                 # It prevents further [WinError 10022]
-                [sock.listen(config.backlog) for sock in sockets]
+                for sock in sockets:
+                    sock.listen(config.backlog)
                 # We add worker to say unicorn to use a shared socket (win32)
                 # https://github.com/encode/uvicorn/pull/802
                 config.workers = num_uvicorn_servers
