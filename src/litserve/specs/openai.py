@@ -313,7 +313,7 @@ class OpenAISpec(LitSpec):
     def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> Dict:
         logger.debug(output)
         if output is None:
-            message = {"role": "assistant", "content": None} 
+            message = {"role": "assistant", "content": None}
         elif isinstance(output, str):
             message = {"role": "assistant", "content": output}
         elif self.validate_chat_message(output):
