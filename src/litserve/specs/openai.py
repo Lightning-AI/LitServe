@@ -133,7 +133,7 @@ ResponseFormat = Annotated[
 
 class ChatMessage(BaseModel):
     role: str
-    content: Union[str, List[Union[TextContent, ImageContent]]]
+    content: Optional[Union[str, List[Union[TextContent, ImageContent]]]] = None
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
@@ -312,9 +312,10 @@ class OpenAISpec(LitSpec):
 
     def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> Dict:
         logger.debug(output)
-        if isinstance(output, str):
+        if output is None:
+            message = {"role": "assistant", "content": None}
+        elif isinstance(output, str):
             message = {"role": "assistant", "content": output}
-
         elif self.validate_chat_message(output):
             message = output
         elif isinstance(output, dict) and "content" in output:
@@ -448,7 +449,7 @@ class OpenAISpec(LitSpec):
                 if chat_msg.tool_calls:
                     tool_calls = chat_msg.tool_calls
 
-            content = "".join(msgs)
+            content = "".join(msg for msg in msgs if msg is not None)
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)
