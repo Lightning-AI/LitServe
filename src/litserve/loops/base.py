@@ -248,6 +248,7 @@ class LitLoop(_BaseLoop):
     def put_response(
         self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
+        # response_data = pickle.dumps(response_data)
         if self.producer:
             self.producer.put((uid, (response_data, status)), consumer_id=response_queue_id)
         else:
