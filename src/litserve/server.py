@@ -27,7 +27,6 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from multiprocessing.context import Process
-from queue import Empty
 from threading import Thread
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -249,7 +248,7 @@ class LitServer:
         self._connector = _Connector(accelerator=accelerator, devices=devices)
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
-        self._uvicorn_servers:List[uvicorn.Server] = []
+        self._uvicorn_servers: List[uvicorn.Server] = []
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
