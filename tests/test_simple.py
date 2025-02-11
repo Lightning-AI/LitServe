@@ -244,3 +244,21 @@ def test_concurrent_requests(lit_server):
         assert response.json() == {"output": i**2}, "Server returns square of the input number"
         count += 1
     assert count == n_requests
+
+
+class CustomError(Exception):
+    def __init__(self, arg1, arg2, arg3):
+        super().__init__("Test exception")
+
+
+class ExceptionAPI(SimpleLitAPI):
+    def predict(self, x):
+        raise CustomError("This", "is", "a test")
+
+
+def test_exception():
+    server = LitServer(ExceptionAPI(), accelerator="cpu", devices=1)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 500
+        assert response.json() == {"detail": "Internal Server Error"}
