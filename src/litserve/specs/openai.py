@@ -117,7 +117,7 @@ class ResponseFormatJSONObject(BaseModel):
 class JSONSchema(BaseModel):
     name: str
     description: Optional[str] = None
-    schema: Optional[Dict[str, object]] = Field(None, alias="schema")
+    schema_: Optional[Dict[str, object]] = Field(None, alias="schema")
     strict: Optional[bool] = False
 
 
