@@ -135,8 +135,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             if self.has_capacity(lit_api):
                 response_queue_id, uid, _, input = request
                 logger.debug(f"New request: {uid}, {input}")
-                self.add_request(uid, input, lit_api, lit_spec)
                 self.response_queue_ids[uid] = response_queue_id
+                self.add_request(uid, input, lit_api, lit_spec)
             else:
                 response_queue_id, uid, _, input = request
                 pending_requests.append((response_queue_id, uid, input))
@@ -197,7 +197,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
-                    raise HTTPException(500, "No responses from step()")
+                    logger.warning("No responses from step() but has_active_requests() is true")
+                    continue
                 if responses and not isinstance(responses[0], Output):
                     raise HTTPException(500, "Expected StepOutput from step()")
 
