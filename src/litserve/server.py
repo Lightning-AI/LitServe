@@ -607,15 +607,13 @@ class LitServer:
                 for iw in inference_workers:
                     iw: Process
                     iw.join()
-        except KeyboardInterrupt:
-            # KeyboardInterruption
+        finally:
             if sys.platform == "win32":
                 # We kindly ask uvicorn servers to exit.
                 # It will properly end threads on windows.
                 for us in self._uvicorn_servers:
                     us: uvicorn.Server
                     us.should_exit = True
-        finally:
             print("Shutting down LitServe")
             for iw in inference_workers:
                 iw: Process
