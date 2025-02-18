@@ -98,9 +98,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             return False
         """)
 
-    async def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
+    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
-        await lit_api.add_request(uid, request)
+        lit_api.add_request(uid, request)
         self.active_sequences[uid] = {"input": request}
 
     def mark_completed(self, uid: str) -> None:
@@ -127,7 +127,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         # First process existing pending requests
         while pending_requests and self.has_capacity(lit_api):
             response_queue_id, uid, input = pending_requests.pop(0)
-            await self.add_request(uid, input, lit_api, lit_spec)
+            self.add_request(uid, input, lit_api, lit_spec)
             self.response_queue_ids[uid] = response_queue_id
 
         while True:
@@ -136,7 +136,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 response_queue_id, uid, _, input = request
                 logger.debug(f"New request: {uid}, {input}")
                 self.response_queue_ids[uid] = response_queue_id
-                await self.add_request(uid, input, lit_api, lit_spec)
+                self.add_request(uid, input, lit_api, lit_spec)
             else:
                 response_queue_id, uid, _, input = request
                 pending_requests.append((response_queue_id, uid, input))
@@ -197,7 +197,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
-                    raise HTTPException(500, "No responses from step()")
+                    logger.warning(f"No responses from step() but has_active_requests() is true")
+                    continue
                 if responses and not isinstance(responses[0], Output):
                     raise HTTPException(500, "Expected StepOutput from step()")
 
