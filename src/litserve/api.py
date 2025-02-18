@@ -143,3 +143,7 @@ class LitAPI(ABC):
 
     def has_capacity(self) -> bool:
         raise NotImplementedError("has_capacity is not implemented")
+
+    def health(self) -> bool:
+        # TODO: Discuss what this should return
+        return True
