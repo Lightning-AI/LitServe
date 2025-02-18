@@ -197,8 +197,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
-                    continue
-                    # raise HTTPException(500, "No responses from step()")
+                    raise HTTPException(500, "No responses from step()")
                 if responses and not isinstance(responses[0], Output):
                     raise HTTPException(500, "Expected StepOutput from step()")
 
