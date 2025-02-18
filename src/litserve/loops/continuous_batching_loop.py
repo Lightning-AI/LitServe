@@ -131,7 +131,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             self.response_queue_ids[uid] = response_queue_id
 
         while True:
-            request = await asyncio.to_thread(self.get_request, request_queue, timeout=None, block=False)
+            request = await asyncio.to_thread(self.get_request, request_queue, timeout=1, block=True)
             if request is None:
                 break
             if self.has_capacity(lit_api):
