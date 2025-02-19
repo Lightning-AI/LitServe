@@ -136,12 +136,12 @@ def test_workers_health_with_custom_health_method(use_zmq):
         assert response.status_code == 503
         assert response.text == "not ready"
 
-        time.sleep(3)
+        time.sleep(1)
         response = client.get("/health")
         assert response.status_code == 503
         assert response.text == "not ready"
 
-        time.sleep(2)
+        time.sleep(4)
         response = client.get("/health")
         assert response.status_code == 200
         assert response.text == "ok"
