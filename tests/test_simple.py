@@ -59,7 +59,7 @@ class SlowSetupWithCustomHealthLitAPI(SimpleLitAPI):
         time.sleep(2)
 
     def health(self) -> bool:
-        # Health check passes after 5 seconds from the first time it is called. 
+        # Health check passes after 5 seconds from the first time it is called.
         if not hasattr(self, "_start_time"):
             self._start_time = time.time()
         return time.time() - self._start_time >= 5
