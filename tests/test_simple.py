@@ -53,6 +53,18 @@ class SlowSetupLitAPI(SimpleLitAPI):
         time.sleep(2)
 
 
+class SlowSetupWithCustomHealthLitAPI(SimpleLitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+        time.sleep(2)
+
+    def health(self) -> bool:
+        # Health check passes after 5 seconds from the first time it is called.
+        if not hasattr(self, "_start_time"):
+            self._start_time = time.time()
+        return time.time() - self._start_time >= 5
+
+
 @pytest.mark.parametrize("use_zmq", [True, False])
 def test_workers_health(use_zmq):
     server = LitServer(
@@ -99,6 +111,38 @@ def test_workers_health_custom_path(use_zmq):
 
         time.sleep(3)
         response = client.get("/my_server/health")
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_health_with_custom_health_method(use_zmq):
+    server = LitServer(
+        SlowSetupWithCustomHealthLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(1)
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(1)
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        time.sleep(4)
+        response = client.get("/health")
         assert response.status_code == 200
         assert response.text == "ok"
 
