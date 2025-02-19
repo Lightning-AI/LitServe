@@ -59,11 +59,9 @@ class SlowSetupWithCustomHealthLitAPI(SimpleLitAPI):
         time.sleep(2)
 
     def health(self) -> bool:
-        # Custom health check logic
+        # Health check passes after 5 seconds from the first time it is called. 
         if not hasattr(self, "_start_time"):
             self._start_time = time.time()
-
-        # Healthy if the server has been running for at least 5 seconds
         return time.time() - self._start_time >= 5
 
 
