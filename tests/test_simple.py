@@ -59,10 +59,12 @@ class SlowSetupWithCustomHealthLitAPI(SimpleLitAPI):
         time.sleep(2)
 
     def health(self) -> bool:
+        # Custom health check logic
         if not hasattr(self, "_start_time"):
             self._start_time = time.time()
 
-        return time.time() - self._start_time > 5
+        # Healthy if the server has been running for at least 5 seconds
+        return time.time() - self._start_time >= 5
 
 
 @pytest.mark.parametrize("use_zmq", [True, False])
