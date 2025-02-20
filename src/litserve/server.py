@@ -410,7 +410,8 @@ class LitServer:
             if not workers_ready:
                 workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
-            if workers_ready:
+            lit_api_health_status = self.lit_api.health()
+            if workers_ready and lit_api_health_status:
                 return Response(content="ok", status_code=200)
 
             return Response(content="not ready", status_code=503)
