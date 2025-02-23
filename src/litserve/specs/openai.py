@@ -289,7 +289,7 @@ class OpenAISpec(LitSpec):
         self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
     ) -> List[Dict[str, str]]:
         # returns [{"role": "system", "content": "..."}, ...]
-        return [el.dict() for el in request.messages]
+        return [el.model_dump(by_alias=True, exclude_none=True) for el in request.messages]
 
     def batch(self, inputs):
         return list(inputs)
