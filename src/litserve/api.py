@@ -77,7 +77,10 @@ class LitAPI(ABC):
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
         if self._default_unbatch is None:
-            raise ValueError("Unbatch function is not set.")
+            raise ValueError(
+                "Default implementation for `LitAPI.unbatch` method was not found. "
+                "Please implement the `LitAPI.unbatch` method."
+            )
         return self._default_unbatch(output)
 
     def encode_response(self, output, **kwargs):
