@@ -78,8 +78,7 @@ class ImageContent(BaseModel):
 
 
 class InputAudio(BaseModel):
-    data: str
-    """Base64 encoded audio data."""
+    data: str  # base64 encoded audio data.
 
     format: Literal["wav", "mp3"]
 
