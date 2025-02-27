@@ -184,7 +184,7 @@ def test_openai_parity_with_image_input():
 
 
 @e2e_from_file("tests/e2e/default_openaispec.py")
-def test_openai_parity_with_image_input(openai_request_data_with_audio_wav):
+def test_openai_parity_with_audio_input(openai_request_data_with_audio_wav):
     client = OpenAI(
         base_url="http://127.0.0.1:8000/v1",
         api_key="lit",  # required, but unused
