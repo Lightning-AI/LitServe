@@ -77,6 +77,19 @@ class ImageContent(BaseModel):
     image_url: Union[str, ImageContentURL]
 
 
+class InputAudio(BaseModel):
+    data: str
+    """Base64 encoded audio data."""
+
+    format: Literal["wav", "mp3"]
+
+
+class AudioContent(BaseModel):
+    type: Literal["input_audio"]
+
+    input_audio: InputAudio
+
+
 class Function(BaseModel):
     name: str
     description: str
@@ -133,7 +146,7 @@ ResponseFormat = Annotated[
 
 class ChatMessage(BaseModel):
     role: str
-    content: Optional[Union[str, List[Union[TextContent, ImageContent]]]] = None
+    content: Optional[Union[str, List[Union[TextContent, ImageContent, AudioContent]]]] = None
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
