@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import time
 from typing import Generator
 
@@ -191,6 +192,44 @@ def openai_request_data_with_image():
         "frequency_penalty": 0,
         "user": "string",
     }
+
+
+@pytest.fixture
+def openai_request_data_with_audio_wav(openai_request_data):
+    # Create a base64 encoded string from a list of audio data
+    audio_data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    encoded_string = base64.b64encode(bytearray(audio_data)).decode("utf-8")
+
+    request_data = openai_request_data.copy()
+    request_data["messages"] = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What is in this recording?"},
+                {"type": "input_audio", "input_audio": {"data": encoded_string, "format": "wav"}},
+            ],
+        },
+    ]
+    return request_data
+
+
+@pytest.fixture
+def openai_request_data_with_audio_flac(openai_request_data):
+    # Create a base64 encoded string from a list of audio data
+    audio_data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    encoded_string = base64.b64encode(bytearray(audio_data)).decode("utf-8")
+
+    request_data = openai_request_data.copy()
+    request_data["messages"] = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What is in this recording?"},
+                {"type": "input_audio", "input_audio": {"data": encoded_string, "format": "flac"}},
+            ],
+        },
+    ]
+    return request_data
 
 
 @pytest.fixture
