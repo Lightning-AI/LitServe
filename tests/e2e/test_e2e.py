@@ -183,6 +183,34 @@ def test_openai_parity_with_image_input():
         )
 
 
+@e2e_from_file("tests/e2e/default_openaispec.py")
+def test_openai_parity_with_audio_input(openai_request_data_with_audio_wav):
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",  # required, but unused
+    )
+    messages = openai_request_data_with_audio_wav["messages"]
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+    )
+    assert response.choices[0].message.content == "This is a generated output", (
+        f"Server didn't return expected output\nOpenAI client output: {response}"
+    )
+
+    response = client.chat.completions.create(
+        model="lit",
+        messages=messages,
+        stream=True,
+    )
+
+    expected_outputs = ["This is a generated output", None]
+    for r, expected_out in zip(response, expected_outputs):
+        assert r.choices[0].delta.content == expected_out, (
+            f"Server didn't return expected output.\nOpenAI client output: {r}"
+        )
+
+
 @e2e_from_file("tests/e2e/default_openaispec_tools.py")
 def test_openai_parity_with_tools():
     client = OpenAI(

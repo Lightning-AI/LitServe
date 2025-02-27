@@ -77,6 +77,16 @@ class ImageContent(BaseModel):
     image_url: Union[str, ImageContentURL]
 
 
+class InputAudio(BaseModel):
+    data: str  # base64 encoded audio data.
+    format: Literal["wav", "mp3"]
+
+
+class AudioContent(BaseModel):
+    type: Literal["input_audio"]
+    input_audio: InputAudio
+
+
 class Function(BaseModel):
     name: str
     description: str
@@ -133,7 +143,7 @@ ResponseFormat = Annotated[
 
 class ChatMessage(BaseModel):
     role: str
-    content: Optional[Union[str, List[Union[TextContent, ImageContent]]]] = None
+    content: Optional[Union[str, List[Union[TextContent, ImageContent, AudioContent]]]] = None
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
@@ -289,7 +299,7 @@ class OpenAISpec(LitSpec):
         self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
     ) -> List[Dict[str, str]]:
         # returns [{"role": "system", "content": "..."}, ...]
-        return [el.dict() for el in request.messages]
+        return [el.model_dump(by_alias=True, exclude_none=True) for el in request.messages]
 
     def batch(self, inputs):
         return list(inputs)

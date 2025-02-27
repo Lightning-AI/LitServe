@@ -72,6 +72,12 @@ def test_default_batch_unbatch():
     assert api.unbatch(output) == inputs, "Default unbatch should not change input"
 
 
+def test_default_unbatch_not_implemented():
+    api = TestDefaultBatchedAPI()
+    with pytest.raises(ValueError, match="Default implementation for `LitAPI.unbatch` method was not found."):
+        api.unbatch(None)
+
+
 class TestStreamAPIBatched(TestStreamAPI):
     def predict(self, x):
         for i in range(4):
