@@ -1,3 +1,4 @@
 uvloop
 tenacity
 jsonargparse
+orjson==3.10.15

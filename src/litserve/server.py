@@ -30,7 +30,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import ORJSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, ORJSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
@@ -414,7 +414,7 @@ class LitServer:
 
         @self.app.get(self.info_path, dependencies=[Depends(self.setup_auth())])
         async def info(request: Request) -> Response:
-            return ORJSONResponse(
+            return JSONResponse(
                 content={
                     "model": self.model_metadata,
                     "server": {
@@ -501,6 +501,7 @@ class LitServer:
                 stream_predict if stream else predict,
                 methods=methods,
                 dependencies=[Depends(self.setup_auth())],
+                response_class=ORJSONResponse,
             )
 
         for spec in self._specs:
