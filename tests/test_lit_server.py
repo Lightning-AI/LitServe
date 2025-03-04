@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import io
 import sys
 from time import sleep
 from unittest.mock import MagicMock, patch
@@ -525,3 +526,67 @@ def test_workers_setup_status(use_zmq):
     server = LitServer(api, devices=1, fast_queue=use_zmq)
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
         server.run()
+
+
+@pytest.mark.parametrize("use_zmq", [False])
+@pytest.mark.parametrize(
+    "file_url",
+    # TODO: Replace with better test files
+    ["https://arxiv.org/pdf/2503.01743", "https://sample-videos.com/img/Sample-jpg-image-2mb.jpg"],
+)
+@pytest.mark.asyncio
+async def test_litserver_with_files_payload(simple_lit_file_api, use_zmq, file_url):
+    server = LitServer(simple_lit_file_api, fast_queue=use_zmq)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            await asyncio.sleep(4)
+
+            # Download the file using httpx
+            async with AsyncClient() as client:
+                response = await client.get(file_url)
+                response.raise_for_status()  # Raise an error for 4xx/5xx responses
+                file_content = response.content  # You can also use .text for string data
+                file_name = file_url.split("/")[-1]
+                content_type = response.headers.get("Content-Type")
+                file_size = len(file_content)
+                files = {"file": (file_name, file_content, content_type)}
+
+            # Send the file to the server
+            resp = ac.post("/predict", files=files, timeout=10)
+            resp = await resp
+            assert resp.status_code == 200, "Check if server is running and the request format is valid."
+            assert resp.json() == {"output": file_size}, "output from server must be same as input file size"
+
+
+@pytest.mark.parametrize("use_zmq", [False])
+@pytest.mark.parametrize(
+    "file_url",
+    # TODO: Replace with better test files
+    ["https://arxiv.org/pdf/2503.01743", "https://sample-videos.com/img/Sample-jpg-image-2mb.jpg"],
+)
+@pytest.mark.asyncio
+async def test_litserver_with_files_payload_request_type_upload_file(simple_lit_uploadfile_api, use_zmq, file_url):
+    server = LitServer(simple_lit_uploadfile_api, fast_queue=use_zmq)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            await asyncio.sleep(4)
+
+            # Download the file using httpx
+            async with AsyncClient() as client:
+                response = await client.get(file_url)
+                response.raise_for_status()  # Raise an error for 4xx/5xx responses
+                file_content = response.content  # You can also use .text for string data
+                file_name = file_url.split("/")[-1]
+                content_type = response.headers.get("Content-Type")
+                file_size = len(file_content)
+                files = {"request": (file_name, file_content, content_type)}
+
+            # Send the file to the server
+            resp = ac.post("/predict", files=files, timeout=10)
+            resp = await resp
+            assert resp.status_code == 200, "Check if server is running and the request format is valid."
+            assert resp.json() == {"output": file_size}, "output from server must be same as input file size"
