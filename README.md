@@ -101,6 +101,13 @@ if __name__ == "__main__":
 
 Now run the server via the command-line
 
+**Using Lightning CLI:**
+```bash
+lightning serve api server.py  # deploy locally
+lightning serve api server.py --cloud --name my-litserve-api  # deploy on cloud
+```
+
+**Using Python:**
 ```bash
 python server.py
 ```
@@ -128,7 +135,7 @@ litgpt serve microsoft/phi-2
 - LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
 - Use the setup method for one-time tasks like connecting models, DBs, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
 - LitServer handles optimizations like batching, GPU autoscaling, streaming, etc... ([docs](https://lightning.ai/docs/litserve/api-reference/litserver)).
-- Self host on your own machines or use Lightning Studios for a fully managed deployment ([learn more](#hosting-options)).         
+- Self host on your machines or create a fully managed deployment with Lightning ([learn more](https://lightning.ai/docs/litserve/features/deploy-on-cloud)).
 
 [Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
 
@@ -173,6 +180,7 @@ State-of-the-art features:
 ✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
 ✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
 ✅ [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
+✅ [Deploy with Lightning AI](https://lightning.ai/docs/litserve/features/deploy-on-cloud)    
 ✅ [Self-host on your machines](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-your-own)    
 ✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
 ✅ [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)        
