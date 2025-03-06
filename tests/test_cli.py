@@ -1,5 +1,4 @@
 import os
-import subprocess
 import sys
 from unittest.mock import patch
 
@@ -39,10 +38,3 @@ def test_ensure_lightning_installed(mock_check_call, mock_find_spec):
     mock_find_spec.return_value = False
     _ensure_lightning_installed()
     mock_check_call.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
-
-
-def test_lightning_serve_help():
-    subprocess.run("lightning serve --help", shell=True, capture_output=True, text=True)
-    from lightning_sdk import __version__
-
-    assert __version__ is not None, "Lightning SDK version not found"

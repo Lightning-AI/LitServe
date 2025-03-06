@@ -30,4 +30,4 @@ jobs:
           pip list
 
       - name: Tests
-        run: python tests/minimal_run.py
+        run: lightning serve api tests/minimal_run.py
