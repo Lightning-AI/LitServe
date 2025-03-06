@@ -1,4 +1,4 @@
-import importlib
+import importlib.util
 import subprocess
 import sys
 
