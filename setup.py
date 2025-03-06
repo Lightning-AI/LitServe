@@ -111,8 +111,6 @@ setup(
         "Programming Language :: Python :: 3.11",
     ],
     entry_points={
-        "console_scripts": [
-            "litserve=litserve.__main__:main",
-        ],
+        "console_scripts": ["litserve=litserve.__main__:main", "lightning=litserve.cli:main"],
     },
 )
