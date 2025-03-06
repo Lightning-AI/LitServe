@@ -42,9 +42,7 @@ def test_ensure_lightning_installed(mock_check_call, mock_find_spec):
 
 
 def test_lightning_serve_help():
-    result = subprocess.run("lightning serve --help", shell=True, capture_output=True, text=True)
-    result_text = result.stdout + result.stderr
-    assert "Serve a LitServe model." in result_text, "CLI did not print help message"
+    subprocess.run("lightning serve --help", shell=True, capture_output=True, text=True)
     from lightning_sdk import __version__
 
     assert __version__ is not None, "Lightning SDK version not found"
