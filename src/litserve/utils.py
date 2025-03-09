@@ -68,10 +68,13 @@ def wrap_litserve_start(server: "LitServer"):
         server.lit_spec.response_queue_id = 0
     manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
     server._prepare_app_run(server.app)
-    yield server
-    for p in processes:
-        p.terminate()
-    server._transport.close()
+    try:
+        yield server
+    finally:
+        for p in processes:
+            p.terminate()
+            p.join()
+        server._transport.close()
     manager.shutdown()
 
 

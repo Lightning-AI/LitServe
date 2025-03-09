@@ -14,6 +14,7 @@
 import asyncio
 import inspect
 import logging
+import pickle
 import sys
 import time
 from abc import ABC
@@ -248,6 +249,7 @@ class LitLoop(_BaseLoop):
     def put_error_response(
         self, transport: MessageTransport, response_queue_id: int, uid: str, error: Exception
     ) -> None:
+        error = pickle.dumps(error)
         self.put_response(transport, response_queue_id, uid, error, LitAPIStatus.ERROR)
 
 

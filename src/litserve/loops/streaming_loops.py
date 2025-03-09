@@ -103,7 +103,7 @@ class StreamingLoop(DefaultLoop):
                     "Please check the error trace for more details.",
                     uid,
                 )
-                self.put_response(transport, response_queue_id, uid, e, LitAPIStatus.ERROR)
+                self.put_error_response(transport, response_queue_id, uid, e)
 
     def __call__(
         self,
@@ -208,7 +208,7 @@ class BatchedStreamingLoop(DefaultLoop):
                     "Please check the error trace for more details."
                 )
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_response(transport, response_queue_id, uid, e, LitAPIStatus.ERROR)
+                    self.put_error_response(transport, response_queue_id, uid, e)
 
     def __call__(
         self,

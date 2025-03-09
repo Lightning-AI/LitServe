@@ -15,7 +15,7 @@ import json
 import warnings
 from abc import ABC, abstractmethod
 from queue import Queue
-from typing import Optional
+from typing import Callable, Optional
 
 from pydantic import BaseModel
 
@@ -24,8 +24,8 @@ from litserve.specs.base import LitSpec
 
 class LitAPI(ABC):
     _stream: bool = False
-    _default_unbatch: callable = None
-    _spec: LitSpec = None
+    _default_unbatch: Optional[Callable] = None
+    _spec: Optional[LitSpec] = None
     _device: Optional[str] = None
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
@@ -76,6 +76,11 @@ class LitAPI(ABC):
 
     def unbatch(self, output):
         """Convert a batched output to a list of outputs."""
+        if self._default_unbatch is None:
+            raise ValueError(
+                "Default implementation for `LitAPI.unbatch` method was not found. "
+                "Please implement the `LitAPI.unbatch` method."
+            )
         return self._default_unbatch(output)
 
     def encode_response(self, output, **kwargs):
@@ -143,3 +148,15 @@ class LitAPI(ABC):
 
     def has_capacity(self) -> bool:
         raise NotImplementedError("has_capacity is not implemented")
+
+    def health(self) -> bool:
+        """Check the additional health status of the API.
+
+        This method is used in the /health endpoint of the server to determine the health status.
+        Users can extend this method to include additional health checks specific to their application.
+
+        Returns:
+            bool: True if the API is healthy, False otherwise.
+
+        """
+        return True

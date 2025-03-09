@@ -1,3 +1,4 @@
 fastapi >=0.100
 uvicorn[standard] >=0.29.0
 pyzmq >=22.0.0
+starlette<0.46.0  # TODO: fix root cause for buffer error

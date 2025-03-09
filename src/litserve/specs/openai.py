@@ -77,6 +77,16 @@ class ImageContent(BaseModel):
     image_url: Union[str, ImageContentURL]
 
 
+class InputAudio(BaseModel):
+    data: str  # base64 encoded audio data.
+    format: Literal["wav", "mp3"]
+
+
+class AudioContent(BaseModel):
+    type: Literal["input_audio"]
+    input_audio: InputAudio
+
+
 class Function(BaseModel):
     name: str
     description: str
@@ -117,7 +127,7 @@ class ResponseFormatJSONObject(BaseModel):
 class JSONSchema(BaseModel):
     name: str
     description: Optional[str] = None
-    schema_def: Optional[Dict[str, object]] = Field(None, alias="schema")
+    schema_: Optional[Dict[str, object]] = Field(None, alias="schema")
     strict: Optional[bool] = False
 
 
@@ -133,7 +143,7 @@ ResponseFormat = Annotated[
 
 class ChatMessage(BaseModel):
     role: str
-    content: Union[str, List[Union[TextContent, ImageContent]]]
+    content: Optional[Union[str, List[Union[TextContent, ImageContent, AudioContent]]]] = None
     name: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
@@ -289,7 +299,7 @@ class OpenAISpec(LitSpec):
         self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
     ) -> List[Dict[str, str]]:
         # returns [{"role": "system", "content": "..."}, ...]
-        return [el.dict() for el in request.messages]
+        return [el.model_dump(by_alias=True, exclude_none=True) for el in request.messages]
 
     def batch(self, inputs):
         return list(inputs)
@@ -312,9 +322,10 @@ class OpenAISpec(LitSpec):
 
     def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> Dict:
         logger.debug(output)
-        if isinstance(output, str):
+        if output is None:
+            message = {"role": "assistant", "content": None}
+        elif isinstance(output, str):
             message = {"role": "assistant", "content": output}
-
         elif self.validate_chat_message(output):
             message = output
         elif isinstance(output, dict) and "content" in output:
@@ -404,7 +415,7 @@ class OpenAISpec(LitSpec):
             usage_info = sum(usage_infos)
             chunk = ChatCompletionChunk(model=model, choices=choices, usage=None)
             logger.debug(chunk)
-            yield f"data: {chunk.model_dump_json()}\n\n"
+            yield f"data: {chunk.model_dump_json(by_alias=True)}\n\n"
 
         choices = [
             ChatCompletionStreamingChoice(
@@ -419,7 +430,7 @@ class OpenAISpec(LitSpec):
             choices=choices,
             usage=usage_info,
         )
-        yield f"data: {last_chunk.model_dump_json()}\n\n"
+        yield f"data: {last_chunk.model_dump_json(by_alias=True)}\n\n"
         yield "data: [DONE]\n\n"
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
@@ -448,7 +459,7 @@ class OpenAISpec(LitSpec):
                 if chat_msg.tool_calls:
                     tool_calls = chat_msg.tool_calls
 
-            content = "".join(msgs)
+            content = "".join(msg for msg in msgs if msg is not None)
             msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
             choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
             choices.append(choice)

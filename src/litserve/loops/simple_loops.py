@@ -110,12 +110,11 @@ class SingleLoop(DefaultLoop):
                     "Please check the error trace for more details.",
                     uid,
                 )
-                self.put_response(
+                self.put_error_response(
                     transport=transport,
                     response_queue_id=response_queue_id,
                     uid=uid,
-                    response_data=e,
-                    status=LitAPIStatus.ERROR,
+                    error=e,
                 )
 
     def __call__(
@@ -227,7 +226,7 @@ class BatchedLoop(DefaultLoop):
                     "Please check the error trace for more details."
                 )
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_response(transport, response_queue_id, uid, e, LitAPIStatus.ERROR)
+                    self.put_error_response(transport, response_queue_id, uid, e)
 
     def __call__(
         self,
