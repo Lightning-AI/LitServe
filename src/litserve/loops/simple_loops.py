@@ -60,6 +60,7 @@ class SingleLoop(DefaultLoop):
                 )
                 continue
             try:
+                print("x_enc", x_enc)
                 context = {}
                 if hasattr(lit_spec, "populate_context"):
                     lit_spec.populate_context(context, x_enc)
@@ -87,6 +88,7 @@ class SingleLoop(DefaultLoop):
                     y,
                 )
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+                print("y_enc", y_enc)
                 self.put_response(
                     transport=transport,
                     response_queue_id=response_queue_id,

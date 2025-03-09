@@ -68,14 +68,21 @@ def wrap_litserve_start(server: "LitServer"):
         server.lit_spec.response_queue_id = 0
     manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
     server._prepare_app_run(server.app)
+    print("server prepare app run")
     try:
+        print("yield server")
         yield server
+        print("server yield")
     finally:
+        print("close server")
+        # First close the transport to signal to the response_queue_to_buffer task that it should stop
+        server._transport.close()
+        # Then terminate and join the worker processes
         for p in processes:
             p.terminate()
             p.join()
-        server._transport.close()
-    manager.shutdown()
+        # Finally, shut down the manager
+        manager.shutdown()
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):

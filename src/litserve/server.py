@@ -76,17 +76,33 @@ async def response_queue_to_buffer(
 ):
     if stream:
         while True:
-            uid, response = await transport.areceive(consumer_id)
-            stream_response_buffer, event = response_buffer[uid]
-            stream_response_buffer.append(response)
-            event.set()
+            try:
+                uid, response = await transport.areceive(consumer_id)
+                stream_response_buffer, event = response_buffer[uid]
+                stream_response_buffer.append(response)
+                event.set()
+            except asyncio.CancelledError:
+                # Transport was closed, exit the loop
+                logger.debug("Response queue to buffer task was cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in response_queue_to_buffer: {e}")
+                break
 
     else:
         while True:
-            uid, response = await transport.areceive(consumer_id)
-            event = response_buffer.pop(uid)
-            response_buffer[uid] = response
-            event.set()
+            try:
+                uid, response = await transport.areceive(consumer_id)
+                event = response_buffer.pop(uid)
+                response_buffer[uid] = response
+                event.set()
+            except asyncio.CancelledError:
+                # Transport was closed, exit the loop
+                logger.debug("Response queue to buffer task was cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in response_queue_to_buffer: {e}")
+                break
 
 
 class LitServer:
@@ -334,8 +350,21 @@ class LitServer:
         yield
 
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
+
+        # Cancel the task and wait for it to complete
+        logger.debug("Cancelling response queue to buffer task")
         task.cancel()
-        logger.debug("Shutting down response queue to buffer task")
+
+        try:
+            # Wait for the task to be cancelled with a timeout
+            await asyncio.wait_for(task, timeout=2.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            # Task was cancelled or timed out, which is expected
+            pass
+        except Exception as e:
+            logger.error(f"Error while cancelling response queue to buffer task: {e}")
+
+        logger.debug("Response queue to buffer task cancelled")
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
@@ -420,6 +449,7 @@ class LitServer:
                 litserver=self,
             )
             response_queue_id = self.app.response_queue_id
+            print("response_queue_id", response_queue_id)
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
@@ -434,7 +464,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
+            self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -577,11 +607,25 @@ class LitServer:
                 s.join()
         finally:
             print("Shutting down LitServe")
+
+            # First close the transport to signal to all tasks that they should stop
+            logger.debug("Closing transport")
+            self._transport.close()
+
+            # Give some time for the signal to propagate
+            time.sleep(0.5)
+
+            # Then terminate and join the worker processes
+            logger.debug("Terminating worker processes")
             for w in litserve_workers:
                 w.terminate()
                 w.join()
+
+            # Finally, shut down the manager
+            logger.debug("Shutting down manager")
             manager.shutdown()
-            self._transport.close()
+
+            logger.debug("LitServe shutdown complete")
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests

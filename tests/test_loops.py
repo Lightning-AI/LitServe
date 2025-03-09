@@ -48,6 +48,8 @@ NOOP_CB_RUNNER = CallbackRunner()
 
 class MockMPQueueTransport(MPQueueTransport):
     def __init__(self, num_consumers=1):
+        self._closed = False
+        self._mp_terminate_event = None
         self._queues = [Queue() for _ in range(num_consumers)]
 
 

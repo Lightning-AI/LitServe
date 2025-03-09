@@ -244,6 +244,7 @@ class LitLoop(_BaseLoop):
     def put_response(
         self, transport: MessageTransport, response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
+        print("put_response", response_queue_id, uid, response_data, status)
         transport.send((uid, (response_data, status)), consumer_id=response_queue_id)
 
     def put_error_response(
