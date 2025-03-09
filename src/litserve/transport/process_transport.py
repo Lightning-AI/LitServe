@@ -14,7 +14,8 @@ class MPQueueTransport(MessageTransport):
         self._mp_terminate_event = manager.Event() if manager else None
 
     def send(self, item: Any, consumer_id: int) -> None:
-        if self._closed or (self._mp_terminate_event and self._mp_terminate_event.is_set()):
+        # skip terminate event due to avoid performance issue
+        if self._closed:
             return None
         return self._queues[consumer_id].put(item)
 

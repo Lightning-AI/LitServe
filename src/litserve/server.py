@@ -447,7 +447,6 @@ class LitServer:
                 litserver=self,
             )
             response_queue_id = self.app.response_queue_id
-            print("response_queue_id", response_queue_id)
             uid = uuid.uuid4()
             event = asyncio.Event()
             self.response_buffer[uid] = event
