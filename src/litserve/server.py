@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import contextlib
 import copy
 import inspect
 import json
@@ -77,7 +78,12 @@ async def response_queue_to_buffer(
     if stream:
         while True:
             try:
-                uid, response = await transport.areceive(consumer_id)
+                result = await transport.areceive(consumer_id)
+                if result is None:
+                    # Timeout occurred, continue waiting
+                    continue
+
+                uid, response = result
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
                 event.set()
@@ -91,7 +97,12 @@ async def response_queue_to_buffer(
     else:
         while True:
             try:
-                uid, response = await transport.areceive(consumer_id)
+                result = await transport.areceive(consumer_id)
+                if result is None:
+                    # Timeout occurred, continue waiting
+                    continue
+
+                uid, response = result
                 event = response_buffer.pop(uid)
                 response_buffer[uid] = response
                 event.set()
@@ -345,24 +356,16 @@ class LitServer:
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
 
-        yield
-
-        self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
-
-        # Cancel the task and wait for it to complete
-        logger.debug("Cancelling response queue to buffer task")
-        task.cancel()
-
         try:
-            # Wait for the task to be cancelled with a timeout
-            await asyncio.wait_for(task, timeout=2.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            # Task was cancelled or timed out, which is expected
-            pass
-        except Exception as e:
-            logger.error(f"Error while cancelling response queue to buffer task: {e}")
+            yield
+        finally:
+            self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
 
-        logger.debug("Response queue to buffer task cancelled")
+            # Cancel the task
+            task.cancel()
+
+            with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                await asyncio.wait_for(task, timeout=1.0)
 
     def device_identifiers(self, accelerator, device):
         if isinstance(device, Sequence):
@@ -604,25 +607,11 @@ class LitServer:
                 s.join()
         finally:
             print("Shutting down LitServe")
-
-            # First close the transport to signal to all tasks that they should stop
-            logger.debug("Closing transport")
             self._transport.close()
-
-            # Give some time for the signal to propagate
-            time.sleep(0.5)
-
-            # Then terminate and join the worker processes
-            logger.debug("Terminating worker processes")
             for w in litserve_workers:
                 w.terminate()
                 w.join()
-
-            # Finally, shut down the manager
-            logger.debug("Shutting down manager")
             manager.shutdown()
-
-            logger.debug("LitServe shutdown complete")
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
