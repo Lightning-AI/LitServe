@@ -82,7 +82,6 @@ async def response_queue_to_buffer(
                 stream_response_buffer.append(response)
                 event.set()
             except asyncio.CancelledError:
-                # Transport was closed, exit the loop
                 logger.debug("Response queue to buffer task was cancelled")
                 break
             except Exception as e:
@@ -97,7 +96,6 @@ async def response_queue_to_buffer(
                 response_buffer[uid] = response
                 event.set()
             except asyncio.CancelledError:
-                # Transport was closed, exit the loop
                 logger.debug("Response queue to buffer task was cancelled")
                 break
             except Exception as e:

@@ -11,11 +11,9 @@ class MPQueueTransport(MessageTransport):
         self._queues = queues
         self._closed = False
         self._terminate_event = asyncio.Event()
-        # Create a multiprocessing Event for cross-process signaling
         self._mp_terminate_event = manager.Event() if manager else None
 
     def send(self, item: Any, consumer_id: int) -> None:
-        # Check if we're already closed
         if self._closed or (self._mp_terminate_event and self._mp_terminate_event.is_set()):
             return None
         return self._queues[consumer_id].put(item)
@@ -31,21 +29,16 @@ class MPQueueTransport(MessageTransport):
 
         while not self._closed and not (self._mp_terminate_event and self._mp_terminate_event.is_set()):
             try:
-                # Try to get an item with a short timeout
                 return await asyncio.to_thread(self._queues[consumer_id].get, timeout=actual_timeout, block=True)
             except asyncio.CancelledError:
-                # Propagate cancellation
                 raise
             except Exception:
-                # Timeout or other error, check if we should terminate
                 if self._closed or (self._mp_terminate_event and self._mp_terminate_event.is_set()):
                     raise asyncio.CancelledError("Transport closed")
-                # If we had a specific timeout and it's expired, raise
                 if timeout is not None:
                     timeout -= actual_timeout
                     if timeout <= 0:
                         raise
-                # Otherwise continue waiting
                 continue
         return None
 

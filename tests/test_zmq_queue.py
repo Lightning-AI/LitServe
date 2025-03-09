@@ -129,7 +129,7 @@ async def test_async_consumer_cleanup():
         mock_ctx.return_value.socket.return_value = socket
 
         consumer = AsyncConsumer(consumer_id=1, address="test_addr")
-        await consumer.aclose()
+        consumer.close()
 
         assert socket.close.called
         assert mock_ctx.return_value.term.called
