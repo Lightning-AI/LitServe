@@ -184,7 +184,7 @@ class AsyncConsumer(BaseConsumer):
         except zmq.ZMQError:
             raise Empty
 
-    async def aclose(self) -> None:
+    def close(self) -> None:
         """Clean up resources asynchronously."""
         if self._socket:
             self._socket.close(linger=0)
