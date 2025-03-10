@@ -71,6 +71,8 @@ def wrap_litserve_start(server: "LitServer"):
     try:
         yield server
     finally:
+        # First close the transport to signal to the response_queue_to_buffer task that it should stop
+        server._transport.close()
         for p in processes:
             p.terminate()
             p.join()
