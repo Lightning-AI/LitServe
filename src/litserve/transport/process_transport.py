@@ -12,8 +12,6 @@ class MPQueueTransport(MessageTransport):
         self._closed = False
 
     def send(self, item: Any, consumer_id: int) -> None:
-        if self._closed:
-            return None
         return self._queues[consumer_id].put(item)
 
     async def areceive(self, consumer_id: int, timeout: Optional[float] = None, block: bool = True) -> dict:

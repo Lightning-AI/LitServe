@@ -290,6 +290,7 @@ def test_server_run_windows(mock_uvicorn):
     server = ls.LitServer(api)
     server.verify_worker_status = MagicMock()
     server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server._transport = MagicMock()
     server._start_server = MagicMock()
 
     server.run(api_server_worker_type=None)

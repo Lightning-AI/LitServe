@@ -80,7 +80,6 @@ async def response_queue_to_buffer(
             try:
                 result = await transport.areceive(consumer_id)
                 if result is None:
-                    # Timeout occurred, continue waiting
                     continue
 
                 uid, response = result
@@ -99,7 +98,6 @@ async def response_queue_to_buffer(
             try:
                 result = await transport.areceive(consumer_id)
                 if result is None:
-                    # Timeout occurred, continue waiting
                     continue
 
                 uid, response = result
