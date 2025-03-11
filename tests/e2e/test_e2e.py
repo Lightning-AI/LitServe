@@ -77,6 +77,13 @@ def test_e2e_default_api():
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
 
 
+@e2e_from_file("tests/e2e/default_multi_worker_api.py")
+def test_e2e_default_multi_worker_api():
+    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
+    assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+    assert resp.json() == {"output": 16.0}, "tests/e2e/default_multi_worker_api.py didn't return expected output"
+
+
 @e2e_from_file("tests/e2e/default_spec.py")
 def test_e2e_default_spec(openai_request_data):
     resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
