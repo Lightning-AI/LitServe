@@ -169,7 +169,7 @@ class BatchedLoop(DefaultLoop):
             response_queue_ids, uids, inputs = zip(*batches)
             num_inputs = len(inputs)
             try:
-                contexts = [{}] * num_inputs
+                contexts = [{} for _ in range(num_inputs)]
                 if hasattr(lit_spec, "populate_context"):
                     for input, context in zip(inputs, contexts):
                         lit_spec.populate_context(context, input)
