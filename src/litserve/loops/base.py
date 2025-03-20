@@ -31,6 +31,8 @@ from litserve.utils import LitAPIStatus
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
+MultiPartParser.max_file_size = sys.maxsize
+# renamed in PR: https://github.com/encode/starlette/pull/2780
 MultiPartParser.spool_max_size = sys.maxsize
 
 

@@ -55,6 +55,8 @@ logger = logging.getLogger(__name__)
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
+MultiPartParser.max_file_size = sys.maxsize
+# renamed in PR: https://github.com/encode/starlette/pull/2780
 MultiPartParser.spool_max_size = sys.maxsize
 
 
