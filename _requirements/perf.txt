@@ -1,3 +1,2 @@
-uvloop
 tenacity
 jsonargparse
