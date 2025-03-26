@@ -107,6 +107,8 @@ lightning serve api server.py  # local
 lightning serve api server.py --cloud  # cloud
 ```
 
+Learn more about deployment [here](https://lightning.ai/docs/litserve/features/deploy-on-cloud).
+
 You can also run the server directly in Python:
 
 ```bash 
