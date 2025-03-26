@@ -171,6 +171,41 @@ Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML
 
 &nbsp;
 
+
+# Hosting options   
+LitServe can be hosted independently on your own machines or fully managed via Lightning Studios.
+
+Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
+
+&nbsp;
+
+<div align="center">
+<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/host-on-lightning.svg" alt="Host on Lightning"/>
+</a>
+</div>
+
+&nbsp;
+
+<div align='center'>
+  
+| Feature                          | Self Managed                      | Fully Managed on Lightning |
+|----------------------------------|-----------------------------------|----------------------------|
+| Deployment                       | ✅ Do it yourself deployment      | ✅ One-button cloud deploy  |
+| Load balancing                   | ❌                                | ✅                          |
+| Autoscaling                      | ❌                                | ✅                          |
+| Scale to zero                    | ❌                                | ✅                          |
+| Multi-machine inference          | ❌                                | ✅                          |
+| Authentication                   | ❌                                | ✅                          |
+| Own VPC                          | ❌                                | ✅                          |
+| AWS, GCP                         | ❌                                | ✅                          |
+| Use your own cloud commits       | ❌                                | ✅                          |
+
+</div>
+
+&nbsp;
+
+
 # Features
 State-of-the-art features:
 
@@ -215,40 +250,8 @@ These results are for image and text classification ML tasks. The performance re
     
 ***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/vLLM), integrate [vLLM with LitServe](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm), or build your custom vLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
 
-&nbsp; 
-
-# Hosting options   
-LitServe can be hosted independently on your own machines or fully managed via Lightning Studios.
-
-Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
-
 &nbsp;
 
-<div align="center">
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/host-on-lightning.svg" alt="Host on Lightning"/>
-</a>
-</div>
-
-&nbsp;
-
-<div align='center'>
-  
-| Feature                          | Self Managed                      | Fully Managed on Studios            |
-|----------------------------------|-----------------------------------|-------------------------------------|
-| Deployment                       | ✅ Do it yourself deployment      | ✅ One-button cloud deploy          |
-| Load balancing                   | ❌                                | ✅                                  |
-| Autoscaling                      | ❌                                | ✅                                  |
-| Scale to zero                    | ❌                                | ✅                                  |
-| Multi-machine inference          | ❌                                | ✅                                  |
-| Authentication                   | ❌                                | ✅                                  |
-| Own VPC                          | ❌                                | ✅                                  |
-| AWS, GCP                         | ❌                                | ✅                                  |
-| Use your own cloud commits       | ❌                                | ✅                                  |
-
-</div>
-
-&nbsp;
 
 # Community
 LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community) - Let's make the world's most advanced AI inference engine.
