@@ -180,7 +180,7 @@ Self-hosting is ideal for hackers, students, and DIY developers, while fully man
 &nbsp;
 
 <div align="center">
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
+<a target="_blank" href="https://lightning.ai/docs/litserve/features/deploy-on-cloud">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/host-on-lightning.svg" alt="Host on Lightning"/>
 </a>
 </div>
