@@ -99,7 +99,7 @@ if __name__ == "__main__":
     server.run(port=8000)
 ```
 
-Now run the server anywhere (local or cloud) via the command-line
+Now run the server anywhere (local or cloud) via the command-line:
 
 ```bash
 lightning serve api server.py  # local
