@@ -101,16 +101,24 @@ if __name__ == "__main__":
 
 Now run the server anywhere (local or cloud) via the command-line:
 
-```bash
-lightning serve api server.py  # local
+### Run locally
 
-lightning serve api server.py --cloud  # cloud
+```bash
+litserve serve api server.py
 ```
 
 You can also run the server directly in Python:
 
 ```bash 
 python server.py
+```
+
+### Run on the cloud
+
+Deploy the server to Lightning AI for fully managed hosting (autoscaling, security, etc...):
+
+```bash
+litserve serve api server.py --cloud
 ```
 
 Learn more about deployment options and cloud hosting [here](https://lightning.ai/docs/litserve/features/deploy-on-cloud).
