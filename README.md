@@ -19,10 +19,11 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving  ✅ Easy to use          ✅ LLMs, non LLMs and more
-✅ Bring your own model  ✅ PyTorch/JAX/TF/...   ✅ Built on FastAPI       
-✅ GPU autoscaling       ✅ Batching, Streaming  ✅ Self-host or ⚡️ managed 
-✅ Compound AI           ✅ Integrate with vLLM and more                   
+✅ (2x)+ faster serving  ✅ Easy to use               ✅ LLMs, non LLMs and more
+✅ Bring your own model  ✅ PyTorch/JAX/TF/...        ✅ Built on FastAPI       
+✅ GPU autoscaling       ✅ Batching, Streaming       ✅ Self-host or ⚡️ managed
+✅ Compound AI           ✅ Integrate with vLLM, etc  ✅ Serverless             
+   
 </pre>
 
 <div align='center'>
@@ -108,7 +109,7 @@ lightning serve api server.py
 # Or deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
 lightning serve api server.py --cloud
 ```
-Learn more about managed hosting on [Lightning AI](https://lightning.ai/docs/litserve/features/deploy-on-cloud).
+Learn more about managed hosting on [Lightning AI](#hosting-options).
 
 You can also run the server manually:
 
@@ -147,14 +148,7 @@ litgpt serve microsoft/phi-2
 
 # Featured examples    
 Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
-
-<div align='center'>
-  <div width='200px'>
-        <video src="https://github.com/user-attachments/assets/5e73549a-bc0f-47a9-9d9c-5b54389be5de" width='200px' controls></video>    
-  </div>
-</div>
-
-## Examples    
+  
 <pre>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
 <strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-llama-3-2-vision-with-litserve">Llama 3.2</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use">Agent with tool use</a>
@@ -176,33 +170,41 @@ Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML
 
 
 # Hosting options   
-LitServe can be hosted independently on your own machines or fully managed via Lightning Studios.
+Self host LitServe anywhere or deploy to your favorite cloud via [Lightning AI](http://lightning.ai/deploy).
+
+https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
 Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
 
-&nbsp;
-
-<div align="center">
-<a target="_blank" href="https://lightning.ai/docs/litserve/features/deploy-on-cloud">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/host-on-lightning.svg" alt="Host on Lightning"/>
-</a>
-</div>
+To host on [Lightning AI](https://lightning.ai/deploy), simply add the `--cloud` arg, login and choose the cloud of your choice.
+```bash
+lightning serve api server.py --cloud
+```
 
 &nbsp;
 
 <div align='center'>
-  
-| Feature                          | Self Managed                      | Fully Managed on Lightning |
-|----------------------------------|-----------------------------------|----------------------------|
-| Deployment                       | ✅ Do it yourself deployment      | ✅ One-button cloud deploy  |
-| Load balancing                   | ❌                                | ✅                          |
-| Autoscaling                      | ❌                                | ✅                          |
-| Scale to zero                    | ❌                                | ✅                          |
-| Multi-machine inference          | ❌                                | ✅                          |
-| Authentication                   | ❌                                | ✅                          |
-| Own VPC                          | ❌                                | ✅                          |
-| AWS, GCP                         | ❌                                | ✅                          |
-| Use your own cloud commits       | ❌                                | ✅                          |
+
+| Feature                          | Self Managed                      | Fully Managed on Lightning         |
+|----------------------------------|-----------------------------------|------------------------------------|
+| Deployment                       | ✅ DIY                             | ✅ One-click deploy                |
+| Full control                     | ✅                                 | ✅                                 |
+| GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
+| Load balancing                   | ❌                                 | ✅ Built-in                        |
+| Autoscaling                      | ❌                                 | ✅ Auto scale up/down              |
+| Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
+| Multi-node inference             | ❌                                 | ✅ Distribute across nodes         |
+| Bring your own container         | ✅                                 | ✅ Full code control               |
+| Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
+| Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
+| Use AWS/GCP credits              | ❌                                 | ✅ Use existing cloud commits      |
+| Enterprise-grade uptime (99.95%) | ❌                                 | ✅ SLA-backed                      |
+| SOC2 / HIPAA compliance          | ❌                                 | ✅ Certified & secure              |
+| Observability                    | ❌                                 | ✅ Dashboards + 3rd party tools    |
+| CI/CD ready                      | ❌                                 | ✅ Lightning SDK                   |
+| 24/7 enterprise support          | ❌                                 | ✅ Slack + on-call                 |
+| Cost controls & audit logs       | ❌                                 | ✅ Budgets, breakdowns, logs       |
+| Debug on GPUs                    | ❌                                 | ✅ Studio integration              |
 
 </div>
 
