@@ -185,59 +185,41 @@ lightning serve api server.py --cloud
 
 <div align='center'>
 
-| Feature                          | Self Managed                      | Fully Managed on Lightning         |
-|----------------------------------|-----------------------------------|------------------------------------|
-| Deployment                       | ✅ DIY                             | ✅ One-click deploy                |
+| [Feature](https://lightning.ai/docs/litserve/features)               | Self Managed                      | [Fully Managed on Lightning](https://lightning.ai/deploy)         |
+|----------------------------------------------------------------------|-----------------------------------|------------------------------------|
+| Docker-first deployment          | ✅ DIY                             | ✅ One-click deploy                |
 | Full control                     | ✅                                 | ✅                                 |
-| GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
-| Load balancing                   | ❌                                 | ✅ Built-in                        |
-| Autoscaling                      | ❌                                 | ✅ Auto scale up/down              |
-| Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
-| Multi-node inference             | ❌                                 | ✅ Distribute across nodes         |
-| Bring your own container         | ✅                                 | ✅ Full code control               |
 | Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
 | Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
+| [(2x)+ faster than plain FastAPI](#performance)                                               | ✅       | ✅                                 |
+| [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)              | ✅       | ✅                                 |
+| [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)                 | ✅       | ✅                                 |
+| [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)                  | ✅       | ✅                                 |
+| [Batching](https://lightning.ai/docs/litserve/features/batching)                              | ✅       | ✅                                 |
+| [Streaming](https://lightning.ai/docs/litserve/features/streaming)                            | ✅       | ✅                                 |
+| [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)                 | ✅       | ✅                                 |
+| [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)         | ✅       | ✅                                 |
+| [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control) | ✅       | ✅                                 |
+| [OpenAPI compliant](https://www.openapis.org/)                                                | ✅       | ✅                                 |
+| [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)             | ✅       | ✅                                 |
+| [Authentication](https://lightning.ai/docs/litserve/features/authentication)                  | ❌ DIY   | ✅ Token, password, custom         |
+| GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
+| Load balancing                   | ❌                                 | ✅ Built-in                        |
+| Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
+| Autoscale up on demand           | ❌                                 | ✅ Auto scale up/down              |
+| Multi-node inference             | ❌                                 | ✅ Distribute across nodes         |
 | Use AWS/GCP credits              | ❌                                 | ✅ Use existing cloud commits      |
 | Versioning                       | ❌                                 | ✅ Make and roll back releases     |
 | Enterprise-grade uptime (99.95%) | ❌                                 | ✅ SLA-backed                      |
 | SOC2 / HIPAA compliance          | ❌                                 | ✅ Certified & secure              |
-| Observability                    | ❌                                 | ✅ Dashboards + 3rd party tools    |
+| Observability                    | ❌                                 | ✅ Built-in, connect 3rd party tools|
 | CI/CD ready                      | ❌                                 | ✅ Lightning SDK                   |
-| 24/7 enterprise support          | ❌                                 | ✅ Slack + on-call                 |
+| 24/7 enterprise support          | ❌                                 | ✅ Dedicated support               |
 | Cost controls & audit logs       | ❌                                 | ✅ Budgets, breakdowns, logs       |
 | Debug on GPUs                    | ❌                                 | ✅ Studio integration              |
+| [20+ features](https://lightning.ai/docs/litserve/features)                    | -                                 | -                                  |
 
 </div>
-
-&nbsp;
-
-
-# Features
-State-of-the-art features:
-
-✅ [(2x)+ faster than plain FastAPI](#performance)      
-✅ [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)    
-✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)    
-✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
-✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
-✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
-✅ [Deploy with Lightning AI](https://lightning.ai/docs/litserve/features/deploy-on-cloud)    
-✅ [Self-host on your machines](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-your-own)    
-✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
-✅ [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)        
-✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control)        
-✅ [OpenAPI compliant](https://www.openapis.org/)          
-✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
-✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
-✅ [Dockerization](https://lightning.ai/docs/litserve/features/dockerization-deployment)
-
-
-
-[10+ features...](https://lightning.ai/docs/litserve/features)    
-
-**Note:** We prioritize scalable, enterprise-level features over hype.   
 
 &nbsp;
 
