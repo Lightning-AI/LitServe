@@ -56,7 +56,7 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
 class RequestCountMiddleware(BaseHTTPMiddleware):
     """Adds a header to the response with the number of active requests."""
 
-    def __init__(self, app: ASGIApp, active_counter: multiprocessing.Value) -> None:
+    def __init__(self, app: ASGIApp, active_counter: multiprocessing.Value) -> None:  # type: ignore
         self.app = app
         self.active_counter = active_counter
 

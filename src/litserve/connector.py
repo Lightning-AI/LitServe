@@ -22,20 +22,15 @@ from typing import List, Optional, Union
 class _Connector:
     def __init__(self, accelerator: str = "auto", devices: Union[List[int], int, str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
-        if accelerator == "cpu":
-            self._accelerator = "cpu"
-        elif accelerator == "cuda":
-            self._accelerator = "cuda"
-        elif accelerator == "mps":
-            self._accelerator = "mps"
-
+        if accelerator in ("cpu", "cuda", "mps"):
+            self._accelerator = accelerator
         elif accelerator == "auto":
             self._accelerator = self._choose_auto_accelerator()
         elif accelerator == "gpu":
             self._accelerator = self._choose_gpu_accelerator_backend()
 
         if devices == "auto":
-            self._devices = self._auto_device_count(self._accelerator)
+            self._devices = self._accelerator_device_count()
         else:
             self._devices = devices
 
@@ -43,7 +38,7 @@ class _Connector:
 
     def check_devices_and_accelerators(self):
         """Check if the devices are in a valid fomra and raise an error if they are not."""
-        if self._accelerator in ["cuda", "mps"]:
+        if self._accelerator in ("cuda", "mps"):
             if not isinstance(self._devices, int) and not (
                 isinstance(self._devices, list) and all(isinstance(device, int) for device in self._devices)
             ):
@@ -68,7 +63,7 @@ class _Connector:
             accelerator = accelerator.lower()
 
         if accelerator not in ["auto", "cpu", "mps", "cuda", "gpu", None]:
-            raise ValueError("accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'")
+            raise ValueError(f"accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'. Found: {accelerator}")
 
         if accelerator is None:
             return "auto"
@@ -80,8 +75,8 @@ class _Connector:
             return gpu_backend
         return "cpu"
 
-    def _auto_device_count(self, accelerator) -> int:
-        if accelerator == "cuda":
+    def _accelerator_device_count(self) -> int:
+        if self._accelerator == "cuda":
             return check_cuda_with_nvidia_smi()
         return 1
 
