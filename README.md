@@ -198,6 +198,7 @@ lightning serve api server.py --cloud
 | Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
 | Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
 | Use AWS/GCP credits              | ❌                                 | ✅ Use existing cloud commits      |
+| Versioning                       | ❌                                 | ✅ Make and roll back releases     |
 | Enterprise-grade uptime (99.95%) | ❌                                 | ✅ SLA-backed                      |
 | SOC2 / HIPAA compliance          | ❌                                 | ✅ Certified & secure              |
 | Observability                    | ❌                                 | ✅ Dashboards + 3rd party tools    |
