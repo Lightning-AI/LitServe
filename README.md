@@ -174,7 +174,7 @@ Self host LitServe anywhere or deploy to your favorite cloud via [Lightning AI](
 
 https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
-Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
+Self-hosting is ideal for hackers, students, and DIY developers while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.
 
 To host on [Lightning AI](https://lightning.ai/deploy), simply add the `--cloud` arg, login and choose the cloud of your choice.
 ```bash
@@ -188,6 +188,7 @@ lightning serve api server.py --cloud
 | [Feature](https://lightning.ai/docs/litserve/features)               | Self Managed                      | [Fully Managed on Lightning](https://lightning.ai/deploy)         |
 |----------------------------------------------------------------------|-----------------------------------|------------------------------------|
 | Docker-first deployment          | ✅ DIY                             | ✅ One-click deploy                |
+| Cost                             | ✅ Free (DIY)                      | ✅ Generous [free tier](https://lightning.ai/pricing) with pay as you go                |
 | Full control                     | ✅                                 | ✅                                 |
 | Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
 | Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
