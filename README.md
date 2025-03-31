@@ -103,7 +103,7 @@ if __name__ == "__main__":
 Now run the server anywhere (local or cloud) via the command-line.
 
 ```bash
-# deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
+# Deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
 lightning serve server.py
 
 # Or run locally (self host anywhere)
