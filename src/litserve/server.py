@@ -244,7 +244,7 @@ class LitServer:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
-        self.active_counters: List[mp.Value] = []  # type: ignore
+        self.active_counters: List[mp.Value] = []
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
