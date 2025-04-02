@@ -16,7 +16,7 @@ import inspect
 import logging
 import time
 import uuid
-from typing import List, Literal, Optional, Union
+from typing import TYPE_CHECKING, List, Literal, Optional, Union
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
@@ -26,6 +26,9 @@ from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from litserve import LitServer
 
 
 class EmbeddingRequest(BaseModel):
@@ -93,7 +96,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         self.add_endpoint("/v1/embeddings", self.embeddings, ["POST"])
         self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 
-    def setup(self, server: "LitServer"):  # noqa: F821
+    def setup(self, server: "LitServer"):
         from litserve import LitAPI
 
         super().setup(server)

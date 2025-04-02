@@ -28,15 +28,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:
-    return (
-        BatchedStreamingLoop()
-        if stream and max_batch_size > 1
-        else StreamingLoop()
-        if stream
-        else BatchedLoop()
-        if max_batch_size > 1
-        else SingleLoop()
-    )
+    if stream:
+        if max_batch_size > 1:
+            return BatchedStreamingLoop()
+        return StreamingLoop()
+    else:  # noqa: RET505
+        if max_batch_size > 1:
+            return BatchedLoop()
+        return SingleLoop()
 
 
 def inference_worker(
