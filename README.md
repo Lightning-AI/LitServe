@@ -19,10 +19,11 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving  ✅ Easy to use          ✅ LLMs, non LLMs and more
-✅ Bring your own model  ✅ PyTorch/JAX/TF/...   ✅ Built on FastAPI       
-✅ GPU autoscaling       ✅ Batching, Streaming  ✅ Self-host or ⚡️ managed 
-✅ Compound AI           ✅ Integrate with vLLM and more                   
+✅ (2x)+ faster serving  ✅ Easy to use               ✅ LLMs, non LLMs and more
+✅ Bring your own model  ✅ PyTorch/JAX/TF/...        ✅ Built on FastAPI       
+✅ GPU autoscaling       ✅ Batching, Streaming       ✅ Self-host or ⚡️ managed
+✅ Compound AI           ✅ Integrate with vLLM, etc  ✅ Serverless             
+   
 </pre>
 
 <div align='center'>
@@ -99,12 +100,23 @@ if __name__ == "__main__":
     server.run(port=8000)
 ```
 
-Now run the server via the command-line
+Now run the server anywhere (local or cloud) via the command-line.
 
 ```bash
+# Deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
+lightning serve server.py
+
+# Or run locally (self host anywhere)
+lightning serve server.py --local
+```
+Learn more about managed hosting on [Lightning AI](#hosting-options).
+
+You can also run the server manually:
+
+```bash 
 python server.py
 ```
-    
+
 ### Test the server
 Run the auto-generated test client:        
 ```bash
@@ -128,7 +140,7 @@ litgpt serve microsoft/phi-2
 - LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
 - Use the setup method for one-time tasks like connecting models, DBs, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
 - LitServer handles optimizations like batching, GPU autoscaling, streaming, etc... ([docs](https://lightning.ai/docs/litserve/api-reference/litserver)).
-- Self host on your own machines or use Lightning Studios for a fully managed deployment ([learn more](#hosting-options)).         
+- Self host on your machines or create a fully managed deployment with Lightning ([learn more](https://lightning.ai/docs/litserve/features/deploy-on-cloud)).
 
 [Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
 
@@ -136,14 +148,7 @@ litgpt serve microsoft/phi-2
 
 # Featured examples    
 Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
-
-<div align='center'>
-  <div width='200px'>
-        <video src="https://github.com/user-attachments/assets/5e73549a-bc0f-47a9-9d9c-5b54389be5de" width='200px' controls></video>    
-  </div>
-</div>
-
-## Examples    
+  
 <pre>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
 <strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-llama-3-2-vision-with-litserve">Llama 3.2</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use">Agent with tool use</a>
@@ -163,31 +168,59 @@ Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML
 
 &nbsp;
 
-# Features
-State-of-the-art features:
 
-✅ [(2x)+ faster than plain FastAPI](#performance)      
-✅ [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)    
-✅ [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)    
-✅ [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)    
-✅ [Batching](https://lightning.ai/docs/litserve/features/batching)    
-✅ [Streaming](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)    
-✅ [Self-host on your machines](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-your-own)    
-✅ [Host fully managed on Lightning AI](https://lightning.ai/docs/litserve/features/hosting-methods#host-on-lightning-studios)  
-✅ [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)        
-✅ [Scale to zero (serverless)](https://lightning.ai/docs/litserve/features/streaming)    
-✅ [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control)        
-✅ [OpenAPI compliant](https://www.openapis.org/)          
-✅ [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)    
-✅ [Authentication](https://lightning.ai/docs/litserve/features/authentication)    
-✅ [Dockerization](https://lightning.ai/docs/litserve/features/dockerization-deployment)
+# Hosting options   
+Self host LitServe anywhere or deploy to your favorite cloud via [Lightning AI](http://lightning.ai/deploy).
 
+https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
+Self-hosting is ideal for hackers, students, and DIY developers while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.
 
-[10+ features...](https://lightning.ai/docs/litserve/features)    
+To host on [Lightning AI](https://lightning.ai/deploy), simply add the `--cloud` arg, login and choose the cloud of your choice.
+```bash
+lightning serve api server.py --cloud
+```
 
-**Note:** We prioritize scalable, enterprise-level features over hype.   
+&nbsp;
+
+<div align='center'>
+
+| [Feature](https://lightning.ai/docs/litserve/features)               | Self Managed                      | [Fully Managed on Lightning](https://lightning.ai/deploy)         |
+|----------------------------------------------------------------------|-----------------------------------|------------------------------------|
+| Docker-first deployment          | ✅ DIY                             | ✅ One-click deploy                |
+| Cost                             | ✅ Free (DIY)                      | ✅ Generous [free tier](https://lightning.ai/pricing) with pay as you go                |
+| Full control                     | ✅                                 | ✅                                 |
+| Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
+| Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
+| [(2x)+ faster than plain FastAPI](#performance)                                               | ✅       | ✅                                 |
+| [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)              | ✅       | ✅                                 |
+| [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)                 | ✅       | ✅                                 |
+| [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)                  | ✅       | ✅                                 |
+| [Batching](https://lightning.ai/docs/litserve/features/batching)                              | ✅       | ✅                                 |
+| [Streaming](https://lightning.ai/docs/litserve/features/streaming)                            | ✅       | ✅                                 |
+| [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)                 | ✅       | ✅                                 |
+| [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)         | ✅       | ✅                                 |
+| [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control) | ✅       | ✅                                 |
+| [OpenAPI compliant](https://www.openapis.org/)                                                | ✅       | ✅                                 |
+| [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)             | ✅       | ✅                                 |
+| [Authentication](https://lightning.ai/docs/litserve/features/authentication)                  | ❌ DIY   | ✅ Token, password, custom         |
+| GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
+| Load balancing                   | ❌                                 | ✅ Built-in                        |
+| Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
+| Autoscale up on demand           | ❌                                 | ✅ Auto scale up/down              |
+| Multi-node inference             | ❌                                 | ✅ Distribute across nodes         |
+| Use AWS/GCP credits              | ❌                                 | ✅ Use existing cloud commits      |
+| Versioning                       | ❌                                 | ✅ Make and roll back releases     |
+| Enterprise-grade uptime (99.95%) | ❌                                 | ✅ SLA-backed                      |
+| SOC2 / HIPAA compliance          | ❌                                 | ✅ Certified & secure              |
+| Observability                    | ❌                                 | ✅ Built-in, connect 3rd party tools|
+| CI/CD ready                      | ❌                                 | ✅ Lightning SDK                   |
+| 24/7 enterprise support          | ❌                                 | ✅ Dedicated support               |
+| Cost controls & audit logs       | ❌                                 | ✅ Budgets, breakdowns, logs       |
+| Debug on GPUs                    | ❌                                 | ✅ Studio integration              |
+| [20+ features](https://lightning.ai/docs/litserve/features)                    | -                                 | -                                  |
+
+</div>
 
 &nbsp;
 
@@ -206,40 +239,8 @@ These results are for image and text classification ML tasks. The performance re
     
 ***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/vLLM), integrate [vLLM with LitServe](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm), or build your custom vLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
 
-&nbsp; 
-
-# Hosting options   
-LitServe can be hosted independently on your own machines or fully managed via Lightning Studios.
-
-Self-hosting is ideal for hackers, students, and DIY developers, while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.   
-
 &nbsp;
 
-<div align="center">
-<a target="_blank" href="https://lightning.ai/lightning-ai/studios/litserve-hello-world">
-  <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/host-on-lightning.svg" alt="Host on Lightning"/>
-</a>
-</div>
-
-&nbsp;
-
-<div align='center'>
-  
-| Feature                          | Self Managed                      | Fully Managed on Studios            |
-|----------------------------------|-----------------------------------|-------------------------------------|
-| Deployment                       | ✅ Do it yourself deployment      | ✅ One-button cloud deploy          |
-| Load balancing                   | ❌                                | ✅                                  |
-| Autoscaling                      | ❌                                | ✅                                  |
-| Scale to zero                    | ❌                                | ✅                                  |
-| Multi-machine inference          | ❌                                | ✅                                  |
-| Authentication                   | ❌                                | ✅                                  |
-| Own VPC                          | ❌                                | ✅                                  |
-| AWS, GCP                         | ❌                                | ✅                                  |
-| Use your own cloud commits       | ❌                                | ✅                                  |
-
-</div>
-
-&nbsp;
 
 # Community
 LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community) - Let's make the world's most advanced AI inference engine.
