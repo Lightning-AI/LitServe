@@ -465,3 +465,63 @@ class OpenAISpec(LitSpec):
             choices.append(choice)
 
         return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
+
+
+# ===== OpenAI Response API =====
+
+
+class ReasoningEffort(str, Enum):
+    low: str = "low"
+    medium: str = "medium"
+    high: str = "high"
+
+
+class SummaryType(str, Enum):
+    concise: str = "concise"
+    detailed: str = "detailed"
+    none: str = "none"
+
+
+class OpenAIResponseSpec(LitSpec):
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        # register the endpoint
+        self.add_endpoint("/v1/responses", self.chat_completion, ["POST"])
+        self.add_endpoint("/v1/responses", self.options_response, ["OPTIONS"])
+
+    @property
+    def stream(self):
+        return True
+
+    def pre_setup(self, lit_api: "LitAPI"):
+        from litserve import LitAPI
+
+        if not inspect.isgeneratorfunction(lit_api.predict):
+            raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
+
+        is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
+        if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
+            raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+
+    def setup(self, server: "LitServer"):
+        super().setup(server)
+        print("OpenAI spec setup complete")
+
+    def populate_context(self, context, request):
+        data = request.dict()
+        data.pop("messages")
+        context.update(data)
+
+    def decode_request(
+        self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
+    ) -> List[Dict[str, str]]:
+        # returns [{"role": "system", "content": "..."}, ...]
+        return [el.model_dump(by_alias=True, exclude_none=True) for el in request.messages]
+
+    def batch(self, inputs):
+        return list(inputs)
+
+    def unbatch(self, output):
+        yield output
