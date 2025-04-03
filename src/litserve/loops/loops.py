@@ -33,9 +33,9 @@ def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:
             return BatchedStreamingLoop()
         return StreamingLoop()
 
-      if max_batch_size > 1:
-          return BatchedLoop()
-      return SingleLoop()
+    if max_batch_size > 1:
+        return BatchedLoop()
+    return SingleLoop()
 
 
 def inference_worker(
