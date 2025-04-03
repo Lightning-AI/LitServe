@@ -443,7 +443,7 @@ class LitServer:
                 }
             )
 
-        async def predict(request: self.request_type) -> self.response_type:  # should be Any
+        async def predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST,
                 active_requests=self.active_requests,
@@ -477,7 +477,7 @@ class LitServer:
             self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
             return response
 
-        async def stream_predict(request: self.request_type) -> self.response_type:  # should be Any
+        async def stream_predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST,
                 active_requests=self.active_requests,
