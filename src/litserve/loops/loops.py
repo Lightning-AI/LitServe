@@ -32,10 +32,10 @@ def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:
         if max_batch_size > 1:
             return BatchedStreamingLoop()
         return StreamingLoop()
-    else:  # noqa: RET505
-        if max_batch_size > 1:
-            return BatchedLoop()
-        return SingleLoop()
+
+      if max_batch_size > 1:
+          return BatchedLoop()
+      return SingleLoop()
 
 
 def inference_worker(
