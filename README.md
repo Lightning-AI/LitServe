@@ -12,7 +12,7 @@ Easy. Flexible. Enterprise-scale.
 
 ----
 
-**LitServe** is a flexible, easy-to-use engine for building AI inference pipelines on top of FastAPI. Define pipelines with one or more models, vector databases, and custom logic — all with features like batching, streaming, and GPU autoscaling built in.
+**LitServe** lets you build high-performance AI inference pipelines on top of FastAPI - no boilerplate. Define one or more models, connect vector DBs, stream responses, batch requests, and autoscale on GPUs out of the box.
 
 LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
