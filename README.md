@@ -85,10 +85,10 @@ class SimpleLitAPI(ls.LitAPI):
 
     def predict(self, x):
         # Run the inference pipeline and return the output
-        squared = self.model1(x)
-        cubed = self.model2(x)
-        output = squared + cubed
-        return {"output": output}
+        a = self.model1(x)
+        b = self.model2(x)
+        c = a + b
+        return {"output": c}
 
     def encode_response(self, output):
         # Convert the model output to a response payload.
