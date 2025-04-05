@@ -6,8 +6,7 @@
 
 &nbsp;
 
-<strong>Build high-performance inference pipelines with full control.</strong>    
-Easy. Flexible. Enterprise-scale.    
+<strong>Easy. Flexible. Enterprise-scale.</strong>    
 </div>
 
 ----
