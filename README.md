@@ -119,7 +119,7 @@ python server.py
 ```
 
 ### Test the server
-Simulate an http request:
+Simulate an http request (run this on any terminal):
 ```bash
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
