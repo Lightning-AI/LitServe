@@ -119,12 +119,7 @@ python server.py
 ```
 
 ### Test the server
-Run the auto-generated test client:        
-```bash
-python client.py    
-```
-
-Or use this terminal command:
+Simulate an http request:
 ```bash
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
