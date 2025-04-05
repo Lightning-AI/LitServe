@@ -4,12 +4,8 @@
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
-&nbsp;
-
-<strong>Easy. Flexible. Enterprise-scale.</strong>    
+&nbsp; 
 </div>
-
-----
 
 **LitServe** lets you build high-performance AI inference pipelines on top of FastAPI - no boilerplate. Define one or more models, connect vector DBs, stream responses, batch requests, and autoscale on GPUs out of the box.
 
