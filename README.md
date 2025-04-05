@@ -177,6 +177,8 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
 Self-hosting is ideal for hackers, students, and DIY developers while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.
 
+*Note:* Lightning offers a generous free tier for developers.
+
 To host on [Lightning AI](https://lightning.ai/deploy), simply run the command, login and choose the cloud of your choice.
 ```bash
 lightning serve server.py
