@@ -143,7 +143,7 @@ litgpt serve microsoft/phi-2
 &nbsp;
 
 # Featured examples    
-Use LitServe to deploy any model or AI service: (Inference pipelines, compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
+Here are examples of inference pipelines for common model types and use cases.      
   
 <pre>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
