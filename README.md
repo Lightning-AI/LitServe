@@ -12,7 +12,7 @@ Easy. Flexible. Enterprise-scale.
 
 ----
 
-**LitServe** is an easy-to-use, flexible serving engine for AI models built on FastAPI. It augments FastAPI with features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model.  
+**LitServe** is a flexible, easy-to-use engine for building AI inference pipelines on top of FastAPI. Define pipelines with one or more models, vector databases, and custom logic — all with features like batching, streaming, and GPU autoscaling built in.
 
 LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
@@ -22,7 +22,7 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
 ✅ (2x)+ faster serving  ✅ Easy to use               ✅ LLMs, non LLMs and more
 ✅ Bring your own model  ✅ PyTorch/JAX/TF/...        ✅ Built on FastAPI       
 ✅ GPU autoscaling       ✅ Batching, Streaming       ✅ Self-host or ⚡️ managed
-✅ Compound AI           ✅ Integrate with vLLM, etc  ✅ Serverless             
+✅ Inference pipeline    ✅ Integrate with vLLM, etc  ✅ Serverless             
    
 </pre>
 
@@ -66,16 +66,16 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#examples)):    
+This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#examples)):    
 
 ```python
 # server.py
 import litserve as ls
 
-# (STEP 1) - DEFINE THE API (compound AI system)
+# (STEP 1) - DEFINE THE API ("inference" pipeline)
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
-        # setup is called once at startup. Build a compound AI system (1+ models), connect DBs, load data, etc...
+        # setup is called once at startup. Defines elements of the pipeline: models, connect DBs, load data, etc...
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
@@ -84,7 +84,7 @@ class SimpleLitAPI(ls.LitAPI):
         return request["input"] 
 
     def predict(self, x):
-        # Easily build compound systems. Run inference and return the output.
+        # Run the inference pipeline and return the output
         squared = self.model1(x)
         cubed = self.model2(x)
         output = squared + cubed
@@ -148,7 +148,7 @@ litgpt serve microsoft/phi-2
 &nbsp;
 
 # Featured examples    
-Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
+Use LitServe to deploy any model or AI service: (Inference pipelines, compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
   
 <pre>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
@@ -183,6 +183,8 @@ lightning serve server.py
 ```
 
 &nbsp;
+
+## Features
 
 <div align='center'>
 
