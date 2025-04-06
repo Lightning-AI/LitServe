@@ -1,18 +1,13 @@
 <div align='center'>
 
-# Easily serve AI models Lightning fast ⚡    
+# Deploy AI models and inference pipelines - ⚡ fast    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
-&nbsp;
-
-<strong>Lightning-fast serving engine for AI models.</strong>    
-Easy. Flexible. Enterprise-scale.    
+&nbsp; 
 </div>
 
-----
-
-**LitServe** is an easy-to-use, flexible serving engine for AI models built on FastAPI. It augments FastAPI with features like batching, streaming, and GPU autoscaling eliminate the need to rebuild a FastAPI server per model.  
+**LitServe** lets you build high-performance AI inference pipelines on top of FastAPI - no boilerplate. Define one or more models, connect vector DBs, stream responses, batch requests, and autoscale on GPUs out of the box.
 
 LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
@@ -22,12 +17,13 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
 ✅ (2x)+ faster serving  ✅ Easy to use               ✅ LLMs, non LLMs and more
 ✅ Bring your own model  ✅ PyTorch/JAX/TF/...        ✅ Built on FastAPI       
 ✅ GPU autoscaling       ✅ Batching, Streaming       ✅ Self-host or ⚡️ managed
-✅ Compound AI           ✅ Integrate with vLLM, etc  ✅ Serverless             
+✅ Inference pipeline    ✅ Integrate with vLLM, etc  ✅ Serverless             
    
 </pre>
 
 <div align='center'>
 
+[![PyPI Downloads](https://static.pepy.tech/badge/litserve)](https://pepy.tech/projects/litserve)
 [![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20help%20on%20Discord)](https://discord.gg/WajDThKAur)
 ![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg)
 [![codecov](https://codecov.io/gh/Lightning-AI/litserve/graph/badge.svg?token=SmzX8mnKlA)](https://codecov.io/gh/Lightning-AI/litserve)
@@ -65,16 +61,16 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models (AI compound system) shows LitServe's flexibility ([see real examples](#examples)):    
+This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#examples)):    
 
 ```python
 # server.py
 import litserve as ls
 
-# (STEP 1) - DEFINE THE API (compound AI system)
+# (STEP 1) - DEFINE THE API ("inference" pipeline)
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
-        # setup is called once at startup. Build a compound AI system (1+ models), connect DBs, load data, etc...
+        # setup is called once at startup. Defines elements of the pipeline: models, connect DBs, load data, etc...
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
@@ -83,11 +79,11 @@ class SimpleLitAPI(ls.LitAPI):
         return request["input"] 
 
     def predict(self, x):
-        # Easily build compound systems. Run inference and return the output.
-        squared = self.model1(x)
-        cubed = self.model2(x)
-        output = squared + cubed
-        return {"output": output}
+        # Run the inference pipeline and return the output
+        a = self.model1(x)
+        b = self.model2(x)
+        c = a + b
+        return {"output": c}
 
     def encode_response(self, output):
         # Convert the model output to a response payload.
@@ -118,12 +114,7 @@ python server.py
 ```
 
 ### Test the server
-Run the auto-generated test client:        
-```bash
-python client.py    
-```
-
-Or use this terminal command:
+Simulate an http request (run this on any terminal):
 ```bash
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
@@ -147,7 +138,7 @@ litgpt serve microsoft/phi-2
 &nbsp;
 
 # Featured examples    
-Use LitServe to deploy any model or AI service: (Compound AI, Gen AI, classic ML, embeddings, LLMs, vision, audio, etc...)       
+Here are examples of inference pipelines for common model types and use cases.      
   
 <pre>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
@@ -176,12 +167,16 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
 Self-hosting is ideal for hackers, students, and DIY developers while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.
 
+*Note:* Lightning offers a generous free tier for developers.
+
 To host on [Lightning AI](https://lightning.ai/deploy), simply run the command, login and choose the cloud of your choice.
 ```bash
 lightning serve server.py
 ```
 
 &nbsp;
+
+## Features
 
 <div align='center'>
 

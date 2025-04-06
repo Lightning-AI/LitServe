@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-# TODO: raise NotImplemented error for all methods
-
 
 class MessageTransport(ABC):
     @abstractmethod
