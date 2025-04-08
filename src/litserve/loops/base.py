@@ -15,7 +15,6 @@ import asyncio
 import inspect
 import logging
 import pickle
-import signal
 import sys
 import time
 from abc import ABC
@@ -27,12 +26,14 @@ from starlette.formparsers import MultiPartParser
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
+from litserve.transport.base import MessageTransport
 from litserve.utils import LitAPIStatus
-from litserve.zmq_queue import Producer
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
+# renamed in PR: https://github.com/encode/starlette/pull/2780
+MultiPartParser.spool_max_size = sys.maxsize
 
 
 def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
@@ -152,7 +153,7 @@ class _BaseLoop(ABC):
         device: str,
         worker_id: int,
         request_queue: Queue,
-        response_queues: List[Queue],
+        transport: MessageTransport,
         max_batch_size: int,
         batch_timeout: float,
         stream: bool,
@@ -164,9 +165,7 @@ class _BaseLoop(ABC):
 
             async def _wrapper():
                 logger.info("Running LitLoop in a asyncio event loop")
-                future = self.schedule_task(
-                    lit_api, lit_spec, request_queue, max_batch_size, batch_timeout, response_queues
-                )
+                future = self.schedule_task(lit_api, lit_spec, request_queue, max_batch_size, batch_timeout, transport)
                 _ = event_loop.create_task(future)
                 while True:
                     try:
@@ -176,7 +175,7 @@ class _BaseLoop(ABC):
                             device,
                             worker_id,
                             request_queue,
-                            response_queues,
+                            transport,
                             max_batch_size,
                             batch_timeout,
                             stream,
@@ -196,7 +195,7 @@ class _BaseLoop(ABC):
                     device,
                     worker_id,
                     request_queue,
-                    response_queues,
+                    transport,
                     max_batch_size,
                     batch_timeout,
                     stream,
@@ -211,7 +210,7 @@ class _BaseLoop(ABC):
         device: str,
         worker_id: int,
         request_queue: Queue,
-        response_queues: List[Queue],
+        transport: MessageTransport,
         max_batch_size: int,
         batch_timeout: float,
         stream: bool,
@@ -223,9 +222,7 @@ class _BaseLoop(ABC):
 
 class LitLoop(_BaseLoop):
     def __init__(self):
-        self.producer: Optional[Producer] = None
         self._context = {}
-        self._setup_signal_handlers()
 
     def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
         batches, timed_out_uids = collate_requests(
@@ -247,32 +244,15 @@ class LitLoop(_BaseLoop):
             lit_spec.populate_context(self._context, request)
 
     def put_response(
-        self, response_queues: List[Queue], response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
+        self, transport: MessageTransport, response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
     ) -> None:
-        if self.producer:
-            self.producer.put((uid, (response_data, status)), consumer_id=response_queue_id)
-        else:
-            response_queues[response_queue_id].put((uid, (response_data, status)), block=False)
+        transport.send((uid, (response_data, status)), consumer_id=response_queue_id)
 
     def put_error_response(
-        self, response_queues: List[Queue], response_queue_id: int, uid: str, error: Exception
+        self, transport: MessageTransport, response_queue_id: int, uid: str, error: Exception
     ) -> None:
         error = pickle.dumps(error)
-        self.put_response(response_queues, response_queue_id, uid, error, LitAPIStatus.ERROR)
-
-    def __del__(self):
-        if self.producer:
-            self.producer.close()
-
-    def _setup_signal_handlers(self):
-        def cleanup_handler(signum=None, frame=None):
-            logging.debug("Worker process received shutdown signal")
-            if self.producer:
-                self.producer.close()
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, cleanup_handler)
-        signal.signal(signal.SIGTERM, cleanup_handler)
+        self.put_response(transport, response_queue_id, uid, error, LitAPIStatus.ERROR)
 
 
 class DefaultLoop(LitLoop):

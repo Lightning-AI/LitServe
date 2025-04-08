@@ -29,7 +29,7 @@ def speed_test():
         if ttft is None:
             ttft = time.time() - start
             print(f"Time to first token: {ttft}")
-            assert ttft < EXPECTED_TTFT, "Expected time to first token to be less than 0.1 seconds"
+            assert ttft < EXPECTED_TTFT, f"Expected time to first token to be less than 0.1 seconds but got {ttft}"
         num_tokens += 1
     end = time.time()
     resp.raise_for_status()

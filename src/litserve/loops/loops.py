@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from queue import Queue
-from typing import Dict, List, Optional, Union
+from typing import Dict, Optional, Union
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
@@ -21,22 +21,21 @@ from litserve.loops.base import _BaseLoop
 from litserve.loops.simple_loops import BatchedLoop, SingleLoop
 from litserve.loops.streaming_loops import BatchedStreamingLoop, StreamingLoop
 from litserve.specs.base import LitSpec
+from litserve.transport.base import MessageTransport
 from litserve.utils import WorkerSetupStatus
-from litserve.zmq_queue import Producer
 
 logger = logging.getLogger(__name__)
 
 
 def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:
-    return (
-        BatchedStreamingLoop()
-        if stream and max_batch_size > 1
-        else StreamingLoop()
-        if stream
-        else BatchedLoop()
-        if max_batch_size > 1
-        else SingleLoop()
-    )
+    if stream:
+        if max_batch_size > 1:
+            return BatchedStreamingLoop()
+        return StreamingLoop()
+
+    if max_batch_size > 1:
+        return BatchedLoop()
+    return SingleLoop()
 
 
 def inference_worker(
@@ -45,15 +44,13 @@ def inference_worker(
     device: str,
     worker_id: int,
     request_queue: Queue,
-    response_queues: List[Queue],
+    transport: MessageTransport,
     max_batch_size: int,
     batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
     loop: Union[str, _BaseLoop],
-    use_zmq: bool,
-    zmq_addr: Optional[str],
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
     try:
@@ -76,18 +73,13 @@ def inference_worker(
     if loop == "auto":
         loop = get_default_loop(stream, max_batch_size)
 
-    if use_zmq:
-        producer = Producer(address=zmq_addr)
-        producer.wait_for_subscribers(timeout=5)
-        loop.producer = producer
-
     loop(
         lit_api,
         lit_spec,
         device,
         worker_id,
         request_queue,
-        response_queues,
+        transport,
         max_batch_size,
         batch_timeout,
         stream,

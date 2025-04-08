@@ -21,10 +21,10 @@ import psutil
 
 def main():
     process = subprocess.Popen(
-        ["python", "tests/simple_server.py"],
+        ["lightning", "serve", "api", "tests/simple_server.py", "--local"],
     )
     print("Waiting for server to start...")
-    time.sleep(5)
+    time.sleep(10)
     try:
         url = "http://127.0.0.1:8000/predict"
         data = json.dumps({"input": 4.0}).encode("utf-8")
