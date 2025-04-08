@@ -156,7 +156,7 @@ def test_encode_response():
 def test_encode_response_with_openai_spec():
     api = ls.test_examples.TestAPI()
     api.pre_setup(max_batch_size=1, spec=ls.OpenAISpec())
-    response = "This is a LLM generated text".split()
+    response = ["This", "is", "a", "LLM", "generated", "text"]
     generated_tokens = []
     for output in api.encode_response(response):
         generated_tokens.append(output["content"])
@@ -188,7 +188,7 @@ def test_encode_response_with_custom_spec_api():
 
     api = ls.test_examples.TestAPI()
     api.pre_setup(max_batch_size=1, spec=CustomSpecAPI())
-    response = "This is a LLM generated text".split()
+    response = ["This", "is", "a", "LLM", "generated", "text"]
     generated_tokens = []
     for output in api.encode_response(response):
         generated_tokens.append(output["content"])
