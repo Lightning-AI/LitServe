@@ -65,7 +65,28 @@ class OpenAIBatchContext(LitAPI):
         assert isinstance(context, list)
         for ctx in context:
             ctx["temperature"] = 1.0
-        output = ["Hi!", "It's", "nice", "to", "meet", "you.", "Is", "there", "something", "I", "can", "help", "you", "with", "or", "would", "you", "like", "to", "chat?"]
+        output = [
+            "Hi!",
+            "It's",
+            "nice",
+            "to",
+            "meet",
+            "you.",
+            "Is",
+            "there",
+            "something",
+            "I",
+            "can",
+            "help",
+            "you",
+            "with",
+            "or",
+            "would",
+            "you",
+            "like",
+            "to",
+            "chat?",
+        ]
         for out in output:
             time.sleep(0.01)  # fake delay
             yield [out + " "] * n
