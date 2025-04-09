@@ -398,10 +398,6 @@ class LitServer:
     def active_requests(self):
         if self.track_requests and self.active_counters:
             return sum(counter.value for counter in self.active_counters)
-        warnings.warn(
-            "Active request counter is not enabled while using `on_request` callback hook. "
-            "Please set track_requests=True in the LitServer."
-        )
         return None
 
     def register_endpoints(self):
