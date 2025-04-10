@@ -30,7 +30,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, ORJSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
@@ -235,7 +235,7 @@ class LitServer:
         lit_api.request_timeout = self.timeout
         lit_api.pre_setup(max_batch_size, spec=spec)
         self._loop.pre_setup(lit_api, spec=spec)
-        self.app = FastAPI(lifespan=self.lifespan)
+        self.app = FastAPI(lifespan=self.lifespan, default_response_class=ORJSONResponse)
         self.app.response_queue_id = None
         self.response_queue_id = None
         self.response_buffer = {}
@@ -510,6 +510,7 @@ class LitServer:
                 stream_predict if stream else predict,
                 methods=methods,
                 dependencies=[Depends(self.setup_auth())],
+                response_class=ORJSONResponse,
             )
 
         for spec in self._specs:
