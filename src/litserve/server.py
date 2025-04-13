@@ -515,9 +515,18 @@ class LitServer:
         for spec in self._specs:
             spec: LitSpec
             # TODO check that path is not clashing
+            # add http endpoints
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(
                     path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
+                )
+
+            # add websocket endpoints
+            for path, endpoint in spec.ws_endpoints:
+                self.app.add_api_websocket_route(
+                    path,
+                    endpoint,
+                    dependencies=[Depends(self.setup_auth())],
                 )
 
         for middleware in self.middlewares:
