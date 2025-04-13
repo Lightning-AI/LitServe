@@ -49,6 +49,10 @@ class LitSpec:
     def endpoints(self):
         return self._endpoints.copy()
 
+    @property
+    def ws_endpoints(self):
+        return self._ws_endpoints.copy()
+
     @abstractmethod
     def decode_request(self, request, meta_kwargs):
         """Convert the request payload to your model input."""
