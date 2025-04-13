@@ -17,7 +17,7 @@ from litserve.api import LitAPI
 from litserve.callbacks import Callback
 from litserve.loggers import Logger
 from litserve.server import LitServer, Request, Response
-from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec
+from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec, WebSocketSpec
 from litserve.utils import configure_logging
 
 configure_logging()
@@ -29,6 +29,7 @@ __all__ = [
     "Response",
     "OpenAISpec",
     "OpenAIEmbeddingSpec",
+    "WebSocketSpec",
     "test_examples",
     "Callback",
     "Logger",
