@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import asyncio
+import json
 
 import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
@@ -40,6 +42,7 @@ from litserve.test_examples.openai_spec_example import (
     TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
 )
+from litserve.test_examples.websocket_spec_example import WebSocketLitAPI
 from litserve.utils import wrap_litserve_start
 
 
@@ -417,3 +420,21 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
             assert len(resp2.json()["data"]) == 4, "Length of data should be 4"
             assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
             assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+@pytest.mark.asyncio
+async def test_websocket_litapi():
+    server = ls.LitServer(WebSocketLitAPI(), spec=ls.WebSocketSpec())
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager:
+            client = TestClient(manager.app)
+
+            with client.websocket_connect("/predict") as websocket:
+                # Send a JSON payload
+                payload = {"input": "test_input"}
+                websocket.send(json.dumps(payload))
+
+                # Receive the response
+                response = websocket.receive_json()
+                assert response["output"] == "Processed: test_input", "Response should match the expected output"
