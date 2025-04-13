@@ -14,8 +14,8 @@
 import asyncio
 import logging
 import time
+import uuid
 from typing import TYPE_CHECKING, Optional, Union
-from uuid import uuid
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect, status
 
@@ -29,11 +29,11 @@ logger = logging.getLogger(__name__)
 
 
 class WebSocketSpec(LitSpec):
-    def __init__(self):
+    def __init__(self, api_path: str = "/predict"):
         super().__init__()
 
         # register the websocket endpoint
-        self.add_ws_endpoint("/predict", self.ws_predict)
+        self.add_ws_endpoint(api_path, self.ws_predict)
 
     def setup(self, server: "LitServer"):
         super().setup(server)
@@ -66,7 +66,7 @@ class WebSocketSpec(LitSpec):
                 self._server.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), payload))
                 # Wait for response
                 await event.wait()
-                response, response_status = self.response_buffer.pop(uid)
+                response, response_status = self._server.response_buffer.pop(uid)
 
                 # Handle errors
                 if response_status == LitAPIStatus.ERROR:
