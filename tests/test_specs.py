@@ -40,7 +40,6 @@ from litserve.test_examples.openai_spec_example import (
     TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
 )
-from litserve.test_examples.websocket_spec_example import WebSocketLitAPI
 from litserve.utils import wrap_litserve_start
 
 
