@@ -20,6 +20,7 @@ from functools import wraps
 import psutil
 import requests
 from openai import OpenAI
+from websockets.sync.client import connect as websocket_connect
 
 
 def e2e_from_file(filename):
@@ -379,3 +380,24 @@ def test_openai_embedding_parity():
     assert len(response.data) == 2, f"Expected 2 embeddings but got {len(response.data)}"
     for data in response.data:
         assert len(data.embedding) == 768, f"Expected 768 dimensions but got {len(data.embedding)}"
+
+
+@e2e_from_file("tests/e2e/default_websocket_spec.py")
+def test_websocket_parity():
+    with websocket_connect("ws://127.0.0.1:8000/predict") as websocket:
+        #  Send a JSON payload
+        websocket.send(json.dumps({"input": "test_input"}))
+        response = websocket.recv()
+        response = json.loads(response)
+        assert response["output"] == "Processed: test_input", (
+            f"Server didn't return expected output\nWebSocket client output: {response}"
+        )
+
+        # Send other types of payloads
+        # TODO: make this test abit more better
+        websocket.send("text_payload")
+        response = websocket.recv()
+        response = json.loads(response)
+        assert "error" in response, (
+            f"Server didn't return expected error for text payload\nWebSocket client output: {response}"
+        )
