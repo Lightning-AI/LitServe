@@ -47,7 +47,7 @@ class WebSocketSpec(LitSpec):
         return output
 
     async def ws_predict(self, websocket: WebSocket):
-        # TODO: Determine if a dedicated connection manager is needed to effectively maintain active WebSocket connections
+        # TODO: Determine if a dedicated connection manager is needed to effectively maintain active connections
         await websocket.accept()
         response_queue_id = self.response_queue_id
         logger.debug("Received WebSocket connection: %s", websocket.client)
