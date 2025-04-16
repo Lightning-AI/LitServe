@@ -23,6 +23,7 @@ class LitSpec:
 
     def __init__(self):
         self._endpoints = []
+        self._ws_endpoints = []
 
         self._server: LitServer = None
 
@@ -40,9 +41,17 @@ class LitSpec:
         """Register an endpoint in the spec."""
         self._endpoints.append((path, endpoint, methods))
 
+    def add_ws_endpoint(self, path: str, endpoint: Callable):
+        """Register a websocket endpoint in the spec."""
+        self._ws_endpoints.append((path, endpoint))
+
     @property
     def endpoints(self):
         return self._endpoints.copy()
+
+    @property
+    def ws_endpoints(self):
+        return self._ws_endpoints.copy()
 
     @abstractmethod
     def decode_request(self, request, meta_kwargs):
