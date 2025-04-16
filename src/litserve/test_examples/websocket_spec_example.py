@@ -6,7 +6,6 @@ class WebSocketLitAPI(LitAPI):
         self.model = lambda x: f"Processed: {x}"
 
     def decode_request(self, request):
-        print(f"Decoding request: {request}")
         return request.get("input", "default_input")
 
     def predict(self, x):
