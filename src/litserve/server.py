@@ -122,8 +122,6 @@ class LitServer:
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
-        max_batch_size: int = 1,
-        batch_timeout: float = 0.0,
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
@@ -146,8 +144,6 @@ class LitServer:
             devices: Number of devices to use, or 'auto' to select automatically.
             workers_per_device: Number of worker processes per device.
             timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
-            max_batch_size: Maximum number of requests to process in a batch.
-            batch_timeout: Maximum time to wait for a batch to fill before processing.
             api_path: URL path for the prediction endpoint.
             healthcheck_path: URL path for the health check endpoint.
             info_path: URL path for the server and model information endpoint.
@@ -163,10 +159,6 @@ class LitServer:
             fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
-        if batch_timeout > timeout and timeout not in (False, -1):
-            raise ValueError("batch_timeout must be less than timeout")
-        if max_batch_size <= 0:
-            raise ValueError("max_batch_size must be greater than 0")
         if isinstance(spec, LitSpec):
             stream = spec.stream
 
@@ -176,7 +168,7 @@ class LitServer:
         if isinstance(loop, str) and loop != "auto":
             raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
         if loop == "auto":
-            loop = get_default_loop(stream, max_batch_size)
+            loop = get_default_loop(stream, lit_api.max_batch_size)
 
         if middlewares is None:
             middlewares = []
@@ -215,7 +207,7 @@ class LitServer:
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
         unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
 
-        if batch_overridden and unbatch_overridden and max_batch_size == 1:
+        if batch_overridden and unbatch_overridden and lit_api.max_batch_size == 1:
             warnings.warn(
                 "The LitServer has both batch and unbatch methods implemented, "
                 "but the max_batch_size parameter was not set."
@@ -233,7 +225,7 @@ class LitServer:
         self.timeout = timeout
         lit_api.stream = stream
         lit_api.request_timeout = self.timeout
-        lit_api.pre_setup(max_batch_size, spec=spec)
+        lit_api.pre_setup(spec=spec, timeout=timeout)
         self._loop.pre_setup(lit_api, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
@@ -251,8 +243,6 @@ class LitServer:
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
-        self.max_batch_size = max_batch_size
-        self.batch_timeout = batch_timeout
         self.stream = stream
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
@@ -324,8 +314,6 @@ class LitServer:
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    self.max_batch_size,
-                    self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
                     self._callback_runner,

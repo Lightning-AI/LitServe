@@ -44,16 +44,17 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
 
 
 def collate_requests(
-    lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float
+    lit_api: LitAPI,
+    request_queue: Queue,
 ) -> Tuple[List, List]:
     payloads = []
     timed_out_uids = []
     entered_at = time.monotonic()
-    end_time = entered_at + batch_timeout
+    end_time = entered_at + lit_api.batch_timeout
     apply_timeout = lit_api.request_timeout not in (-1, False)
 
-    if batch_timeout == 0:
-        while len(payloads) < max_batch_size:
+    if lit_api.batch_timeout == 0:
+        while len(payloads) < lit_api.max_batch_size:
             try:
                 response_queue_id, uid, timestamp, x_enc = request_queue.get_nowait()
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
@@ -64,7 +65,7 @@ def collate_requests(
                 break
         return payloads, timed_out_uids
 
-    while time.monotonic() < end_time and len(payloads) < max_batch_size:
+    while time.monotonic() < end_time and len(payloads) < lit_api.max_batch_size:
         remaining_time = end_time - time.monotonic()
         if remaining_time <= 0:
             break
@@ -111,8 +112,6 @@ class _BaseLoop(ABC):
             worker_id: int,
             request_queue: Queue,
             response_queues: List[Queue],
-            max_batch_size: int,
-            batch_timeout: float,
             stream: bool,
             workers_setup_status: Dict[int, str],
             callback_runner: CallbackRunner,
@@ -140,8 +139,6 @@ class _BaseLoop(ABC):
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        max_batch_size: int,
-        batch_timeout: float,
         response_queues: List[Queue],
     ):
         pass
@@ -154,8 +151,6 @@ class _BaseLoop(ABC):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
@@ -165,7 +160,7 @@ class _BaseLoop(ABC):
 
             async def _wrapper():
                 logger.info("Running LitLoop in a asyncio event loop")
-                future = self.schedule_task(lit_api, lit_spec, request_queue, max_batch_size, batch_timeout, transport)
+                future = self.schedule_task(lit_api, lit_spec, request_queue, transport)
                 _ = event_loop.create_task(future)
                 while True:
                     try:
@@ -176,8 +171,6 @@ class _BaseLoop(ABC):
                             worker_id,
                             request_queue,
                             transport,
-                            max_batch_size,
-                            batch_timeout,
                             stream,
                             workers_setup_status,
                             callback_runner,
@@ -196,8 +189,6 @@ class _BaseLoop(ABC):
                     worker_id,
                     request_queue,
                     transport,
-                    max_batch_size,
-                    batch_timeout,
                     stream,
                     workers_setup_status,
                     callback_runner,
@@ -211,8 +202,6 @@ class _BaseLoop(ABC):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
@@ -224,12 +213,14 @@ class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
 
-    def get_batch_requests(self, lit_api: LitAPI, request_queue: Queue, max_batch_size: int, batch_timeout: float):
+    def get_batch_requests(
+        self,
+        lit_api: LitAPI,
+        request_queue: Queue,
+    ):
         batches, timed_out_uids = collate_requests(
             lit_api,
             request_queue,
-            max_batch_size,
-            batch_timeout,
         )
         return batches, timed_out_uids
 

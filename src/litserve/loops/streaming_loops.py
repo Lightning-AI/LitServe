@@ -113,8 +113,6 @@ class StreamingLoop(DefaultLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
@@ -129,16 +127,12 @@ class BatchedStreamingLoop(DefaultLoop):
         lit_spec: LitSpec,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         callback_runner: CallbackRunner,
     ):
         while True:
             batches, timed_out_uids = collate_requests(
                 lit_api,
                 request_queue,
-                max_batch_size,
-                batch_timeout,
             )
             for response_queue_id, uid in timed_out_uids:
                 logger.error(
@@ -218,8 +212,6 @@ class BatchedStreamingLoop(DefaultLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
@@ -229,7 +221,5 @@ class BatchedStreamingLoop(DefaultLoop):
             lit_spec,
             request_queue,
             transport,
-            max_batch_size,
-            batch_timeout,
             callback_runner,
         )
