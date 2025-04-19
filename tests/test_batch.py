@@ -88,8 +88,8 @@ class SimpleTorchAPI(LitAPI):
 
 @pytest.mark.asyncio
 async def test_batched():
-    api = SimpleBatchLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
+    api = SimpleBatchLitAPI(max_batch_size=2, batch_timeout=4)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -105,8 +105,8 @@ async def test_batched():
 
 @pytest.mark.asyncio
 async def test_unbatched():
-    api = SimpleTorchAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=1)
+    api = SimpleTorchAPI(max_batch_size=1)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -121,13 +121,13 @@ async def test_unbatched():
 
 def test_max_batch_size():
     with pytest.raises(ValueError, match="must be"):
-        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=0)
+        SimpleBatchLitAPI(max_batch_size=0)
 
     with pytest.raises(ValueError, match="must be"):
-        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=-1)
+        SimpleBatchLitAPI(max_batch_size=-1)
 
     with pytest.raises(ValueError, match="must be"):
-        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2, batch_timeout=5)
+        SimpleBatchLitAPI(max_batch_size=2, batch_timeout=5)
 
 
 def test_max_batch_size_warning():
@@ -143,7 +143,7 @@ def test_max_batch_size_warning():
         UserWarning,
         match=warning,
     ):
-        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2, max_batch_size=2)
+        LitServer(SimpleBatchLitAPI(max_batch_size=2), accelerator="cpu", devices=1, timeout=2)
 
     # Test no warning is set when LitAPI doesn't implement batch and unbatch
     with pytest.raises(pytest.fail.Exception), pytest.warns(
@@ -239,8 +239,8 @@ class BatchSizeMismatchAPI(SimpleBatchLitAPI):
 
 @pytest.mark.asyncio
 async def test_batch_size_mismatch():
-    api = BatchSizeMismatchAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, timeout=10, max_batch_size=2, batch_timeout=4)
+    api = BatchSizeMismatchAPI(max_batch_size=2, batch_timeout=4)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(

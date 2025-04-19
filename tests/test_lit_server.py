@@ -372,7 +372,7 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
-    server = LitServer(IdentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
+    server = LitServer(IdentityBatchedAPI(max_batch_size=2, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -381,7 +381,7 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
-    server = LitServer(IdentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
+    server = LitServer(IdentityBatchedStreamingAPI(max_batch_size=2, batch_timeout=0.01), stream=True)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
