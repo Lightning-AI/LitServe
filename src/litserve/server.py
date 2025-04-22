@@ -145,6 +145,8 @@ class LitServer:
             accelerator: Type of hardware to use, like 'cpu', 'cuda', or 'mps'. 'auto' selects the best available.
             devices: Number of devices to use, or 'auto' to select automatically.
             workers_per_device: Number of worker processes per device.
+            max_batch_size: Deprecated. Use `lit_api.max_batch_size` instead.
+            batch_timeout: Deprecated. Use `lit_api.batch_timeout` instead.
             timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
             api_path: URL path for the prediction endpoint.
             healthcheck_path: URL path for the health check endpoint.
@@ -163,7 +165,8 @@ class LitServer:
         """
         if max_batch_size is not None:
             warnings.warn(
-                "'max_batch_size' and 'batch_timeout' have moved from LitServer to LitAPI initialization.\n"
+                "'max_batch_size' and 'batch_timeout' have moved from LitServer to LitAPI initialization and "
+                "will be removed in v0.3.0.\n"
                 "Update code from:\n"
                 "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n"
                 "to:\n"
