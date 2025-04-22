@@ -91,9 +91,9 @@ async def test_stream(simple_stream_api, use_zmq):
 @pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
 async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
-    simple_batched_stream_api.max_batch_size = 4
-    simple_batched_stream_api.batch_timeout = 2
-    server = LitServer(simple_batched_stream_api, stream=True, timeout=30, fast_queue=use_zmq)
+    server = LitServer(
+        simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30, fast_queue=use_zmq
+    )
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
@@ -372,7 +372,7 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
-    server = LitServer(IdentityBatchedAPI(max_batch_size=2, batch_timeout=0.01))
+    server = LitServer(IdentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -381,7 +381,7 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
-    server = LitServer(IdentityBatchedStreamingAPI(max_batch_size=2, batch_timeout=0.01), stream=True)
+    server = LitServer(IdentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
