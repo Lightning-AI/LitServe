@@ -70,9 +70,7 @@ async def test_openai_spec(openai_request_data):
     ],
 )
 async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
-    api.max_batch_size = batch_size
-    api.batch_timeout = 0.01
-    server = ls.LitServer(api, spec=ls.OpenAISpec())
+    server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -115,9 +113,7 @@ class OpenAIWithUsagePerToken(ls.LitAPI):
     ],
 )
 async def test_openai_per_token_usage(api, batch_size, openai_request_data, openai_response_data):
-    api.max_batch_size = batch_size
-    api.batch_timeout = 0.01
-    server = ls.LitServer(api, spec=ls.OpenAISpec())
+    server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -403,8 +399,7 @@ class TestOpenAIWithBatching(TestEmbedAPI):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_batching(openai_embedding_request_data, openai_embedding_request_data_array):
-    api = TestOpenAIWithBatching(max_batch_size=2, batch_timeout=10)
-    server = ls.LitServer(api, spec=ls.OpenAIEmbeddingSpec())
+    server = ls.LitServer(TestOpenAIWithBatching(), spec=ls.OpenAIEmbeddingSpec(), max_batch_size=2, batch_timeout=10)
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
