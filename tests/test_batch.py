@@ -106,6 +106,7 @@ async def test_batched():
 @pytest.mark.asyncio
 async def test_unbatched():
     api = SimpleTorchAPI(max_batch_size=1)
+    api.pre_setup(spec=None, timeout=30)
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -120,14 +121,15 @@ async def test_unbatched():
 
 
 def test_max_batch_size():
-    with pytest.raises(ValueError, match="must be"):
+    with pytest.raises(ValueError, match="must be greater than 0"):
         SimpleBatchLitAPI(max_batch_size=0)
 
-    with pytest.raises(ValueError, match="must be"):
+    with pytest.raises(ValueError, match="must be greater than 0"):
         SimpleBatchLitAPI(max_batch_size=-1)
 
-    with pytest.raises(ValueError, match="must be"):
-        SimpleBatchLitAPI(max_batch_size=2, batch_timeout=5)
+    api = SimpleBatchLitAPI(max_batch_size=2, batch_timeout=5)
+    with pytest.raises(ValueError, match="must be less than timeout"):
+        api.pre_setup(spec=None, timeout=2)
 
 
 def test_max_batch_size_warning():
@@ -154,8 +156,8 @@ def test_max_batch_size_warning():
 
 
 def test_batch_predict_string_warning():
-    api = ls.test_examples.SimpleBatchedAPI()
-    api.pre_setup(2, None)
+    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
+    api.pre_setup(spec=None, timeout=30)
     api.predict = MagicMock(return_value="This is a string")
 
     mock_input = torch.tensor([[1.0], [2.0]])
@@ -182,6 +184,8 @@ def test_batched_loop():
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 2
+    lit_api_mock.max_batch_size = 2
+    lit_api_mock.batch_timeout = 4
     lit_api_mock.decode_request = MagicMock(side_effect=lambda x: x["input"])
     lit_api_mock.batch = MagicMock(side_effect=lambda x: x)
     lit_api_mock.predict = MagicMock(side_effect=lambda x: [16.0, 25.0])
@@ -195,8 +199,6 @@ def test_batched_loop():
             lit_api_mock,
             requests_queue,
             [FakeResponseQueue()],
-            max_batch_size=2,
-            batch_timeout=4,
             callback_runner=NOOP_CB_RUNNER,
         )
 
@@ -216,14 +218,12 @@ def test_batched_loop():
     ],
 )
 def test_collate_requests(batch_timeout, batch_size):
-    api = ls.test_examples.SimpleBatchedAPI()
+    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=batch_size, batch_timeout=batch_timeout)
     api.request_timeout = 5
     request_queue = Queue()
     for i in range(batch_size):
         request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i))  # response_queue_id, uid, timestamp, x_enc
-    payloads, timed_out_uids = collate_requests(
-        api, request_queue, max_batch_size=batch_size, batch_timeout=batch_timeout
-    )
+    payloads, timed_out_uids = collate_requests(api, request_queue)
     assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
 
@@ -240,6 +240,7 @@ class BatchSizeMismatchAPI(SimpleBatchLitAPI):
 @pytest.mark.asyncio
 async def test_batch_size_mismatch():
     api = BatchSizeMismatchAPI(max_batch_size=2, batch_timeout=4)
+    api.pre_setup(spec=None, timeout=30)
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
 
     with wrap_litserve_start(server) as server:
