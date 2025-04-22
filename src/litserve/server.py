@@ -122,6 +122,8 @@ class LitServer:
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
+        max_batch_size: Optional[int] = None,
+        batch_timeout: float = 0.0,
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
@@ -159,6 +161,17 @@ class LitServer:
             fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
+        if max_batch_size is not None:
+            warnings.warn(
+                "'max_batch_size' and 'batch_timeout' have moved from LitServer to LitAPI initialization.\n"
+                "Update code from:\n"
+                "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n"
+                "to:\n"
+                "    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
+                "    server = LitServer(api, ...)"
+            )
+            lit_api.max_batch_size = max_batch_size
+            lit_api.batch_timeout = batch_timeout
         if isinstance(spec, LitSpec):
             stream = spec.stream
 

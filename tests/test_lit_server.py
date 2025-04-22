@@ -526,3 +526,12 @@ def test_workers_setup_status(use_zmq):
     server = LitServer(api, devices=1, fast_queue=use_zmq)
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
         server.run()
+
+
+def test_max_batch_size_warning(simple_litapi):
+    with pytest.warns(
+        UserWarning,
+        match="'max_batch_size' and 'batch_timeout' have moved from LitServer to LitAPI initialization.",
+    ):
+        ls.LitServer(simple_litapi, max_batch_size=4)
+    assert simple_litapi.max_batch_size == 4, "LitServer should have max_batch_size set to 4"
