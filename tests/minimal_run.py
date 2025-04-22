@@ -21,7 +21,7 @@ import psutil
 
 def main():
     process = subprocess.Popen(
-        ["lightning", "serve", "api", "tests/simple_server.py", "--local"],
+        ["python", "tests/simple_server.py"],
     )
     print("Waiting for server to start...")
     time.sleep(10)

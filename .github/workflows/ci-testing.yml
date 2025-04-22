@@ -21,7 +21,6 @@ jobs:
         include:
           - { os: "macos-latest", python-version: "3.12" }
           - { os: "windows-latest", python-version: "3.11" }
-          - { os: "ubuntu-20.04", python-version: "3.9", requires: "oldest" }
 
     timeout-minutes: 35
     env:
