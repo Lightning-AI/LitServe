@@ -418,8 +418,6 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "max_batch_size": self.max_batch_size,
-                        "batch_timeout": self.batch_timeout,
                         "stream": self.stream,
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
