@@ -171,7 +171,9 @@ class LitServer:
                 "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n"
                 "to:\n"
                 "    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
-                "    server = LitServer(api, ...)"
+                "    server = LitServer(api, ...)",
+                DeprecationWarning,
+                stacklevel=2,
             )
             lit_api.max_batch_size = max_batch_size
             lit_api.batch_timeout = batch_timeout
