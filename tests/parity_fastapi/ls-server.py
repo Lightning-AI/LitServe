@@ -57,11 +57,12 @@ class ImageClassifierAPI(ls.LitAPI):
 
 def main(batch_size: int, workers_per_device: int):
     print(locals())
-    api = ImageClassifierAPI()
-    server = ls.LitServer(
-        api,
+    api = ImageClassifierAPI(
         max_batch_size=batch_size,
         batch_timeout=0.01,
+    )
+    server = ls.LitServer(
+        api,
         timeout=10,
         workers_per_device=workers_per_device,
         fast_queue=True,

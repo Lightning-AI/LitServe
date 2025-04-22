@@ -50,14 +50,15 @@ def main(
     workers_per_device=2,
 ):
     print(locals())
-    api = HuggingFaceLitAPI()
+    api = HuggingFaceLitAPI(
+        max_batch_size=batch_size,
+        batch_timeout=batch_timeout,
+    )
     server = ls.LitServer(
         api,
-        max_batch_size=batch_size,
         workers_per_device=workers_per_device,
         accelerator="auto",
         devices=devices,
-        batch_timeout=batch_timeout,
         timeout=200,
         fast_queue=True,
     )
