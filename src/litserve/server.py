@@ -165,16 +165,18 @@ class LitServer:
         """
         if max_batch_size is not None:
             warnings.warn(
-                "'max_batch_size' and 'batch_timeout' have moved from LitServer to LitAPI initialization and "
-                "will be removed in v0.3.0.\n"
-                "Update code from:\n"
-                "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n"
-                "to:\n"
+                "'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer` "
+                "and will be removed in version v0.3.0.\n\n"
+                "Please update your code to pass these arguments to `LitAPI` instead.\n\n"
+                "Old usage:\n"
+                "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n\n"
+                "New usage:\n"
                 "    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
                 "    server = LitServer(api, ...)",
                 DeprecationWarning,
                 stacklevel=2,
             )
+
             lit_api.max_batch_size = max_batch_size
             lit_api.batch_timeout = batch_timeout
         if isinstance(spec, LitSpec):

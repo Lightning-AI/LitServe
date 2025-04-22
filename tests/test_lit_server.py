@@ -531,7 +531,7 @@ def test_workers_setup_status(use_zmq):
 def test_max_batch_size_warning(simple_litapi):
     with pytest.warns(
         DeprecationWarning,
-        match="'max_batch_size' and 'batch_timeout' have moved from LitServer to LitAPI initialization.",
+        match="'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer`",
     ):
         ls.LitServer(simple_litapi, max_batch_size=4)
     assert simple_litapi.max_batch_size == 4, "LitServer should have max_batch_size set to 4"
