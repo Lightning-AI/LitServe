@@ -45,8 +45,6 @@ def inference_worker(
     worker_id: int,
     request_queue: Queue,
     transport: MessageTransport,
-    max_batch_size: int,
-    batch_timeout: float,
     stream: bool,
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
@@ -71,7 +69,7 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
 
     if loop == "auto":
-        loop = get_default_loop(stream, max_batch_size)
+        loop = get_default_loop(stream, lit_api.max_batch_size)
 
     loop(
         lit_api,
@@ -80,8 +78,6 @@ def inference_worker(
         worker_id,
         request_queue,
         transport,
-        max_batch_size,
-        batch_timeout,
         stream,
         workers_setup_status,
         callback_runner,
