@@ -225,6 +225,46 @@ async def test_openai_spec_with_response_format(openai_request_data_with_respons
             ), "LitAPI predict response should match with the generated output"
 
 
+class MetadataRequiredAPI(ls.LitAPI):
+    def setup(self, device):
+        self.device = device
+
+    def decode_request(self, request):
+        return request
+
+    def predict(self, request):
+        metadata = request.metadata
+        if not metadata or "user_id" not in metadata:
+            raise HTTPException(status_code=500, detail="Missing required metadata")
+        yield "ok"
+
+
+@pytest.mark.asyncio
+async def test_openai_spec_metadata(openai_request_data_with_metadata):
+    server = ls.LitServer(MetadataRequiredAPI(), spec=OpenAISpec())
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_metadata)
+            assert resp.status_code == 200
+            assert resp.json()["choices"][0]["message"]["content"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_openai_spec_metadata_required_fail(openai_request_data):
+    server = ls.LitServer(MetadataRequiredAPI(), spec=OpenAISpec())
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data)
+            assert resp.status_code == 500
+            assert "Missing required metadata" in resp.text
+
+
 class IncorrectAPI1(ls.LitAPI):
     def setup(self, device):
         self.model = None
