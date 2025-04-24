@@ -307,6 +307,30 @@ def openai_request_data_with_response_format():
 
 
 @pytest.fixture
+def openai_request_data_with_metadata():
+    return {
+        "model": "lit",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Extract the event information.",
+            },
+            {"role": "user", "content": "Alice and Bob are going to a science fair on Friday."},
+        ],
+        "temperature": 0.7,
+        "top_p": 1,
+        "n": 1,
+        "max_completion_tokens": 0,
+        "stop": "string",
+        "stream": False,
+        "presence_penalty": 0,
+        "frequency_penalty": 0,
+        "user": "string",
+        "metadata": {"user_id": "123", "trace_id": "abc-xyz"},
+    }
+
+
+@pytest.fixture
 def openai_embedding_request_data():
     return {"input": "A beautiful sunset over the beach.", "model": "lit", "encoding_format": "float"}
 
