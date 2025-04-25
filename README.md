@@ -61,7 +61,7 @@ pip install litserve
 ```
     
 ### Define a server    
-This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#examples)):    
+This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#featured-examples)):    
 
 ```python
 # server.py
