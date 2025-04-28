@@ -245,7 +245,7 @@ class LitServer:
         self.timeout = timeout
         lit_api.stream = stream
         lit_api.request_timeout = self.timeout
-        lit_api.pre_setup(spec=spec, timeout=timeout)
+        lit_api.pre_setup(spec=spec)
         self._loop.pre_setup(lit_api, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None

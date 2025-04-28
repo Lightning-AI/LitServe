@@ -302,8 +302,8 @@ async def test_run_batched_loop():
     lit_api.setup(None)
     lit_api.max_batch_size = 2
     lit_api.batch_timeout = 1
-    lit_api.pre_setup(spec=None, timeout=30)
     lit_api.request_timeout = 1
+    lit_api.pre_setup(spec=None)
 
     request_queue = Queue()
     transport = MockMPQueueTransport(1)
@@ -341,8 +341,8 @@ async def test_run_batched_loop_timeout(mock_transport):
     lit_api.setup(None)
     lit_api.max_batch_size = 2
     lit_api.batch_timeout = 0.001
-    lit_api.pre_setup(spec=None, timeout=30)
     lit_api.request_timeout = 0.1
+    lit_api.pre_setup(spec=None)
 
     request_queue = Queue()
     transport = mock_transport
@@ -717,7 +717,7 @@ def continuous_batching_setup(monkeypatch, mock_transport):
     lit_api.request_timeout = 0.1
     lit_api.max_batch_size = 2
     lit_api.batch_timeout = 0.1
-    lit_api.pre_setup(spec=None, timeout=30)
+    lit_api.pre_setup(spec=None)
     lit_api.setup(None)
     request_queue = Queue()
 
