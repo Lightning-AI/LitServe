@@ -106,7 +106,8 @@ async def test_batched():
 @pytest.mark.asyncio
 async def test_unbatched():
     api = SimpleTorchAPI(max_batch_size=1)
-    api.pre_setup(spec=None, timeout=30)
+    api.request_timeout = 30
+    api.pre_setup(spec=None)
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -128,8 +129,9 @@ def test_max_batch_size():
         SimpleBatchLitAPI(max_batch_size=-1)
 
     api = SimpleBatchLitAPI(max_batch_size=2, batch_timeout=5)
-    with pytest.raises(ValueError, match="must be less than timeout"):
-        api.pre_setup(spec=None, timeout=2)
+    api.request_timeout = 2
+    with pytest.raises(ValueError, match="batch_timeout must be less than request_timeout"):
+        api.pre_setup(spec=None)
 
 
 def test_max_batch_size_warning():
@@ -157,7 +159,8 @@ def test_max_batch_size_warning():
 
 def test_batch_predict_string_warning():
     api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
-    api.pre_setup(spec=None, timeout=30)
+    api.request_timeout = 30
+    api.pre_setup(spec=None)
     api.predict = MagicMock(return_value="This is a string")
 
     mock_input = torch.tensor([[1.0], [2.0]])
@@ -240,7 +243,8 @@ class BatchSizeMismatchAPI(SimpleBatchLitAPI):
 @pytest.mark.asyncio
 async def test_batch_size_mismatch():
     api = BatchSizeMismatchAPI(max_batch_size=2, batch_timeout=4)
-    api.pre_setup(spec=None, timeout=30)
+    api.request_timeout = 30
+    api.pre_setup(spec=None)
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
 
     with wrap_litserve_start(server) as server:
