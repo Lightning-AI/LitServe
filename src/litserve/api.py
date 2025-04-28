@@ -133,9 +133,9 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
-    def pre_setup(self, spec: Optional[LitSpec], timeout):
-        if self.batch_timeout > timeout and timeout not in (False, -1):
-            raise ValueError("batch_timeout must be less than timeout")
+    def pre_setup(self, spec: Optional[LitSpec]):
+        if self.batch_timeout > self.request_timeout and self.request_timeout not in (False, -1):
+            raise ValueError("batch_timeout must be less than request_timeout")
 
         if self.stream:
             self._default_unbatch = self._unbatch_stream
