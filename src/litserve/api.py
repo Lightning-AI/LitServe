@@ -30,6 +30,23 @@ class LitAPI(ABC):
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
 
+    def __init__(self, max_batch_size: int = 1, batch_timeout: float = 0.0):
+        """Initialize a LitAPI instance.
+
+        Args:
+            max_batch_size: Maximum number of requests to process in a batch.
+            batch_timeout: Maximum time to wait for a batch to fill before processing.
+
+        """
+
+        if max_batch_size <= 0:
+            raise ValueError("max_batch_size must be greater than 0")
+
+        if batch_timeout < 0:
+            raise ValueError("batch_timeout must be greater than or equal to 0")
+        self.max_batch_size = max_batch_size
+        self.batch_timeout = batch_timeout
+
     @abstractmethod
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
@@ -116,8 +133,10 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
-    def pre_setup(self, max_batch_size: int, spec: Optional[LitSpec]):
-        self.max_batch_size = max_batch_size
+    def pre_setup(self, spec: Optional[LitSpec]):
+        if self.batch_timeout > self.request_timeout and self.request_timeout not in (False, -1):
+            raise ValueError("batch_timeout must be less than request_timeout")
+
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:

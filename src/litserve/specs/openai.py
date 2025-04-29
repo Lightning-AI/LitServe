@@ -176,6 +176,7 @@ class ChatCompletionRequest(BaseModel):
     tools: Optional[List[Tool]] = None
     tool_choice: Optional[ToolChoice] = ToolChoice.auto
     response_format: Optional[ResponseFormat] = None
+    metadata: Optional[Dict[str, str]] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):

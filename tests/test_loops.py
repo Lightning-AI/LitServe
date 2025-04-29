@@ -185,6 +185,8 @@ def test_batched_streaming_loop(mock_transport):
     fake_stream_api.encode_response = MagicMock(side_effect=fake_encode)
     fake_stream_api.unbatch = MagicMock(side_effect=lambda inputs: inputs)
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
+    fake_stream_api.max_batch_size = 2
+    fake_stream_api.batch_timeout = 2
 
     requests_queue = Queue()
     requests_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
@@ -198,8 +200,6 @@ def test_batched_streaming_loop(mock_transport):
             fake_stream_api,
             requests_queue,
             transport=transport,
-            max_batch_size=2,
-            batch_timeout=2,
             callback_runner=NOOP_CB_RUNNER,
         )
     fake_stream_api.predict.assert_called_once_with(["Hello", "World"])
@@ -209,10 +209,13 @@ def test_batched_streaming_loop(mock_transport):
 @patch("litserve.loops.simple_loops.BatchedLoop.run_batched_loop")
 @patch("litserve.loops.simple_loops.SingleLoop.run_single_loop")
 def test_inference_worker(mock_single_loop, mock_batched_loop):
+    lit_api_mock = MagicMock()
+    lit_api_mock.max_batch_size = 2
+    lit_api_mock.batch_timeout = 0
+
     inference_worker(
-        *[MagicMock()] * 6,
-        max_batch_size=2,
-        batch_timeout=0,
+        lit_api_mock,
+        *[MagicMock()] * 5,
         stream=False,
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
@@ -220,10 +223,13 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     )
     mock_batched_loop.assert_called_once()
 
+    lit_api_mock = MagicMock()
+    lit_api_mock.max_batch_size = 1
+    lit_api_mock.batch_timeout = 0
+
     inference_worker(
-        *[MagicMock()] * 6,
-        max_batch_size=1,
-        batch_timeout=0,
+        lit_api_mock,
+        *[MagicMock()] * 5,
         stream=False,
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
@@ -294,8 +300,10 @@ async def test_run_single_loop_timeout():
 async def test_run_batched_loop():
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api.pre_setup(2, None)
+    lit_api.max_batch_size = 2
+    lit_api.batch_timeout = 1
     lit_api.request_timeout = 1
+    lit_api.pre_setup(spec=None)
 
     request_queue = Queue()
     transport = MockMPQueueTransport(1)
@@ -307,7 +315,7 @@ async def test_run_batched_loop():
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, transport, 2, 1, NOOP_CB_RUNNER),
+        args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -331,8 +339,10 @@ async def test_run_batched_loop_timeout(mock_transport):
 
     lit_api = ls.test_examples.SimpleBatchedAPI()
     lit_api.setup(None)
-    lit_api.pre_setup(2, None)
+    lit_api.max_batch_size = 2
+    lit_api.batch_timeout = 0.001
     lit_api.request_timeout = 0.1
+    lit_api.pre_setup(spec=None)
 
     request_queue = Queue()
     transport = mock_transport
@@ -348,7 +358,7 @@ async def test_run_batched_loop_timeout(mock_transport):
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, transport, 2, 0.001, NOOP_CB_RUNNER),
+        args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -429,8 +439,10 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     lit_api.setup(None)
     lit_api.request_timeout = 1
     lit_api.stream = True
+    lit_api.max_batch_size = 2
+    lit_api.batch_timeout = 0.1
     spec = ls.OpenAISpec()
-    lit_api.pre_setup(2, spec)
+    lit_api.pre_setup(spec=spec, timeout=30)
 
     request_queue = Queue()
     # response_queue_id, uid, timestamp, x_enc
@@ -444,7 +456,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     lit_loop = BatchedStreamingLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_streaming_loop,
-        args=(lit_api, spec, request_queue, response_queues, 2, 0.1, NOOP_CB_RUNNER),
+        args=(lit_api, spec, request_queue, response_queues, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -468,8 +480,6 @@ class TestLoop(LitLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
@@ -482,8 +492,6 @@ class TestLoop(LitLoop):
                 worker_id,
                 request_queue,
                 transport,
-                max_batch_size,
-                batch_timeout,
                 stream,
                 workers_setup_status,
                 callback_runner,
@@ -499,8 +507,6 @@ class TestLoop(LitLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
@@ -527,7 +533,7 @@ async def test_custom_loop(mock_transport):
     request_queue = Queue()
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
 
-    loop(lit_api, None, "cpu", 0, request_queue, mock_transport, 2, 1, False, {}, NOOP_CB_RUNNER)
+    loop(lit_api, None, "cpu", 0, request_queue, mock_transport, False, {}, NOOP_CB_RUNNER)
     response = await mock_transport.areceive(0)
     assert response[0] == "UUID-001"
     assert response[1][0] == {"output": 16.0}
@@ -565,16 +571,28 @@ def test_loop_with_server_sync():
 
 
 def test_get_default_loop():
-    loop = ls.loops.get_default_loop(stream=False, max_batch_size=1)
+    lit_api = MagicMock()
+    lit_api.stream = False
+    lit_api.max_batch_size = 1
+    loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
     assert isinstance(loop, ls.loops.SingleLoop), "SingleLoop must be returned when stream=False"
 
-    loop = ls.loops.get_default_loop(stream=False, max_batch_size=4)
+    lit_api = MagicMock()
+    lit_api.stream = False
+    lit_api.max_batch_size = 4
+    loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
     assert isinstance(loop, ls.loops.BatchedLoop), "BatchedLoop must be returned when stream=False and max_batch_size>1"
 
-    loop = ls.loops.get_default_loop(stream=True, max_batch_size=1)
+    lit_api = MagicMock()
+    lit_api.stream = True
+    lit_api.max_batch_size = 1
+    loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
     assert isinstance(loop, ls.loops.StreamingLoop), "StreamingLoop must be returned when stream=True"
 
-    loop = ls.loops.get_default_loop(stream=True, max_batch_size=4)
+    lit_api = MagicMock()
+    lit_api.stream = True
+    lit_api.max_batch_size = 4
+    loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
     assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
         "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
     )
@@ -590,9 +608,11 @@ def lit_loop_setup():
 
 def test_lit_loop_get_batch_requests(lit_loop_setup):
     lit_loop, lit_api, request_queue = lit_loop_setup
+    lit_api.max_batch_size = 2
+    lit_api.batch_timeout = 0.001
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
     request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
-    batches, timed_out_uids = lit_loop.get_batch_requests(lit_api, request_queue, 2, 0.001)
+    batches, timed_out_uids = lit_loop.get_batch_requests(lit_api, request_queue)
     assert len(batches) == 2
     assert batches == [(0, "UUID-001", {"input": 4.0}), (0, "UUID-002", {"input": 5.0})]
     assert timed_out_uids == []
@@ -695,7 +715,9 @@ def continuous_batching_setup(monkeypatch, mock_transport):
     lit_api = ContinuousBatchingAPI()
     lit_api.stream = True
     lit_api.request_timeout = 0.1
-    lit_api.pre_setup(2, None)
+    lit_api.max_batch_size = 2
+    lit_api.batch_timeout = 0.1
+    lit_api.pre_setup(spec=None)
     lit_api.setup(None)
     request_queue = Queue()
 
@@ -721,7 +743,7 @@ async def test_continuous_batching_run(continuous_batching_setup):
     response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
     lit_loop.add_request(uid, input, lit_api, None)
     lit_loop.response_queue_ids[uid] = response_queue_id
-    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, mock_transport, 2, 0.1, True, {}, NOOP_CB_RUNNER)
+    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, mock_transport, True, {}, NOOP_CB_RUNNER)
 
     results = []
     for i in range(5):

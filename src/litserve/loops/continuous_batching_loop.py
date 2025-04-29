@@ -120,9 +120,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
+        response_queues: List[Queue] = None,
         max_batch_size: Optional[int] = None,
         batch_timeout: Optional[float] = None,
-        response_queues: List[Queue] = None,
     ) -> List[Tuple[str, Any]]:
         """Fill available capacity with pending and new requests."""
         # First process existing pending requests
@@ -151,8 +151,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        max_batch_size: int,
-        batch_timeout: float,
         response_queues: List[Queue],
     ):
         logger.info("Running prefill in background")
@@ -164,9 +162,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     lit_api,
                     lit_spec,
                     request_queue,
-                    max_batch_size,
-                    batch_timeout,
                     response_queues,
+                    max_batch_size=lit_api.max_batch_size,
+                    batch_timeout=lit_api.batch_timeout,
                 )
                 await asyncio.sleep(0)
         except Exception as e:
@@ -187,8 +185,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        max_batch_size: int,
-        batch_timeout: float,
         stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,

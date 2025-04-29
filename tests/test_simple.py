@@ -221,11 +221,12 @@ async def test_timeout(use_zmq):
 @pytest.mark.asyncio
 async def test_batch_timeout_with_concurrent_requests(use_zmq):
     server = LitServer(
-        SlowBatchAPI(),
+        SlowBatchAPI(
+            max_batch_size=2,
+            batch_timeout=0.01,
+        ),
         accelerator="cpu",
         timeout=2,
-        max_batch_size=2,
-        batch_timeout=0.01,
         fast_queue=use_zmq,
     )
     with wrap_litserve_start(server) as server:
@@ -249,21 +250,23 @@ def test_server_with_disabled_timeout(use_zmq):
         LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=-1),
         LitServer(SlowLitAPI(), accelerator="cpu", devices=1, timeout=False),
         LitServer(
-            SlowBatchAPI(),
+            SlowBatchAPI(
+                max_batch_size=2,
+                batch_timeout=2,
+            ),
             accelerator="cpu",
             devices=1,
             timeout=False,
-            max_batch_size=2,
-            batch_timeout=2,
             fast_queue=use_zmq,
         ),
         LitServer(
-            SlowBatchAPI(),
+            SlowBatchAPI(
+                max_batch_size=2,
+                batch_timeout=2,
+            ),
             accelerator="cpu",
             devices=1,
             timeout=-1,
-            max_batch_size=2,
-            batch_timeout=2,
             fast_queue=use_zmq,
         ),
     ]

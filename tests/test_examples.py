@@ -28,8 +28,8 @@ async def test_simple_pytorch_api():
 
 @pytest.mark.asyncio
 async def test_simple_batched_api():
-    api = ls.test_examples.SimpleBatchedAPI()
-    server = ls.LitServer(api, max_batch_size=4, batch_timeout=0.1)
+    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=4, batch_timeout=0.1)
+    server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"

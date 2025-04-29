@@ -432,8 +432,6 @@ def test_custom_info_path():
             "devices": ["cpu"],
             "workers_per_device": 1,
             "timeout": 30,
-            "max_batch_size": 1,
-            "batch_timeout": 0.0,
             "stream": False,
             "max_payload_size": None,
             "track_requests": False,
@@ -460,8 +458,6 @@ def test_info_route():
             "devices": ["cpu"],
             "workers_per_device": 1,
             "timeout": 30,
-            "max_batch_size": 1,
-            "batch_timeout": 0.0,
             "stream": False,
             "max_payload_size": None,
             "track_requests": False,
@@ -530,3 +526,12 @@ def test_workers_setup_status(use_zmq):
     server = LitServer(api, devices=1, fast_queue=use_zmq)
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
         server.run()
+
+
+def test_max_batch_size_warning(simple_litapi):
+    with pytest.warns(
+        DeprecationWarning,
+        match="'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer`",
+    ):
+        ls.LitServer(simple_litapi, max_batch_size=4)
+    assert simple_litapi.max_batch_size == 4, "LitServer should have max_batch_size set to 4"

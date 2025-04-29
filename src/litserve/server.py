@@ -125,7 +125,7 @@ class LitServer:
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
-        max_batch_size: int = 1,
+        max_batch_size: Optional[int] = None,
         batch_timeout: float = 0.0,
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
@@ -148,9 +148,9 @@ class LitServer:
             accelerator: Type of hardware to use, like 'cpu', 'cuda', or 'mps'. 'auto' selects the best available.
             devices: Number of devices to use, or 'auto' to select automatically.
             workers_per_device: Number of worker processes per device.
+            max_batch_size: Deprecated. Use `lit_api.max_batch_size` instead.
+            batch_timeout: Deprecated. Use `lit_api.batch_timeout` instead.
             timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
-            max_batch_size: Maximum number of requests to process in a batch.
-            batch_timeout: Maximum time to wait for a batch to fill before processing.
             api_path: URL path for the prediction endpoint.
             healthcheck_path: URL path for the health check endpoint.
             info_path: URL path for the server and model information endpoint.
@@ -166,10 +166,22 @@ class LitServer:
             fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
-        if batch_timeout > timeout and timeout not in (False, -1):
-            raise ValueError("batch_timeout must be less than timeout")
-        if max_batch_size <= 0:
-            raise ValueError("max_batch_size must be greater than 0")
+        if max_batch_size is not None:
+            warnings.warn(
+                "'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer` "
+                "and will be removed in version v0.3.0.\n\n"
+                "Please update your code to pass these arguments to `LitAPI` instead.\n\n"
+                "Old usage:\n"
+                "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n\n"
+                "New usage:\n"
+                "    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
+                "    server = LitServer(api, ...)",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+            lit_api.max_batch_size = max_batch_size
+            lit_api.batch_timeout = batch_timeout
         if isinstance(spec, LitSpec):
             stream = spec.stream
 
@@ -179,7 +191,7 @@ class LitServer:
         if isinstance(loop, str) and loop != "auto":
             raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
         if loop == "auto":
-            loop = get_default_loop(stream, max_batch_size)
+            loop = get_default_loop(stream, lit_api.max_batch_size)
 
         if middlewares is None:
             middlewares = []
@@ -218,7 +230,7 @@ class LitServer:
         batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
         unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
 
-        if batch_overridden and unbatch_overridden and max_batch_size == 1:
+        if batch_overridden and unbatch_overridden and lit_api.max_batch_size == 1:
             warnings.warn(
                 "The LitServer has both batch and unbatch methods implemented, "
                 "but the max_batch_size parameter was not set."
@@ -236,7 +248,7 @@ class LitServer:
         self.timeout = timeout
         lit_api.stream = stream
         lit_api.request_timeout = self.timeout
-        lit_api.pre_setup(max_batch_size, spec=spec)
+        lit_api.pre_setup(spec=spec)
         self._loop.pre_setup(lit_api, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
@@ -254,8 +266,6 @@ class LitServer:
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
-        self.max_batch_size = max_batch_size
-        self.batch_timeout = batch_timeout
         self.stream = stream
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
@@ -328,8 +338,6 @@ class LitServer:
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    self.max_batch_size,
-                    self.batch_timeout,
                     self.stream,
                     self.workers_setup_status,
                     self._callback_runner,
@@ -402,10 +410,6 @@ class LitServer:
     def active_requests(self):
         if self.track_requests and self.active_counters:
             return sum(counter.value for counter in self.active_counters)
-        warnings.warn(
-            "Active request counter is not enabled while using `on_request` callback hook. "
-            "Please set track_requests=True in the LitServer."
-        )
         return None
 
     def register_endpoints(self):
@@ -438,8 +442,6 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "max_batch_size": self.max_batch_size,
-                        "batch_timeout": self.batch_timeout,
                         "stream": self.stream,
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,

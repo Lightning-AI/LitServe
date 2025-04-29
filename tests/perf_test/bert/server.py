@@ -54,10 +54,10 @@ def main(
     server = ls.LitServer(
         api,
         max_batch_size=batch_size,
+        batch_timeout=batch_timeout,
         workers_per_device=workers_per_device,
         accelerator="auto",
         devices=devices,
-        batch_timeout=batch_timeout,
         timeout=200,
         fast_queue=True,
     )
