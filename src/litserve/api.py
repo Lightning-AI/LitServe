@@ -29,6 +29,7 @@ class LitAPI(ABC):
     _device: Optional[str] = None
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
+    parent_pid: Optional[int] = None
 
     def __init__(self, max_batch_size: int = 1, batch_timeout: float = 0.0):
         """Initialize a LitAPI instance.

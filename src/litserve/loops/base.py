@@ -16,13 +16,14 @@ import inspect
 import logging
 import pickle
 import sys
+import signal
 import time
 from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 from starlette.formparsers import MultiPartParser
-
+import multiprocessing as mp
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
@@ -212,7 +213,16 @@ class _BaseLoop(ABC):
 class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
-        self.server_pid = os.getpid()
+        self._lock = mp.Lock()
+
+    def kill(self,lit_api:LitAPI):
+        with self._lock:
+            try:
+                print(f'Stop Server Requested - Kill parent pid [{lit_api.parent_pid}] from [{os.getpid()}]')
+                os.kill(lit_api.parent_pid,signal.SIGTERM)
+            except PermissionError:
+                # Access Denied because pid already killed...
+                return
 
     def get_batch_requests(
         self,

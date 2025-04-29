@@ -179,7 +179,6 @@ class LitServer:
                 DeprecationWarning,
                 stacklevel=2,
             )
-
             lit_api.max_batch_size = max_batch_size
             lit_api.batch_timeout = batch_timeout
         if isinstance(spec, LitSpec):
@@ -328,6 +327,8 @@ class LitServer:
 
             self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
 
+            self.lit_api.parent_pid = os.getpid()
+            
             ctx = mp.get_context("spawn")
             process = ctx.Process(
                 target=inference_worker,

@@ -43,9 +43,8 @@ class SingleLoop(DefaultLoop):
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
             except (Empty, ValueError):
                 continue
-            except KeyboardInterrupt:
-                print(f"Keyboard Interruption - Kill server [{self.server_pid}]")
-                os.kill(self.server_pid,signal.SIGTERM)
+            except KeyboardInterrupt: #pragma: no cover
+                self.kill(lit_api)
                 return
 
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
@@ -218,9 +217,8 @@ class BatchedLoop(DefaultLoop):
                         PickleableHTTPException.from_exception(e),
                         LitAPIStatus.ERROR,
                     )
-            except KeyboardInterrupt:
-                print(f"Keyboard Interruption - Kill server [{self.server_pid}]")
-                os.kill(self.server_pid,signal.SIGTERM)
+            except KeyboardInterrupt: #pragma: no cover
+                self.kill(lit_api)
                 return
             except Exception as e:
                 logger.exception(
