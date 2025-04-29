@@ -221,8 +221,8 @@ class LitLoop(_BaseLoop):
     def kill(self):
         with self._lock:
             try:
-                print(f'Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]')
-                os.kill(self._server_pid,signal.SIGTERM)
+                print(f"Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]")
+                os.kill(self._server_pid, signal.SIGTERM)
             except PermissionError:
                 # Access Denied because pid already killed...
                 return
