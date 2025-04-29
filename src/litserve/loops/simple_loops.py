@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import os
-import signal
 import time
 from queue import Empty, Queue
 from typing import Dict, Optional
@@ -44,7 +42,7 @@ class SingleLoop(DefaultLoop):
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
             except (Empty, ValueError):
                 continue
-            except KeyboardInterrupt: #pragma: no cover
+            except KeyboardInterrupt:  # pragma: no cover
                 self.kill(lit_api)
                 return
 
@@ -218,7 +216,7 @@ class BatchedLoop(DefaultLoop):
                         PickleableHTTPException.from_exception(e),
                         LitAPIStatus.ERROR,
                     )
-            except KeyboardInterrupt: #pragma: no cover
+            except KeyboardInterrupt:  # pragma: no cover
                 self.kill(lit_api)
                 return
             except Exception as e:

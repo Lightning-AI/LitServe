@@ -14,17 +14,18 @@
 import asyncio
 import inspect
 import logging
+import multiprocessing as mp
 import os
 import pickle
-import sys
 import signal
+import sys
 import time
 from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from starlette.formparsers import MultiPartParser
-import multiprocessing as mp
+
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
@@ -216,11 +217,11 @@ class LitLoop(_BaseLoop):
         self._context = {}
         self._lock = mp.Lock()
 
-    def kill(self,lit_api:LitAPI):
+    def kill(self, lit_api: LitAPI):
         with self._lock:
             try:
-                print(f'Stop Server Requested - Kill parent pid [{lit_api.parent_pid}] from [{os.getpid()}]')
-                os.kill(lit_api.parent_pid,signal.SIGTERM)
+                print(f"Stop Server Requested - Kill parent pid [{lit_api.parent_pid}] from [{os.getpid()}]")
+                os.kill(lit_api.parent_pid, signal.SIGTERM)
             except PermissionError:
                 # Access Denied because pid already killed...
                 return

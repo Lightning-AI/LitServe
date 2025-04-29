@@ -97,7 +97,7 @@ class StreamingLoop(DefaultLoop):
                     PickleableHTTPException.from_exception(e),
                     LitAPIStatus.ERROR,
                 )
-            except KeyboardInterrupt: #pragma: no cover
+            except KeyboardInterrupt:  # pragma: no cover
                 self.kill(lit_api)
                 return
             except Exception as e:
@@ -188,7 +188,7 @@ class BatchedStreamingLoop(DefaultLoop):
 
                 for response_queue_id, uid in zip(response_queue_ids, uids):
                     self.put_response(transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
-            except KeyboardInterrupt: #pragma: no cover
+            except KeyboardInterrupt:  # pragma: no cover
                 self.kill(lit_api)
                 return
 
