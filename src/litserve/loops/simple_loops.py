@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
+import signal
 import time
 from queue import Empty, Queue
 from typing import Dict, Optional
-import os
-import signal
+
 from fastapi import HTTPException
 
 from litserve import LitAPI
@@ -45,7 +46,7 @@ class SingleLoop(DefaultLoop):
                 continue
             except KeyboardInterrupt:
                 print(f"Keyboard Interruption - Kill server [{self.server_pid}]")
-                os.kill(self.server_pid,signal.SIGTERM)
+                os.kill(self.server_pid, signal.SIGTERM)
                 return
 
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
@@ -220,7 +221,7 @@ class BatchedLoop(DefaultLoop):
                     )
             except KeyboardInterrupt:
                 print(f"Keyboard Interruption - Kill server [{self.server_pid}]")
-                os.kill(self.server_pid,signal.SIGTERM)
+                os.kill(self.server_pid, signal.SIGTERM)
                 return
             except Exception as e:
                 logger.exception(
