@@ -20,7 +20,7 @@ import time
 from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+import os
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -212,6 +212,7 @@ class _BaseLoop(ABC):
 class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
+        self.server_pid = os.getpid()
 
     def get_batch_requests(
         self,

@@ -15,7 +15,8 @@ import logging
 import time
 from queue import Empty, Queue
 from typing import Dict, Optional
-
+import os
+import signal
 from fastapi import HTTPException
 
 from litserve import LitAPI
@@ -42,6 +43,10 @@ class SingleLoop(DefaultLoop):
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
             except (Empty, ValueError):
                 continue
+            except KeyboardInterrupt:
+                print(f"Keyboard Interruption - Kill server [{self.server_pid}]")
+                os.kill(self.server_pid,signal.SIGTERM)
+                return
 
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
                 time.monotonic() - timestamp > lit_api.request_timeout
@@ -213,7 +218,10 @@ class BatchedLoop(DefaultLoop):
                         PickleableHTTPException.from_exception(e),
                         LitAPIStatus.ERROR,
                     )
-
+            except KeyboardInterrupt:
+                print(f"Keyboard Interruption - Kill server [{self.server_pid}]")
+                os.kill(self.server_pid,signal.SIGTERM)
+                return
             except Exception as e:
                 logger.exception(
                     "LitAPI ran into an error while processing the batched request.\n"

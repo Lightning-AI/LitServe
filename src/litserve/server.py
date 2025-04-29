@@ -345,6 +345,7 @@ class LitServer:
                 ),
             )
             process.start()
+            print(f'Inference Worker {worker_id} - [{process.pid}]')
             process_list.append(process)
         return manager, process_list
 
@@ -611,25 +612,14 @@ class LitServer:
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            if sys.platform != "win32":
-                # On Linux, kill signal will be captured by uvicorn.
-                # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
-                for uw in uvicorn_workers:
-                    uw: Union[Process, Thread]
-                    uw.join()
-            else:
-                # On Windows, kill signal is captured by inference workers.
-                # => They will join and raise a KeyboardInterrupt, allowing to Shutdown Server
-                for iw in inference_workers:
-                    iw: Process
-                    iw.join()
+            # On Linux, kill signal will be captured by uvicorn.
+            # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
+            for i,uw in enumerate(uvicorn_workers):
+                uw: Union[Process, Thread]
+                if isinstance(uw,Process):
+                    print(f"Uvicorn worker {i} : [{uw.pid}]")
+                uw.join()
         finally:
-            if sys.platform == "win32":
-                # We kindly ask uvicorn servers to exit.
-                # It will properly end threads on windows.
-                for us in self._uvicorn_servers:
-                    us: uvicorn.Server
-                    us.should_exit = True
             print("Shutting down LitServe")
             self._transport.close()
             for iw in inference_workers:
