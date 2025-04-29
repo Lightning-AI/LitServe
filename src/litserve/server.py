@@ -327,8 +327,6 @@ class LitServer:
 
             self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
 
-            self.lit_api.parent_pid = os.getpid()
-
             ctx = mp.get_context("spawn")
             process = ctx.Process(
                 target=inference_worker,

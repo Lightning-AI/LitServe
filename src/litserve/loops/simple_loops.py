@@ -43,7 +43,7 @@ class SingleLoop(DefaultLoop):
             except (Empty, ValueError):
                 continue
             except KeyboardInterrupt:  # pragma: no cover
-                self.kill(lit_api)
+                self.kill()
                 return
 
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
@@ -217,7 +217,7 @@ class BatchedLoop(DefaultLoop):
                         LitAPIStatus.ERROR,
                     )
             except KeyboardInterrupt:  # pragma: no cover
-                self.kill(lit_api)
+                self.kill()
                 return
             except Exception as e:
                 logger.exception(
