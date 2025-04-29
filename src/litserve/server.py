@@ -346,7 +346,7 @@ class LitServer:
                 ),
             )
             process.start()
-            print(f'Inference Worker {worker_id} - [{process.pid}]')
+            print(f"Inference Worker {worker_id} - [{process.pid}]")
             process_list.append(process)
         return manager, process_list
 
@@ -615,9 +615,9 @@ class LitServer:
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
             # On Linux, kill signal will be captured by uvicorn.
             # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
-            for i,uw in enumerate(uvicorn_workers):
+            for i, uw in enumerate(uvicorn_workers):
                 uw: Union[Process, Thread]
-                if isinstance(uw,Process):
+                if isinstance(uw, Process):
                     print(f"Uvicorn worker {i} : [{uw.pid}]")
                 uw.join()
         finally:

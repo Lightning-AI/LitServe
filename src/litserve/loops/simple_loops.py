@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
+import signal
 import time
 from queue import Empty, Queue
 from typing import Dict, Optional
-import os
-import signal
+
 from fastapi import HTTPException
 
 from litserve import LitAPI
