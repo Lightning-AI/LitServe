@@ -272,7 +272,6 @@ class LitServer:
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
         self.transport_config = None
-        self._uvicorn_servers: List[uvicorn.Server] = []
 
         specs = spec if spec is not None else []
         self._specs = specs if isinstance(specs, Sequence) else [specs]
@@ -662,7 +661,6 @@ class LitServer:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
             workers.append(w)
-            self._uvicorn_servers.append(server)
         return workers
 
     def setup_auth(self):
