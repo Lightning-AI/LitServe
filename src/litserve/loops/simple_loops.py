@@ -42,6 +42,9 @@ class SingleLoop(DefaultLoop):
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
             except (Empty, ValueError):
                 continue
+            except KeyboardInterrupt:  # pragma: no cover
+                self.kill()
+                return
 
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
                 time.monotonic() - timestamp > lit_api.request_timeout
@@ -213,7 +216,9 @@ class BatchedLoop(DefaultLoop):
                         PickleableHTTPException.from_exception(e),
                         LitAPIStatus.ERROR,
                     )
-
+            except KeyboardInterrupt:  # pragma: no cover
+                self.kill()
+                return
             except Exception as e:
                 logger.exception(
                     "LitAPI ran into an error while processing the batched request.\n"

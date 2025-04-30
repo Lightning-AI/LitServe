@@ -14,7 +14,9 @@
 import asyncio
 import inspect
 import logging
+import os
 import pickle
+import signal
 import sys
 import time
 from abc import ABC
@@ -212,6 +214,15 @@ class _BaseLoop(ABC):
 class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
+        self._server_pid = os.getpid()
+
+    def kill(self):
+        try:
+            print(f"Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]")
+            os.kill(self._server_pid, signal.SIGTERM)
+        except PermissionError:
+            # Access Denied because pid already killed...
+            return
 
     def get_batch_requests(
         self,
