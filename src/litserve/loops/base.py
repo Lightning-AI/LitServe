@@ -45,6 +45,13 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
+async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
+    sig = inspect.signature(func)
+    if "context" in sig.parameters:
+        return await func(*args, **kwargs, context=context)
+    return await func(*args, **kwargs)
+
+
 def collate_requests(
     lit_api: LitAPI,
     request_queue: Queue,

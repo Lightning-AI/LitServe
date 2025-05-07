@@ -343,7 +343,6 @@ class LitServer:
                 ),
             )
             process.start()
-            print(f"Inference Worker {worker_id} - [{process.pid}]")
             process_list.append(process)
         return manager, process_list
 

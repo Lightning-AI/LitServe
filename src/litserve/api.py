@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 import warnings
 from abc import ABC, abstractmethod
@@ -30,12 +31,13 @@ class LitAPI(ABC):
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
 
-    def __init__(self, max_batch_size: int = 1, batch_timeout: float = 0.0):
+    def __init__(self, max_batch_size: int = 1, batch_timeout: float = 0.0, enable_async: bool = False):
         """Initialize a LitAPI instance.
 
         Args:
             max_batch_size: Maximum number of requests to process in a batch.
             batch_timeout: Maximum time to wait for a batch to fill before processing.
+            enable_async: Enable async support.
 
         """
 
@@ -46,6 +48,25 @@ class LitAPI(ABC):
             raise ValueError("batch_timeout must be greater than or equal to 0")
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
+        self.enable_async = enable_async
+
+    def __post_init__(self):
+        if self.enable_async:
+            # check if LitAPI methods are coroutines
+            for method in ["decode_request", "predict", "encode_response"]:
+                if not asyncio.iscoroutinefunction(getattr(self, method)):
+                    raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.
+
+Please either set enable_async=False or implement the following methods as coroutines:
+Example:
+    class MyLitAPI(LitAPI):
+        async def decode_request(self, request, **kwargs):
+            return request
+        async def predict(self, x, **kwargs):
+            return x
+        async def encode_response(self, output, **kwargs):
+            return output
+""")
 
     @abstractmethod
     def setup(self, device):
