@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import inspect
 import json
 import warnings
 from abc import ABC, abstractmethod
@@ -54,9 +55,10 @@ class LitAPI(ABC):
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
         if self.enable_async:
-            # check if LitAPI methods are coroutines
+            # check if LitAPI methods are coroutines or async generators
             for method in ["decode_request", "predict", "encode_response"]:
-                if not asyncio.iscoroutinefunction(getattr(self, method)):
+                method_obj = getattr(self, method)
+                if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
                     raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.
 
 Please either set enable_async=False or implement the following methods as coroutines:
@@ -68,6 +70,13 @@ Example:
             return x
         async def encode_response(self, output, **kwargs):
             return output
+
+Streaming example:
+    class MyStreamingAPI(LitAPI):
+        async def predict(self, x, **kwargs):
+            for i in range(10):
+                await asyncio.sleep(0.1)  # simulate async work
+                yield f"Token {i}: {x}"
 """)
 
     @abstractmethod

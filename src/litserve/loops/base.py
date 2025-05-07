@@ -47,9 +47,16 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
 
 async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
+    is_async_gen = inspect.isasyncgenfunction(func)
+
     if "context" in sig.parameters:
-        return await func(*args, **kwargs, context=context)
-    return await func(*args, **kwargs)
+        result = (
+            await func(*args, **kwargs, context=context) if not is_async_gen else func(*args, **kwargs, context=context)
+        )
+    else:
+        result = await func(*args, **kwargs) if not is_async_gen else func(*args, **kwargs)
+
+    return result
 
 
 def collate_requests(
@@ -277,16 +284,21 @@ class DefaultLoop(LitLoop):
 
         original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
         if not lit_api.stream and any([
-            inspect.isgeneratorfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response),
+            inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response) or inspect.isasyncgenfunction(lit_api.encode_response),
         ]):
             raise ValueError(
                 """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` must not be
-                generator functions.
+                generator or async generator functions.
 
                 Correct usage:
 
                     def predict(self, inputs):
+                        ...
+                        return {"output": output}
+
+                    # Or async version if using LitAPI(..., enable_async=True)
+                    async def predict(self, inputs):
                         ...
                         return {"output": output}
 
@@ -296,20 +308,31 @@ class DefaultLoop(LitLoop):
                         ...
                         for i in range(max_token_length):
                             yield prediction
+
+                    # Or async version if using LitAPI(..., enable_async=True)
+                    async def predict(self, inputs):
+                        ...
+                        for i in range(max_token_length):
+                            yield prediction
                 """
             )
         if (
             lit_api.stream
             and lit_api.max_batch_size > 1
             and not all([
-                inspect.isgeneratorfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response),
-                (original or inspect.isgeneratorfunction(lit_api.unbatch)),
+                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response)
+                or inspect.isasyncgenfunction(lit_api.encode_response),
+                (
+                    original
+                    or inspect.isgeneratorfunction(lit_api.unbatch)
+                    or inspect.isasyncgenfunction(lit_api.unbatch)
+                ),
             ])
         ):
             raise ValueError(
                 """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
-                `lit_api.unbatch` must generate values using `yield`.
+                `lit_api.unbatch` must generate values using `yield` (can be regular or async generators).
 
              Example:
 
@@ -327,16 +350,23 @@ class DefaultLoop(LitLoop):
                     for output in outputs:
                         unbatched_output = ...
                         yield unbatched_output
+
+                # Or using async generators if using LitAPI(..., enable_async=True):
+                async def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        await asyncio.sleep(0.01)  # Some async work
+                        yield prediction
              """
             )
 
         if lit_api.stream and not all([
-            inspect.isgeneratorfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response),
+            inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response) or inspect.isasyncgenfunction(lit_api.encode_response),
         ]):
             raise ValueError(
                 """When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield`.
+             `lit_api.encode_response` must generate values using `yield` (can be regular or async generators).
 
              Example:
 
@@ -349,5 +379,12 @@ class DefaultLoop(LitLoop):
                     for output in outputs:
                         encoded_output = ...
                         yield encoded_output
+
+                # Or using async generators:
+                async def predict(self, inputs):
+                    ...
+                    for i in range(max_token_length):
+                        await asyncio.sleep(0.01)  # Some async work
+                        yield prediction
              """
             )
