@@ -535,3 +535,30 @@ def test_max_batch_size_warning(simple_litapi):
     ):
         ls.LitServer(simple_litapi, max_batch_size=4)
     assert simple_litapi.max_batch_size == 4, "LitServer should have max_batch_size set to 4"
+
+
+class TestAsyncLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        return x**2
+
+    async def encode_response(self, output):
+        return {"output": output}
+
+
+@pytest.mark.asyncio
+async def test_async_litapi():
+    api = TestAsyncLitAPI(enable_async=True)
+    server = LitServer(api)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+            assert resp.status_code == 200, "Server response should be 200 (OK)"
+            assert resp.json()["output"] == 25.0, "output from Identity server must be same as input"
