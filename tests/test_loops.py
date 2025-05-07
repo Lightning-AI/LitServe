@@ -212,6 +212,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock = MagicMock()
     lit_api_mock.max_batch_size = 2
     lit_api_mock.batch_timeout = 0
+    lit_api_mock.enable_async = False
 
     inference_worker(
         lit_api_mock,
@@ -226,6 +227,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock = MagicMock()
     lit_api_mock.max_batch_size = 1
     lit_api_mock.batch_timeout = 0
+    lit_api_mock.enable_async = False
 
     inference_worker(
         lit_api_mock,
@@ -596,6 +598,17 @@ def test_get_default_loop():
     assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
         "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
     )
+
+
+def test_get_default_loop_enable_async():
+    lit_api = MagicMock()
+    lit_api.stream = True
+    lit_api.max_batch_size = 1
+    lit_api.enable_async = True
+    with pytest.raises(
+        ValueError, match="Async streaming is not supported. Please use enable_async=False with streaming."
+    ):
+        ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size, lit_api.enable_async)
 
 
 @pytest.fixture
