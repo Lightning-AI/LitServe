@@ -457,3 +457,24 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
             assert len(resp2.json()["data"]) == 4, "Length of data should be 4"
             assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
             assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+# TODO: Find a way to test websocket spec
+# Currently, the following test seems to get stuck somewhere in the async code.
+
+# @pytest.mark.asyncio
+# async def test_websocket_litapi():
+#     server = ls.LitServer(WebSocketLitAPI(), spec=ls.WebSocketSpec())
+
+#     with wrap_litserve_start(server) as server:
+#         async with LifespanManager(server.app) as manager:
+#             client = TestClient(server.app)
+
+#             with client.websocket_connect("/predict") as websocket:
+#                 # Send a JSON payload
+#                 payload = {"input": "test_input"}
+#                 websocket.send_json(payload)
+
+#                 # Receive the response (should work now that lifespan is running)
+#                 response = websocket.receive_json()
+#                 assert response["output"] == "Processed: test_input"
