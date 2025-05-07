@@ -191,9 +191,6 @@ class StreamingLoop(DefaultLoop):
                     logger.debug("uid=%s", uid)
                 except (Empty, ValueError):
                     continue
-                except KeyboardInterrupt:
-                    self.kill()
-                    return
 
                 if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
                     time.monotonic() - timestamp > lit_api.request_timeout
