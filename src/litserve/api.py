@@ -49,8 +49,10 @@ class LitAPI(ABC):
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
+        self._validate_async_methods()
 
-    def __post_init__(self):
+    def _validate_async_methods(self):
+        """Validate that async methods are properly implemented when enable_async is True."""
         if self.enable_async:
             # check if LitAPI methods are coroutines
             for method in ["decode_request", "predict", "encode_response"]:
