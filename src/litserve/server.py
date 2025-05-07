@@ -190,7 +190,7 @@ class LitServer:
         if isinstance(loop, str) and loop != "auto":
             raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
         if loop == "auto":
-            loop = get_default_loop(stream, lit_api.max_batch_size)
+            loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
 
         if middlewares is None:
             middlewares = []
@@ -343,7 +343,6 @@ class LitServer:
                 ),
             )
             process.start()
-            print(f"Inference Worker {worker_id} - [{process.pid}]")
             process_list.append(process)
         return manager, process_list
 

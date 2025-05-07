@@ -27,7 +27,14 @@ from litserve.utils import WorkerSetupStatus
 logger = logging.getLogger(__name__)
 
 
-def get_default_loop(stream: bool, max_batch_size: int) -> _BaseLoop:
+def get_default_loop(stream: bool, max_batch_size: int, enable_async: bool = False) -> _BaseLoop:
+    if enable_async:
+        if stream:
+            raise ValueError("Async streaming is not supported. Please use enable_async=False with streaming.")
+        if max_batch_size > 1:
+            raise ValueError("Async batching is not supported. Please use enable_async=False with batching.")
+        return SingleLoop()  # Only SingleLoop supports async currently
+
     if stream:
         if max_batch_size > 1:
             return BatchedStreamingLoop()
@@ -69,7 +76,7 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
 
     if loop == "auto":
-        loop = get_default_loop(stream, lit_api.max_batch_size)
+        loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
 
     loop(
         lit_api,

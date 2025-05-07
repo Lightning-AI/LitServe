@@ -280,3 +280,8 @@ def test_log():
     server.launch_inference_worker(1)
     api.log("time", 0.1)
     assert server.logger_queue.get() == ("time", 0.1)
+
+
+def test_enable_async_not_set():
+    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+        ls.test_examples.SimpleLitAPI(enable_async=True)
