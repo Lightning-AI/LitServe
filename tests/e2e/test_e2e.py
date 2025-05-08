@@ -379,3 +379,14 @@ def test_openai_embedding_parity():
     assert len(response.data) == 2, f"Expected 2 embeddings but got {len(response.data)}"
     for data in response.data:
         assert len(data.embedding) == 768, f"Expected 768 dimensions but got {len(data.embedding)}"
+
+
+@e2e_from_file("tests/e2e/default_async_streaming.py")
+def test_e2e_default_async_streaming():
+    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+    outputs = []
+    for line in resp.iter_lines():
+        if line:
+            outputs.append(json.loads(line.decode("utf-8"))["output"])
+
+    assert outputs == list(range(10)), "server didn't return expected output"

@@ -28,11 +28,25 @@ logger = logging.getLogger(__name__)
 
 
 def get_default_loop(stream: bool, max_batch_size: int, enable_async: bool = False) -> _BaseLoop:
+    """Get the default loop based on the stream flag, batch size, and async support.
+
+    Args:
+        stream: Whether streaming is enabled
+        max_batch_size: Maximum batch size
+        enable_async: Whether async support is enabled (supports both coroutines and async generators)
+
+    Returns:
+        The appropriate loop implementation
+
+    Raises:
+        ValueError: If async and batching are enabled together (not supported)
+
+    """
     if enable_async:
-        if stream:
-            raise ValueError("Async streaming is not supported. Please use enable_async=False with streaming.")
         if max_batch_size > 1:
             raise ValueError("Async batching is not supported. Please use enable_async=False with batching.")
+        if stream:
+            return StreamingLoop()  # StreamingLoop now supports async
         return SingleLoop()  # Only SingleLoop supports async currently
 
     if stream:

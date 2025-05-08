@@ -602,11 +602,10 @@ def test_get_default_loop():
 
 def test_get_default_loop_enable_async():
     lit_api = MagicMock()
-    lit_api.stream = True
-    lit_api.max_batch_size = 1
+    lit_api.max_batch_size = 2
     lit_api.enable_async = True
     with pytest.raises(
-        ValueError, match="Async streaming is not supported. Please use enable_async=False with streaming."
+        ValueError, match="Async batching is not supported. Please use enable_async=False with batching."
     ):
         ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size, lit_api.enable_async)
 
