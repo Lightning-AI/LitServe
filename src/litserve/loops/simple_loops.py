@@ -223,12 +223,16 @@ class SingleLoop(DefaultLoop):
                     )
                     continue
 
-                await self._process_single_request(
-                    (response_queue_id, uid, timestamp, x_enc),
-                    lit_api,
-                    lit_spec,
-                    transport,
-                    callback_runner,
+                # Process the incoming request asynchronously to enable concurrent execution
+                # of multiple requests
+                asyncio.create_task(
+                    self._process_single_request(
+                        (response_queue_id, uid, timestamp, x_enc),
+                        lit_api,
+                        lit_spec,
+                        transport,
+                        callback_runner,
+                    )
                 )
 
         # Get the current event loop
