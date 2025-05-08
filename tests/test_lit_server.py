@@ -13,7 +13,7 @@
 # limitations under the License.
 import asyncio
 import sys
-from time import monotonic, sleep
+from time import sleep, time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -591,9 +591,9 @@ async def test_concurrent_async_inference():
         ) as ac:
             num_requests = 10
             tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
-            start = monotonic()
+            start = time()
             responses = await asyncio.gather(*tasks)
-            elapsed = monotonic() - start
+            elapsed = time() - start
 
             for resp in responses:
                 assert resp.status_code == 200
