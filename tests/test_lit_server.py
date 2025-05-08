@@ -605,11 +605,13 @@ async def test_concurrent_async_inference():
                 end_time = monotonic()
                 output = resp.json()["output"]
                 input_duration = output**0.5
-                completions.append({
-                    "input": input_duration,
-                    "output": output,
-                    "elapsed": end_time - start_times[input_duration],
-                })
+                completions.append(
+                    {
+                        "input": input_duration,
+                        "output": output,
+                        "elapsed": end_time - start_times[input_duration],
+                    }
+                )
 
             # The order of completion should be shortest sleep first
             completed_order = [item["input"] for item in completions]
@@ -621,6 +623,6 @@ async def test_concurrent_async_inference():
             # TODO: discuss to update this test, as time based seems to be flaky in CI
             # max_elapsed = max(item["elapsed"] for item in completions)
             # assert max_elapsed < sum(sleep_durations), (
-            #     f"Total elapsed time ({max_elapsed:.2f}s) should be less than sum of sleeps ({sum(sleep_durations)}s), "
-            #     "indicating concurrent execution."
+            #     "Total elapsed time ({max_elapsed:.2f}s) should be less than sum of sleeps"
+            #     f" ({sum(sleep_durations)}s), indicating concurrent execution."
             # )
