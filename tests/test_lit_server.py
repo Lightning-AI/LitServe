@@ -593,7 +593,7 @@ async def test_concurrent_async_inference():
             tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
             start = time.perf_counter()
             responses = await asyncio.gather(*tasks)
-            elapsed = time() - start
+            elapsed = time.perf_counter() - start
 
             for resp in responses:
                 assert resp.status_code == 200
