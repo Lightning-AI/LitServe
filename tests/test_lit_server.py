@@ -13,7 +13,7 @@
 # limitations under the License.
 import asyncio
 import sys
-from time import sleep, time
+from time import sleep
 from unittest.mock import MagicMock, patch
 
 import pytest
