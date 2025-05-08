@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import sys
+import time
 from time import sleep
 from unittest.mock import MagicMock, patch
 
@@ -562,3 +563,43 @@ async def test_async_litapi():
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 200, "Server response should be 200 (OK)"
             assert resp.json()["output"] == 25.0, "output from Identity server must be same as input"
+
+
+class TestSleepAsyncLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        # simulate a long-running task
+        await asyncio.sleep(4)
+        return x**2
+
+    async def encode_response(self, output):
+        return {"output": output}
+
+
+@pytest.mark.asyncio
+async def test_concurrent_async_inference():
+    """Test that async API processes requests concurrently (not sequentially)."""
+    api = TestSleepAsyncLitAPI(enable_async=True)
+    server = LitServer(api)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            sleep(2)  # Sleep a bit to ensure the server is ready
+            num_requests = 10
+            tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
+            start = time.perf_counter()
+            responses = await asyncio.gather(*tasks)
+            elapsed = time.perf_counter() - start
+
+            for resp in responses:
+                assert resp.status_code == 200
+                assert resp.json()["output"] == 25.0
+
+            # All requests should finish in just over 4s, plus some overhead
+            assert elapsed < 4 + 4, f"Expected all requests to finish in just over 4s, but took {elapsed:.2f}s."
