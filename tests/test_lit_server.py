@@ -572,8 +572,8 @@ class TestSleepAsyncLitAPI(ls.LitAPI):
         return request["input"]
 
     async def predict(self, x):
-        # sleep x time to simulate a long-running task
-        await asyncio.sleep(x)
+        # simulate a long-running task
+        await asyncio.sleep(4)
         return x**2
 
     async def encode_response(self, output):
@@ -589,38 +589,15 @@ async def test_concurrent_async_inference():
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            # Each input value is the sleep duration for that request
-            sleep_durations = [4.0, 2.0, 1.0]
-            request_tasks = []
-            start_times = {}
+            num_requests = 10
+            tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
+            start = monotonic()
+            responses = await asyncio.gather(*tasks)
+            elapsed = monotonic() - start
 
-            for duration in sleep_durations:
-                start_times[duration] = monotonic()
-                request_tasks.append(ac.post("/predict", json={"input": duration}, timeout=10))
+            for resp in responses:
+                assert resp.status_code == 200
+                assert resp.json()["output"] == 25.0
 
-            # Collect responses in the order they finish
-            completions = []
-            for coro in asyncio.as_completed(request_tasks):
-                resp = await coro
-                end_time = monotonic()
-                output = resp.json()["output"]
-                input_duration = output**0.5
-                completions.append({
-                    "input": input_duration,
-                    "output": output,
-                    "elapsed": end_time - start_times[input_duration],
-                })
-
-            # The order of completion should be shortest sleep first
-            completed_order = [item["input"] for item in completions]
-            assert completed_order == [1.0, 2.0, 4.0], (
-                f"Expected completion order [1.0, 2.0, 4.0], got {completed_order}"
-            )
-
-            # The total elapsed time should be just over the longest sleep, not the sum
-            # TODO: discuss to update this test, as time based seems to be flaky in CI
-            # max_elapsed = max(item["elapsed"] for item in completions)
-            # assert max_elapsed < sum(sleep_durations), (
-            #     "Total elapsed time ({max_elapsed:.2f}s) should be less than sum of sleeps"
-            #     f" ({sum(sleep_durations)}s), indicating concurrent execution."
-            # )
+            # All requests should finish in just over 4s, plus some overhead
+            assert elapsed < 4 + 4, f"Expected all requests to finish in just over 4s, but took {elapsed:.2f}s."
