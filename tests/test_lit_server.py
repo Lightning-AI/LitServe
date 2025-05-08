@@ -605,9 +605,11 @@ async def test_concurrent_async_inference():
                 end_time = monotonic()
                 output = resp.json()["output"]
                 input_duration = output**0.5
-                completions.append(
-                    {"input": input_duration, "output": output, "elapsed": end_time - start_times[input_duration]}
-                )
+                completions.append({
+                    "input": input_duration,
+                    "output": output,
+                    "elapsed": end_time - start_times[input_duration],
+                })
 
             # The order of completion should be shortest sleep first
             completed_order = [item["input"] for item in completions]
