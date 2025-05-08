@@ -590,6 +590,7 @@ async def test_concurrent_async_inference():
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
+            sleep(2) # Sleep a bit to ensure the server is ready
             num_requests = 10
             tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
             start = time.perf_counter()
