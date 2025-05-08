@@ -13,7 +13,7 @@
 # limitations under the License.
 import asyncio
 import sys
-from time import sleep
+from time import monotonic, sleep
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -562,3 +562,62 @@ async def test_async_litapi():
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 200, "Server response should be 200 (OK)"
             assert resp.json()["output"] == 25.0, "output from Identity server must be same as input"
+
+
+class TestSleepAsyncLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        # sleep x time to simulate a long-running task
+        await asyncio.sleep(x)
+        return x**2
+
+    async def encode_response(self, output):
+        return {"output": output}
+
+
+@pytest.mark.asyncio
+async def test_concurrent_async_inference():
+    """Test that async API processes requests concurrently (not sequentially)."""
+    api = TestSleepAsyncLitAPI(enable_async=True)
+    server = LitServer(api)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            # Each input value is the sleep duration for that request
+            sleep_durations = [4.0, 2.0, 1.0]
+            request_tasks = []
+            start_times = {}
+
+            for duration in sleep_durations:
+                start_times[duration] = monotonic()
+                request_tasks.append(ac.post("/predict", json={"input": duration}, timeout=10))
+
+            # Collect responses in the order they finish
+            completions = []
+            for coro in asyncio.as_completed(request_tasks):
+                resp = await coro
+                end_time = monotonic()
+                output = resp.json()["output"]
+                input_duration = output**0.5
+                completions.append(
+                    {"input": input_duration, "output": output, "elapsed": end_time - start_times[input_duration]}
+                )
+
+            # The order of completion should be shortest sleep first
+            completed_order = [item["input"] for item in completions]
+            assert completed_order == [1.0, 2.0, 4.0], (
+                f"Expected completion order [1.0, 2.0, 4.0], got {completed_order}"
+            )
+
+            # The total elapsed time should be just over the longest sleep, not the sum
+            max_elapsed = max(item["elapsed"] for item in completions)
+            assert max_elapsed < sum(sleep_durations), (
+                f"Total elapsed time ({max_elapsed:.2f}s) should be less than sum of sleeps ({sum(sleep_durations)}s), "
+                "indicating concurrent execution."
+            )
