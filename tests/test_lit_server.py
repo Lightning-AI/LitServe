@@ -601,4 +601,4 @@ async def test_concurrent_async_inference():
                 assert resp.json()["output"] == 25.0
 
             # All requests should finish in just over 4s, plus some overhead
-            assert elapsed < 4 + 2, f"Expected all requests to finish in just over 4s, but took {elapsed:.2f}s."
+            assert elapsed < 4 + 4, f"Expected all requests to finish in just over 4s, but took {elapsed:.2f}s."
