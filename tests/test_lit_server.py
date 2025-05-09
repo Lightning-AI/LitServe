@@ -620,6 +620,3 @@ async def test_error_propagation_in_async_litapi():
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 501, "Server raises 501 error"
             assert resp.json() == {"detail": "decode request is bad"}, "decode request is bad"
-
-
-
