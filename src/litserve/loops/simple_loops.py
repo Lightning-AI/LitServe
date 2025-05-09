@@ -197,6 +197,7 @@ class SingleLoop(DefaultLoop):
         callback_runner: CallbackRunner,
     ):
         async def process_requests():
+            pending_tasks = set()
             while True:
                 try:
                     response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -225,7 +226,7 @@ class SingleLoop(DefaultLoop):
 
                 # Process the incoming request asynchronously to enable concurrent execution
                 # of multiple requests
-                asyncio.create_task(
+                task = asyncio.create_task(
                     self._process_single_request(
                         (response_queue_id, uid, timestamp, x_enc),
                         lit_api,
@@ -234,6 +235,10 @@ class SingleLoop(DefaultLoop):
                         callback_runner,
                     )
                 )
+                # Save a reference to the task's result to prevent it from being
+                # garbage-collected during execution.
+                pending_tasks.add(task)
+                task.add_done_callback(pending_tasks.discard)
 
         # Get the current event loop
         loop = asyncio.get_event_loop()
