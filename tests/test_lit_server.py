@@ -605,14 +605,14 @@ async def test_concurrent_async_inference():
             assert elapsed < 4 + 4, f"Expected all requests to finish in just over 4s, but took {elapsed:.2f}s."
 
 
-class TestAsyncHTTPExceptionLitAPI(TestAsyncLitAPI):
+class TestHTTPExceptionAsyncLitAPI(TestAsyncLitAPI):
     async def decode_request(self, request):
         raise HTTPException(status_code=501, detail="decode request is bad")
 
 
 @pytest.mark.asyncio
-async def test_async_http_exception():
-    server = LitServer(TestAsyncHTTPExceptionLitAPI(enable_async=True))
+async def test_error_propagation_in_async_litapi():
+    server = LitServer(TestHTTPExceptionAsyncLitAPI(enable_async=True))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -620,3 +620,6 @@ async def test_async_http_exception():
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 501, "Server raises 501 error"
             assert resp.json() == {"detail": "decode request is bad"}, "decode request is bad"
+
+
+
