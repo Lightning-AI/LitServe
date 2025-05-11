@@ -96,7 +96,7 @@ def async_loop_args():
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 1
-    lit_api_mock.decode_request = AsyncMock(side_effect=lambda x: x.get("input", 0))
+    lit_api_mock.decode_request = AsyncMock(side_effect=lambda x: x["input"])
     lit_api_mock.predict = AsyncMock(side_effect=lambda x: x**2)
     lit_api_mock.encode_response = AsyncMock(side_effect=lambda x: {"output": x})
     return lit_api_mock, requests_queue
