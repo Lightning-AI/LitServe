@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import contextlib
 import inspect
 import io
 import json
 import re
 import threading
 import time
-from queue import Queue
+from queue import Empty, Queue
 from typing import Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -72,11 +71,28 @@ def loop_args():
     return lit_api_mock, requests_queue
 
 
+class TestQueue(Queue):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sentinel_seen = False
+
+    def get(self, timeout=None):
+        if self._sentinel_seen:
+            raise Empty  # Simulate queue being empty after sentinel
+        item = super().get(timeout=timeout)
+        # Sentinel: (None, None, None, None)
+        if item == (None, None, None, None):
+            self._sentinel_seen = True
+            raise KeyboardInterrupt  # Triggers loop exit in your code
+        return item
+
+
 @pytest.fixture
 def async_loop_args():
-    requests_queue = Queue()
+    requests_queue = TestQueue()
     requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 1}))
     requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}))
+    requests_queue.put((None, None, None, None))
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 1
@@ -123,32 +139,24 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     assert response == (request[1], ({"output": expected_output}, ls.utils.LitAPIStatus.OK))
 
 
-@pytest.mark.asyncio
-async def test_run_single_loop_with_async(async_loop_args, mock_transport):
+def test_run_single_loop_with_async(async_loop_args, monkeypatch):
+    mock_transport = MockMPQueueTransport(num_consumers=2)
     lit_api_mock, requests_queue = async_loop_args
+
     loop = SingleLoop()
-    # Add a sentinel to break the loop after processing
-    requests_queue.put((None, None, None, None))
 
-    # Run the async loop in a background task
-    async def run_loop():
-        await loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
+    # Patch kill to do nothing in test
+    monkeypatch.setattr(loop, "kill", lambda: None)
 
-    task = asyncio.create_task(run_loop())
-    await asyncio.sleep(0.5)  # Give the loop time to process
+    try:  # noqa: SIM105
+        loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
+    except KeyboardInterrupt:
+        pass  # Expected to break the loop in test
 
-    # Check the first response
-    response = await mock_transport.areceive(consumer_id=0)
+    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK))
-    # Check the second response
-    response = await mock_transport.areceive(consumer_id=1)
+    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
     assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK))
-
-    # Cancel the loop task if still running
-    if not task.done():
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
 
 
 class FakeStreamSender(DummyMessageTransport):
