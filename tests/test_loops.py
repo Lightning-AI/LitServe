@@ -160,6 +160,7 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
 
     # Expected to break the loop in test
     import contextlib
+
     with contextlib.suppress(KeyboardInterrupt):
         loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
