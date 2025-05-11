@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
+import contextlib
 import inspect
 import io
 import json
@@ -119,6 +121,34 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     response = await mock_transport.areceive(consumer_id=request[0])
     expected_output = request[3]["input"] ** 2
     assert response == (request[1], ({"output": expected_output}, ls.utils.LitAPIStatus.OK))
+
+
+@pytest.mark.asyncio
+async def test_run_single_loop_with_async(async_loop_args, mock_transport):
+    lit_api_mock, requests_queue = async_loop_args
+    loop = SingleLoop()
+    # Add a sentinel to break the loop after processing
+    requests_queue.put((None, None, None, None))
+
+    # Run the async loop in a background task
+    async def run_loop():
+        await loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
+
+    task = asyncio.create_task(run_loop())
+    await asyncio.sleep(0.5)  # Give the loop time to process
+
+    # Check the first response
+    response = await mock_transport.areceive(consumer_id=0)
+    assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK))
+    # Check the second response
+    response = await mock_transport.areceive(consumer_id=1)
+    assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK))
+
+    # Cancel the loop task if still running
+    if not task.done():
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 
 class FakeStreamSender(DummyMessageTransport):
