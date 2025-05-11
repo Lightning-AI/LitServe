@@ -19,7 +19,7 @@ import threading
 import time
 from queue import Queue
 from typing import Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from asgi_lifespan import LifespanManager
@@ -70,6 +70,20 @@ def loop_args():
     return lit_api_mock, requests_queue
 
 
+@pytest.fixture
+def async_loop_args():
+    requests_queue = Queue()
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 1}))
+    requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}))
+
+    lit_api_mock = MagicMock()
+    lit_api_mock.request_timeout = 1
+    lit_api_mock.decode_request = AsyncMock(side_effect=lambda x: x["input"])
+    lit_api_mock.predict = AsyncMock(side_effect=lambda x: x**2)
+    lit_api_mock.encode_response = AsyncMock(side_effect=lambda x: {"output": x})
+    return lit_api_mock, requests_queue
+
+
 class DummyMessageTransport(MessageTransport):
     def send(self, item, consumer_id, block=True, timeout=None):
         raise StopIteration("exit loop")
@@ -86,6 +100,25 @@ def test_single_loop(loop_args):
     lit_loop = SingleLoop()
     with pytest.raises(StopIteration, match="exit loop"):
         lit_loop.run_single_loop(lit_api_mock, None, requests_queue, transport, callback_runner=NOOP_CB_RUNNER)
+
+
+@pytest.mark.asyncio
+async def test_single_loop_process_single_async_request(async_loop_args, mock_transport):
+    lit_api_mock, requests_queue = async_loop_args
+
+    # Get a request from the queue (already populated by the fixture)
+    request = requests_queue.get()
+    loop = SingleLoop()
+    await loop._process_single_request(
+        request,
+        lit_api_mock,
+        None,
+        mock_transport,
+        NOOP_CB_RUNNER,
+    )
+    response = await mock_transport.areceive(consumer_id=request[0])
+    expected_output = request[3]["input"] ** 2
+    assert response == (request[1], ({"output": expected_output}, ls.utils.LitAPIStatus.OK))
 
 
 class FakeStreamSender(DummyMessageTransport):
