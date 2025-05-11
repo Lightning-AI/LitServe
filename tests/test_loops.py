@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import inspect
 import io
 import json
 import re
 import threading
 import time
-from queue import Queue
+from queue import Empty, Queue
 from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
@@ -70,6 +71,47 @@ def loop_args():
     return lit_api_mock, requests_queue
 
 
+class TestQueue(Queue):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sentinel_seen = False
+
+    def get(self, timeout=None):
+        if self._sentinel_seen:
+            raise Empty  # Simulate queue being empty after sentinel
+        item = super().get(timeout=timeout)
+        # Sentinel: (None, None, None, None)
+        if item == (None, None, None, None):
+            self._sentinel_seen = True
+            raise KeyboardInterrupt  # Triggers loop exit in your code
+        return item
+
+
+class AsyncTestLitAPI(LitAPI):
+    def setup(self, device):
+        pass
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        return x**2
+
+    async def encode_response(self, output):
+        return {"output": output}
+
+
+@pytest.fixture
+def async_loop_args():
+    requests_queue = TestQueue()
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 1}))
+    requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}))
+    requests_queue.put((None, None, None, None))
+
+    lit_api = AsyncTestLitAPI()
+    return lit_api, requests_queue
+
+
 class DummyMessageTransport(MessageTransport):
     def send(self, item, consumer_id, block=True, timeout=None):
         raise StopIteration("exit loop")
@@ -86,6 +128,46 @@ def test_single_loop(loop_args):
     lit_loop = SingleLoop()
     with pytest.raises(StopIteration, match="exit loop"):
         lit_loop.run_single_loop(lit_api_mock, None, requests_queue, transport, callback_runner=NOOP_CB_RUNNER)
+
+
+@pytest.mark.asyncio
+async def test_single_loop_process_single_async_request(async_loop_args, mock_transport):
+    lit_api_mock, requests_queue = async_loop_args
+
+    # Get a request from the queue (already populated by the fixture)
+    request = requests_queue.get()
+    loop = SingleLoop()
+    await loop._process_single_request(
+        request,
+        lit_api_mock,
+        None,
+        mock_transport,
+        NOOP_CB_RUNNER,
+    )
+    response = await mock_transport.areceive(consumer_id=request[0])
+    expected_output = request[3]["input"] ** 2
+    assert response == (request[1], ({"output": expected_output}, ls.utils.LitAPIStatus.OK))
+
+
+def test_run_single_loop_with_async(async_loop_args, monkeypatch):
+    mock_transport = MockMPQueueTransport(num_consumers=2)
+    lit_api_mock, requests_queue = async_loop_args
+
+    loop = SingleLoop()
+
+    # Patch kill to do nothing in test
+    monkeypatch.setattr(loop, "kill", lambda: None)
+
+    # Expected to break the loop in test
+    import contextlib
+
+    with contextlib.suppress(KeyboardInterrupt):
+        loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
+
+    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+    assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK))
+    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
+    assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK))
 
 
 class FakeStreamSender(DummyMessageTransport):
