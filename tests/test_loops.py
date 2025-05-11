@@ -158,10 +158,10 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     # Patch kill to do nothing in test
     monkeypatch.setattr(loop, "kill", lambda: None)
 
-    try:  # noqa: SIM105
+    # Expected to break the loop in test
+    import contextlib
+    with contextlib.suppress(KeyboardInterrupt):
         loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
-    except KeyboardInterrupt:
-        pass  # Expected to break the loop in test
 
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK))
