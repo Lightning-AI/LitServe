@@ -20,7 +20,7 @@ import threading
 import time
 from queue import Empty, Queue
 from typing import Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from asgi_lifespan import LifespanManager
@@ -87,6 +87,20 @@ class TestQueue(Queue):
         return item
 
 
+class AsyncTestLitAPI(LitAPI):
+    def setup(self, device):
+        pass
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        return x**2
+
+    async def encode_response(self, output):
+        return {"output": output}
+
+
 @pytest.fixture
 def async_loop_args():
     requests_queue = TestQueue()
@@ -94,12 +108,8 @@ def async_loop_args():
     requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}))
     requests_queue.put((None, None, None, None))
 
-    lit_api_mock = MagicMock()
-    lit_api_mock.request_timeout = 1
-    lit_api_mock.decode_request = AsyncMock(side_effect=lambda x: x["input"])
-    lit_api_mock.predict = AsyncMock(side_effect=lambda x: x**2)
-    lit_api_mock.encode_response = AsyncMock(side_effect=lambda x: {"output": x})
-    return lit_api_mock, requests_queue
+    lit_api = AsyncTestLitAPI()
+    return lit_api, requests_queue
 
 
 class DummyMessageTransport(MessageTransport):
