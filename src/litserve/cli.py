@@ -23,5 +23,5 @@ def main():
     except ImportError as e:
         # If there's an issue importing or finding the right module
         print(f"Error importing lightning_sdk CLI: {e}")
-        print("Please ensure lightning-sdk is installed correctly.")
+        print("Please ensure `lightning-sdk` is installed correctly.")
         sys.exit(1)
