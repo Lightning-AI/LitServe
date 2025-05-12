@@ -12,6 +12,16 @@ def _ensure_lightning_installed():
 def main():
     _ensure_lightning_installed()
 
-    # Forward CLI arguments to the real lightning command
-    cli_args = sys.argv[1:]
-    subprocess.run(["lightning"] + cli_args)
+    try:
+        # Import the correct entry point for lightning_sdk
+        from lightning_sdk.cli.entrypoint import main_cli
+
+        # Call the lightning CLI's main function directly with our arguments
+        # This bypasses the command-line entry point completely
+        sys.argv[0] = "lightning"  # Make it think it was called as "lightning"
+        main_cli()
+    except ImportError as e:
+        # If there's an issue importing or finding the right module
+        print(f"Error importing lightning_sdk CLI: {e}")
+        print("Please ensure lightning-sdk is installed correctly.")
+        sys.exit(1)
