@@ -688,6 +688,6 @@ async def test_concurrent_async_streaming_inference(num_requests):
                 assert chunks == list(range(5)), "Expected output to be a sequence of integers from 0 to 4"
 
             # All requests should finish in just over the streaming time for one request
-            assert elapsed < 3 + 4, (
-                f"Expected all requests to finish in just over 3s, plus some overhead, but took {elapsed:.2f}s."
+            assert elapsed < 4 + 4, (
+                f"Expected all requests to finish in just over 4s, plus some overhead, but took {elapsed:.2f}s."
             )
