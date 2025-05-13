@@ -70,18 +70,22 @@ def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_fin
 @patch("importlib.util.find_spec")
 @patch("builtins.__import__")
 def test_cli_main_import_error(mock_import, mock_find_spec, capsys):
-    # Mock the import to raise an ImportError
-    mock_import.side_effect = ImportError("Module not found")
+    # Set up the mock to raise ImportError specifically for lightning_sdk import
+    def import_mock(name, *args, **kwargs):
+        if name == "lightning_sdk.cli.entrypoint":
+            raise ImportError("Module not found")
+        return __import__(name, *args, **kwargs)
+
+    mock_import.side_effect = import_mock
 
     # Mock find_spec to return True so we attempt the import
     mock_find_spec.return_value = True
-    test_args = ["lightning", "run", "app", "app.py"]
+    test_args = ["lightning", "deploy", "api", "app.py"]
 
     with patch.object(sys, "argv", test_args):  # noqa: SIM117
         with pytest.raises(SystemExit) as excinfo:
             cli_main()
 
     assert excinfo.value.code == 1
-
     captured = capsys.readouterr()
     assert "Error importing lightning_sdk CLI" in captured.out
