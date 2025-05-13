@@ -68,29 +68,29 @@ class SingleLoop(DefaultLoop):
                 if hasattr(lit_spec, "populate_context"):
                     lit_spec.populate_context(context, x_enc)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
                 x = _inject_context(
                     context,
                     lit_api.decode_request,
                     x_enc,
                 )
-                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y = _inject_context(
                     context,
                     lit_api.predict,
                     x,
                 )
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc = _inject_context(
                     context,
                     lit_api.encode_response,
                     y,
                 )
-                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
                 self.put_response(
                     transport=transport,
                     response_queue_id=response_queue_id,
@@ -135,29 +135,29 @@ class SingleLoop(DefaultLoop):
             if hasattr(lit_spec, "populate_context"):
                 lit_spec.populate_context(context, x_enc)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
             x = await _async_inject_context(
                 context,
                 lit_api.decode_request,
                 x_enc,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
             y = await _async_inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
             y_enc = await _async_inject_context(
                 context,
                 lit_api.encode_response,
                 y,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
             self.put_response(
                 transport=transport,
                 response_queue_id=response_queue_id,
@@ -306,7 +306,7 @@ class BatchedLoop(DefaultLoop):
                     for input, context in zip(inputs, contexts):
                         lit_spec.populate_context(context, input)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
                 x = [
                     _inject_context(
                         context,
@@ -315,13 +315,13 @@ class BatchedLoop(DefaultLoop):
                     )
                     for input, context in zip(inputs, contexts)
                 ]
-                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
                 x = lit_api.batch(x)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y = _inject_context(contexts, lit_api.predict, x)
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
                 outputs = lit_api.unbatch(y)
 
@@ -332,12 +332,12 @@ class BatchedLoop(DefaultLoop):
                     )
                     raise HTTPException(500, "Batch size mismatch")
 
-                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_list = []
                 for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
                     y_enc = _inject_context(context, lit_api.encode_response, y)
                     y_enc_list.append((response_queue_id, uid, y_enc))
-                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
                 for response_queue_id, uid, y_enc in y_enc_list:
                     self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)

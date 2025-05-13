@@ -71,7 +71,7 @@ def inference_worker(
     callback_runner: CallbackRunner,
     loop: Union[str, _BaseLoop],
 ):
-    callback_runner.trigger_event(EventTypes.BEFORE_SETUP, lit_api=lit_api)
+    callback_runner.trigger_event(EventTypes.BEFORE_SETUP.value, lit_api=lit_api)
     try:
         lit_api.setup(device)
     except Exception:
@@ -79,7 +79,7 @@ def inference_worker(
         workers_setup_status[worker_id] = WorkerSetupStatus.ERROR
         return
     lit_api.device = device
-    callback_runner.trigger_event(EventTypes.AFTER_SETUP, lit_api=lit_api)
+    callback_runner.trigger_event(EventTypes.AFTER_SETUP.value, lit_api=lit_api)
 
     print(f"Setup complete for worker {worker_id}.")
 

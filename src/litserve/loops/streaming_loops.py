@@ -68,15 +68,15 @@ class StreamingLoop(DefaultLoop):
                     x_enc,
                 )
 
-                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y_gen = _inject_context(
                     context,
                     lit_api.predict,
                     x,
                 )
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_gen = _inject_context(
                     context,
                     lit_api.encode_response,
@@ -87,8 +87,8 @@ class StreamingLoop(DefaultLoop):
                     self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)
                 self.put_response(transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
 
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
-                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
             except HTTPException as e:
                 self.put_response(
@@ -123,23 +123,23 @@ class StreamingLoop(DefaultLoop):
             if hasattr(lit_spec, "populate_context"):
                 lit_spec.populate_context(context, x_enc)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
             x = await _async_inject_context(
                 context,
                 lit_api.decode_request,
                 x_enc,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
             y_gen = await _async_inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
-            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
 
             # When using async, predict should return an async generator
             # and encode_response should handle async generators
@@ -158,7 +158,7 @@ class StreamingLoop(DefaultLoop):
                     self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)
 
             self.put_response(transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
-            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+            callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
         except HTTPException as e:
             self.put_response(
@@ -282,7 +282,7 @@ class BatchedStreamingLoop(DefaultLoop):
                     for input, context in zip(inputs, contexts):
                         lit_spec.populate_context(context, input)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
                 x = [
                     _inject_context(
                         context,
@@ -291,19 +291,19 @@ class BatchedStreamingLoop(DefaultLoop):
                     )
                     for input, context in zip(inputs, contexts)
                 ]
-                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
                 x = lit_api.batch(x)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y_iter = _inject_context(contexts, lit_api.predict, x)
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
                 unbatched_iter = lit_api.unbatch(y_iter)
 
-                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
-                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
                 # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
                 for y_batch in y_enc_iter:

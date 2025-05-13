@@ -58,8 +58,8 @@ def test_metric_logger(capfd):
     cb_runner = CallbackRunner()
     cb_runner._add_callbacks(cb)
     assert cb_runner._callbacks == [cb], "Callback not added to runner"
-    cb_runner.trigger_event(EventTypes.BEFORE_PREDICT, lit_api=None)
-    cb_runner.trigger_event(EventTypes.AFTER_PREDICT, lit_api=None)
+    cb_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=None)
+    cb_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=None)
 
     captured = capfd.readouterr()
     pattern = r"Prediction took \d+\.\d{2} seconds"
