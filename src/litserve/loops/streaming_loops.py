@@ -187,6 +187,7 @@ class StreamingLoop(DefaultLoop):
         async def process_requests():
             event_loop = asyncio.get_running_loop()
             pending_tasks = set()
+
             while True:
                 try:
                     response_queue_id, uid, timestamp, x_enc = await event_loop.run_in_executor(
