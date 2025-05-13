@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import json
 import sys
 import time
 from time import sleep
@@ -620,3 +621,37 @@ async def test_error_propagation_in_async_litapi():
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 501, "Server raises 501 error"
             assert resp.json() == {"detail": "decode request is bad"}, "decode request is bad"
+
+
+class TestAsyncStreamLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        for i in range(5):
+            yield self.model(i)
+
+    async def encode_response(self, output_stream):
+        for output in output_stream:
+            yield {"output": output}
+
+
+@pytest.mark.asyncio
+async def test_async_stream_litapi():
+    api = TestAsyncStreamLitAPI(enable_async=True)
+    server = LitServer(api, stream=True)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/predict", json={"input": 4.0}, timeout=10)
+            assert resp.status_code == 200, "Server response should be 200 (OK)"
+            chunks = []
+            async for line in resp.aiter_lines():
+                if line.strip():
+                    chunks.append(json.loads(line)["output"])
+            assert len(chunks) == 5, "Expected 5 chunks of output"
+            assert chunks == list(range(5)), "Expected output to be a sequence of integers from 0 to 4"
