@@ -191,7 +191,6 @@ class StreamingLoop(DefaultLoop):
                     response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
                     logger.debug("uid=%s", uid)
                 except (Empty, ValueError):
-                    await asyncio.sleep(0.1)  # Add small delay to prevent CPU spinning
                     continue
 
                 if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
