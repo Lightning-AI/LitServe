@@ -197,12 +197,14 @@ class SingleLoop(DefaultLoop):
         callback_runner: CallbackRunner,
     ):
         async def process_requests():
+            event_loop = asyncio.get_running_loop()
             pending_tasks = set()
             while True:
                 try:
-                    response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
+                    response_queue_id, uid, timestamp, x_enc = await event_loop.run_in_executor(
+                        None, request_queue.get, 1.0
+                    )
                 except (Empty, ValueError):
-                    await asyncio.sleep(0.1)  # Add small delay to prevent CPU spinning
                     continue
                 except KeyboardInterrupt:
                     self.kill()
@@ -233,7 +235,8 @@ class SingleLoop(DefaultLoop):
                         lit_spec,
                         transport,
                         callback_runner,
-                    )
+                    ),
+                    name=f"process_request_{uid}",
                 )
                 # Save a reference to the task's result to prevent it from being
                 # garbage-collected during execution.
