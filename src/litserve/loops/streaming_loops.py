@@ -185,10 +185,11 @@ class StreamingLoop(DefaultLoop):
         callback_runner: CallbackRunner,
     ):
         async def process_requests():
+            event_loop = asyncio.get_running_loop()
             pending_tasks = set()
             while True:
                 try:
-                    response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
+                    response_queue_id, uid, timestamp, x_enc = await event_loop.run_in_executor(None, request_queue.get, 1.0)
                     logger.debug("uid=%s", uid)
                 except (Empty, ValueError):
                     continue
@@ -213,7 +214,8 @@ class StreamingLoop(DefaultLoop):
                         lit_spec,
                         transport,
                         callback_runner,
-                    )
+                    ),
+                    name=f"streaming_request_{uid}",
                 )
                 pending_tasks.add(task)
                 task.add_done_callback(pending_tasks.discard)
