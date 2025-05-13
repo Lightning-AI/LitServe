@@ -1,8 +1,7 @@
-import dataclasses
 import logging
 from abc import ABC
-from typing import List, Union
 from enum import Enum
+from typing import List, Union
 
 logger = logging.getLogger(__name__)
 
