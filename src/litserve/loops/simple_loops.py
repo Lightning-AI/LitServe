@@ -201,7 +201,9 @@ class SingleLoop(DefaultLoop):
             pending_tasks = set()
             while True:
                 try:
-                    response_queue_id, uid, timestamp, x_enc = await event_loop.run_in_executor(None, request_queue.get, 1.0)
+                    response_queue_id, uid, timestamp, x_enc = await event_loop.run_in_executor(
+                        None, request_queue.get, 1.0
+                    )
                 except (Empty, ValueError):
                     continue
                 except KeyboardInterrupt:
