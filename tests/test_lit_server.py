@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import json
 import sys
 import time
 from time import sleep
@@ -565,24 +566,16 @@ async def test_async_litapi():
             assert resp.json()["output"] == 25.0, "output from Identity server must be same as input"
 
 
-class TestSleepAsyncLitAPI(ls.LitAPI):
-    def setup(self, device):
-        self.model = None
-
-    async def decode_request(self, request):
-        return request["input"]
-
+class TestSleepAsyncLitAPI(TestAsyncLitAPI):
     async def predict(self, x):
         # simulate a long-running task
         await asyncio.sleep(4)
         return x**2
 
-    async def encode_response(self, output):
-        return {"output": output}
-
 
 @pytest.mark.asyncio
-async def test_concurrent_async_inference():
+@pytest.mark.parametrize("num_requests", [10, 50, 100])
+async def test_concurrent_async_inference(num_requests):
     """Test that async API processes requests concurrently (not sequentially)."""
     api = TestSleepAsyncLitAPI(enable_async=True)
     server = LitServer(api)
@@ -591,7 +584,7 @@ async def test_concurrent_async_inference():
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             sleep(2)  # Sleep a bit to ensure the server is ready
-            num_requests = 10
+
             tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
             start = time.perf_counter()
             responses = await asyncio.gather(*tasks)
@@ -620,3 +613,77 @@ async def test_error_propagation_in_async_litapi():
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 501, "Server raises 501 error"
             assert resp.json() == {"detail": "decode request is bad"}, "decode request is bad"
+
+
+class TestAsyncStreamLitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        for i in range(5):
+            yield self.model(i)
+
+    async def encode_response(self, output_stream):
+        for output in output_stream:
+            yield {"output": output}
+
+
+@pytest.mark.asyncio
+async def test_async_stream_litapi():
+    api = TestAsyncStreamLitAPI(enable_async=True)
+    server = LitServer(api, stream=True)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/predict", json={"input": 4.0}, timeout=10)
+            assert resp.status_code == 200, "Server response should be 200 (OK)"
+            chunks = []
+            async for line in resp.aiter_lines():
+                if line.strip():
+                    chunks.append(json.loads(line)["output"])
+            assert len(chunks) == 5, "Expected 5 chunks of output"
+            assert chunks == list(range(5)), "Expected output to be a sequence of integers from 0 to 4"
+
+
+class TestSleepAsyncStreamLitAPI(TestAsyncStreamLitAPI):
+    async def predict(self, x):
+        for i in range(5):
+            await asyncio.sleep(0.5)  # Simulate streaming delay
+            yield i
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("num_requests", [10, 50, 100])
+async def test_concurrent_async_streaming_inference(num_requests):
+    api = TestSleepAsyncStreamLitAPI(enable_async=True)
+    server = LitServer(api, stream=True)
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            sleep(2)  # Sleep a bit to ensure the server is ready
+
+            # Prepare concurrent streaming requests using the parameterized num_requests
+            tasks = [ac.post("/predict", json={"input": 4.0}, timeout=10) for _ in range(num_requests)]
+            start = time.perf_counter()
+            responses = await asyncio.gather(*tasks)
+            elapsed = time.perf_counter() - start
+
+            # Collect and check streamed outputs for each response
+            for resp in responses:
+                assert resp.status_code == 200, "Server response should be 200 (OK)"
+                chunks = []
+                async for line in resp.aiter_lines():
+                    if line.strip():
+                        chunks.append(json.loads(line)["output"])
+                assert len(chunks) == 5, "Expected 5 chunks of output"
+                assert chunks == list(range(5)), "Expected output to be a sequence of integers from 0 to 4"
+
+            # All requests should finish in just over the streaming time for one request
+            assert elapsed < 4 + 4, (
+                f"Expected all requests to finish in just over 4s, plus some overhead, but took {elapsed:.2f}s."
+            )
