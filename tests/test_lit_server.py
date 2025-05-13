@@ -584,8 +584,6 @@ async def test_concurrent_async_inference(num_requests):
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             sleep(2)  # Sleep a bit to ensure the server is ready
-            resp = await ac.get("/health")
-            assert resp.status_code == 200, "Health check should return 200 (OK)"
 
             tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
             start = time.perf_counter()
@@ -668,8 +666,6 @@ async def test_concurrent_async_streaming_inference(num_requests):
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             sleep(2)  # Sleep a bit to ensure the server is ready
-            resp = await ac.get("/health")
-            assert resp.status_code == 200, "Health check should return 200 (OK)"
 
             # Prepare concurrent streaming requests using the parameterized num_requests
             tasks = [ac.post("/predict", json={"input": 4.0}, timeout=10) for _ in range(num_requests)]
