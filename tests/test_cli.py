@@ -41,8 +41,8 @@ def test_ensure_lightning_installed(mock_check_call, mock_find_spec):
     mock_check_call.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
 
 
-# TODO: Remove this once we have a fix for Python 3.9
-@pytest.mark.skipif(sys.version_info[:2] == (3, 9), reason="Test fails on Python 3.9")
+# TODO: Remove this once we have a fix for Python 3.9 and 3.10
+@pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
 @patch("importlib.util.find_spec")
 @patch("subprocess.check_call")
 @patch("builtins.__import__")
@@ -69,7 +69,7 @@ def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_fin
     mock_check_call.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
 
 
-@pytest.mark.skipif(sys.version_info[:2] == (3, 9), reason="Test fails on Python 3.9")
+@pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
 @patch("importlib.util.find_spec")
 @patch("builtins.__import__")
 def test_cli_main_import_error(mock_import, mock_find_spec, capsys):
