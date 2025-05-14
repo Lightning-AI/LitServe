@@ -369,7 +369,7 @@ class LitServer:
         try:
             yield
         finally:
-            self._callback_runner.trigger_event(EventTypes.ON_SERVER_END, litserver=self)
+            self._callback_runner.trigger_event(EventTypes.ON_SERVER_END.value, litserver=self)
 
             # Cancel the task
             task.cancel()
@@ -412,7 +412,7 @@ class LitServer:
 
     def register_endpoints(self):
         """Register endpoint routes for the FastAPI app and setup middlewares."""
-        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START, litserver=self)
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -449,7 +449,7 @@ class LitServer:
 
         async def predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
-                EventTypes.ON_REQUEST,
+                EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
                 litserver=self,
             )
@@ -478,12 +478,12 @@ class LitServer:
             if status == LitAPIStatus.ERROR:
                 logger.error("Error in request: %s", response)
                 raise HTTPException(status_code=500)
-            self._callback_runner.trigger_event(EventTypes.ON_RESPONSE, litserver=self)
+            self._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self)
             return response
 
         async def stream_predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
-                EventTypes.ON_REQUEST,
+                EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
                 litserver=self,
             )
@@ -502,7 +502,7 @@ class LitServer:
             response = call_after_stream(
                 self.data_streamer(q, data_available=event),
                 self._callback_runner.trigger_event,
-                EventTypes.ON_RESPONSE,
+                EventTypes.ON_RESPONSE.value,
                 litserver=self,
             )
             return StreamingResponse(response)

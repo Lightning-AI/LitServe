@@ -1,13 +1,12 @@
-import dataclasses
 import logging
 from abc import ABC
+from enum import Enum
 from typing import List, Union
 
 logger = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
-class EventTypes:
+class EventTypes(Enum):
     BEFORE_SETUP = "on_before_setup"
     AFTER_SETUP = "on_after_setup"
     BEFORE_DECODE_REQUEST = "on_before_decode_request"
