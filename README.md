@@ -100,10 +100,10 @@ Now run the server anywhere (local or cloud) via the command-line.
 
 ```bash
 # Deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
-lightning serve server.py
+lightning deploy server.py --cloud
 
 # Or run locally (self host anywhere)
-lightning serve server.py --local
+lightning deploy server.py
 ```
 Learn more about managed hosting on [Lightning AI](#hosting-options).
 
@@ -171,7 +171,7 @@ Self-hosting is ideal for hackers, students, and DIY developers while fully mana
 
 To host on [Lightning AI](https://lightning.ai/deploy), simply run the command, login and choose the cloud of your choice.
 ```bash
-lightning serve server.py
+lightning deploy server.py --cloud
 ```
 
 &nbsp;
