@@ -171,7 +171,7 @@ Self-hosting is ideal for hackers, students, and DIY developers while fully mana
 
 To host on [Lightning AI](https://lightning.ai/deploy), simply run the command, login and choose the cloud of your choice.
 ```bash
-lightning deploy server.py
+lightning deploy server.py --cloud
 ```
 
 &nbsp;
