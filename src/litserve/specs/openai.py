@@ -351,6 +351,15 @@ class OpenAISpec(LitSpec):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
 
         else:
+            for method in ["decode_request", "predict", "encode_response"]:
+                method_obj = getattr(lit_api, method)
+                if asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj):
+                    raise ValueError(
+                        f"'{method}' is defined as async/coroutine, but 'enable_async' is not set in LitAPI. "
+                        "Please set 'enable_async=True' in your LitAPI class or "
+                        "use synchronous (non-async) methods instead."
+                    )
+
             if not inspect.isgeneratorfunction(lit_api.predict):
                 raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 

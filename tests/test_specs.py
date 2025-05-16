@@ -486,6 +486,9 @@ async def test_openai_spec_with_async_lit_api_validation(openai_request_data):
     with pytest.raises(ValueError, match="encode_response is not a generator"):
         ls.LitServer(IncorrectAsyncAPI2(enable_async=True), spec=OpenAISpec())
 
+    with pytest.raises(ValueError, match="'enable_async' is not set in LitAPI."):
+        ls.LitServer(IncorrectAsyncAPI2(enable_async=False), spec=OpenAISpec())
+
 
 class AsyncOpenAILitAPI(ls.LitAPI):
     def setup(self, device):
