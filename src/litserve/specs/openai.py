@@ -344,6 +344,9 @@ class OpenAISpec(LitSpec):
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
 
         if lit_api.enable_async:
+            if not asyncio.iscoroutinefunction(lit_api.decode_request):
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("decode_request is not a coroutine"))
+
             if not inspect.isasyncgenfunction(lit_api.predict):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 
