@@ -457,3 +457,103 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
             assert len(resp2.json()["data"]) == 4, "Length of data should be 4"
             assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
             assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+class IncorrectAsyncAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def decode_request(self, request):
+        return request
+
+    async def predict(self, x):
+        return "This is a generated output"
+
+    async def encode_response(self, output):
+        return ChatMessage(role="assistant", content="This is a generated output")
+
+
+class IncorrectDecodeAsyncAPI(IncorrectAsyncAPI):
+    def decode_request(self, request):
+        return request
+
+    def _validate_async_methods(self):
+        return None
+
+
+class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
+    async def predict(self, x):
+        yield "This is a generated output"
+
+
+@pytest.mark.asyncio
+def test_openai_spec_asyncapi_decode_request_validation():
+    with pytest.raises(ValueError, match="decode_request is not a coroutine"):
+        ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
+
+
+@pytest.mark.asyncio
+def test_openai_spec_asyncapi_predict_validation():
+    with pytest.raises(ValueError, match="predict is not a generator"):
+        ls.LitServer(IncorrectAsyncAPI(enable_async=True), spec=OpenAISpec())
+
+
+@pytest.mark.asyncio
+def test_openai_spec_asyncapi_encode_response_validation():
+    with pytest.raises(ValueError, match="encode_response is not a generator"):
+        ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True), spec=OpenAISpec())
+
+
+@pytest.mark.asyncio
+def test_openai_asyncapi_enable_async_flag_validation():
+    with pytest.raises(ValueError, match="'enable_async' is not set in LitAPI."):
+        ls.LitServer(IncorrectAsyncAPI(enable_async=False), spec=OpenAISpec())
+
+
+class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def predict(self, x):
+        yield "This is a generated output"
+
+    async def encode_response(self, output):
+        yield {"role": "assistant", "content": output}
+
+
+@pytest.mark.asyncio
+def test_openai_asyncapi_decode_not_implemented():
+    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+        ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+
+
+class AsyncOpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+        self.sentence = ["This", " is", " a", " sample", " response"]
+
+    async def decode_request(self, request):
+        return request
+
+    async def predict(self, x):
+        for token in self.sentence:
+            yield token
+
+    async def encode_response(self, output_stream, context):
+        for output in output_stream:
+            yield {"role": "assistant", "content": output}
+
+
+@pytest.mark.asyncio
+async def test_openai_spec_with_async_litapi(openai_request_data):
+    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a sample response", (
+                "LitAPI predict response should match with the generated output"
+            )
