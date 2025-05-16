@@ -327,7 +327,7 @@ class BatchedLoop(DefaultLoop):
 
                 if len(outputs) != num_inputs:
                     logger.error(
-                        "LitAPI.predict/unbatch returned {len(outputs)} outputs, but expected {num_inputs}. "
+                        f"LitAPI.predict/unbatch returned {len(outputs)} outputs, but expected {num_inputs}. "
                         "Please check the predict/unbatch method of the LitAPI implementation."
                     )
                     raise HTTPException(500, "Batch size mismatch")
