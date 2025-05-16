@@ -263,6 +263,58 @@ class ExampleAPI(ls.LitAPI):
 ```
 """
 
+ASYNC_LITAPI_VALIDATION_MSG = """LitAPI.predict and LitAPI.encode_response must be async generators (use 'async def' and
+ 'yield' or 'yield from') while using the OpenAISpec with async enabled in LitAPI.
+
+Error: {}
+
+Please follow the below examples for guidance on how to use the spec in async mode:
+
+If your current code looks like this:
+
+```
+import litserve as ls
+from litserve.specs.openai import ChatMessage
+
+class ExampleAPI(ls.LitAPI):
+    ...
+    def predict(self, x):
+        return "This is a generated output"
+
+    def encode_response(self, output: dict):
+        return ChatMessage(role="assistant", content="This is a custom encoded output")
+```
+
+You should modify it to:
+
+```
+import litserve as ls
+from litserve.specs.openai import ChatMessage
+
+class ExampleAPI(ls.LitAPI):
+    ...
+    async def predict(self, x):
+        yield "This is a generated output"
+
+    async def encode_response(self, output):
+        yield ChatMessage(role="assistant", content="This is a custom encoded output")
+```
+
+You can also yield responses in chunks. LitServe will handle the streaming for you:
+
+```
+class ExampleAPI(ls.LitAPI):
+    ...
+    async def predict(self, x):
+        async for out in self.model(x):
+            yield out
+
+    async def encode_response(self, output):
+        async for out in output:
+            yield ChatMessage(role="assistant", content=out)
+```
+"""
+
 
 class OpenAISpec(LitSpec):
     def __init__(
@@ -280,7 +332,15 @@ class OpenAISpec(LitSpec):
     def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
-        if not inspect.isgeneratorfunction(lit_api.predict):
+        lit_api_is_async = lit_api.enable_async
+        # validations for async
+        if lit_api_is_async and not (
+            asyncio.iscoroutinefunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict)
+        ):
+            raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.""")
+
+        # validations for non async methods
+        if not (lit_api_is_async and inspect.isgeneratorfunction(lit_api.predict)):
             raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
