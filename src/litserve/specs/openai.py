@@ -332,20 +332,21 @@ class OpenAISpec(LitSpec):
     def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
-        lit_api_is_async = lit_api.enable_async
-        # validations for async
-        if lit_api_is_async and not (
-            asyncio.iscoroutinefunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict)
-        ):
-            raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.""")
-
-        # validations for non async methods
-        if not (lit_api_is_async and inspect.isgeneratorfunction(lit_api.predict)):
-            raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
-
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
-        if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
-            raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+
+        if lit_api.enable_async:
+            if not inspect.isasyncgenfunction(lit_api.predict):
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict is not a generator"))
+
+            if not inspect.isasyncgenfunction(lit_api.encode_response):
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+
+        else:
+            if not inspect.isgeneratorfunction(lit_api.predict):
+                raise ValueError(LITAPI_VALIDATION_MSG.format("predict is not a generator"))
+
+            if not is_encode_response_original and not inspect.isgeneratorfunction(lit_api.encode_response):
+                raise ValueError(LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
 
     def setup(self, server: "LitServer"):
         super().setup(server)
