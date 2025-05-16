@@ -341,13 +341,9 @@ class OpenAISpec(LitSpec):
     def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
-        is_decode_request_original = lit_api.decode_request.__code__ is LitAPI.decode_request.__code__
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
 
         if lit_api.enable_async:
-            if is_decode_request_original or is_encode_response_original:
-                raise
-
             if not inspect.isasyncgenfunction(lit_api.predict):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict is not a generator"))
 
