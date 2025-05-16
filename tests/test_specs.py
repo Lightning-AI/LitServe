@@ -510,6 +510,23 @@ def test_openai_asyncapi_enable_async_flag_validation():
         ls.LitServer(IncorrectAsyncAPI(enable_async=False), spec=OpenAISpec())
 
 
+class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def predict(self, x):
+        yield "This is a generated output"
+
+    async def encode_response(self, output):
+        yield {"role": "assistant", "content": output}
+
+
+@pytest.mark.asyncio
+def test_openai_asyncapi_decode_not_implemented():
+    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+        ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+
+
 class AsyncOpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
