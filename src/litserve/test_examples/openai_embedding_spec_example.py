@@ -9,9 +9,6 @@ class TestEmbedAPI(LitAPI):
     def setup(self, device):
         self.model = None
 
-    def decode_request(self, request) -> List[str]:
-        return request.ensure_list()
-
     def predict(self, x) -> List[List[float]]:
         return np.random.rand(len(x), 768).tolist()
 

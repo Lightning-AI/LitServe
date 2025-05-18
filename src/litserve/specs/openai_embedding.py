@@ -78,25 +78,44 @@ Please follow the example below for guidance on how to use the OpenAI Embedding 
 ```python
 import numpy as np
 from typing import List
-from litserve.specs import EmbeddingRequest
-from litserve import LitAPI, OpenAIEmbeddingSpec
+from litserve.specs import OpenAIEmbeddingSpec, EmbeddingRequest
+import litserve as ls
 
-class TestAPI(LitAPI):
+class TestAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def decode_request(self, request: EmbeddingRequest) -> List[str]:
-        return request.input
+    def predict(self, inputs) -> List[List[float]]:
+        # inputs is a string
+        return np.random.rand(1, 768).tolist()
 
-    def predict(self, x) -> List[List[float]]:
-        return np.random.rand(len(x), 768).tolist()
-
-    def encode_response(self, output) -> dict:
-        return {"embeddings": output}
 
 if __name__ == "__main__":
-    import litserve as ls
     server = ls.LitServer(TestAPI(), spec=OpenAIEmbeddingSpec())
+    server.run()
+```
+"""
+
+EMBEDDING_API_EXAMPLE_BATCHING = """
+Please follow the example below for guidance on how to use the OpenAI Embedding spec with batching:
+
+```python
+import numpy as np
+from typing import List
+from litserve.specs import OpenAIEmbeddingSpec, EmbeddingRequest
+import litserve as ls
+
+class TestAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, inputs) -> List[List[float]]:
+        # inputs is a list of texts (List[str])
+        return np.random.rand(len(inputs), 768)
+
+if __name__ == "__main__":
+    api = TestAPI(max_batch_size=2, batch_timeout=0.4)
+    server = ls.LitServer(api, spec=OpenAIEmbeddingSpec())
     server.run()
 ```
 """
@@ -149,7 +168,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         return {"embeddings": output} | usage
 
     def _validate_response(self, response: Union[dict, List[Embedding], Any]) -> None:
-        if isinstance(response, List[Embedding]):
+        if isinstance(response, list) and all(isinstance(item, Embedding) for item in response):
             return
         if not isinstance(response, (dict, EmbeddingResponse)):
             raise ValueError(
@@ -184,16 +203,26 @@ class OpenAIEmbeddingSpec(LitSpec):
             if isinstance(embeddings, np.ndarray):
                 ndim = embeddings.ndim
 
+        # expand_dims for torch.Tensor or np.ndarray
         if ndim == 1:
             embeddings = embeddings[None, :]
 
         if ndim is not None:
             embeddings = embeddings.tolist()
 
+        # expand dims for list of floats
+        if isinstance(embeddings, list) and isinstance(embeddings[0], (int, float)):
+            embeddings = [embeddings]
+
         # check if we have total num_items number of embeddings vectors
         num_response_items = len(embeddings)
         if num_response_items != num_items:
-            raise ValueError(f"Expected {num_items} embeddings, but got {len(embeddings)}")
+            logger.debug("mismatch between number of requested and returned embeddings: %s", embeddings)
+            raise ValueError(
+                f"Mismatch between requested and returned embeddings: "
+                f"expected {num_items}, but got {num_response_items}. "
+                f"This may indicate a bug in the LitAPI embedding implementation."
+            )
 
         result = []
         for i, embedding in enumerate(embeddings):
@@ -203,6 +232,15 @@ class OpenAIEmbeddingSpec(LitSpec):
 
     async def embeddings_endpoint(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
+        num_items = request.get_num_items()
+        if num_items > 1:
+            raise HTTPException(
+                status_code=status_code.HTTP_400_BAD_REQUEST,
+                detail=f"OpenAIEmbedding specs doesn't support client side batching. "
+                "Please send a single input or enable batching in the LitAPI implementation.\n\n"
+                f"{EMBEDDING_API_EXAMPLE_BATCHING}",
+            )
+
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
         event = asyncio.Event()
@@ -223,7 +261,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         logger.debug(response)
 
         self._validate_response(response)
-        data: List[Embedding] = self._handle_embedding_response(response["embeddings"], request.get_num_items())
+        data: List[Embedding] = self._handle_embedding_response(response["embeddings"], num_items)
 
         usage = UsageInfo(**response)
 
