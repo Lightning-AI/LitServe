@@ -211,7 +211,7 @@ class OpenAIEmbeddingSpec(LitSpec):
             embeddings = embeddings.tolist()
 
         # expand dims for list of floats
-        if isinstance(embeddings, list) and isinstance(embeddings[0], (int, float)):
+        if isinstance(embeddings, (list, tuple)) and isinstance(embeddings[0], (int, float)):
             embeddings = [embeddings]
 
         # check if we have total num_items number of embeddings vectors
