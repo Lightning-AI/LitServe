@@ -390,3 +390,20 @@ def test_e2e_default_async_streaming():
             outputs.append(json.loads(line.decode("utf-8"))["output"])
 
     assert outputs == list(range(10)), "server didn't return expected output"
+
+
+@e2e_from_file("tests/e2e/openai_embedding_with_batching.py")
+def test_e2e_openai_embedding_with_batching():
+    model = "text-embedding-3-large"
+    client = OpenAI(
+        base_url="http://127.0.0.1:8000/v1",
+        api_key="lit",  # required, but unused
+    )
+    response = client.embeddings.create(
+        model=model,
+        input=[
+            "How are you?",
+        ],
+    )
+    assert response.model == model, f"Expected model to be {model} but got {response.model}"
+    assert len(response.data[0].embedding) == 768, f"Expected 768 dimensions but got {len(response.data[0].embedding)}"
