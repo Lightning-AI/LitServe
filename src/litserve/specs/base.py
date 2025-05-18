@@ -25,6 +25,7 @@ class LitSpec:
         self._endpoints = []
 
         self._server: LitServer = None
+        self._max_batch_size = 1
 
     @property
     def stream(self):

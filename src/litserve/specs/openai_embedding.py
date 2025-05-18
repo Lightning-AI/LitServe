@@ -233,12 +233,13 @@ class OpenAIEmbeddingSpec(LitSpec):
     async def embeddings_endpoint(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
         num_items = request.get_num_items()
-        if num_items > 1:
+        if num_items > 1 and self._max_batch_size > 1:
             raise HTTPException(
-                status_code=status_code.HTTP_400_BAD_REQUEST,
-                detail=f"OpenAIEmbedding specs doesn't support client side batching. "
-                "Please send a single input or enable batching in the LitAPI implementation.\n\n"
-                f"{EMBEDDING_API_EXAMPLE_BATCHING}",
+                status_code=400,
+                detail=(
+                    "The OpenAIEmbedding spec does not support dynamic batching when client-side batching is used. "
+                    "To resolve this, either set `max_batch_size=1` or send a single input from the client."
+                ),
             )
 
         logger.debug("Received embedding request: %s", request)
