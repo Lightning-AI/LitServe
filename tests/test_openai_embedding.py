@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import copy
 
 import numpy as np
 import pytest
@@ -131,26 +132,51 @@ async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_re
 class TestOpenAIWithBatching(TestEmbedAPI):
     def predict(self, batch):
         assert len(batch) == 2, f"Batch size should be 2 but got {len(batch)}"
-        return [np.random.rand(len(x), 768).tolist() for x in batch]
+        return np.random.rand(len(batch), 768).tolist()
 
 
 @pytest.mark.asyncio
-async def test_openai_embedding_spec_with_batching(openai_embedding_request_data, openai_embedding_request_data_array):
-    server = ls.LitServer(TestOpenAIWithBatching(), spec=ls.OpenAIEmbeddingSpec(), max_batch_size=2, batch_timeout=10)
+async def test_openai_embedding_spec_with_batching(openai_embedding_request_data):
+    server = ls.LitServer(TestOpenAIWithBatching(max_batch_size=2, batch_timeout=10), spec=ls.OpenAIEmbeddingSpec())
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             # send concurrent requests
+            req1 = copy.deepcopy(openai_embedding_request_data)
+            req2 = copy.deepcopy(openai_embedding_request_data)
+            req2["input"] = "This is the second request"
             resp1, resp2 = await asyncio.gather(
-                ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10),
-                ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10),
+                ac.post("/v1/embeddings", json=req1, timeout=10),
+                ac.post("/v1/embeddings", json=req2, timeout=10),
             )
 
-            assert resp1.status_code == 200, "Status code should be 200"
-            assert resp2.status_code == 200, "Status code should be 200"
+            assert resp1.status_code == 200, (
+                f"Status code should be 200, but got {resp1.status_code}, response: {resp1.content}"
+            )
+            assert resp2.status_code == 200, (
+                f"Status code should be 200, but got {resp2.status_code}, response: {resp2.content}"
+            )
             assert len(resp1.json()["data"]) == 1, "Length of data should be 1"
             assert len(resp2.json()["data"]) == 4, "Length of data should be 4"
             assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
             assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+@pytest.mark.asyncio
+async def test_batching_with_client_side_batching(openai_embedding_request_data_array):
+    server = ls.LitServer(TestOpenAIWithBatching(max_batch_size=2, batch_timeout=10), spec=ls.OpenAIEmbeddingSpec())
+
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10)
+
+            assert resp.status_code == 400, "Cient side batching is not supported with dynamic batching"
+            assert (
+                resp.json()["detail"]
+                == "The OpenAIEmbedding spec does not support dynamic batching when client-side batching is used. "
+                "To resolve this, either set `max_batch_size=1` or send a single input from the client."
+            )
