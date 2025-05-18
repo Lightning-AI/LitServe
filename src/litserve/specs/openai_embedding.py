@@ -17,7 +17,7 @@ import logging
 import sys
 import time
 import uuid
-from typing import TYPE_CHECKING, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, Union
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
@@ -139,15 +139,19 @@ class OpenAIEmbeddingSpec(LitSpec):
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
         return request.input
 
-    def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
+    def encode_response(
+        self, output: List[List[float]], context_kwargs: Optional[dict] = None
+    ) -> Union[dict, EmbeddingResponse]:
         usage = {
             "prompt_tokens": context_kwargs.get("prompt_tokens", 0) if context_kwargs else 0,
             "total_tokens": context_kwargs.get("total_tokens", 0) if context_kwargs else 0,
         }
         return {"embeddings": output} | usage
 
-    def _validate_response(self, response: dict) -> None:
-        if not isinstance(response, dict):
+    def _validate_response(self, response: Union[dict, List[Embedding], Any]) -> None:
+        if isinstance(response, List[Embedding]):
+            return
+        if not isinstance(response, (dict, EmbeddingResponse)):
             raise ValueError(
                 f"Expected response to be a dictionary, but got type {type(response)}.",
                 "The response should be a dictionary to ensure proper compatibility with the OpenAIEmbeddingSpec.\n\n"
@@ -218,10 +222,8 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         logger.debug(response)
 
-        print(response["embeddings"].shape)
-
         self._validate_response(response)
-        data = self._handle_embedding_response(response["embeddings"], request.get_num_items())
+        data: List[Embedding] = self._handle_embedding_response(response["embeddings"], request.get_num_items())
 
         usage = UsageInfo(**response)
 
