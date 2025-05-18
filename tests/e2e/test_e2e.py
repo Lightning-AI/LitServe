@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 
 import psutil
@@ -399,11 +400,17 @@ def test_e2e_openai_embedding_with_batching():
         base_url="http://127.0.0.1:8000/v1",
         api_key="lit",  # required, but unused
     )
-    response = client.embeddings.create(
-        model=model,
-        input=[
-            "How are you?",
-        ],
-    )
-    assert response.model == model, f"Expected model to be {model} but got {response.model}"
-    assert len(response.data[0].embedding) == 768, f"Expected 768 dimensions but got {len(response.data[0].embedding)}"
+    futures = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures.append(executor.submit(client.embeddings.create, model=model, input=["This is the first request"]))
+        futures.append(executor.submit(client.embeddings.create, model=model, input=["This is the second request"]))
+        futures.append(executor.submit(client.embeddings.create, model=model, input=["This is the first request"]))
+        futures.append(executor.submit(client.embeddings.create, model=model, input=["This is the second request"]))
+
+    responses = [future.result() for future in futures]
+    for response in responses:
+        assert response.model == model, f"Expected model to be {model} but got {response.model}"
+        assert len(response.data[0].embedding) == 768, (
+            f"Expected 768 dimensions but got {len(response.data[0].embedding)}"
+        )
+    assert len(responses) == 4, f"Expected 4 responses but got {len(responses)}"

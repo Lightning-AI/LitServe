@@ -159,7 +159,7 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
                 f"Status code should be 200, but got {resp2.status_code}, response: {resp2.content}"
             )
             assert len(resp1.json()["data"]) == 1, "Length of data should be 1"
-            assert len(resp2.json()["data"]) == 4, "Length of data should be 4"
+            assert len(resp2.json()["data"]) == 1, "Length of data should be 1"
             assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
             assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
 
