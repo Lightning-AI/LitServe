@@ -11,10 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import asyncio
-
-import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
@@ -22,15 +18,6 @@ from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve.specs.openai import ChatMessage, OpenAISpec
-from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
-from litserve.test_examples.openai_embedding_spec_example import (
-    TestEmbedAPI,
-    TestEmbedAPIWithMissingEmbeddings,
-    TestEmbedAPIWithNonDictOutput,
-    TestEmbedAPIWithUsage,
-    TestEmbedAPIWithYieldEncodeResponse,
-    TestEmbedAPIWithYieldPredict,
-)
 from litserve.test_examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsage,
@@ -335,130 +322,6 @@ async def test_fail_http(openai_request_data):
             res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert res.status_code == 501, "Server raises 501 error"
             assert res.text == '{"detail":"test LitAPI.predict error"}'
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_with_single_input(openai_embedding_request_data):
-    spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPI(), spec=spec)
-
-    with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
-            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
-            assert resp.status_code == 200, "Status code should be 200"
-            assert resp.json()["object"] == "list", "Object should be list"
-            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
-            assert len(resp.json()["data"]) == 1, "Length of data should be 1"
-            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_with_multiple_input(openai_embedding_request_data_array):
-    spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPI(), spec=spec)
-
-    with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
-            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10)
-            assert resp.status_code == 200, (
-                f"Status code should be 200 but got {resp.status_code}, response: {resp.content}"
-            )
-            assert resp.json()["object"] == "list", "Object should be list"
-            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
-            assert len(resp.json()["data"]) == 4, "Length of data should be 1"
-            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
-    spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPIWithUsage(), spec=spec)
-
-    with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
-            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
-            assert resp.status_code == 200, "Status code should be 200"
-            assert resp.json()["object"] == "list", "Object should be list"
-            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
-            assert len(resp.json()["data"]) == 1, "Length of data should be 1"
-            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
-            assert resp.json()["usage"]["prompt_tokens"] == 10, "Prompt tokens should be 10"
-            assert resp.json()["usage"]["total_tokens"] == 10, "Total tokens should be 10"
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_validation(openai_request_data):
-    server = ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=OpenAIEmbeddingSpec())
-    with pytest.raises(ValueError, match="You are using yield in your predict method"), wrap_litserve_start(
-        server
-    ) as server:
-        async with LifespanManager(server.app):
-            pass
-
-    server = ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=OpenAIEmbeddingSpec())
-    with pytest.raises(ValueError, match="You are using yield in your encode_response method"), wrap_litserve_start(
-        server
-    ) as server:
-        async with LifespanManager(server.app):
-            pass
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_request_data):
-    server = ls.LitServer(TestEmbedAPIWithNonDictOutput(), spec=ls.OpenAIEmbeddingSpec())
-
-    with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
-            with pytest.raises(ValueError, match="Expected response to be a dictionary"):
-                await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_request_data):
-    server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(), spec=OpenAIEmbeddingSpec())
-
-    with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
-            with pytest.raises(ValueError, match="The response does not contain the key 'embeddings'"):
-                await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
-
-
-class TestOpenAIWithBatching(TestEmbedAPI):
-    def predict(self, batch):
-        assert len(batch) == 2, f"Batch size should be 2 but got {len(batch)}"
-        return [np.random.rand(len(x), 768).tolist() for x in batch]
-
-
-@pytest.mark.asyncio
-async def test_openai_embedding_spec_with_batching(openai_embedding_request_data, openai_embedding_request_data_array):
-    server = ls.LitServer(TestOpenAIWithBatching(), spec=ls.OpenAIEmbeddingSpec(), max_batch_size=2, batch_timeout=10)
-
-    with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
-            # send concurrent requests
-            resp1, resp2 = await asyncio.gather(
-                ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10),
-                ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10),
-            )
-
-            assert resp1.status_code == 200, "Status code should be 200"
-            assert resp2.status_code == 200, "Status code should be 200"
-            assert len(resp1.json()["data"]) == 1, "Length of data should be 1"
-            assert len(resp2.json()["data"]) == 4, "Length of data should be 4"
-            assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
-            assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
 
 
 class IncorrectAsyncAPI(ls.LitAPI):

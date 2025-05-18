@@ -10,7 +10,8 @@ class TestEmbedAPI(LitAPI):
         self.model = None
 
     def predict(self, x) -> List[List[float]]:
-        return np.random.rand(768).tolist()
+        n = len(x) if isinstance(x, list) else 1
+        return np.random.rand(n, 768).tolist()
 
     def encode_response(self, output) -> dict:
         return {"embeddings": output}
