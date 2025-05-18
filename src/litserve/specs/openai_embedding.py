@@ -14,6 +14,7 @@
 import asyncio
 import inspect
 import logging
+import sys
 import time
 import uuid
 from typing import TYPE_CHECKING, List, Literal, Optional, Union
@@ -28,6 +29,9 @@ from litserve.utils import LitAPIStatus
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    import numpy as np
+    import torch
+
     from litserve import LitServer
 
 
@@ -37,6 +41,14 @@ class EmbeddingRequest(BaseModel):
     dimensions: Optional[int] = None
     encoding_format: Literal["float", "base64"] = "float"
     user: Optional[str] = None
+
+    def get_num_items(self) -> int:
+        """Return the number of sentences or tokens in the input."""
+        if isinstance(self.input, list):
+            if isinstance(self.input[0], list):
+                return len(self.input[0])
+            return len(self.input)
+        return 1
 
     def ensure_list(self):
         return self.input if isinstance(self.input, list) else [self.input]
@@ -93,7 +105,7 @@ class OpenAIEmbeddingSpec(LitSpec):
     def __init__(self):
         super().__init__()
         # register the endpoint
-        self.add_endpoint("/v1/embeddings", self.embeddings, ["POST"])
+        self.add_endpoint("/v1/embeddings", self.embeddings_endpoint, ["POST"])
         self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 
     def setup(self, server: "LitServer"):
@@ -152,7 +164,39 @@ class OpenAIEmbeddingSpec(LitSpec):
                 f"{EMBEDDING_API_EXAMPLE}"
             )
 
-    async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
+    def _handle_embedding_response(
+        self, embeddings: Union[List, "np.ndarray", "torch.Tensor", "List[List[float]]"], num_items: int = 1
+    ) -> List[Embedding]:
+        ndim = None
+        if "torch" in sys.modules:
+            import torch
+
+            if isinstance(embeddings, torch.Tensor):
+                ndim = embeddings.ndim
+        if "numpy" in sys.modules:
+            import numpy as np
+
+            if isinstance(embeddings, np.ndarray):
+                ndim = embeddings.ndim
+
+        if ndim == 1:
+            embeddings = embeddings[None, :]
+
+        if ndim is not None:
+            embeddings = embeddings.tolist()
+
+        # check if we have total num_items number of embeddings vectors
+        num_response_items = len(embeddings)
+        if num_response_items != num_items:
+            raise ValueError(f"Expected {num_items} embeddings, but got {len(embeddings)}")
+
+        result = []
+        for i, embedding in enumerate(embeddings):
+            result.append(Embedding(index=i, embedding=embedding))
+
+        return result
+
+    async def embeddings_endpoint(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
@@ -173,10 +217,12 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         logger.debug(response)
 
+        print(response["embeddings"].shape)
+
         self._validate_response(response)
+        data = self._handle_embedding_response(response["embeddings"], request.get_num_items())
 
         usage = UsageInfo(**response)
-        data = [Embedding(index=i, embedding=embedding) for i, embedding in enumerate(response["embeddings"])]
 
         return EmbeddingResponse(data=data, model=request.model, usage=usage)
 
