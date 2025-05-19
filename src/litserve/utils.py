@@ -188,27 +188,32 @@ async def _stream_gen_from_thread(gen_func, *args, **kwargs):
 def asyncify(func):
     """Decorator that converts any function type to a consistent async interface.
 
-    Works with:
-    - Regular sync functions (runs in thread pool)
-    - Sync generators (streams through async generator)
-    - Async functions (preserves behavior)
-    - Async generators (preserves behavior)
+    - Regular sync functions -> run in thread pool and return via coroutine
+    - Sync generators -> converted to async generators that stream values
+    - Async functions -> preserved as is
+    - Async generators -> preserved as is
 
     """
+    # Already an async generator - return as is
+    if inspect.isasyncgenfunction(func):
+        return func
 
-    async def wrapper(*args, **kwargs):
-        if inspect.isgeneratorfunction(func):
-            return _stream_gen_from_thread(func, *args, **kwargs)
+    # Already a coroutine function - return as is
+    if asyncio.iscoroutinefunction(func):
+        return func
 
-        if asyncio.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
+    # Handle regular generator
+    if inspect.isgeneratorfunction(func):
 
-        if inspect.isasyncgenfunction(func):
-            return func(*args, **kwargs)
+        async def async_gen_wrapper(*args, **kwargs):
+            return await _stream_gen_from_thread(func, *args, **kwargs)
 
-        # Handle regular functions in thread
+        return async_gen_wrapper
+
+    # Handle regular function
+    async def async_wrapper(*args, **kwargs):
         loop = asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=1) as executor:
             return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))
 
-    return wrapper
+    return async_wrapper
