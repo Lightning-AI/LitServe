@@ -176,6 +176,7 @@ Streaming example:
 
         if spec:
             self._spec = spec
+            spec._max_batch_size = self.max_batch_size
             spec.pre_setup(self)
 
     def set_logger_queue(self, queue: Queue):

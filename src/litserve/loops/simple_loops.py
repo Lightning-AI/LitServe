@@ -326,11 +326,14 @@ class BatchedLoop(DefaultLoop):
                 outputs = lit_api.unbatch(y)
 
                 if len(outputs) != num_inputs:
+                    actual = len(outputs)
                     logger.error(
-                        f"LitAPI.predict/unbatch returned {len(outputs)} outputs, but expected {num_inputs}. "
-                        "Please check the predict/unbatch method of the LitAPI implementation."
+                        f"LitAPI.predict/unbatch returned {actual} outputs, but expected {num_inputs}. "
+                        "This suggests a possible issue in the predict or unbatch implementation.\n"
+                        "Hint: Ensure that LitAPI.predict returns a list with one prediction per input — "
+                        "the length of the returned list should match the number of inputs."
                     )
-                    raise HTTPException(500, "Batch size mismatch")
+                    raise HTTPException(500, detail="Batch size mismatch")
 
                 callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_list = []
