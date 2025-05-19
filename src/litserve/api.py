@@ -52,14 +52,14 @@ class LitAPI(ABC):
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
 
-        # asyncify default decode_request if not implemented by user when enable_async is True
+        # Asyncify default decode_request if not implemented by user when enable_async is True
         if self.enable_async and not asyncio.iscoroutinefunction(self.decode_request):
             self.decode_request = self._asyncify(self.decode_request)
 
         self._validate_async_methods()
 
     def _asyncify(self, func):
-        """Wrap a function to be async if enable_async is True."""
+        """Wrap a synchronous function to be async using asyncio.to_thread."""
 
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
