@@ -54,6 +54,14 @@ class LitAPI(ABC):
 
         # Asyncify default decode_request if not implemented by user when enable_async is True
         if self.enable_async and not asyncio.iscoroutinefunction(self.decode_request):
+            warnings.warn(
+                "'decode_request' is not implemented as an async coroutine. "
+                "Since 'enable_async=True', the default implementation will be wrapped to run asynchronously. "
+                "To avoid this warning and ensure proper async support, "
+                "please override 'decode_request' as 'async def decode_request(...)'.",
+                UserWarning,
+                stacklevel=2,
+            )
             self.decode_request = self._asyncify(self.decode_request)
 
         self._validate_async_methods()
