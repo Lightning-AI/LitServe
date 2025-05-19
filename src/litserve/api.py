@@ -16,6 +16,7 @@ import inspect
 import json
 import warnings
 from abc import ABC, abstractmethod
+from functools import wraps
 from queue import Queue
 from typing import Callable, Optional
 
@@ -50,7 +51,21 @@ class LitAPI(ABC):
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
+
+        # asyncify default decode_request if not implemented by user when enable_async is True
+        if self.enable_async and not asyncio.iscoroutinefunction(self.decode_request):
+            self.decode_request = self._asyncify(self.decode_request)
+
         self._validate_async_methods()
+
+    def _asyncify(self, func):
+        """Wrap a function to be async if enable_async is True."""
+
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            return await asyncio.to_thread(func, *args, **kwargs)
+
+        return async_wrapper
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
