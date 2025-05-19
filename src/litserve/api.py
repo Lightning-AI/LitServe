@@ -59,25 +59,11 @@ class LitAPI(ABC):
             for method in ["decode_request", "predict", "encode_response"]:
                 method_obj = getattr(self, method)
                 if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
-                    raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.
-
-Please either set enable_async=False or implement the following methods as coroutines:
-Example:
-    class MyLitAPI(LitAPI):
-        async def decode_request(self, request, **kwargs):
-            return request
-        async def predict(self, x, **kwargs):
-            return x
-        async def encode_response(self, output, **kwargs):
-            return output
-
-Streaming example:
-    class MyStreamingAPI(LitAPI):
-        async def predict(self, x, **kwargs):
-            for i in range(10):
-                await asyncio.sleep(0.1)  # simulate async work
-                yield f"Token {i}: {x}"
-""")
+                    warnings.warn(
+                        f"enable_async set to True but {method} is not a coroutine or async generator. "
+                        "LitServe will asyncify the method.",
+                        UserWarning,
+                    )
 
     @abstractmethod
     def setup(self, device):
