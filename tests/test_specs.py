@@ -522,8 +522,8 @@ class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
 
 
 @pytest.mark.asyncio
-def test_openai_asyncapi_decode_not_implemented():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+def test_openai_asyncapi_decode_not_implemented_warning():
+    with pytest.warns(UserWarning, match="'decode_request' is not implemented as an async coroutine."):
         ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
 
 
