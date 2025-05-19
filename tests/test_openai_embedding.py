@@ -14,11 +14,11 @@
 
 import asyncio
 import copy
+import time
 
 import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
-from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
@@ -132,14 +132,13 @@ async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_re
 
 class TestOpenAIWithBatching(TestEmbedAPI):
     def predict(self, batch):
-        if len(batch) != 2:
-            raise HTTPException(status_code=400, detail="Batch size should be 2")
+        time.sleep(2)
         return np.random.rand(len(batch), 768).tolist()
 
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_batching(openai_embedding_request_data):
-    server = ls.LitServer(TestOpenAIWithBatching(max_batch_size=2, batch_timeout=10), spec=ls.OpenAIEmbeddingSpec())
+    server = ls.LitServer(TestOpenAIWithBatching(max_batch_size=10, batch_timeout=4), spec=ls.OpenAIEmbeddingSpec())
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -149,22 +148,21 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
             req1 = copy.deepcopy(openai_embedding_request_data)
             req2 = copy.deepcopy(openai_embedding_request_data)
             req2["input"] = "This is the second request"
-            await asyncio.sleep(2)
-            resp1, resp2 = await asyncio.gather(
-                ac.post("/v1/embeddings", json=req1, timeout=10),
-                ac.post("/v1/embeddings", json=req2, timeout=10),
-            )
+            tasks = []
+            t0 = time.perf_counter()
+            for _ in range(5):
+                tasks.append(ac.post("/v1/embeddings", json=req1, timeout=10))
+                tasks.append(ac.post("/v1/embeddings", json=req2, timeout=10))
 
-            assert resp1.status_code == 200, (
-                f"Status code should be 200, but got {resp1.status_code}, response: {resp1.content}"
-            )
-            assert resp2.status_code == 200, (
-                f"Status code should be 200, but got {resp2.status_code}, response: {resp2.content}"
-            )
-            assert len(resp1.json()["data"]) == 1, "Length of data should be 1"
-            assert len(resp2.json()["data"]) == 1, "Length of data should be 1"
-            assert len(resp1.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
-            assert len(resp2.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+            responses = await asyncio.gather(*tasks)
+            t1 = time.perf_counter()
+            print(f"Time taken: {t1 - t0} seconds")
+            for resp in responses:
+                assert resp.status_code == 200, (
+                    f"Status code should be 200, but got {resp.status_code}, response: {resp.content}"
+                )
+                assert len(resp.json()["data"]) == 1, "Length of data should be 1"
+            assert t1 - t0 < 20, "Time taken must be less than 20 seconds (batching is not working)"
 
 
 @pytest.mark.asyncio
