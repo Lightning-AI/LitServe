@@ -18,6 +18,7 @@ import copy
 import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
@@ -131,7 +132,8 @@ async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_re
 
 class TestOpenAIWithBatching(TestEmbedAPI):
     def predict(self, batch):
-        assert len(batch) == 2, f"Batch size should be 2 but got {len(batch)}"
+        if len(batch) != 2:
+            raise HTTPException(status_code=400, detail="Batch size should be 2")
         return np.random.rand(len(batch), 768).tolist()
 
 
@@ -147,6 +149,7 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
             req1 = copy.deepcopy(openai_embedding_request_data)
             req2 = copy.deepcopy(openai_embedding_request_data)
             req2["input"] = "This is the second request"
+            await asyncio.sleep(2)
             resp1, resp2 = await asyncio.gather(
                 ac.post("/v1/embeddings", json=req1, timeout=10),
                 ac.post("/v1/embeddings", json=req2, timeout=10),
