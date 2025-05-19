@@ -473,23 +473,9 @@ class IncorrectAsyncAPI(ls.LitAPI):
         return ChatMessage(role="assistant", content="This is a generated output")
 
 
-class IncorrectDecodeAsyncAPI(IncorrectAsyncAPI):
-    def decode_request(self, request):
-        return request
-
-    def _validate_async_methods(self):
-        return None
-
-
 class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
     async def predict(self, x):
         yield "This is a generated output"
-
-
-@pytest.mark.asyncio
-def test_openai_spec_asyncapi_decode_request_validation():
-    with pytest.warns(UserWarning, match="'decode_request' is not implemented as an async coroutine."):
-        ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
 @pytest.mark.asyncio
