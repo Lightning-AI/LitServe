@@ -42,7 +42,7 @@ from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
-from litserve.loops import LitLoop, get_default_loop, inference_worker
+from litserve.loops import LitLoop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
@@ -181,16 +181,23 @@ class LitServer:
             )
             lit_api.max_batch_size = max_batch_size
             lit_api.batch_timeout = batch_timeout
+
+        if loop is not None and loop != "auto":
+            warnings.warn(
+                "'loop' is being deprecated in `LitServer` and will be removed in version v0.3.0.\n\n"
+                "Please update your code to pass this argument to `LitAPI` instead.\n\n"
+                "Old usage:\n"
+                "    server = LitServer(api, loop=...)\n\n"
+                "New usage:\n"
+                "    api = LitAPI(loop=...)\n"
+                "    server = LitServer(api, ...)",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            lit_api._set_loop(loop)
+
         if isinstance(spec, LitSpec):
             stream = spec.stream
-
-        if loop is None:
-            loop = "auto"
-
-        if isinstance(loop, str) and loop != "auto":
-            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
-        if loop == "auto":
-            loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
 
         if middlewares is None:
             middlewares = []
@@ -239,7 +246,6 @@ class LitServer:
             warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
             fast_queue = False
 
-        self._loop: LitLoop = loop
         self.api_path = api_path
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path
@@ -248,7 +254,7 @@ class LitServer:
         lit_api.stream = stream
         lit_api.request_timeout = self.timeout
         lit_api.pre_setup(spec=spec)
-        self._loop.pre_setup(lit_api, spec=spec)
+        lit_api.loop.pre_setup(lit_api, spec=spec)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None
@@ -265,7 +271,6 @@ class LitServer:
         self.lit_api = lit_api
         self.lit_spec = spec
         self.workers_per_device = workers_per_device
-        self.stream = stream
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
@@ -336,10 +341,8 @@ class LitServer:
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    self.stream,
                     self.workers_setup_status,
                     self._callback_runner,
-                    self._loop,
                 ),
             )
             process.start()
@@ -361,7 +364,7 @@ class LitServer:
         future = response_queue_to_buffer(
             transport,
             self.response_buffer,
-            self.stream,
+            self.lit_api.stream,
             app.response_queue_id,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
@@ -440,7 +443,7 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "stream": self.stream,
+                        "stream": self.lit_api.stream,
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
                     },

@@ -17,10 +17,11 @@ import json
 import warnings
 from abc import ABC, abstractmethod
 from queue import Queue
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 from pydantic import BaseModel
 
+from litserve.loops import LitLoop, get_default_loop
 from litserve.specs.base import LitSpec
 
 
@@ -32,13 +33,22 @@ class LitAPI(ABC):
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
 
-    def __init__(self, max_batch_size: int = 1, batch_timeout: float = 0.0, enable_async: bool = False):
+    def __init__(
+        self,
+        max_batch_size: int = 1,
+        batch_timeout: float = 0.0,
+        enable_async: bool = False,
+        stream: bool = False,
+        loop: Optional[Union[str, LitLoop]] = "auto",
+    ):
         """Initialize a LitAPI instance.
 
         Args:
             max_batch_size: Maximum number of requests to process in a batch.
             batch_timeout: Maximum time to wait for a batch to fill before processing.
             enable_async: Enable async support.
+            stream: Whether to enable streaming responses.
+            loop: Inference loop to use, or 'auto' to select based on settings.
 
         """
 
@@ -49,8 +59,10 @@ class LitAPI(ABC):
             raise ValueError("batch_timeout must be greater than or equal to 0")
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
+        self.stream = stream
         self.enable_async = enable_async
         self._validate_async_methods()
+        self._set_loop(loop)
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
@@ -78,6 +90,21 @@ Streaming example:
                 await asyncio.sleep(0.1)  # simulate async work
                 yield f"Token {i}: {x}"
 """)
+
+    def _set_loop(
+        self,
+        loop: Optional[Union[str, LitLoop]] = "auto",
+    ):
+        """Set the event loop for operations."""
+        if loop is None:
+            loop = "auto"
+
+        if isinstance(loop, str) and loop != "auto":
+            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
+        if loop == "auto":
+            loop = get_default_loop(self.stream, self.max_batch_size, self.enable_async)
+
+        self.loop = loop
 
     @abstractmethod
     def setup(self, device):
