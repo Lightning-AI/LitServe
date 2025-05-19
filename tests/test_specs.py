@@ -488,7 +488,7 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 
 @pytest.mark.asyncio
 def test_openai_spec_asyncapi_decode_request_validation():
-    with pytest.raises(ValueError, match="decode_request is not a coroutine"):
+    with pytest.warns(UserWarning, match="'decode_request' is not implemented as an async coroutine."):
         ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
