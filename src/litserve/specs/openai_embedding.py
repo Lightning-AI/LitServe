@@ -14,9 +14,10 @@
 import asyncio
 import inspect
 import logging
+import sys
 import time
 import uuid
-from typing import TYPE_CHECKING, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, List, Literal, Optional, Union
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
@@ -28,6 +29,9 @@ from litserve.utils import LitAPIStatus
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    import numpy as np
+    import torch
+
     from litserve import LitServer
 
 
@@ -37,6 +41,14 @@ class EmbeddingRequest(BaseModel):
     dimensions: Optional[int] = None
     encoding_format: Literal["float", "base64"] = "float"
     user: Optional[str] = None
+
+    def get_num_items(self) -> int:
+        """Return the number of sentences or tokens in the input."""
+        if isinstance(self.input, list):
+            if isinstance(self.input[0], list):
+                return len(self.input[0])
+            return len(self.input)
+        return 1
 
     def ensure_list(self):
         return self.input if isinstance(self.input, list) else [self.input]
@@ -66,24 +78,44 @@ Please follow the example below for guidance on how to use the OpenAI Embedding 
 ```python
 import numpy as np
 from typing import List
-from litserve import LitAPI, OpenAIEmbeddingSpec
+from litserve.specs import OpenAIEmbeddingSpec, EmbeddingRequest
+import litserve as ls
 
-class TestAPI(LitAPI):
+class TestAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
 
-    def decode_request(self, request) -> List[str]:
-        return request.ensure_list()
+    def predict(self, inputs) -> List[List[float]]:
+        # inputs is a string
+        return np.random.rand(1, 768).tolist()
 
-    def predict(self, x) -> List[List[float]]:
-        return np.random.rand(len(x), 768).tolist()
-
-    def encode_response(self, output) -> dict:
-        return {"embeddings": output}
 
 if __name__ == "__main__":
-    import litserve as ls
     server = ls.LitServer(TestAPI(), spec=OpenAIEmbeddingSpec())
+    server.run()
+```
+"""
+
+EMBEDDING_API_EXAMPLE_BATCHING = """
+Please follow the example below for guidance on how to use the OpenAI Embedding spec with batching:
+
+```python
+import numpy as np
+from typing import List
+from litserve.specs import OpenAIEmbeddingSpec, EmbeddingRequest
+import litserve as ls
+
+class TestAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, inputs) -> List[List[float]]:
+        # inputs is a list of texts (List[str])
+        return np.random.rand(len(inputs), 768)
+
+if __name__ == "__main__":
+    api = TestAPI(max_batch_size=2, batch_timeout=0.4)
+    server = ls.LitServer(api, spec=OpenAIEmbeddingSpec())
     server.run()
 ```
 """
@@ -93,7 +125,7 @@ class OpenAIEmbeddingSpec(LitSpec):
     def __init__(self):
         super().__init__()
         # register the endpoint
-        self.add_endpoint("/v1/embeddings", self.embeddings, ["POST"])
+        self.add_endpoint("/v1/embeddings", self.embeddings_endpoint, ["POST"])
         self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 
     def setup(self, server: "LitServer"):
@@ -124,17 +156,21 @@ class OpenAIEmbeddingSpec(LitSpec):
         print("OpenAI Embedding Spec is ready.")
 
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
-        return request.ensure_list()
+        return request.input
 
-    def encode_response(self, output: List[List[float]], context_kwargs: Optional[dict] = None) -> dict:
+    def encode_response(
+        self, output: List[List[float]], context_kwargs: Optional[dict] = None
+    ) -> Union[dict, EmbeddingResponse]:
         usage = {
             "prompt_tokens": context_kwargs.get("prompt_tokens", 0) if context_kwargs else 0,
             "total_tokens": context_kwargs.get("total_tokens", 0) if context_kwargs else 0,
         }
         return {"embeddings": output} | usage
 
-    def _validate_response(self, response: dict) -> None:
-        if not isinstance(response, dict):
+    def _validate_response(self, response: Union[dict, List[Embedding], Any]) -> None:
+        if isinstance(response, list) and all(isinstance(item, Embedding) for item in response):
+            return
+        if not isinstance(response, (dict, EmbeddingResponse)):
             raise ValueError(
                 f"Expected response to be a dictionary, but got type {type(response)}.",
                 "The response should be a dictionary to ensure proper compatibility with the OpenAIEmbeddingSpec.\n\n"
@@ -152,8 +188,60 @@ class OpenAIEmbeddingSpec(LitSpec):
                 f"{EMBEDDING_API_EXAMPLE}"
             )
 
-    async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
+    def _handle_embedding_response(
+        self, embeddings: Union[List, "np.ndarray", "torch.Tensor", "List[List[float]]"], num_items: int = 1
+    ) -> List[Embedding]:
+        ndim = None
+        if "torch" in sys.modules:
+            import torch
+
+            if isinstance(embeddings, torch.Tensor):
+                ndim = embeddings.ndim
+        if "numpy" in sys.modules:
+            import numpy as np
+
+            if isinstance(embeddings, np.ndarray):
+                ndim = embeddings.ndim
+
+        # expand_dims for torch.Tensor or np.ndarray
+        if ndim == 1:
+            embeddings = embeddings[None, :]
+
+        if ndim is not None:
+            embeddings = embeddings.tolist()
+
+        # expand dims for list of floats
+        if isinstance(embeddings, (list, tuple)) and isinstance(embeddings[0], (int, float)):
+            embeddings = [embeddings]
+
+        # check if we have total num_items number of embeddings vectors
+        num_response_items = len(embeddings)
+        if num_response_items != num_items:
+            logger.debug("mismatch between number of requested and returned embeddings: %s", embeddings)
+            raise ValueError(
+                f"Mismatch between requested and returned embeddings: "
+                f"expected {num_items}, but got {num_response_items}. "
+                f"This may indicate a bug in the LitAPI embedding implementation."
+            )
+
+        result = []
+        for i, embedding in enumerate(embeddings):
+            result.append(Embedding(index=i, embedding=embedding))
+
+        return result
+
+    async def embeddings_endpoint(self, request: EmbeddingRequest) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
+        num_items = request.get_num_items()
+        if num_items > 1 and self._max_batch_size > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "The OpenAIEmbedding spec does not support dynamic batching when client-side batching is used. "
+                    "To resolve this, either set `max_batch_size=1` or send a single input from the client."
+                ),
+            )
+
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
         event = asyncio.Event()
@@ -174,9 +262,9 @@ class OpenAIEmbeddingSpec(LitSpec):
         logger.debug(response)
 
         self._validate_response(response)
+        data: List[Embedding] = self._handle_embedding_response(response["embeddings"], num_items)
 
         usage = UsageInfo(**response)
-        data = [Embedding(index=i, embedding=embedding) for i, embedding in enumerate(response["embeddings"])]
 
         return EmbeddingResponse(data=data, model=request.model, usage=usage)
 
