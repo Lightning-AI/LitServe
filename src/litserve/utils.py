@@ -13,11 +13,13 @@
 # limitations under the License.
 import asyncio
 import dataclasses
+import inspect
 import logging
 import os
 import pickle
 import sys
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
@@ -151,3 +153,67 @@ def generate_random_zmq_address(temp_dir="/tmp"):
     unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
     ipc_path = os.path.join(temp_dir, unique_name)
     return f"ipc://{ipc_path}"
+
+
+async def _stream_gen_from_thread(gen_func, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    queue = asyncio.Queue()
+    executor = ThreadPoolExecutor(max_workers=1)  # TODO: check if executor needs to be shutdown
+
+    # This function runs in a separate thread
+    def thread_generator():
+        try:
+            for item in gen_func(*args, **kwargs):
+                # Block until the item is put in the queue
+                asyncio.run_coroutine_threadsafe(queue.put(item), loop).result()
+            # Signal completion
+            asyncio.run_coroutine_threadsafe(queue.put(None), loop).result()
+        except Exception as e:
+            # Handle exceptions
+            asyncio.run_coroutine_threadsafe(queue.put(e), loop).result()
+
+    # Start the thread
+    loop.run_in_executor(executor, thread_generator)
+
+    # Yield items as they arrive
+    while True:
+        item = await queue.get()
+        if item is None:
+            break
+        elif isinstance(item, Exception):
+            raise item
+        yield item
+
+
+def asyncify(func):
+    """Decorator that converts any function type to a consistent async interface.
+
+    - Regular sync functions -> run in thread pool and return via coroutine
+    - Sync generators -> converted to async generators that stream values
+    - Async functions -> preserved as is
+    - Async generators -> preserved as is
+
+    """
+    # Already an async generator - return as is
+    if inspect.isasyncgenfunction(func):
+        return func
+
+    # Already a coroutine function - return as is
+    if asyncio.iscoroutinefunction(func):
+        return func
+
+    # Handle regular generator
+    if inspect.isgeneratorfunction(func):
+
+        async def async_gen_wrapper(*args, **kwargs):
+            return await _stream_gen_from_thread(func, *args, **kwargs)
+
+        return async_gen_wrapper
+
+    # Handle regular function
+    async def async_wrapper(*args, **kwargs):
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            return await loop.run_in_executor(executor, lambda: func(*args, **kwargs))
+
+    return async_wrapper
