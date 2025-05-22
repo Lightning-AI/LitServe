@@ -26,6 +26,9 @@ from httpx import ASGITransport, AsyncClient
 from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
 
+from types import SimpleNamespace
+
+
 
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
@@ -145,6 +148,25 @@ def test_workers_health_with_custom_health_method(use_zmq):
         response = client.get("/health")
         assert response.status_code == 200
         assert response.text == "ok"
+   
+def test_shutdown_endpoint():
+    server = LitServer(
+        SlowSetupLitAPI(),
+        accelerator="cpu",
+        shutdown_path="/shutdown",
+        devices=1,
+        workers_per_device=1,
+    )
+
+    server.app.state.server = SimpleNamespace(should_exit=False)
+    
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Send a shutdown request
+        response = client.post("/shutdown")
+        assert response.status_code == 200
+        assert "shutdown" in response.text.lower()
+        time.sleep(0.5)
+        assert server.app.state.server.should_exit is True, "Server should be marked for shutdown"
 
 
 def make_load_request(server, outputs):
