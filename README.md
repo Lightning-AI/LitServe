@@ -1,6 +1,10 @@
 <div align='center'>
 
-# The simplest way to deploy AI models and inference pipelines - ⚡ fast    
+<h1>
+  The simplest way to deploy AI models
+  <br/>
+  and inference pipelines - ⚡️ fast.
+</h1>    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
