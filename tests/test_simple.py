@@ -27,9 +27,6 @@ from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
 
 from types import SimpleNamespace
-
-
-
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
         self.model = lambda x: x**2
