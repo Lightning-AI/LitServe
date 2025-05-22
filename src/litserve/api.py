@@ -24,6 +24,35 @@ from pydantic import BaseModel
 from litserve.specs.base import LitSpec
 from litserve.utils import asyncify
 
+ASYNC_LITAPI_VALIDATION_MSG = """
+`enable_async` turns on async mode and recommends using async functions and generators for LitAPI.
+
+Error: {}
+
+- LitAPI.decode_request can be a regular function or an async function.
+- LitAPI.predict must be an async function or an async generator. (use 'yield' or 'yield from' inside an 'async def' \
+    function).
+- LitAPI.encode_response can be a regular function or an async function or an async generator.
+
+
+Please follow the examples below for guidance on how to use LitAPI in async mode:
+Example:
+    class MyLitAPI(LitAPI):
+        async def decode_request(self, request, **kwargs):
+            return request
+        async def predict(self, x, **kwargs):
+            return x
+        async def encode_response(self, output, **kwargs):
+            return output
+
+Streaming example:
+    class MyStreamingAPI(LitAPI):
+        async def predict(self, x, **kwargs):
+            for i in range(10):
+                await asyncio.sleep(0.1)  # simulate async work
+                yield f"Token {i}: {x}"
+"""
+
 
 class LitAPI(ABC):
     _stream: bool = False
@@ -52,49 +81,34 @@ class LitAPI(ABC):
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
 
-        self._asyncify_methods()
-        self._validate_async_methods()
+        if self.enable_async:
+            self._asyncify_methods()
+            self._validate_async_methods()
 
     def _asyncify_methods(self):
         """Asyncify decode_request and encode_response if enable_async is True and not already async."""
-        if self.enable_async:
-            for method in ["decode_request", "encode_response"]:
-                method_obj = getattr(self, method)
-                if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
-                    warnings.warn(
-                        f"enable_async set to True but {method} is not a coroutine or async generator. "
-                        "LitServe will asyncify this method."
-                        f"Consider defining '{method}' as 'async def' for clarity.",
-                        UserWarning,
-                    )
-                    setattr(self, method, asyncify(method_obj))
+        for method in ["decode_request", "encode_response"]:
+            method_obj = getattr(self, method)
+            if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
+                warnings.warn(
+                    f"enable_async set to True but {method} is not a coroutine or async generator. "
+                    "LitServe will asyncify this method."
+                    f"Consider defining '{method}' as 'async def' for clarity.",
+                    UserWarning,
+                )
+                setattr(self, method, asyncify(method_obj))
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
-        if self.enable_async:
-            # check if LitAPI methods are coroutines or async generators
-            for method in ["decode_request", "predict", "encode_response"]:
-                method_obj = getattr(self, method)
-                if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
-                    raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.
-
-Please either set enable_async=False or implement the following methods as coroutines:
-Example:
-    class MyLitAPI(LitAPI):
-        async def decode_request(self, request, **kwargs):
-            return request
-        async def predict(self, x, **kwargs):
-            return x
-        async def encode_response(self, output, **kwargs):
-            return output
-
-Streaming example:
-    class MyStreamingAPI(LitAPI):
-        async def predict(self, x, **kwargs):
-            for i in range(10):
-                await asyncio.sleep(0.1)  # simulate async work
-                yield f"Token {i}: {x}"
-""")
+        # check if LitAPI methods are coroutines or async generators
+        for method in ["decode_request", "predict", "encode_response"]:
+            method_obj = getattr(self, method)
+            if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
+                raise ValueError(
+                    ASYNC_LITAPI_VALIDATION_MSG.format(
+                        f"enable_async set to True but {method} is not a coroutine or async generator. "
+                    )
+                )
 
     @abstractmethod
     def setup(self, device):
