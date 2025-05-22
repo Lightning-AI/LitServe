@@ -15,6 +15,7 @@ import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -26,7 +27,7 @@ from httpx import ASGITransport, AsyncClient
 from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
 
-from types import SimpleNamespace
+
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
         self.model = lambda x: x**2
@@ -145,7 +146,8 @@ def test_workers_health_with_custom_health_method(use_zmq):
         response = client.get("/health")
         assert response.status_code == 200
         assert response.text == "ok"
-   
+
+
 def test_shutdown_endpoint():
     server = LitServer(
         SlowSetupLitAPI(),
@@ -156,7 +158,7 @@ def test_shutdown_endpoint():
     )
 
     server.app.state.server = SimpleNamespace(should_exit=False)
-    
+
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         # Send a shutdown request
         response = client.post("/shutdown")

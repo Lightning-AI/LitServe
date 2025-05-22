@@ -221,12 +221,9 @@ class LitServer:
             raise ValueError(
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
-        
+
         if not shutdown_path.startswith("/"):
-            raise ValueError(
-                "shutdown_path must start with '/'. "
-                "Please provide a valid api path like '/shutdown'"
-            )
+            raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
         try:
             json.dumps(model_metadata)
@@ -455,7 +452,7 @@ class LitServer:
                     },
                 }
             )
-        
+
         @self.app.post(self.shutdown_path, dependencies=[Depends(self.setup_auth())])
         async def shutdown(request: Request):
             server = self.app.state.server
