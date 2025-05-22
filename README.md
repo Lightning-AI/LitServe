@@ -78,11 +78,20 @@ class SimpleLitAPI(ls.LitAPI):
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
+    def decode_request(self, request):
+        # get inputs to /predict
+        return request["input"]
+
     def predict(self, x):
+        # perform calculations using both models
         a = self.model1(x)
         b = self.model2(x)
         c = a + b
         return {"output": c}
+
+    def encode_response(self, output):
+        # package outputs from /predict
+        return {"output": output} 
 
 if __name__ == "__main__":
     # 12+ features like batching, streaming, etc...
