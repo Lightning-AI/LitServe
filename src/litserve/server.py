@@ -130,6 +130,7 @@ class LitServer:
         api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
+        shutdown_path: str = "/shutdown",
         model_metadata: Optional[dict] = None,
         stream: bool = False,
         spec: Optional[LitSpec] = None,
@@ -154,6 +155,7 @@ class LitServer:
             api_path: URL path for the prediction endpoint.
             healthcheck_path: URL path for the health check endpoint.
             info_path: URL path for the server and model information endpoint.
+            shutdown_path: URL path for the server shutdown endpoint.
             model_metadata: Metadata about the model, shown at the info endpoint.
             stream: Whether to enable streaming responses.
             spec: Specification for the API, such as OpenAISpec or custom specs.
@@ -219,6 +221,12 @@ class LitServer:
             raise ValueError(
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
+        
+        if not shutdown_path.startswith("/"):
+            raise ValueError(
+                "shutdown_path must start with '/'. "
+                "Please provide a valid api path like '/shutdown'"
+            )
 
         try:
             json.dumps(model_metadata)
@@ -243,6 +251,7 @@ class LitServer:
         self.api_path = api_path
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path
+        self.shutdown_path = shutdown_path
         self.track_requests = track_requests
         self.timeout = timeout
         lit_api.stream = stream
@@ -446,6 +455,14 @@ class LitServer:
                     },
                 }
             )
+        
+        @self.app.post(self.shutdown_path, dependencies=[Depends(self.setup_auth())])
+        async def shutdown(request: Request):
+            server = self.app.state.server
+            print("Initiating shutdown...")
+            server.should_exit = True
+
+            return Response(content="Server has been shutdown")
 
         async def predict(request: self.request_type) -> self.response_type:
             self._callback_runner.trigger_event(
@@ -651,6 +668,7 @@ class LitServer:
                 # https://github.com/encode/uvicorn/pull/802
                 config.workers = num_uvicorn_servers
             server = uvicorn.Server(config=config)
+            self.app.state.server = server
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
                 w = ctx.Process(target=server.run, args=(sockets,))
