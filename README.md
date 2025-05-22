@@ -90,21 +90,15 @@ if __name__ == "__main__":
     server.run(port=8000)
 ```
 
-Now run the server anywhere (local or cloud) via the command-line.
+Now deploy for free to [Lightning cloud](#hosting-options) (or self host anywhere):
 
 ```bash
-# Deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
+# Deploy for free with autoscaling, monitoring, etc...
 lightning deploy server.py --cloud
 
 # Or run locally (self host anywhere)
 lightning deploy server.py
-```
-Learn more about managed hosting on [Lightning AI](#hosting-options).
-
-You can also run the server manually:
-
-```bash 
-python server.py
+# python server.py
 ```
 
 ### Test the server
