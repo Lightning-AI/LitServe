@@ -3,7 +3,7 @@
 <h1>
   Deploy AI models and inference pipelines.
   <br/>
-  Without learning DevOps.
+  Without learning MLOps.
 </h1>    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
@@ -11,9 +11,9 @@
 &nbsp; 
 </div>
 
-**Most AI inference tools are built around single-model APIs with rigid abstractions**. You’re locked into serving one model per server, with no way to customize internals like batching, caching, or kernels - making it hard to build full systems like RAG or agents without stitching together multiple services, which leads to complex MLOps orchestration, slower iteration, and bloated infrastructure.   
+**Most AI inference tools are built around single-model APIs with rigid abstractions**. They lock you into serving one model per server, with no way to customize internals like batching, caching, or kernels. This makes it hard to build full systems like RAG or agents without stitching together multiple services. The result is complex MLOps orchestration, slower iteration, and bloated infrastructure.   
 
-**LitServe flips this paradigm**: Write full AI pipelines - not just models - in clean, extensible Python. Built on FastAPI and optimized for AI workloads, LitServe supports multi-model serving, streaming, batching, and custom logic - all from a single server. Deploy in one click with autoscaling, monitoring, and zero infrastructure overhead. Or run it self-hosted with full control and no lock-in.
+**LitServe flips this paradigm**: Write full AI pipelines, not just models, in clean, extensible Python. Built on FastAPI but optimized for AI workloads, LitServe supports multi-model serving, streaming, batching, and custom logic - all from a single server. Deploy in one click with autoscaling, monitoring, and zero infrastructure overhead. Or run it self-hosted with full control and no lock-in.
 
 LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
