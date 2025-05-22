@@ -1,9 +1,9 @@
 <div align='center'>
 
 <h1>
-  The simplest way to deploy AI models
+  Deploy AI models and inference pipelines.
   <br/>
-  and inference pipelines - ⚡️ fast.
+  Without learning DevOps.
 </h1>    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
@@ -11,9 +11,9 @@
 &nbsp; 
 </div>
 
-**Most AI inference tools are built for single models - not full systems**. TorchServe, Triton, vLLM, and others lock you into model-only APIs, forcing pipelines like RAG or agents to sprawl across multiple services. This results in complex MLOps orchestration, slower iteration, and bloated infrastructure.   
+**Most AI inference tools are built around single-model APIs with rigid abstractions**. You’re locked into serving one model per server, with no way to customize internals like batching, caching, or kernels - making it hard to build full systems like RAG or agents without stitching together multiple services, which leads to complex MLOps orchestration, slower iteration, and bloated infrastructure.   
 
-**LitServe flips this paradigm**: Write full AI pipelines - not just models - in clean, readable Python. Built on FastAPI but optimized for AI workloads. Run multi-model systems with batching, streaming, multi-process support, and autoscaling - all from a single server. Deploy in one click with full observability, or run it self-hosted with zero lock-in.
+**LitServe flips this paradigm**: Write full AI pipelines - not just models - in clean, extensible Python. Built on FastAPI and optimized for AI workloads, LitServe supports multi-model serving, streaming, batching, and custom logic - all from a single server. Deploy in one click with autoscaling, monitoring, and zero infrastructure overhead. Or run it self-hosted with full control and no lock-in.
 
 LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
