@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from queue import Queue
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
@@ -66,10 +66,8 @@ def inference_worker(
     worker_id: int,
     request_queue: Queue,
     transport: MessageTransport,
-    stream: bool,
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
-    loop: Union[str, _BaseLoop],
 ):
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP.value, lit_api=lit_api)
     try:
@@ -89,17 +87,14 @@ def inference_worker(
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
 
-    if loop == "auto":
-        loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
-
-    loop(
+    lit_api.loop(
         lit_api,
         lit_spec,
         device,
         worker_id,
         request_queue,
         transport,
-        stream,
+        lit_api.stream,
         workers_setup_status,
         callback_runner,
     )
