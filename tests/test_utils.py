@@ -8,7 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from litserve.utils import call_after_stream, configure_logging, dump_exception, generate_random_zmq_address
+from litserve.utils import (
+    call_after_stream,
+    configure_logging,
+    dump_exception,
+    generate_random_zmq_address,
+    set_trace_if_debug,
+)
 
 
 def test_dump_exception():
@@ -64,3 +70,18 @@ def test_configure_logging_rich_not_installed():
     with mock.patch("builtins.__import__", side_effect=ImportError):
         configure_logging(use_rich=True)
         assert logging.getLogger("litserve").handlers[0].__class__.__name__ == "StreamHandler"
+
+
+@mock.patch("litserve.utils.set_trace")
+def test_set_trace_if_debug(mock_set_trace):
+    # mock environ
+    with mock.patch("litserve.utils.os.environ", {"LITSERVE_DEBUG": "1"}):
+        set_trace_if_debug()
+    mock_set_trace.assert_called_once()
+
+
+@mock.patch("litserve.utils.ForkedPdb")
+def test_set_trace_if_debug_not_set(mock_forked_pdb):
+    with mock.patch("litserve.utils.os.environ", {"LITSERVE_DEBUG": "0"}):
+        set_trace_if_debug()
+    mock_forked_pdb.assert_not_called()
