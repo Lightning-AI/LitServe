@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 from contextlib import suppress
 
@@ -301,3 +302,22 @@ def test_api_predict_async_enforcement():
     # Check that an error is raised when predict is not async and enable_async is True
     with pytest.raises(ValueError, match="enable_async set to True but predict is not a coroutine or async generator."):
         ls.test_examples.SimpleLitAPI(enable_async=True)
+
+
+class AsyncPredictLitAPI(ls.test_examples.SimpleLitAPI):
+    async def predict(self, x):
+        return x
+
+
+@pytest.mark.asyncio
+async def test_api_async_predict():
+    api = AsyncPredictLitAPI(enable_async=True)
+    result = await api.predict("test")
+    assert result == "test"
+
+
+@pytest.mark.asyncio
+async def test_asyncified_decode_and_encode_methods():
+    api = AsyncPredictLitAPI(enable_async=True)
+    assert asyncio.iscoroutinefunction(api.decode_request), "decode_request should have asyncified."
+    assert asyncio.iscoroutinefunction(api.encode_response), "encode_response should have asyncified."
