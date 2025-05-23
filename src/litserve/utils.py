@@ -194,6 +194,8 @@ def asyncify(func):
     - Async functions -> preserved as is
     - Async generators -> preserved as is
 
+    Note: Uses functools.wraps to preserve the original function's signature and metadata.
+
     """
     # Already an async generator - return as is
     if inspect.isasyncgenfunction(func):
