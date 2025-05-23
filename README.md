@@ -1,13 +1,19 @@
 <div align='center'>
 
-# Deploy AI models and inference pipelines - ⚡ fast    
+<h1>
+  Deploy agents, RAG, models, pipelines and more.
+  <br/>
+  Without learning MLOps.
+</h1>    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
 &nbsp; 
 </div>
 
-**LitServe** lets you build high-performance AI inference pipelines on top of FastAPI - no boilerplate. Define one or more models, connect vector DBs, stream responses, batch requests, and autoscale on GPUs out of the box.
+**Most AI inference tools are built around single-model APIs with rigid abstractions**. They lock you into serving one model per server, with no way to customize internals like batching, caching, or kernels. This makes it hard to build full systems like RAG or agents without stitching together multiple services. The result is complex MLOps orchestration, slower iteration, and bloated infrastructure.   
+
+**LitServe flips this paradigm**: Write full AI pipelines, not just models, in clean, extensible Python. Built on FastAPI but optimized for AI workloads, LitServe supports multi-model serving, streaming, batching, and custom logic - all from a single server. Deploy in one click with autoscaling, monitoring, and zero infrastructure overhead. Or run it self-hosted with full control and no lock-in.
 
 LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
 
@@ -64,53 +70,44 @@ pip install litserve
 This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#featured-examples)):    
 
 ```python
-# server.py
 import litserve as ls
 
-# (STEP 1) - DEFINE THE API ("inference" pipeline)
+# define the api to include any number of models, dbs, etc...
 class SimpleLitAPI(ls.LitAPI):
     def setup(self, device):
-        # setup is called once at startup. Defines elements of the pipeline: models, connect DBs, load data, etc...
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
     def decode_request(self, request):
-        # Convert the request payload to model input.
-        return request["input"] 
+        # get inputs to /predict
+        return request["input"]
 
     def predict(self, x):
-        # Run the inference pipeline and return the output
+        # perform calculations using both models
         a = self.model1(x)
         b = self.model2(x)
         c = a + b
         return {"output": c}
 
     def encode_response(self, output):
-        # Convert the model output to a response payload.
+        # package outputs from /predict
         return {"output": output} 
 
-# (STEP 2) - START THE SERVER
 if __name__ == "__main__":
-    # scale with advanced features (batching, GPUs, etc...)
+    # 12+ features like batching, streaming, etc...
     server = ls.LitServer(SimpleLitAPI(max_batch_size=1), accelerator="auto")
     server.run(port=8000)
 ```
 
-Now run the server anywhere (local or cloud) via the command-line.
+Now deploy for free to [Lightning cloud](#hosting-options) (or self host anywhere):
 
 ```bash
-# Deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
+# Deploy for free with autoscaling, monitoring, etc...
 lightning deploy server.py --cloud
 
 # Or run locally (self host anywhere)
 lightning deploy server.py
-```
-Learn more about managed hosting on [Lightning AI](#hosting-options).
-
-You can also run the server manually:
-
-```bash 
-python server.py
+# python server.py
 ```
 
 ### Test the server
