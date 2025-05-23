@@ -1,7 +1,7 @@
 <div align='center'>
 
 <h1>
-  Deploy AI models and inference pipelines.
+  Deploy agents, RAG, models, pipelines and more.
   <br/>
   Without learning MLOps.
 </h1>    
