@@ -457,6 +457,8 @@ class LitServer:
         async def shutdown(request: Request):
             server = self.app.state.server
             print("Initiating shutdown...")
+            if server.should_exit:
+                return Response(content="Shutdown already in progress", status_code=400)
             server.should_exit = True
 
             return Response(content="Server has been shutdown")
@@ -631,12 +633,14 @@ class LitServer:
                     print(f"Uvicorn worker {i} : [{uw.pid}]")
                 uw.join()
         finally:
-            print("Shutting down LitServe")
             self._transport.close()
+            print("Transport closed")
             for iw in inference_workers:
                 iw: Process
+                print(f"Terminating worker [PID {iw.pid}]")
                 iw.terminate()
                 iw.join()
+            print("Shutting down LitServe")
             manager.shutdown()
 
     def _prepare_app_run(self, app: FastAPI):

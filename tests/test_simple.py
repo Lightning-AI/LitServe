@@ -166,7 +166,11 @@ def test_shutdown_endpoint():
         assert "shutdown" in response.text.lower()
         time.sleep(0.5)
         assert server.app.state.server.should_exit is True, "Server should be marked for shutdown"
-
+        
+        time.sleep(1)
+        response = client.post("/shutdown")
+        assert response.status_code == 400
+        assert "shutdown already" in response.text.lower()
 
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
