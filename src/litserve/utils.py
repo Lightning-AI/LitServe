@@ -98,7 +98,7 @@ class WorkerSetupStatus:
 
 
 def configure_logging(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout, use_rich=False
 ):
     """Configure logging for the entire library with sensible defaults.
 
@@ -106,12 +106,24 @@ def configure_logging(
         level (int): Logging level (default: logging.INFO)
         format (str): Log message format string
         stream (file-like): Output stream for logs
+        use_rich (bool): Whether to use rich for logging
 
     """
-    # Create a library-wide handler
-    handler = logging.StreamHandler(stream)
+    if use_rich:
+        try:
+            from rich.logging import RichHandler
+            from rich.traceback import install
 
-    # Set formatter with user-configurable format
+            install(show_locals=True)
+            handler = RichHandler(rich_tracebacks=True, show_time=True, show_path=True)
+        except ImportError:
+            logger.warning("Rich is not installed, using default logging")
+            handler = logging.StreamHandler(stream)
+            formatter = logging.Formatter(format)
+            handler.setFormatter(formatter)
+
+    else:
+        handler = logging.StreamHandler(stream)
     formatter = logging.Formatter(format)
     handler.setFormatter(formatter)
 
