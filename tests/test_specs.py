@@ -369,7 +369,7 @@ class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
         yield {"role": "assistant", "content": output}
 
 
-def test_openai_asyncapi_decode_not_implemented_warning():
+def test_openai_asyncapi_decode_not_async_warning():
     with pytest.warns(
         UserWarning,
         match="enable_async set to True but decode_request is not a coroutine or async generator."
