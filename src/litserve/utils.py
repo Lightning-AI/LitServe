@@ -21,6 +21,7 @@ import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from functools import wraps
 from typing import TYPE_CHECKING, AsyncIterator
 
 from fastapi import HTTPException
@@ -205,12 +206,14 @@ def asyncify(func):
     # Handle regular generator
     if inspect.isgeneratorfunction(func):
 
+        @wraps(func)
         async def async_gen_wrapper(*args, **kwargs):
             return await _stream_gen_from_thread(func, *args, **kwargs)
 
         return async_gen_wrapper
 
     # Handle regular function
+    @wraps(func)
     async def async_wrapper(*args, **kwargs):
         loop = asyncio.get_running_loop()
         with ThreadPoolExecutor(max_workers=1) as executor:
