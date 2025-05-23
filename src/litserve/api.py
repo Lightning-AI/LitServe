@@ -34,7 +34,6 @@ Error: {}
     function).
 - LitAPI.encode_response can be a regular function or an async function or an async generator.
 
-
 Please follow the examples below for guidance on how to use LitAPI in async mode:
 Example:
     class MyLitAPI(LitAPI):
@@ -50,7 +49,7 @@ Streaming example:
         async def predict(self, x, **kwargs):
             for i in range(10):
                 await asyncio.sleep(0.1)  # simulate async work
-                yield f"Token {i}: {x}"
+                yield f"Token {{i}}: {{x}}"
 """
 
 
