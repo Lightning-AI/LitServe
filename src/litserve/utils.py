@@ -155,7 +155,7 @@ def generate_random_zmq_address(temp_dir="/tmp"):
 
 
 class ForkedPdb(pdb.Pdb):
-    # Borrowed from https://github.com/Lightning-AI/forked-pdb
+    # Borrowed from - https://github.com/Lightning-AI/forked-pdb
     """
     PDB Subclass for debugging multi-processed code
     Suggested in: https://stackoverflow.com/questions/4716533/how-to-attach-debugger-to-a-python-subproccess
