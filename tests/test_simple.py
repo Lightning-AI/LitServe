@@ -160,7 +160,6 @@ def test_shutdown_endpoint():
     server.app.state.server = SimpleNamespace(should_exit=False)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        # Send a shutdown request
         response = client.post("/shutdown")
         assert response.status_code == 200
         assert "shutdown" in response.text.lower()
