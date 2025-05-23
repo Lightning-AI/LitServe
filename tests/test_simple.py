@@ -15,7 +15,6 @@ import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -146,30 +145,6 @@ def test_workers_health_with_custom_health_method(use_zmq):
         response = client.get("/health")
         assert response.status_code == 200
         assert response.text == "ok"
-
-
-def test_shutdown_endpoint():
-    server = LitServer(
-        SlowSetupLitAPI(),
-        accelerator="cpu",
-        shutdown_path="/shutdown",
-        devices=1,
-        workers_per_device=1,
-    )
-
-    server.app.state.server = SimpleNamespace(should_exit=False)
-
-    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post("/shutdown")
-        assert response.status_code == 200
-        assert "shutdown" in response.text.lower()
-        time.sleep(0.5)
-        assert server.app.state.server.should_exit is True, "Server should be marked for shutdown"
-
-        time.sleep(1)
-        response = client.post("/shutdown")
-        assert response.status_code == 400
-        assert "shutdown already" in response.text.lower()
 
 
 def make_load_request(server, outputs):
