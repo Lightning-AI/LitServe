@@ -97,6 +97,13 @@ class WorkerSetupStatus:
     FINISHED: str = "finished"
 
 
+def _get_default_handler(stream, format):
+    handler = logging.StreamHandler(stream)
+    formatter = logging.Formatter(format)
+    handler.setFormatter(formatter)
+    return handler
+
+
 def configure_logging(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout, use_rich=False
 ):
@@ -118,14 +125,10 @@ def configure_logging(
             handler = RichHandler(rich_tracebacks=True, show_time=True, show_path=True)
         except ImportError:
             logger.warning("Rich is not installed, using default logging")
-            handler = logging.StreamHandler(stream)
-            formatter = logging.Formatter(format)
-            handler.setFormatter(formatter)
+            handler = _get_default_handler(stream, format)
 
     else:
-        handler = logging.StreamHandler(stream)
-    formatter = logging.Formatter(format)
-    handler.setFormatter(formatter)
+        handler = _get_default_handler(stream, format)
 
     # Configure root library logger
     library_logger = logging.getLogger("litserve")
