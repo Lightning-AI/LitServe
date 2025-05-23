@@ -105,7 +105,7 @@ class LitAPI(ABC):
             if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
                 raise ValueError(
                     ASYNC_LITAPI_VALIDATION_MSG.format(
-                        f"enable_async set to True but {method} is not a coroutine or async generator. "
+                        f"enable_async set to True but {method} is not a coroutine or async generator."
                     )
                 )
 
