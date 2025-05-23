@@ -294,3 +294,9 @@ def test_api_asyncification_warnings_for_decode_and_encode_methods():
     for expected in expected_messages:
         assert any(expected in msg for msg in warn_msgs), f"Expected warning containing '{expected}'"
     assert len(warning_record) == 2, "Should have exactly 2 warnings for decode_request and encode_response"
+
+
+def test_api_predict_async_enforcement():
+    # Check that an error is raised when predict is not async and enable_async is True
+    with pytest.raises(ValueError, match="enable_async set to True but predict is not a coroutine or async generator."):
+        ls.test_examples.SimpleLitAPI(enable_async=True)
