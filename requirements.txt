@@ -1,4 +1,3 @@
 fastapi >=0.100
 uvicorn[standard] >=0.29.0
 pyzmq >=22.0.0
-fpdb >=0.0.0.dev2

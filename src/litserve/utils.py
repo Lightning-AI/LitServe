@@ -15,14 +15,14 @@ import asyncio
 import dataclasses
 import logging
 import os
+import pdb
 import pickle
 import sys
 import uuid
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from fastapi import HTTPException
-from fpdb import ForkedPdb
 
 if TYPE_CHECKING:
     from litserve.server import LitServer
@@ -152,6 +152,22 @@ def generate_random_zmq_address(temp_dir="/tmp"):
     unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
     ipc_path = os.path.join(temp_dir, unique_name)
     return f"ipc://{ipc_path}"
+
+
+class ForkedPdb(pdb.Pdb):
+    # Borrowed from https://github.com/Lightning-AI/forked-pdb
+    """
+    PDB Subclass for debugging multi-processed code
+    Suggested in: https://stackoverflow.com/questions/4716533/how-to-attach-debugger-to-a-python-subproccess
+    """
+
+    def interaction(self, *args: Any, **kwargs: Any) -> None:
+        _stdin = sys.stdin
+        try:
+            sys.stdin = open("/dev/stdin")  # noqa: SIM115
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
 
 
 def set_trace():
