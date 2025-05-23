@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, AsyncIterator
 
 from fastapi import HTTPException
+from fpdb import ForkedPdb
 
 if TYPE_CHECKING:
     from litserve.server import LitServer
@@ -151,3 +152,14 @@ def generate_random_zmq_address(temp_dir="/tmp"):
     unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
     ipc_path = os.path.join(temp_dir, unique_name)
     return f"ipc://{ipc_path}"
+
+
+def set_trace():
+    """Set a tracepoint in the code."""
+    ForkedPdb().set_trace()
+
+
+def set_trace_if_debug(debug_env_var="LITSERVE_DEBUG", debug_env_var_value="1"):
+    """Set a tracepoint in the code if the environment variable LITSERVE_DEBUG is set."""
+    if os.environ.get(debug_env_var) == debug_env_var_value:
+        set_trace()
