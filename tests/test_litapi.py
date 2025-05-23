@@ -286,6 +286,8 @@ def test_log():
 def test_api_asyncification_warnings_for_decode_and_encode_methods():
     with suppress(ValueError), pytest.warns(UserWarning, match="LitServe will asyncify this method.") as warning_record:
         ls.test_examples.SimpleLitAPI(enable_async=True)
+
+    assert len(warning_record) == 2, "Should have exactly 2 warnings for decode_request and encode_response"
     warn_msgs = [str(w.message) for w in warning_record]
     expected_messages = [
         "decode_request is not a coroutine",
@@ -293,7 +295,6 @@ def test_api_asyncification_warnings_for_decode_and_encode_methods():
     ]
     for expected in expected_messages:
         assert any(expected in msg for msg in warn_msgs), f"Expected warning containing '{expected}'"
-    assert len(warning_record) == 2, "Should have exactly 2 warnings for decode_request and encode_response"
 
 
 def test_api_predict_async_enforcement():
