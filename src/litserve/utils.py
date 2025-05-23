@@ -15,11 +15,12 @@ import asyncio
 import dataclasses
 import logging
 import os
+import pdb
 import pickle
 import sys
 import uuid
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from fastapi import HTTPException
 
@@ -151,3 +152,30 @@ def generate_random_zmq_address(temp_dir="/tmp"):
     unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
     ipc_path = os.path.join(temp_dir, unique_name)
     return f"ipc://{ipc_path}"
+
+
+class ForkedPdb(pdb.Pdb):
+    # Borrowed from - https://github.com/Lightning-AI/forked-pdb
+    """
+    PDB Subclass for debugging multi-processed code
+    Suggested in: https://stackoverflow.com/questions/4716533/how-to-attach-debugger-to-a-python-subproccess
+    """
+
+    def interaction(self, *args: Any, **kwargs: Any) -> None:
+        _stdin = sys.stdin
+        try:
+            sys.stdin = open("/dev/stdin")  # noqa: SIM115
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
+
+
+def set_trace():
+    """Set a tracepoint in the code."""
+    ForkedPdb().set_trace()
+
+
+def set_trace_if_debug(debug_env_var="LITSERVE_DEBUG", debug_env_var_value="1"):
+    """Set a tracepoint in the code if the environment variable LITSERVE_DEBUG is set."""
+    if os.environ.get(debug_env_var) == debug_env_var_value:
+        set_trace()
