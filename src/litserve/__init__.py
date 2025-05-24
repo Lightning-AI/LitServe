@@ -18,7 +18,7 @@ from litserve.callbacks import Callback
 from litserve.loggers import Logger
 from litserve.server import LitServer, Request, Response
 from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec
-from litserve.utils import configure_logging
+from litserve.utils import configure_logging, set_trace, set_trace_if_debug
 
 configure_logging()
 
@@ -32,4 +32,6 @@ __all__ = [
     "test_examples",
     "Callback",
     "Logger",
+    "set_trace",
+    "set_trace_if_debug",
 ]

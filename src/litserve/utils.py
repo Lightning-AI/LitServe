@@ -16,13 +16,14 @@ import dataclasses
 import inspect
 import logging
 import os
+import pdb
 import pickle
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import wraps
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from fastapi import HTTPException
 
@@ -100,8 +101,15 @@ class WorkerSetupStatus:
     FINISHED: str = "finished"
 
 
+def _get_default_handler(stream, format):
+    handler = logging.StreamHandler(stream)
+    formatter = logging.Formatter(format)
+    handler.setFormatter(formatter)
+    return handler
+
+
 def configure_logging(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout, use_rich=False
 ):
     """Configure logging for the entire library with sensible defaults.
 
@@ -109,14 +117,22 @@ def configure_logging(
         level (int): Logging level (default: logging.INFO)
         format (str): Log message format string
         stream (file-like): Output stream for logs
+        use_rich (bool): Whether to use rich for logging
 
     """
-    # Create a library-wide handler
-    handler = logging.StreamHandler(stream)
+    if use_rich:
+        try:
+            from rich.logging import RichHandler
+            from rich.traceback import install
 
-    # Set formatter with user-configurable format
-    formatter = logging.Formatter(format)
-    handler.setFormatter(formatter)
+            install(show_locals=True)
+            handler = RichHandler(rich_tracebacks=True, show_time=True, show_path=True)
+        except ImportError:
+            logger.warning("Rich is not installed, using default logging")
+            handler = _get_default_handler(stream, format)
+
+    else:
+        handler = _get_default_handler(stream, format)
 
     # Configure root library logger
     library_logger = logging.getLogger("litserve")
@@ -154,6 +170,33 @@ def generate_random_zmq_address(temp_dir="/tmp"):
     unique_name = f"zmq-{uuid.uuid4().hex}.ipc"
     ipc_path = os.path.join(temp_dir, unique_name)
     return f"ipc://{ipc_path}"
+
+
+class ForkedPdb(pdb.Pdb):
+    # Borrowed from - https://github.com/Lightning-AI/forked-pdb
+    """
+    PDB Subclass for debugging multi-processed code
+    Suggested in: https://stackoverflow.com/questions/4716533/how-to-attach-debugger-to-a-python-subproccess
+    """
+
+    def interaction(self, *args: Any, **kwargs: Any) -> None:
+        _stdin = sys.stdin
+        try:
+            sys.stdin = open("/dev/stdin")  # noqa: SIM115
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
+
+
+def set_trace():
+    """Set a tracepoint in the code."""
+    ForkedPdb().set_trace()
+
+
+def set_trace_if_debug(debug_env_var="LITSERVE_DEBUG", debug_env_var_value="1"):
+    """Set a tracepoint in the code if the environment variable LITSERVE_DEBUG is set."""
+    if os.environ.get(debug_env_var) == debug_env_var_value:
+        set_trace()
 
 
 async def _stream_gen_from_thread(gen_func, *args, **kwargs):
