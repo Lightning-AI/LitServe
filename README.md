@@ -1,9 +1,9 @@
 <div align='center'>
 
 <h1>
-  Deploy agents, RAG, models, pipelines and more.
+  The easiest way to deploy agents, RAG, pipelines, any model. 
   <br/>
-  Without learning MLOps.
+  No MLOps. No YAML.
 </h1>    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
