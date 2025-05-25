@@ -159,7 +159,7 @@ A few key benefits:
 - **Instant setup:** Connect models, DBs, and data in a few lines with `setup()` ([more](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).    
 - **Optimized:** autoscaling, GPU support, and fast inference included ([more](https://lightning.ai/docs/litserve/api-reference/litserver)).    
 - **Deploy anywhere:** self-host or one-click deploy with Lightning ([more](https://lightning.ai/docs/litserve/features/deploy-on-cloud)).
-- **FastAPI for AI/ML:** Built on FastAPI but optimized for AI - 2× faster with AI-specific multi-worker handling ([more]((#performance))).   
+- **FastAPI for AI:** Built on FastAPI but optimized for AI - 2× faster with AI-specific multi-worker handling ([more]((#performance))).   
 - **Expert-friendly:** Use vLLM, or build your own with full control over batching, caching, and logic ([more](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api)).    
 
 > ⚠️ Not a vLLM or Ollama alternative out of the box. LitServe gives you lower-level flexibility to build what they do (and more) if you need it.
