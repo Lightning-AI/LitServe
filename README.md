@@ -65,9 +65,10 @@ Install LitServe via pip ([more options](https://lightning.ai/docs/litserve/home
 ```bash
 pip install litserve
 ```
-    
-### Toy example   
-This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#featured-examples)):    
+
+Example 1: Toy inference pipeline with multiple models.   
+[Example 2](#agentic-example): Real minimal agent (with OpenAI API).    
+([Advanced examples](#featured-examples)):    
 
 ```python
 import litserve as ls
