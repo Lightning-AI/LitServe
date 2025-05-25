@@ -263,3 +263,7 @@ Streaming example:
 
             self._loop = get_default_loop(self.stream, self.max_batch_size, self.enable_async)
         return self._loop
+
+    @loop.setter
+    def loop(self, value: "LitLoop"):
+        self._loop = value
