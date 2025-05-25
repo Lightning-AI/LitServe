@@ -113,20 +113,20 @@ class NewsAgent(ls.LitAPI):
         return request.get("website_url", "https://text.npr.org/")
 
     def predict(self, website_url):
-        # fetch news
-        news_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
+        website_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
 
         # ask the LLM to tell you about the news
-        llm_response = self.openai_client.Completion.create(model="text-davinci-003", prompt=f"Based on this, what is the latest: {news_text}",)
-        answer = llm_response.choices[0].text.strip()
+        llm_response = self.openai_client.Completion.create(model="text-davinci-003", prompt=f"Based on this, what is the latest: {website_text}",)
+        output = llm_response.choices[0].text.strip()
         
-        return {"answer": answer}
+        return {"output": output}
 
     def encode_response(self, output):
         return {"response": output}
 
 if __name__ == "__main__":
-    server = ls.LitServer(NewsAgent())
+    api = NewsAgent()
+    server = ls.LitServer(api, accelerator="auto")
     server.run(port=8000)
 ```
 
