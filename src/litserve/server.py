@@ -42,7 +42,7 @@ from litserve import LitAPI
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
-from litserve.loops import LitLoop, get_default_loop, inference_worker
+from litserve.loops import LitLoop, inference_worker
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
@@ -117,53 +117,19 @@ async def response_queue_to_buffer(
                 break
 
 
-class LitAPIV2(LitAPI):
-    def __init__(
-        self,
-        api_path: str = "/predict",
-        stream: bool = False,
-        loop: Optional[Union[str, LitLoop]] = "auto",
-        max_batch_size: Optional[int] = 1,
-        batch_timeout: float = 0.0,
-        spec: Optional[LitSpec] = None,
-        enable_async: bool = False,
-        **kwargs,
-    ):
-        if isinstance(spec, LitSpec):
-            stream = spec.stream
-
-        if loop is None:
-            loop = "auto"
-
-        if isinstance(loop, str) and loop != "auto":
-            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
-
-        if loop == "auto":
-            loop = get_default_loop(stream, max_batch_size, enable_async)
-
-        if not api_path.startswith("/"):
-            raise ValueError(
-                "api_path must start with '/'. "
-                "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
-            )
-
-        # Check if the batch and unbatch methods are overridden in the lit_api instance
-        batch_overridden = self.batch.__code__ is not LitAPI.batch.__code__
-        unbatch_overridden = self.unbatch.__code__ is not LitAPI.unbatch.__code__
-
-        if batch_overridden and unbatch_overridden and max_batch_size == 1:
-            warnings.warn(
-                "The LitServer has both batch and unbatch methods implemented, "
-                "but the max_batch_size parameter was not set."
-            )
-
-        self.api_path = api_path
-        self.stream = stream
-        self.loop = loop
-        self.spec = spec
-        super().__init__(max_batch_size=max_batch_size, batch_timeout=batch_timeout, **kwargs)
-        self.pre_setup(spec=spec)
-        self.loop.pre_setup(self, spec=spec)
+def _migration_warning(feature_name):
+    warnings.warn(
+        f"The {feature_name} parameter is being deprecated in `LitServer` "
+        "and will be removed in version v0.3.0.\n\n"
+        "Please update your code to pass these arguments to `LitAPI` instead.\n\n"
+        "Old usage:\n"
+        f"    server = LitServer(api, {feature_name}=...)\n\n"
+        "New usage:\n"
+        f"    api = LitAPI({feature_name}=...)\n"
+        "    server = LitServer(api, ...)",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 class LitServer:
@@ -174,21 +140,21 @@ class LitServer:
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
-        max_batch_size: Optional[int] = None,
-        batch_timeout: float = 0.0,
-        api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
         model_metadata: Optional[dict] = None,
-        stream: bool = False,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         track_requests: bool = False,
-        loop: Optional[Union[str, LitLoop]] = "auto",
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         fast_queue: bool = False,
+        max_batch_size: Optional[int] = None,
+        batch_timeout: float = 0.0,
+        stream: bool = False,
+        api_path: Optional[str] = None,
+        loop: Optional[Union[str, LitLoop]] = None,
     ):
         """Initialize a LitServer instance.
 
@@ -200,7 +166,7 @@ class LitServer:
             max_batch_size: Deprecated. Use `lit_api.max_batch_size` instead.
             batch_timeout: Deprecated. Use `lit_api.batch_timeout` instead.
             timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
-            api_path: URL path for the prediction endpoint.
+            api_path: Deprecated. Use `LitAPI(api_path=...)` instead.
             healthcheck_path: URL path for the health check endpoint.
             info_path: URL path for the server and model information endpoint.
             model_metadata: Metadata about the model, shown at the info endpoint.
@@ -244,13 +210,18 @@ class LitServer:
 
         # Handle 0.3.0 migration
         if api_path is not None:
+            _migration_warning("api_path")
             lit_api.api_path = api_path
         if stream is True:
+            _migration_warning("stream")
             lit_api.stream = stream
         if isinstance(loop, LitLoop):
+            _migration_warning("loop")
             lit_api.loop = loop
         if isinstance(spec, LitSpec):
+            _migration_warning("spec")
             lit_api.spec = spec
+            lit_api.stream = spec.stream
 
         # pre setup
         lit_api.pre_setup(spec=spec)
@@ -572,6 +543,7 @@ class LitServer:
             )
 
         specs = [self.lit_api._spec] if self.lit_api._spec else []
+        print(f"specs: {specs}")
         for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing

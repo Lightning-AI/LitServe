@@ -50,6 +50,10 @@ class LitAPI(ABC):
         Args:
             max_batch_size: Maximum number of requests to process in a batch.
             batch_timeout: Maximum time to wait for a batch to fill before processing.
+            api_path: URL path for the prediction endpoint.
+            stream: Whether to enable streaming responses.
+            loop: Inference loop to use, or 'auto' to select based on settings.
+            spec: Specification for the API, such as OpenAISpec or custom specs.
             enable_async: Enable async support.
 
         """
@@ -88,7 +92,7 @@ class LitAPI(ABC):
         self.api_path = api_path
         self.stream = stream
         self._loop = loop
-        self.spec = spec
+        self._spec = spec
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
@@ -253,6 +257,7 @@ Streaming example:
 
     @property
     def loop(self):
+        print(f"self.stream: {self.stream}")
         if self._loop == "auto":
             from litserve.loops.loops import get_default_loop
 
