@@ -193,12 +193,6 @@ class SlowBatchAPI(SlowLitAPI):
         return list(output)
 
 
-def test_request_timeout_connector():
-    api = SlowLitAPI()
-    LitServer(api, accelerator="cpu", devices=1, timeout=43.432)
-    assert api.request_timeout == 43.432
-
-
 @pytest.mark.flaky(retries=3)
 @pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio

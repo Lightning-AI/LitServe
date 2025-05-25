@@ -257,7 +257,6 @@ Streaming example:
 
     @property
     def loop(self):
-        print(f"self.stream: {self.stream}")
         if self._loop == "auto":
             from litserve.loops.loops import get_default_loop
 

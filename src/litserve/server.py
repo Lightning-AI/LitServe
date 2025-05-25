@@ -543,7 +543,6 @@ class LitServer:
             )
 
         specs = [self.lit_api._spec] if self.lit_api._spec else []
-        print(f"specs: {specs}")
         for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing
