@@ -117,25 +117,79 @@ async def response_queue_to_buffer(
                 break
 
 
+class LitAPIV2(LitAPI):
+    def __init__(
+        self,
+        api_path: str = "/predict",
+        stream: bool = False,
+        loop: Optional[Union[str, LitLoop]] = "auto",
+        max_batch_size: Optional[int] = 1,
+        batch_timeout: float = 0.0,
+        spec: Optional[LitSpec] = None,
+        enable_async: bool = False,
+        **kwargs,
+    ):
+        if isinstance(spec, LitSpec):
+            stream = spec.stream
+
+        if loop is None:
+            loop = "auto"
+
+        if isinstance(loop, str) and loop != "auto":
+            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
+
+        if loop == "auto":
+            loop = get_default_loop(stream, max_batch_size, enable_async)
+
+        if not api_path.startswith("/"):
+            raise ValueError(
+                "api_path must start with '/'. "
+                "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
+            )
+
+        # Check if the batch and unbatch methods are overridden in the lit_api instance
+        batch_overridden = self.batch.__code__ is not LitAPI.batch.__code__
+        unbatch_overridden = self.unbatch.__code__ is not LitAPI.unbatch.__code__
+
+        if batch_overridden and unbatch_overridden and max_batch_size == 1:
+            warnings.warn(
+                "The LitServer has both batch and unbatch methods implemented, "
+                "but the max_batch_size parameter was not set."
+            )
+
+        self.api_path = api_path
+        self.stream = stream
+        self.loop = loop
+        self.spec = spec
+        super().__init__(max_batch_size=max_batch_size, batch_timeout=batch_timeout, **kwargs)
+        self.pre_setup(spec=spec)
+        self.loop.pre_setup(self, spec=spec)
+
+    def pre_setup(self, spec: Optional[LitSpec]):
+        if self.stream:
+            self._default_unbatch = self._unbatch_stream
+        else:
+            self._default_unbatch = self._unbatch_no_stream
+
+        if spec:
+            self._spec = spec
+            spec._max_batch_size = self.max_batch_size
+            spec.pre_setup(self)
+
+
 class LitServerV2:
     def __init__(
         self,
-        lit_api: LitAPI,
+        lit_api: Union[LitAPI, Dict[str, LitAPI]],
         accelerator: str = "auto",
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
-        max_batch_size: Optional[int] = None,
-        batch_timeout: float = 0.0,
-        api_path: str = "/predict",
         healthcheck_path: str = "/health",
         info_path: str = "/info",
         model_metadata: Optional[dict] = None,
-        stream: bool = False,
-        spec: Optional[LitSpec] = None,
         max_payload_size=None,
         track_requests: bool = False,
-        loop: Optional[Union[str, LitLoop]] = "auto",
         callbacks: Optional[Union[List[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
@@ -166,32 +220,6 @@ class LitServerV2:
             fast_queue: Whether to use ZeroMQ for faster response handling.
 
         """
-        if max_batch_size is not None:
-            warnings.warn(
-                "'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer` "
-                "and will be removed in version v0.3.0.\n\n"
-                "Please update your code to pass these arguments to `LitAPI` instead.\n\n"
-                "Old usage:\n"
-                "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n\n"
-                "New usage:\n"
-                "    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
-                "    server = LitServer(api, ...)",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            lit_api.max_batch_size = max_batch_size
-            lit_api.batch_timeout = batch_timeout
-        if isinstance(spec, LitSpec):
-            stream = spec.stream
-
-        if loop is None:
-            loop = "auto"
-
-        if isinstance(loop, str) and loop != "auto":
-            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
-        if loop == "auto":
-            loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
-
         if middlewares is None:
             middlewares = []
         if not isinstance(middlewares, list):
@@ -202,12 +230,6 @@ class LitServerV2:
                 'middlewares=[(RequestIdMiddleware, {"length": 5})])'
             )
             raise ValueError(_msg)
-
-        if not api_path.startswith("/"):
-            raise ValueError(
-                "api_path must start with '/'. "
-                "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
-            )
 
         if not healthcheck_path.startswith("/"):
             raise ValueError(
@@ -239,22 +261,21 @@ class LitServerV2:
             warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
             fast_queue = False
 
-        self._loop: LitLoop = loop
-        self.api_path = api_path
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path
         self.track_requests = track_requests
         self.timeout = timeout
-        lit_api.stream = stream
-        lit_api.request_timeout = self.timeout
-        lit_api.pre_setup(spec=spec)
-        self._loop.pre_setup(lit_api, spec=spec)
+        # TODO: Connector
+        # lit_api.request_timeout = self.timeout
+        if lit_api.batch_timeout > timeout and timeout not in (False, -1):
+            raise ValueError("batch_timeout must be less than request_timeout")
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
-        if not stream:
+        # TODO: Connector
+        if not lit_api.stream:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
@@ -263,9 +284,7 @@ class LitServerV2:
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
         self.lit_api = lit_api
-        self.lit_spec = spec
         self.workers_per_device = workers_per_device
-        self.stream = stream
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
@@ -273,8 +292,8 @@ class LitServerV2:
         self.use_zmq = fast_queue
         self.transport_config = None
 
-        specs = spec if spec is not None else []
-        self._specs = specs if isinstance(specs, Sequence) else [specs]
+        # specs = spec if spec is not None else []
+        # self._specs = specs if isinstance(specs, Sequence) else [specs]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -312,7 +331,8 @@ class LitServerV2:
 
         self._logger_connector.run(self)
 
-        for spec in self._specs:
+        specs = [self.lit_api._spec] if self.lit_api._spec else []
+        for spec in specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
@@ -331,15 +351,15 @@ class LitServerV2:
                 target=inference_worker,
                 args=(
                     self.lit_api,
-                    self.lit_spec,
+                    self.lit_api._spec,
                     device,
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    self.stream,
+                    self.lit_api.stream,
                     self.workers_setup_status,
                     self._callback_runner,
-                    self._loop,
+                    self.lit_api.loop,
                 ),
             )
             process.start()
@@ -361,7 +381,7 @@ class LitServerV2:
         future = response_queue_to_buffer(
             transport,
             self.response_buffer,
-            self.stream,
+            self.lit_api.stream,
             app.response_queue_id,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
@@ -507,11 +527,11 @@ class LitServerV2:
             )
             return StreamingResponse(response)
 
-        if not self._specs:
+        if not self.lit_api._spec:
             stream = self.lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
-            endpoint = self.api_path
+            endpoint = self.lit_api.api_path
             methods = ["POST"]
             self.app.add_api_route(
                 endpoint,
@@ -520,7 +540,8 @@ class LitServerV2:
                 dependencies=[Depends(self.setup_auth())],
             )
 
-        for spec in self._specs:
+        specs = self.lit_api._spec if self.lit_api._spec else []
+        for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
@@ -635,8 +656,8 @@ class LitServerV2:
         workers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
-            if self.lit_spec:
-                self.lit_spec.response_queue_id = response_queue_id
+            if self.lit_api._spec:
+                self.lit_api._spec.response_queue_id = response_queue_id
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
