@@ -402,7 +402,7 @@ def test_custom_api_path():
         LitServer(ls.test_examples.SimpleLitAPI(), api_path="predict")
 
     server = LitServer(ls.test_examples.SimpleLitAPI(), api_path="/v1/custom_predict")
-    url = server.api_path
+    url = server.lit_api.api_path
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"

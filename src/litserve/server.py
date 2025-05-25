@@ -256,6 +256,12 @@ class LitServer:
         lit_api.pre_setup(spec=spec)
         lit_api.loop.pre_setup(lit_api, spec=spec)
 
+        if api_path and not api_path.startswith("/"):
+            raise ValueError(
+                "api_path must start with '/'. "
+                "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
+            )
+
         if not healthcheck_path.startswith("/"):
             raise ValueError(
                 "healthcheck_path must start with '/'. "
@@ -485,7 +491,7 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "stream": self.stream,
+                        "stream": self.lit_api.stream,
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
                     },
