@@ -117,7 +117,7 @@ async def response_queue_to_buffer(
                 break
 
 
-class LitServer:
+class LitServerV2:
     def __init__(
         self,
         lit_api: LitAPI,
@@ -569,7 +569,7 @@ class LitServer:
         **kwargs,
     ):
         if generate_client_file:
-            LitServer.generate_client_file(port=port)
+            LitServerV2.generate_client_file(port=port)
 
         port_msg = f"port must be a value from 1024 to 65535 but got {port}"
         try:
