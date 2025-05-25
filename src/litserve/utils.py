@@ -65,8 +65,8 @@ async def azip(*async_iterables):
 @contextmanager
 def wrap_litserve_start(server: "LitServer"):
     server.app.response_queue_id = 0
-    if server.lit_spec:
-        server.lit_spec.response_queue_id = 0
+    if server.lit_api._spec:
+        server.lit_api._spec.response_queue_id = 0
     manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
     server._prepare_app_run(server.app)
     try:

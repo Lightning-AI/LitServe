@@ -17,22 +17,34 @@ import json
 import warnings
 from abc import ABC, abstractmethod
 from queue import Queue
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from pydantic import BaseModel
 
 from litserve.specs.base import LitSpec
 
+if TYPE_CHECKING:
+    from litserve.loops.base import LitLoop
+
 
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: Optional[Callable] = None
-    _spec: Optional[LitSpec] = None
+    _spec: Optional["LitSpec"] = None
     _device: Optional[str] = None
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
 
-    def __init__(self, max_batch_size: int = 1, batch_timeout: float = 0.0, enable_async: bool = False):
+    def __init__(
+        self,
+        max_batch_size: int = 1,
+        batch_timeout: float = 0.0,
+        api_path: str = "/predict",
+        stream: bool = False,
+        loop: Optional[Union[str, "LitLoop"]] = "auto",
+        spec: Optional["LitSpec"] = None,
+        enable_async: bool = False,
+    ):
         """Initialize a LitAPI instance.
 
         Args:
@@ -47,6 +59,41 @@ class LitAPI(ABC):
 
         if batch_timeout < 0:
             raise ValueError("batch_timeout must be greater than or equal to 0")
+
+        if isinstance(spec, LitSpec):
+            stream = spec.stream
+
+        if loop is None:
+            loop = "auto"
+
+        if isinstance(loop, str) and loop != "auto":
+            raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
+
+        if loop == "auto":
+            from litserve.loops.loops import get_default_loop
+
+            loop = get_default_loop(stream, max_batch_size, enable_async)
+
+        if not api_path.startswith("/"):
+            raise ValueError(
+                "api_path must start with '/'. "
+                "Please provide a valid api path like '/predict', '/classify', or '/v1/predict'"
+            )
+
+        # Check if the batch and unbatch methods are overridden in the lit_api instance
+        batch_overridden = self.batch.__code__ is not LitAPI.batch.__code__
+        unbatch_overridden = self.unbatch.__code__ is not LitAPI.unbatch.__code__
+
+        if batch_overridden and unbatch_overridden and max_batch_size == 1:
+            warnings.warn(
+                "The LitServer has both batch and unbatch methods implemented, "
+                "but the max_batch_size parameter was not set."
+            )
+
+        self.api_path = api_path
+        self.stream = stream
+        self.loop = loop
+        self.spec = spec
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
@@ -82,7 +129,6 @@ Streaming example:
     @abstractmethod
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
-        pass
 
     def decode_request(self, request, **kwargs):
         """Convert the request payload to your model input."""
@@ -165,10 +211,7 @@ Streaming example:
     def device(self, value):
         self._device = value
 
-    def pre_setup(self, spec: Optional[LitSpec]):
-        if self.batch_timeout > self.request_timeout and self.request_timeout not in (False, -1):
-            raise ValueError("batch_timeout must be less than request_timeout")
-
+    def pre_setup(self, spec: Optional["LitSpec"]):
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
