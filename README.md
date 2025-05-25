@@ -73,7 +73,7 @@ This toy example with 2 models (inference pipeline) shows LitServe's flexibility
 import litserve as ls
 
 # define the api to include any number of models, dbs, etc...
-class SimpleLitAPI(ls.LitAPI):
+class InferencePipeline(ls.LitAPI):
     def setup(self, device):
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
@@ -95,7 +95,7 @@ class SimpleLitAPI(ls.LitAPI):
 
 if __name__ == "__main__":
     # 12+ features like batching, streaming, etc...
-    server = ls.LitServer(SimpleLitAPI(max_batch_size=1), accelerator="auto")
+    server = ls.LitServer(InferencePipeline(max_batch_size=1), accelerator="auto")
     server.run(port=8000)
 ```
 
