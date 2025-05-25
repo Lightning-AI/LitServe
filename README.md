@@ -118,15 +118,13 @@ class NewsAgent(ls.LitAPI):
         # ask the LLM to tell you about the news
         llm_response = self.openai_client.Completion.create(model="text-davinci-003", prompt=f"Based on this, what is the latest: {website_text}",)
         output = llm_response.choices[0].text.strip()
-        
         return {"output": output}
 
     def encode_response(self, output):
         return {"response": output}
 
 if __name__ == "__main__":
-    api = NewsAgent()
-    server = ls.LitServer(api, accelerator="auto")
+    server = ls.LitServer(NewsAgent())
     server.run(port=8000)
 ```
 
