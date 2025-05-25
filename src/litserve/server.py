@@ -132,10 +132,40 @@ def _migration_warning(feature_name):
     )
 
 
+class _LitAPIConnector:
+    def __init__(self, lit_apis: Union[LitAPI, List[LitAPI]]):
+        if isinstance(lit_apis, LitAPI):
+            self.lit_apis = [lit_apis]
+        elif isinstance(lit_apis, list):
+            self.lit_apis = lit_apis
+        else:
+            raise ValueError(f"lit_apis must be a LitAPI or a list of LitAPI, but got {type(lit_apis)}")
+
+    def pre_setup(self):
+        for lit_api in self.lit_apis:
+            spec = lit_api._spec
+            lit_api.pre_setup(spec=spec)
+            lit_api.loop.pre_setup(lit_api, spec=spec)
+
+    def set_request_timeout(self, timeout: float):
+        for lit_api in self.lit_apis:
+            lit_api.request_timeout = timeout
+
+        for lit_api in self.lit_apis:
+            if lit_api.batch_timeout > timeout and timeout not in (False, -1):
+                raise ValueError("batch_timeout must be less than request_timeout")
+
+    def __iter__(self):
+        return iter(self.lit_apis)
+
+    def any_stream(self):
+        return any(lit_api.stream for lit_api in self.lit_apis)
+
+
 class LitServer:
     def __init__(
         self,
-        lit_api: LitAPI,
+        lit_api: Union[LitAPI, List[LitAPI]],
         accelerator: str = "auto",
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
@@ -224,8 +254,8 @@ class LitServer:
             lit_api.stream = spec.stream
 
         # pre setup
-        lit_api.pre_setup(spec=spec)
-        lit_api.loop.pre_setup(lit_api, spec=spec)
+        self.litapi_connector = _LitAPIConnector(lit_api)
+        self.litapi_connector.pre_setup()
 
         if api_path and not api_path.startswith("/"):
             raise ValueError(
@@ -249,16 +279,6 @@ class LitServer:
         except (TypeError, ValueError):
             raise ValueError("model_metadata must be JSON serializable.")
 
-        # Check if the batch and unbatch methods are overridden in the lit_api instance
-        batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
-        unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
-
-        if batch_overridden and unbatch_overridden and lit_api.max_batch_size == 1:
-            warnings.warn(
-                "The LitServer has both batch and unbatch methods implemented, "
-                "but the max_batch_size parameter was not set."
-            )
-
         if sys.platform == "win32" and fast_queue:
             warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
             fast_queue = False
@@ -267,17 +287,14 @@ class LitServer:
         self.info_path = info_path
         self.track_requests = track_requests
         self.timeout = timeout
-        # TODO: Connector
-        lit_api.request_timeout = timeout
-        if lit_api.batch_timeout > timeout and timeout not in (False, -1):
-            raise ValueError("batch_timeout must be less than request_timeout")
+        self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         # TODO: Connector
-        if not lit_api.stream:
+        if not self.litapi_connector.any_stream():
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
@@ -293,9 +310,6 @@ class LitServer:
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
         self.transport_config = None
-
-        # specs = spec if spec is not None else []
-        # self._specs = specs if isinstance(specs, Sequence) else [specs]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -322,9 +336,8 @@ class LitServer:
         self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
 
-    def launch_inference_worker(self, num_uvicorn_servers: int):
-        self.transport_config.num_consumers = num_uvicorn_servers
-        manager = self.transport_config.manager = mp.Manager()
+    def launch_inference_worker(self, lit_api: LitAPI):
+        manager = self.transport_config.manager
         self._transport = create_transport_from_config(self.transport_config)
         self.workers_setup_status = manager.dict()
         self.request_queue = manager.Queue()
@@ -333,7 +346,7 @@ class LitServer:
 
         self._logger_connector.run(self)
 
-        specs = [self.lit_api._spec] if self.lit_api._spec else []
+        specs = [lit_api._spec] if lit_api._spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
@@ -352,16 +365,16 @@ class LitServer:
             process = ctx.Process(
                 target=inference_worker,
                 args=(
-                    self.lit_api,
-                    self.lit_api._spec,
+                    lit_api,
+                    lit_api._spec,
                     device,
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    self.lit_api.stream,
+                    lit_api.stream,
                     self.workers_setup_status,
                     self._callback_runner,
-                    self.lit_api.loop,
+                    lit_api.loop,
                 ),
             )
             process.start()
@@ -624,7 +637,12 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager, inference_workers = self.launch_inference_worker(num_api_servers)
+        self.transport_config.manager = mp.Manager()
+        self.transport_config.num_consumers = num_api_servers
+        inference_workers = []
+        for lit_api in self.litapi_connector:
+            manager, _inference_workers = self.launch_inference_worker(lit_api)
+            inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
         try:
