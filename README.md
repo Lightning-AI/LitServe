@@ -196,7 +196,8 @@ Self-host with full control, or deploy with [Lightning AI](https://lightning.ai/
 ```bash
 lightning deploy server.py --cloud
 ```
-[learn more](https://lightning.ai/)    
+
+https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
 &nbsp;
 
