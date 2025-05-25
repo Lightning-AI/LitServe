@@ -11,7 +11,7 @@
 &nbsp; 
 </div>
 
-Most tools serve one model with rigid abstractions. LitServe runs full AI systems - agents, chatbots, RAG, pipelines - with full control, custom logic, multi-model support, and zero YAML. 
+Most tools serve one model with rigid abstractions. LitServe lets you build full AI systems - agents, chatbots, RAG, pipelines - with full control, custom logic, multi-model support, and zero YAML. 
 
 Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
 
@@ -22,7 +22,7 @@ Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
 <pre>
 ✅ Build full AI systems   ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
 ✅ Custom logic + control  ✅ Any PyTorch model          ✅ Self-host or managed        
-✅ GPU autoscaling         ✅ Batching + streaming       ✅ BYO model or vLLM           
+✅ Multi-GPU autoscaling   ✅ Batching + streaming       ✅ BYO model or vLLM           
 ✅ No MLOps glue code      ✅ Easy setup in Python       ✅ Serverless support          
 
 </pre>
@@ -65,9 +65,12 @@ Install LitServe via pip ([more options](https://lightning.ai/docs/litserve/home
 ```bash
 pip install litserve
 ```
-    
-### Toy example   
-This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#featured-examples)):    
+
+[Example 1](#inference-pipeline-example): Toy inference pipeline with multiple models.   
+[Example 2](#agent-example): Minimal agent to fetch the news (with OpenAI API).    
+([Advanced examples](#featured-examples)):    
+
+### Inference pipeline example   
 
 ```python
 import litserve as ls
@@ -115,7 +118,7 @@ Test the server: Simulate an http request (run this on any terminal):
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
 
-### Agentic example
+### Agent example
 
 ```python
 import re, requests, openai
@@ -132,7 +135,10 @@ class NewsAgent(ls.LitAPI):
         website_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
 
         # ask the LLM to tell you about the news
-        llm_response = self.openai_client.Completion.create(model="text-davinci-003", prompt=f"Based on this, what is the latest: {website_text}",)
+        llm_response = self.openai_client.Completion.create(
+           model="text-davinci-003",
+           prompt=f"Based on this, what is the latest: {website_text}",
+        )
         output = llm_response.choices[0].text.strip()
         return {"output": output}
 
@@ -196,7 +202,8 @@ Self-host with full control, or deploy with [Lightning AI](https://lightning.ai/
 ```bash
 lightning deploy server.py --cloud
 ```
-[learn more](https://lightning.ai/)    
+
+https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
 &nbsp;
 
