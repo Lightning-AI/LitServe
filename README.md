@@ -66,9 +66,11 @@ Install LitServe via pip ([more options](https://lightning.ai/docs/litserve/home
 pip install litserve
 ```
 
-Example 1: Toy inference pipeline with multiple models.   
-[Example 2](#agentic-example): Real minimal agent (with OpenAI API).    
+[Example 1](#inference-pipeline-example): Toy inference pipeline with multiple models.   
+[Example 2](#agent-example): Minimal agent to fetch the news (with OpenAI API).    
 ([Advanced examples](#featured-examples)):    
+
+### Inference pipeline example   
 
 ```python
 import litserve as ls
@@ -116,7 +118,7 @@ Test the server: Simulate an http request (run this on any terminal):
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
 
-### Agentic example
+### Agent example
 
 ```python
 import re, requests, openai
