@@ -22,7 +22,7 @@ Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
 <pre>
 ✅ Build full AI systems   ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
 ✅ Custom logic + control  ✅ Any PyTorch model          ✅ Self-host or managed        
-✅ GPU autoscaling         ✅ Batching + streaming       ✅ BYO model or vLLM           
+✅ Multi-GPU autoscaling   ✅ Batching + streaming       ✅ BYO model or vLLM           
 ✅ No MLOps glue code      ✅ Easy setup in Python       ✅ Serverless support          
 
 </pre>
