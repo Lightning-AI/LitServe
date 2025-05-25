@@ -69,11 +69,6 @@ class LitAPI(ABC):
         if isinstance(loop, str) and loop != "auto":
             raise ValueError("loop must be an instance of _BaseLoop or 'auto'")
 
-        if loop == "auto":
-            from litserve.loops.loops import get_default_loop
-
-            loop = get_default_loop(stream, max_batch_size, enable_async)
-
         if not api_path.startswith("/"):
             raise ValueError(
                 "api_path must start with '/'. "
@@ -92,7 +87,7 @@ class LitAPI(ABC):
 
         self.api_path = api_path
         self.stream = stream
-        self.loop = loop
+        self._loop = loop
         self.spec = spec
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
@@ -255,3 +250,11 @@ Streaming example:
 
         """
         return True
+
+    @property
+    def loop(self):
+        if self._loop == "auto":
+            from litserve.loops.loops import get_default_loop
+
+            self._loop = get_default_loop(self.stream, self.max_batch_size, self.enable_async)
+        return self._loop

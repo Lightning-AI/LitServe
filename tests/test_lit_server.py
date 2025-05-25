@@ -227,7 +227,7 @@ def test_start_server(mock_uvicon):
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
     mock_uvicon.Server.assert_called()
-    assert server.lit_spec.response_queue_id is not None, "response_queue_id must be generated"
+    assert server.lit_api._spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
 @pytest.fixture
