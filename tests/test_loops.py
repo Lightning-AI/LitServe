@@ -559,24 +559,20 @@ class TestLoop(LitLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         try:
             self.run(
                 lit_api,
-                lit_spec,
                 device,
                 worker_id,
                 request_queue,
                 transport,
-                stream,
                 workers_setup_status,
                 callback_runner,
             )
@@ -586,12 +582,10 @@ class TestLoop(LitLoop):
     def run(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):

@@ -70,7 +70,9 @@ def wrap_litserve_start(server: "LitServer"):
         server.lit_api.spec.response_queue_id = 0
     server.transport_config.num_consumers = 1
     server.transport_config.manager = mp.Manager()
-    manager, processes = server.launch_inference_worker()
+    server.workers_setup_status = server.transport_config.manager.dict()
+    server.request_queue = server.transport_config.manager.Queue()
+    manager, processes = server.launch_inference_worker(server.lit_api)
     server._prepare_app_run(server.app)
     try:
         yield server
