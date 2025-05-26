@@ -333,7 +333,7 @@ class LitServer:
 
         self._logger_connector.run(self)
 
-        specs = [self.lit_api._spec] if self.lit_api._spec else []
+        specs = [self.lit_api.spec] if self.lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
@@ -353,7 +353,7 @@ class LitServer:
                 target=inference_worker,
                 args=(
                     self.lit_api,
-                    self.lit_api._spec,
+                    self.lit_api.spec,
                     device,
                     worker_id,
                     self.request_queue,
@@ -529,7 +529,7 @@ class LitServer:
             )
             return StreamingResponse(response)
 
-        if not self.lit_api._spec:
+        if not self.lit_api.spec:
             stream = self.lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
@@ -542,7 +542,7 @@ class LitServer:
                 dependencies=[Depends(self.setup_auth())],
             )
 
-        specs = [self.lit_api._spec] if self.lit_api._spec else []
+        specs = [self.lit_api.spec] if self.lit_api.spec else []
         for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing
@@ -658,8 +658,8 @@ class LitServer:
         workers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
-            if self.lit_api._spec:
-                self.lit_api._spec.response_queue_id = response_queue_id
+            if self.lit_api.spec:
+                self.lit_api.spec.response_queue_id = response_queue_id
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
