@@ -254,8 +254,8 @@ class LitServer:
             lit_api.stream = spec.stream
 
         # pre setup
-        self.litapi_connector = _LitAPIConnector(lit_api)
-        self.litapi_connector.pre_setup()
+        lit_api.pre_setup(spec=spec)
+        lit_api.loop.pre_setup(lit_api, spec=spec)
 
         if api_path and not api_path.startswith("/"):
             raise ValueError(
@@ -293,7 +293,6 @@ class LitServer:
         self.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
-        # TODO: Connector
         if not self.litapi_connector.any_stream():
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
@@ -310,6 +309,9 @@ class LitServer:
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
         self.transport_config = None
+
+        # specs = spec if spec is not None else []
+        # self._specs = specs if isinstance(specs, Sequence) else [specs]
 
         decode_request_signature = inspect.signature(lit_api.decode_request)
         encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -346,7 +348,7 @@ class LitServer:
 
         self._logger_connector.run(self)
 
-        specs = [lit_api._spec] if lit_api._spec else []
+        specs = [self.lit_api.spec] if self.lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
@@ -365,16 +367,16 @@ class LitServer:
             process = ctx.Process(
                 target=inference_worker,
                 args=(
-                    lit_api,
-                    lit_api._spec,
+                    self.lit_api,
+                    self.lit_api.spec,
                     device,
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    lit_api.stream,
+                    self.lit_api.stream,
                     self.workers_setup_status,
                     self._callback_runner,
-                    lit_api.loop,
+                    self.lit_api.loop,
                 ),
             )
             process.start()
@@ -542,7 +544,7 @@ class LitServer:
             )
             return StreamingResponse(response)
 
-        if not self.lit_api._spec:
+        if not self.lit_api.spec:
             stream = self.lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
@@ -555,7 +557,7 @@ class LitServer:
                 dependencies=[Depends(self.setup_auth())],
             )
 
-        specs = [self.lit_api._spec] if self.lit_api._spec else []
+        specs = [self.lit_api.spec] if self.lit_api.spec else []
         for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing
@@ -676,8 +678,8 @@ class LitServer:
         workers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
-            if self.lit_api._spec:
-                self.lit_api._spec.response_queue_id = response_queue_id
+            if self.lit_api.spec:
+                self.lit_api.spec.response_queue_id = response_queue_id
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)

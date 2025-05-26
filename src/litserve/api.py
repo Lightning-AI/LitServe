@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class LitAPI(ABC):
     _stream: bool = False
     _default_unbatch: Optional[Callable] = None
-    _spec: Optional["LitSpec"] = None
+    _spec: Optional[LitSpec] = None
     _device: Optional[str] = None
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
@@ -128,6 +128,7 @@ Streaming example:
     @abstractmethod
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
+        pass
 
     def decode_request(self, request, **kwargs):
         """Convert the request payload to your model input."""
@@ -210,7 +211,7 @@ Streaming example:
     def device(self, value):
         self._device = value
 
-    def pre_setup(self, spec: Optional["LitSpec"]):
+    def pre_setup(self, spec: Optional[LitSpec]):
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
@@ -266,3 +267,11 @@ Streaming example:
     @loop.setter
     def loop(self, value: "LitLoop"):
         self._loop = value
+
+    @property
+    def spec(self):
+        return self._spec
+
+    @spec.setter
+    def spec(self, value: LitSpec):
+        self._spec = value
