@@ -37,7 +37,7 @@ from litserve.utils import wrap_litserve_start
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_single_input(openai_embedding_request_data):
     spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPI(), spec=spec)
+    server = ls.LitServer(TestEmbedAPI(spec=spec))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
