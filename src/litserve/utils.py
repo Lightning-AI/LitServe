@@ -14,6 +14,7 @@
 import asyncio
 import dataclasses
 import logging
+import multiprocessing as mp
 import os
 import pdb
 import pickle
@@ -65,9 +66,11 @@ async def azip(*async_iterables):
 @contextmanager
 def wrap_litserve_start(server: "LitServer"):
     server.app.response_queue_id = 0
-    if server.lit_api._spec:
-        server.lit_api._spec.response_queue_id = 0
-    manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
+    if server.lit_api.spec:
+        server.lit_api.spec.response_queue_id = 0
+    server.transport_config.num_consumers = 1
+    server.transport_config.manager = mp.Manager()
+    manager, processes = server.launch_inference_worker()
     server._prepare_app_run(server.app)
     try:
         yield server

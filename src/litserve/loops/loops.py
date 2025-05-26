@@ -13,14 +13,13 @@
 # limitations under the License.
 import logging
 from queue import Queue
-from typing import Dict, Optional, Union
+from typing import Dict
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.loops.base import _BaseLoop
+from litserve.loops.base import LitLoop, _BaseLoop
 from litserve.loops.simple_loops import BatchedLoop, SingleLoop
 from litserve.loops.streaming_loops import BatchedStreamingLoop, StreamingLoop
-from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.utils import WorkerSetupStatus
 
@@ -61,16 +60,18 @@ def get_default_loop(stream: bool, max_batch_size: int, enable_async: bool = Fal
 
 def inference_worker(
     lit_api: LitAPI,
-    lit_spec: Optional[LitSpec],
     device: str,
     worker_id: int,
     request_queue: Queue,
     transport: MessageTransport,
-    stream: bool,
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
-    loop: Union[str, _BaseLoop],
 ):
+    print("workers_setup_status", workers_setup_status)
+    lit_spec = lit_api.spec
+    loop: LitLoop = lit_api.loop
+    stream = lit_api.stream
+
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP.value, lit_api=lit_api)
     try:
         lit_api.setup(device)
@@ -94,12 +95,10 @@ def inference_worker(
 
     loop(
         lit_api,
-        lit_spec,
         device,
         worker_id,
         request_queue,
         transport,
-        stream,
         workers_setup_status,
         callback_runner,
     )

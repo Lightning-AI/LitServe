@@ -211,7 +211,8 @@ Streaming example:
     def device(self, value):
         self._device = value
 
-    def pre_setup(self, spec: Optional[LitSpec]):
+    def pre_setup(self, spec: Optional[LitSpec] = None):
+        spec = spec or self._spec
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:

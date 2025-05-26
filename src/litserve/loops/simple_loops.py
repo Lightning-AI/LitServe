@@ -33,11 +33,12 @@ class SingleLoop(DefaultLoop):
     def run_single_loop(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         request_queue: Queue,
         transport: MessageTransport,
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
     ):
+        lit_spec = lit_spec or lit_api.spec
         while True:
             try:
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -125,10 +126,11 @@ class SingleLoop(DefaultLoop):
         self,
         request,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         transport: MessageTransport,
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
     ):
+        lit_spec = lit_spec or lit_api.spec
         response_queue_id, uid, timestamp, x_enc = request
         try:
             context = {}
@@ -191,11 +193,12 @@ class SingleLoop(DefaultLoop):
     def _run_single_loop_with_async(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         request_queue: Queue,
         transport: MessageTransport,
         callback_runner: CallbackRunner,
     ):
+        lit_spec = lit_api.spec
+
         async def process_requests():
             event_loop = asyncio.get_running_loop()
             pending_tasks = set()
@@ -255,19 +258,19 @@ class SingleLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
+        stream: bool = False,
     ):
         if lit_api.enable_async:
-            self._run_single_loop_with_async(lit_api, lit_spec, request_queue, transport, callback_runner)
+            self._run_single_loop_with_async(lit_api, request_queue, transport, callback_runner)
         else:
-            self.run_single_loop(lit_api, lit_spec, request_queue, transport, callback_runner)
+            self.run_single_loop(lit_api, request_queue, transport, callback_runner)
 
 
 class BatchedLoop(DefaultLoop):

@@ -27,6 +27,7 @@ import warnings
 from collections import deque
 from contextlib import asynccontextmanager
 from multiprocessing.context import Process
+from queue import Queue
 from threading import Thread
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -136,16 +137,17 @@ class _LitAPIConnector:
     def __init__(self, lit_apis: Union[LitAPI, List[LitAPI]]):
         if isinstance(lit_apis, LitAPI):
             self.lit_apis = [lit_apis]
-        elif isinstance(lit_apis, list):
+        elif isinstance(lit_apis, list) and len(lit_apis) > 0:
             self.lit_apis = lit_apis
         else:
             raise ValueError(f"lit_apis must be a LitAPI or a list of LitAPI, but got {type(lit_apis)}")
 
     def pre_setup(self):
         for lit_api in self.lit_apis:
-            spec = lit_api._spec
-            lit_api.pre_setup(spec=spec)
-            lit_api.loop.pre_setup(lit_api, spec=spec)
+            lit_api.pre_setup()
+            # Ideally LitAPI should not know about LitLoop
+            # LitLoop can keep litapi as a class variable
+            lit_api.loop.pre_setup(lit_api)
 
     def set_request_timeout(self, timeout: float):
         for lit_api in self.lit_apis:
@@ -160,6 +162,10 @@ class _LitAPIConnector:
 
     def any_stream(self):
         return any(lit_api.stream for lit_api in self.lit_apis)
+
+    def set_logger_queue(self, queue: Queue):
+        for lit_api in self.lit_apis:
+            lit_api.set_logger_queue(queue)
 
 
 class LitServer:
@@ -254,8 +260,8 @@ class LitServer:
             lit_api.stream = spec.stream
 
         # pre setup
-        lit_api.pre_setup(spec=spec)
-        lit_api.loop.pre_setup(lit_api, spec=spec)
+        self.litapi_connector = _LitAPIConnector(lit_api)
+        self.litapi_connector.pre_setup()
 
         if api_path and not api_path.startswith("/"):
             raise ValueError(
@@ -310,20 +316,6 @@ class LitServer:
         self.use_zmq = fast_queue
         self.transport_config = None
 
-        # specs = spec if spec is not None else []
-        # self._specs = specs if isinstance(specs, Sequence) else [specs]
-
-        decode_request_signature = inspect.signature(lit_api.decode_request)
-        encode_response_signature = inspect.signature(lit_api.encode_response)
-
-        self.request_type = decode_request_signature.parameters["request"].annotation
-        if self.request_type == decode_request_signature.empty:
-            self.request_type = Request
-
-        self.response_type = encode_response_signature.return_annotation
-        if self.response_type == encode_response_signature.empty:
-            self.response_type = Response
-
         accelerator = self._connector.accelerator
         devices = self._connector.devices
         if accelerator == "cpu":
@@ -341,14 +333,8 @@ class LitServer:
     def launch_inference_worker(self, lit_api: LitAPI):
         manager = self.transport_config.manager
         self._transport = create_transport_from_config(self.transport_config)
-        self.workers_setup_status = manager.dict()
-        self.request_queue = manager.Queue()
-        if self._logger_connector._loggers:
-            self.logger_queue = manager.Queue()
 
-        self._logger_connector.run(self)
-
-        specs = [self.lit_api.spec] if self.lit_api.spec else []
+        specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
@@ -357,26 +343,24 @@ class LitServer:
             spec.setup(server_copy)
 
         process_list = []
+        endpoint = lit_api.api_path.split("/")[-1]
         for worker_id, device in enumerate(self.inference_workers):
             if len(device) == 1:
                 device = device[0]
 
-            self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
+            self.workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.STARTING
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
                 target=inference_worker,
                 args=(
-                    self.lit_api,
-                    self.lit_api.spec,
+                    lit_api,
                     device,
                     worker_id,
                     self.request_queue,
                     self._transport,
-                    self.lit_api.stream,
                     self.workers_setup_status,
                     self._callback_runner,
-                    self.lit_api.loop,
                 ),
             )
             process.start()
@@ -398,7 +382,7 @@ class LitServer:
         future = response_queue_to_buffer(
             transport,
             self.response_buffer,
-            self.lit_api.stream,
+            self.litapi_connector.any_stream(),
             app.response_queue_id,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
@@ -447,9 +431,7 @@ class LitServer:
             return sum(counter.value for counter in self.active_counters)
         return None
 
-    def register_endpoints(self):
-        """Register endpoint routes for the FastAPI app and setup middlewares."""
-        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
+    def _register_internal_endpoints(self):
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -484,7 +466,27 @@ class LitServer:
                 }
             )
 
-        async def predict(request: self.request_type) -> self.response_type:
+    def register_endpoints(self):
+        self._register_internal_endpoints()
+        for lit_api in self.litapi_connector:
+            decode_request_signature = inspect.signature(lit_api.decode_request)
+            encode_response_signature = inspect.signature(lit_api.encode_response)
+
+            request_type = decode_request_signature.parameters["request"].annotation
+            if request_type == decode_request_signature.empty:
+                request_type = Request
+
+            response_type = encode_response_signature.return_annotation
+            if response_type == encode_response_signature.empty:
+                response_type = Response
+            self._register_api_endpoints(lit_api, request_type, response_type)
+
+    def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
+        """Register endpoint routes for the FastAPI app and setup middlewares."""
+
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
+
+        async def predict(request: request_type) -> response_type:
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -497,7 +499,7 @@ class LitServer:
             logger.debug(f"Received request uid={uid}")
 
             payload = request
-            if self.request_type == Request:
+            if request_type == Request:
                 if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
                     "Content-Type"
                 ].startswith("multipart/form-data"):
@@ -518,7 +520,7 @@ class LitServer:
             self._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self)
             return response
 
-        async def stream_predict(request: self.request_type) -> self.response_type:
+        async def stream_predict(request: request_type) -> response_type:
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -532,7 +534,7 @@ class LitServer:
             logger.debug(f"Received request uid={uid}")
 
             payload = request
-            if self.request_type == Request:
+            if request_type == Request:
                 payload = await request.json()
             self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
@@ -544,11 +546,11 @@ class LitServer:
             )
             return StreamingResponse(response)
 
-        if not self.lit_api.spec:
-            stream = self.lit_api.stream
+        if not lit_api.spec:
+            stream = lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
-            endpoint = self.lit_api.api_path
+            endpoint = lit_api.api_path
             methods = ["POST"]
             self.app.add_api_route(
                 endpoint,
@@ -557,7 +559,7 @@ class LitServer:
                 dependencies=[Depends(self.setup_auth())],
             )
 
-        specs = [self.lit_api.spec] if self.lit_api.spec else []
+        specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing
@@ -639,8 +641,13 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        self.transport_config.manager = mp.Manager()
+        manager = self.transport_config.manager = mp.Manager()
         self.transport_config.num_consumers = num_api_servers
+        self.workers_setup_status = manager.dict()
+        self.request_queue = manager.Queue()
+        if self._logger_connector._loggers:
+            self.logger_queue = manager.Queue()
+        self._logger_connector.run(self)
         inference_workers = []
         for lit_api in self.litapi_connector:
             manager, _inference_workers = self.launch_inference_worker(lit_api)
@@ -678,8 +685,10 @@ class LitServer:
         workers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
-            if self.lit_api.spec:
-                self.lit_api.spec.response_queue_id = response_queue_id
+            for lit_api in self.litapi_connector:
+                if lit_api.spec:
+                    lit_api.spec.response_queue_id = response_queue_id
+
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)

@@ -68,7 +68,7 @@ class ContinuousBatchingLoop(LitLoop):
         self.max_sequence_length = max_sequence_length
         self.response_queue_ids: Dict[str, int] = {}  # uid -> response_queue_id
 
-    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         """Check if the lit_api has the necessary methods and if streaming is enabled."""
         if not lit_api.stream:
             raise ValueError(
@@ -180,16 +180,15 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
     async def run(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         """Main loop that processes batches of requests."""
+        lit_spec = lit_api.spec
         try:
             prev_outputs = None
             while lit_api.has_active_requests():
