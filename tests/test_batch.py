@@ -121,6 +121,12 @@ async def test_unbatched():
     assert response2.json() == {"output": 11.0}
 
 
+def test_request_timeout_connector():
+    api = SimpleBatchLitAPI()
+    LitServer(api, accelerator="cpu", devices=1, timeout=43.432)
+    assert api.request_timeout == 43.432
+
+
 def test_max_batch_size():
     with pytest.raises(ValueError, match="must be greater than 0"):
         SimpleBatchLitAPI(max_batch_size=0)
@@ -129,9 +135,8 @@ def test_max_batch_size():
         SimpleBatchLitAPI(max_batch_size=-1)
 
     api = SimpleBatchLitAPI(max_batch_size=2, batch_timeout=5)
-    api.request_timeout = 2
     with pytest.raises(ValueError, match="batch_timeout must be less than request_timeout"):
-        api.pre_setup(spec=None)
+        LitServer(api, timeout=2)
 
 
 def test_max_batch_size_warning():
