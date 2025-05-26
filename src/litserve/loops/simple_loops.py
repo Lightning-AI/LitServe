@@ -277,11 +277,12 @@ class BatchedLoop(DefaultLoop):
     def run_batched_loop(
         self,
         lit_api: LitAPI,
-        lit_spec: LitSpec,
         request_queue: Queue,
         transport: MessageTransport,
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
     ):
+        lit_spec = lit_api.spec
         while True:
             batches, timed_out_uids = collate_requests(
                 lit_api,
@@ -371,18 +372,17 @@ class BatchedLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
+        stream: bool = False,
     ):
         self.run_batched_loop(
             lit_api,
-            lit_spec,
             request_queue,
             transport,
             callback_runner,

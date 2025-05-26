@@ -598,6 +598,15 @@ class LitServer:
             time.sleep(0.05)
         logger.debug("One or more workers are ready to serve requests")
 
+    def _init_manager(self, num_api_servers: int):
+        manager = self.transport_config.manager = mp.Manager()
+        self.transport_config.num_consumers = num_api_servers
+        self.workers_setup_status = manager.dict()
+        self.request_queue = manager.Queue()
+        if self._logger_connector._loggers:
+            self.logger_queue = manager.Queue()
+        return manager
+
     def run(
         self,
         host: str = "0.0.0.0",
@@ -641,12 +650,7 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager = self.transport_config.manager = mp.Manager()
-        self.transport_config.num_consumers = num_api_servers
-        self.workers_setup_status = manager.dict()
-        self.request_queue = manager.Queue()
-        if self._logger_connector._loggers:
-            self.logger_queue = manager.Queue()
+        manager = self._init_manager(num_api_servers)
         self._logger_connector.run(self)
         inference_workers = []
         for lit_api in self.litapi_connector:

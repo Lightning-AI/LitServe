@@ -246,7 +246,7 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_wor
     server = server_for_api_worker_test
 
     server.run(api_server_worker_type="process", num_api_servers=10)
-    server.launch_inference_worker.assert_called_with(10)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
@@ -258,7 +258,7 @@ def test_server_run_with_process_api_worker(
     server = server_for_api_worker_test
 
     server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
-    server.launch_inference_worker.assert_called_with(num_api_workers)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
     actual = server._start_server.call_args
     assert actual[0][4] == "process", "Server should run in process mode"
     mock_uvicorn.Config.assert_called()
@@ -269,7 +269,7 @@ def test_server_run_with_process_api_worker(
 def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test):
     server = server_for_api_worker_test
     server.run(api_server_worker_type="thread")
-    server.launch_inference_worker.assert_called_with(1)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
     assert server._start_server.call_args[0][4] == "thread", "Server should run in thread mode"
     mock_uvicorn.Config.assert_called()
 
