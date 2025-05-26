@@ -227,7 +227,7 @@ def test_start_server(mock_uvicon):
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
     mock_uvicon.Server.assert_called()
-    assert server.lit_spec.response_queue_id is not None, "response_queue_id must be generated"
+    assert server.lit_api._spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
 @pytest.fixture
@@ -402,7 +402,7 @@ def test_custom_api_path():
         LitServer(ls.test_examples.SimpleLitAPI(), api_path="predict")
 
     server = LitServer(ls.test_examples.SimpleLitAPI(), api_path="/v1/custom_predict")
-    url = server.api_path
+    url = server.lit_api.api_path
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
