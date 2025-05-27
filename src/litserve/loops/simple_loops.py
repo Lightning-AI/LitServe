@@ -197,8 +197,6 @@ class SingleLoop(DefaultLoop):
         transport: MessageTransport,
         callback_runner: CallbackRunner,
     ):
-        lit_spec = lit_api.spec
-
         async def process_requests():
             event_loop = asyncio.get_running_loop()
             pending_tasks = set()
@@ -235,7 +233,6 @@ class SingleLoop(DefaultLoop):
                     self._process_single_request(
                         (response_queue_id, uid, timestamp, x_enc),
                         lit_api,
-                        lit_spec,
                         transport,
                         callback_runner,
                     ),
