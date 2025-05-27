@@ -29,7 +29,7 @@ from contextlib import asynccontextmanager
 from multiprocessing.context import Process
 from queue import Queue
 from threading import Thread
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
