@@ -14,7 +14,6 @@
 import asyncio
 import dataclasses
 import logging
-import multiprocessing as mp
 import os
 import pdb
 import pickle
@@ -68,10 +67,8 @@ def wrap_litserve_start(server: "LitServer"):
     server.app.response_queue_id = 0
     if server.lit_api.spec:
         server.lit_api.spec.response_queue_id = 0
-    server.transport_config.num_consumers = 1
-    server.transport_config.manager = mp.Manager()
-    server.workers_setup_status = server.transport_config.manager.dict()
-    server.request_queue = server.transport_config.manager.Queue()
+
+    manager = server._init_manager(1)
     processes = server.launch_inference_worker(server.lit_api)
     server._prepare_app_run(server.app)
     try:
@@ -82,7 +79,7 @@ def wrap_litserve_start(server: "LitServer"):
         for p in processes:
             p.terminate()
             p.join()
-        server.transport_config.manager.shutdown()
+        manager.shutdown()
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
