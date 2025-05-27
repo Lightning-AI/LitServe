@@ -42,7 +42,7 @@ class LitAPI(ABC):
         api_path: str = "/predict",
         stream: bool = False,
         loop: Optional[Union[str, "LitLoop"]] = "auto",
-        spec: Optional["LitSpec"] = None,
+        spec: Optional[LitSpec] = None,
         enable_async: bool = False,
     ):
         """Initialize a LitAPI instance.

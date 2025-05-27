@@ -306,12 +306,14 @@ def test_server_terminate():
     server._transport = MagicMock()
 
     with (
+        patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager,
         patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start,
         patch("litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])) as mock_launch,
     ):
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
 
+        mock_init_manager.assert_called()
         mock_launch.assert_called()
         mock_start.assert_called()
         server._transport.close.assert_called()
