@@ -402,7 +402,8 @@ class LitServer:
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    async def data_streamer(self, q: deque, data_available: asyncio.Event, send_status: bool = False):
+    @staticmethod
+    async def data_streamer(q: deque, data_available: asyncio.Event, send_status: bool = False):
         while True:
             await data_available.wait()
             while len(q) > 0:

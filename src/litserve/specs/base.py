@@ -41,6 +41,7 @@ class LitSpec:
         """This method is called by the server to connect the spec to the server."""
         self.response_buffer = server.response_buffer
         self.request_queue = server.request_queue
+        self.data_streamer = server.data_streamer
 
     def add_endpoint(self, path: str, endpoint: Callable, methods: List[str]):
         """Register an endpoint in the spec."""

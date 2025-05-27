@@ -436,7 +436,7 @@ class OpenAISpec(LitSpec):
     async def get_from_queues(self, uids) -> List[AsyncGenerator]:
         choice_pipes = []
         for uid, q, event in zip(uids, self.queues, self.events):
-            data = self._server.data_streamer(q, event, send_status=True)
+            data = self.data_streamer(q, event, send_status=True)
             choice_pipes.append(data)
         return choice_pipes
 
@@ -454,8 +454,8 @@ class OpenAISpec(LitSpec):
             request_el.n = 1
             q = deque()
             event = asyncio.Event()
-            self._server.response_buffer[uid] = (q, event)
-            self._server.request_queue.put((response_queue_id, uid, time.monotonic(), request_el))
+            self.response_buffer[uid] = (q, event)
+            self.request_queue.put((response_queue_id, uid, time.monotonic(), request_el))
             self.queues.append(q)
             self.events.append(event)
 
