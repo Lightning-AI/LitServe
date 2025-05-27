@@ -134,8 +134,7 @@ def _migration_warning(feature_name):
 
 
 class _LitAPIConnector:
-    """
-    A helper class to manage one or more `LitAPI` instances.
+    """A helper class to manage one or more `LitAPI` instances.
 
     This class provides utilities for performing setup tasks, managing request
     and batch timeouts, and interacting with `LitAPI` instances in a unified way.
@@ -152,7 +151,9 @@ class _LitAPIConnector:
         __iter__(): Allows iteration over the managed `LitAPI` instances.
         any_stream(): Checks if any of the `LitAPI` instances have streaming enabled.
         set_logger_queue(queue): Sets a logger queue for all `LitAPI` instances.
+
     """
+
     def __init__(self, lit_apis: Union[LitAPI, Iterable[LitAPI]]):
         if isinstance(lit_apis, LitAPI):
             self.lit_apis = [lit_apis]
