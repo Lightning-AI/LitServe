@@ -337,6 +337,7 @@ class LitServer:
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
         self.transport_config = None
+        self.litapi_request_queues = {}
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -353,8 +354,6 @@ class LitServer:
         self.register_endpoints()
 
     def launch_inference_worker(self, lit_api: LitAPI):
-        self._transport = create_transport_from_config(self.transport_config)
-
         specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
@@ -378,7 +377,7 @@ class LitServer:
                     lit_api,
                     device,
                     worker_id,
-                    self.request_queue,
+                    self._get_request_queue(lit_api),
                     self._transport,
                     self.workers_setup_status,
                     self._callback_runner,
@@ -503,12 +502,16 @@ class LitServer:
                 response_type = Response
             self._register_api_endpoints(lit_api, request_type, response_type)
 
+    def _get_request_queue(self, lit_api: LitAPI):
+        return self.litapi_request_queues[lit_api.api_path]
+
     def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
         """Register endpoint routes for the FastAPI app and setup middlewares."""
 
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
 
         async def predict(request: request_type) -> response_type:
+            request_queue = self._get_request_queue(lit_api)
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -529,7 +532,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+            request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -543,6 +546,7 @@ class LitServer:
             return response
 
         async def stream_predict(request: request_type) -> response_type:
+            request_queue = self._get_request_queue(lit_api)
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -558,7 +562,7 @@ class LitServer:
             payload = request
             if request_type == Request:
                 payload = await request.json()
-            self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+            request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
             response = call_after_stream(
                 self.data_streamer(q, data_available=event),
@@ -624,10 +628,15 @@ class LitServer:
         manager = self.transport_config.manager = mp.Manager()
         self.transport_config.num_consumers = num_api_servers
         self.workers_setup_status = manager.dict()
-        self.request_queue = manager.Queue()
+
+        # create request queues for each unique lit_api api_path
+        for lit_api in self.litapi_connector:
+            self.litapi_request_queues[lit_api.api_path] = manager.Queue()
+
         if self._logger_connector._loggers:
             self.logger_queue = manager.Queue()
         self._logger_connector.run(self)
+        self._transport = create_transport_from_config(self.transport_config)
         return manager
 
     def run(
