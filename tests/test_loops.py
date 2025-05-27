@@ -616,7 +616,7 @@ async def test_custom_loop(mock_transport):
     request_queue = Queue()
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
 
-    loop(lit_api, None, "cpu", 0, request_queue, mock_transport, False, {}, NOOP_CB_RUNNER)
+    loop(lit_api, "cpu", 0, request_queue, mock_transport, {}, NOOP_CB_RUNNER)
     response = await mock_transport.areceive(0)
     assert response[0] == "UUID-001"
     assert response[1][0] == {"output": 16.0}
