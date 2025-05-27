@@ -161,8 +161,16 @@ class _LitAPIConnector:
             self.lit_apis = list(lit_apis)
             if not self.lit_apis:  # Check if the iterable is empty
                 raise ValueError("lit_apis must not be an empty iterable")
+            self._detect_path_collision()
         else:
             raise ValueError(f"lit_apis must be a LitAPI or an iterable of LitAPI, but got {type(lit_apis)}")
+
+    def _detect_path_collision(self):
+        paths = {"/health": "LitServe healthcheck", "/info": "LitServe info"}
+        for lit_api in self.lit_apis:
+            if lit_api.api_path in paths:
+                raise ValueError(f"api_path {lit_api.api_path} is already in use by {paths[lit_api.api_path]}")
+            paths[lit_api.api_path] = lit_api
 
     def pre_setup(self):
         for lit_api in self.lit_apis:
