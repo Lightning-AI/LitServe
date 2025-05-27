@@ -27,8 +27,9 @@ import warnings
 from collections import deque
 from contextlib import asynccontextmanager
 from multiprocessing.context import Process
+from queue import Queue
 from threading import Thread
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
@@ -132,10 +133,91 @@ def _migration_warning(feature_name):
     )
 
 
+class _LitAPIConnector:
+    """A helper class to manage one or more `LitAPI` instances.
+
+    This class provides utilities for performing setup tasks, managing request
+    and batch timeouts, and interacting with `LitAPI` instances in a unified way.
+    It ensures that all `LitAPI` instances are properly initialized and configured
+    before use.
+
+    Attributes:
+        lit_apis (List[LitAPI]): A list of `LitAPI` instances managed by this connector.
+
+    Methods:
+        pre_setup(): Calls the `pre_setup` method on all managed `LitAPI` instances.
+        set_request_timeout(timeout): Sets the request timeout for all `LitAPI` instances
+            and validates that batch timeouts are within acceptable limits.
+        __iter__(): Allows iteration over the managed `LitAPI` instances.
+        any_stream(): Checks if any of the `LitAPI` instances have streaming enabled.
+        set_logger_queue(queue): Sets a logger queue for all `LitAPI` instances.
+
+    """
+
+    def __init__(self, lit_apis: Union[LitAPI, Iterable[LitAPI]]):
+        if isinstance(lit_apis, LitAPI):
+            self.lit_apis = [lit_apis]
+        elif isinstance(lit_apis, Iterable):
+            self.lit_apis = list(lit_apis)
+            if not self.lit_apis:  # Check if the iterable is empty
+                raise ValueError("lit_apis must not be an empty iterable")
+            self._detect_path_collision()
+            self._check_mixed_streaming_configuration()
+        else:
+            raise ValueError(f"lit_apis must be a LitAPI or an iterable of LitAPI, but got {type(lit_apis)}")
+
+    def _check_mixed_streaming_configuration(self):
+        """Ensure consistent streaming configuration across all endpoints.
+
+        Streaming must be either enabled for all endpoints or disabled for all. Mixing streaming and non-streaming
+        endpoints is currently not supported.
+
+        """
+        streams_enabled = [api.stream for api in self.lit_apis]
+        if any(streams_enabled) and not all(streams_enabled):
+            raise ValueError(
+                "Inconsistent streaming configuration: all endpoints must either "
+                "enable streaming or disable it. "
+                "Mixed configurations are not supported yet."
+            )
+
+    def _detect_path_collision(self):
+        paths = {"/health": "LitServe healthcheck", "/info": "LitServe info"}
+        for lit_api in self.lit_apis:
+            if lit_api.api_path in paths:
+                raise ValueError(f"api_path {lit_api.api_path} is already in use by {paths[lit_api.api_path]}")
+            paths[lit_api.api_path] = lit_api
+
+    def pre_setup(self):
+        for lit_api in self.lit_apis:
+            lit_api.pre_setup()
+            # Ideally LitAPI should not know about LitLoop
+            # LitLoop can keep litapi as a class variable
+            lit_api.loop.pre_setup(lit_api)
+
+    def set_request_timeout(self, timeout: float):
+        for lit_api in self.lit_apis:
+            lit_api.request_timeout = timeout
+
+        for lit_api in self.lit_apis:
+            if lit_api.batch_timeout > timeout and timeout not in (False, -1):
+                raise ValueError("batch_timeout must be less than request_timeout")
+
+    def __iter__(self):
+        return iter(self.lit_apis)
+
+    def any_stream(self):
+        return any(lit_api.stream for lit_api in self.lit_apis)
+
+    def set_logger_queue(self, queue: Queue):
+        for lit_api in self.lit_apis:
+            lit_api.set_logger_queue(queue)
+
+
 class LitServer:
     def __init__(
         self,
-        lit_api: LitAPI,
+        lit_api: Union[LitAPI, List[LitAPI]],
         accelerator: str = "auto",
         devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
@@ -224,8 +306,8 @@ class LitServer:
             lit_api.stream = spec.stream
 
         # pre setup
-        lit_api.pre_setup(spec=spec)
-        lit_api.loop.pre_setup(lit_api, spec=spec)
+        self.litapi_connector = _LitAPIConnector(lit_api)
+        self.litapi_connector.pre_setup()
 
         if api_path and not api_path.startswith("/"):
             raise ValueError(
@@ -249,16 +331,6 @@ class LitServer:
         except (TypeError, ValueError):
             raise ValueError("model_metadata must be JSON serializable.")
 
-        # Check if the batch and unbatch methods are overridden in the lit_api instance
-        batch_overridden = lit_api.batch.__code__ is not LitAPI.batch.__code__
-        unbatch_overridden = lit_api.unbatch.__code__ is not LitAPI.unbatch.__code__
-
-        if batch_overridden and unbatch_overridden and lit_api.max_batch_size == 1:
-            warnings.warn(
-                "The LitServer has both batch and unbatch methods implemented, "
-                "but the max_batch_size parameter was not set."
-            )
-
         if sys.platform == "win32" and fast_queue:
             warnings.warn("ZMQ is not supported on Windows with LitServe. Disabling ZMQ.")
             fast_queue = False
@@ -267,17 +339,13 @@ class LitServer:
         self.info_path = info_path
         self.track_requests = track_requests
         self.timeout = timeout
-        # TODO: Connector
-        lit_api.request_timeout = timeout
-        if lit_api.batch_timeout > timeout and timeout not in (False, -1):
-            raise ValueError("batch_timeout must be less than request_timeout")
+        self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
         self.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
-        # TODO: Connector
-        if not lit_api.stream:
+        if not self.litapi_connector.any_stream():
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
@@ -293,20 +361,7 @@ class LitServer:
         self._callback_runner = CallbackRunner(callbacks)
         self.use_zmq = fast_queue
         self.transport_config = None
-
-        # specs = spec if spec is not None else []
-        # self._specs = specs if isinstance(specs, Sequence) else [specs]
-
-        decode_request_signature = inspect.signature(lit_api.decode_request)
-        encode_response_signature = inspect.signature(lit_api.encode_response)
-
-        self.request_type = decode_request_signature.parameters["request"].annotation
-        if self.request_type == decode_request_signature.empty:
-            self.request_type = Request
-
-        self.response_type = encode_response_signature.return_annotation
-        if self.response_type == encode_response_signature.empty:
-            self.response_type = Response
+        self.litapi_request_queues = {}
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -322,51 +377,40 @@ class LitServer:
         self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
 
-    def launch_inference_worker(self, num_uvicorn_servers: int):
-        self.transport_config.num_consumers = num_uvicorn_servers
-        manager = self.transport_config.manager = mp.Manager()
-        self._transport = create_transport_from_config(self.transport_config)
-        self.workers_setup_status = manager.dict()
-        self.request_queue = manager.Queue()
-        if self._logger_connector._loggers:
-            self.logger_queue = manager.Queue()
-
-        self._logger_connector.run(self)
-
-        specs = [self.lit_api.spec] if self.lit_api.spec else []
+    def launch_inference_worker(self, lit_api: LitAPI):
+        specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
-            del server_copy.app, server_copy.transport_config
+            del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
+            print(self.litapi_request_queues)
             spec.setup(server_copy)
 
         process_list = []
+        endpoint = lit_api.api_path.split("/")[-1]
         for worker_id, device in enumerate(self.inference_workers):
             if len(device) == 1:
                 device = device[0]
 
-            self.workers_setup_status[worker_id] = WorkerSetupStatus.STARTING
+            self.workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.STARTING
 
             ctx = mp.get_context("spawn")
             process = ctx.Process(
                 target=inference_worker,
                 args=(
-                    self.lit_api,
-                    self.lit_api.spec,
+                    lit_api,
                     device,
                     worker_id,
-                    self.request_queue,
+                    self._get_request_queue(lit_api.api_path),
                     self._transport,
-                    self.lit_api.stream,
                     self.workers_setup_status,
                     self._callback_runner,
-                    self.lit_api.loop,
                 ),
             )
             process.start()
             process_list.append(process)
-        return manager, process_list
+        return process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -383,7 +427,7 @@ class LitServer:
         future = response_queue_to_buffer(
             transport,
             self.response_buffer,
-            self.lit_api.stream,
+            self.litapi_connector.any_stream(),
             app.response_queue_id,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
@@ -404,7 +448,8 @@ class LitServer:
             return [f"{accelerator}:{el}" for el in device]
         return [f"{accelerator}:{device}"]
 
-    async def data_streamer(self, q: deque, data_available: asyncio.Event, send_status: bool = False):
+    @staticmethod
+    async def data_streamer(q: deque, data_available: asyncio.Event, send_status: bool = False):
         while True:
             await data_available.wait()
             while len(q) > 0:
@@ -432,9 +477,7 @@ class LitServer:
             return sum(counter.value for counter in self.active_counters)
         return None
 
-    def register_endpoints(self):
-        """Register endpoint routes for the FastAPI app and setup middlewares."""
-        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
+    def _register_internal_endpoints(self):
         workers_ready = False
 
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
@@ -469,7 +512,31 @@ class LitServer:
                 }
             )
 
-        async def predict(request: self.request_type) -> self.response_type:
+    def register_endpoints(self):
+        self._register_internal_endpoints()
+        for lit_api in self.litapi_connector:
+            decode_request_signature = inspect.signature(lit_api.decode_request)
+            encode_response_signature = inspect.signature(lit_api.encode_response)
+
+            request_type = decode_request_signature.parameters["request"].annotation
+            if request_type == decode_request_signature.empty:
+                request_type = Request
+
+            response_type = encode_response_signature.return_annotation
+            if response_type == encode_response_signature.empty:
+                response_type = Response
+            self._register_api_endpoints(lit_api, request_type, response_type)
+
+    def _get_request_queue(self, api_path: str):
+        return self.litapi_request_queues[api_path]
+
+    def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
+        """Register endpoint routes for the FastAPI app and setup middlewares."""
+
+        self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
+
+        async def predict(request: request_type) -> response_type:
+            request_queue = self._get_request_queue(lit_api.api_path)
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -482,7 +549,7 @@ class LitServer:
             logger.debug(f"Received request uid={uid}")
 
             payload = request
-            if self.request_type == Request:
+            if request_type == Request:
                 if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
                     "Content-Type"
                 ].startswith("multipart/form-data"):
@@ -490,7 +557,7 @@ class LitServer:
                 else:
                     payload = await request.json()
 
-            self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+            request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
             await event.wait()
             response, status = self.response_buffer.pop(uid)
@@ -503,7 +570,8 @@ class LitServer:
             self._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self)
             return response
 
-        async def stream_predict(request: self.request_type) -> self.response_type:
+        async def stream_predict(request: request_type) -> response_type:
+            request_queue = self._get_request_queue(lit_api.api_path)
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -517,9 +585,9 @@ class LitServer:
             logger.debug(f"Received request uid={uid}")
 
             payload = request
-            if self.request_type == Request:
+            if request_type == Request:
                 payload = await request.json()
-            self.request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+            request_queue.put((response_queue_id, uid, time.monotonic(), payload))
 
             response = call_after_stream(
                 self.data_streamer(q, data_available=event),
@@ -529,11 +597,11 @@ class LitServer:
             )
             return StreamingResponse(response)
 
-        if not self.lit_api.spec:
-            stream = self.lit_api.stream
+        if not lit_api.spec:
+            stream = lit_api.stream
             # In the future we might want to differentiate endpoints for streaming vs non-streaming
             # For now we allow either one or the other
-            endpoint = self.lit_api.api_path
+            endpoint = lit_api.api_path
             methods = ["POST"]
             self.app.add_api_route(
                 endpoint,
@@ -542,7 +610,7 @@ class LitServer:
                 dependencies=[Depends(self.setup_auth())],
             )
 
-        specs = [self.lit_api.spec] if self.lit_api.spec else []
+        specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             spec: LitSpec
             # TODO check that path is not clashing
@@ -580,6 +648,21 @@ class LitServer:
                 raise RuntimeError("One or more workers failed to start. Shutting down LitServe")
             time.sleep(0.05)
         logger.debug("One or more workers are ready to serve requests")
+
+    def _init_manager(self, num_api_servers: int):
+        manager = self.transport_config.manager = mp.Manager()
+        self.transport_config.num_consumers = num_api_servers
+        self.workers_setup_status = manager.dict()
+
+        # create request queues for each unique lit_api api_path
+        for lit_api in self.litapi_connector:
+            self.litapi_request_queues[lit_api.api_path] = manager.Queue()
+
+        if self._logger_connector._loggers:
+            self.logger_queue = manager.Queue()
+        self._logger_connector.run(self)
+        self._transport = create_transport_from_config(self.transport_config)
+        return manager
 
     def run(
         self,
@@ -624,7 +707,12 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        manager, inference_workers = self.launch_inference_worker(num_api_servers)
+        manager = self._init_manager(num_api_servers)
+        self._logger_connector.run(self)
+        inference_workers = []
+        for lit_api in self.litapi_connector:
+            _inference_workers = self.launch_inference_worker(lit_api)
+            inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
         try:
@@ -658,8 +746,10 @@ class LitServer:
         workers = []
         for response_queue_id in range(num_uvicorn_servers):
             self.app.response_queue_id = response_queue_id
-            if self.lit_api.spec:
-                self.lit_api.spec.response_queue_id = response_queue_id
+            for lit_api in self.litapi_connector:
+                if lit_api.spec:
+                    lit_api.spec.response_queue_id = response_queue_id
+
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)

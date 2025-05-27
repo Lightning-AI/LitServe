@@ -125,6 +125,7 @@ class OpenAIEmbeddingSpec(LitSpec):
     def __init__(self):
         super().__init__()
         # register the endpoint
+        self.api_path = "/v1/embeddings"  # default api path
         self.add_endpoint("/v1/embeddings", self.embeddings_endpoint, ["POST"])
         self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 
@@ -133,7 +134,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         super().setup(server)
 
-        lit_api = self._server.lit_api
+        lit_api = server.lit_api
         if inspect.isgeneratorfunction(lit_api.predict):
             raise ValueError(
                 "You are using yield in your predict method, which is used for streaming.",
@@ -245,12 +246,12 @@ class OpenAIEmbeddingSpec(LitSpec):
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
         event = asyncio.Event()
-        self._server.response_buffer[uid] = event
+        self.response_buffer[uid] = event
 
-        self._server.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
+        self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
         await event.wait()
 
-        response, status = self._server.response_buffer.pop(uid)
+        response, status = self.response_buffer.pop(uid)
 
         if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
             logger.error("Error in embedding request: %s", response)
