@@ -360,6 +360,7 @@ class LitServer:
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
+            print(self.litapi_request_queues)
             spec.setup(server_copy)
 
         process_list = []
@@ -377,7 +378,7 @@ class LitServer:
                     lit_api,
                     device,
                     worker_id,
-                    self._get_request_queue(lit_api),
+                    self._get_request_queue(lit_api.api_path),
                     self._transport,
                     self.workers_setup_status,
                     self._callback_runner,
@@ -502,8 +503,8 @@ class LitServer:
                 response_type = Response
             self._register_api_endpoints(lit_api, request_type, response_type)
 
-    def _get_request_queue(self, lit_api: LitAPI):
-        return self.litapi_request_queues[lit_api.api_path]
+    def _get_request_queue(self, api_path: str):
+        return self.litapi_request_queues[api_path]
 
     def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
         """Register endpoint routes for the FastAPI app and setup middlewares."""
@@ -511,7 +512,7 @@ class LitServer:
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
 
         async def predict(request: request_type) -> response_type:
-            request_queue = self._get_request_queue(lit_api)
+            request_queue = self._get_request_queue(lit_api.api_path)
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,
@@ -546,7 +547,7 @@ class LitServer:
             return response
 
         async def stream_predict(request: request_type) -> response_type:
-            request_queue = self._get_request_queue(lit_api)
+            request_queue = self._get_request_queue(lit_api.api_path)
             self._callback_runner.trigger_event(
                 EventTypes.ON_REQUEST.value,
                 active_requests=self.active_requests,

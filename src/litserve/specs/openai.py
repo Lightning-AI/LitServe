@@ -331,6 +331,7 @@ class OpenAISpec(LitSpec):
     ):
         super().__init__()
         # register the endpoint
+        self.api_path = "/v1/chat/completions"  # default api path
         self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
         self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
 

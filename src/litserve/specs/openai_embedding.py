@@ -125,6 +125,7 @@ class OpenAIEmbeddingSpec(LitSpec):
     def __init__(self):
         super().__init__()
         # register the endpoint
+        self.api_path = "/v1/embeddings"  # default api path
         self.add_endpoint("/v1/embeddings", self.embeddings_endpoint, ["POST"])
         self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 

@@ -23,7 +23,7 @@ class LitSpec:
 
     def __init__(self):
         self._endpoints = []
-
+        self.api_path = None
         self._server: LitServer = None
         self._max_batch_size = 1
         self.response_buffer = None
@@ -40,7 +40,7 @@ class LitSpec:
     def setup(self, server: "LitServer"):
         """This method is called by the server to connect the spec to the server."""
         self.response_buffer = server.response_buffer
-        self.request_queue = server.request_queue
+        self.request_queue = server._get_request_queue(self.api_path)
         self.data_streamer = server.data_streamer
 
     def add_endpoint(self, path: str, endpoint: Callable, methods: List[str]):

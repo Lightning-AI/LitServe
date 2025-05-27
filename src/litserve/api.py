@@ -89,7 +89,7 @@ class LitAPI(ABC):
                 "but the max_batch_size parameter was not set."
             )
 
-        self.api_path = api_path
+        self._api_path = api_path
         self.stream = stream
         self._loop = loop
         self._spec = spec
@@ -276,3 +276,13 @@ Streaming example:
     @spec.setter
     def spec(self, value: LitSpec):
         self._spec = value
+
+    @property
+    def api_path(self):
+        if self._spec:
+            return self._spec.api_path
+        return self._api_path
+
+    @api_path.setter
+    def api_path(self, value: str):
+        self._api_path = value
