@@ -331,7 +331,6 @@ class LitServer:
         self.register_endpoints()
 
     def launch_inference_worker(self, lit_api: LitAPI):
-        manager = self.transport_config.manager
         self._transport = create_transport_from_config(self.transport_config)
 
         specs = [lit_api.spec] if lit_api.spec else []
@@ -339,7 +338,7 @@ class LitServer:
             # Objects of Server class are referenced (not copied)
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
-            del server_copy.app, server_copy.transport_config
+            del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
             spec.setup(server_copy)
 
         process_list = []
@@ -365,7 +364,7 @@ class LitServer:
             )
             process.start()
             process_list.append(process)
-        return manager, process_list
+        return process_list
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
@@ -654,7 +653,7 @@ class LitServer:
         self._logger_connector.run(self)
         inference_workers = []
         for lit_api in self.litapi_connector:
-            manager, _inference_workers = self.launch_inference_worker(lit_api)
+            _inference_workers = self.launch_inference_worker(lit_api)
             inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()

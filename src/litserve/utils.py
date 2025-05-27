@@ -72,7 +72,7 @@ def wrap_litserve_start(server: "LitServer"):
     server.transport_config.manager = mp.Manager()
     server.workers_setup_status = server.transport_config.manager.dict()
     server.request_queue = server.transport_config.manager.Queue()
-    manager, processes = server.launch_inference_worker(server.lit_api)
+    processes = server.launch_inference_worker(server.lit_api)
     server._prepare_app_run(server.app)
     try:
         yield server
@@ -82,7 +82,7 @@ def wrap_litserve_start(server: "LitServer"):
         for p in processes:
             p.terminate()
             p.join()
-        manager.shutdown()
+        server.transport_config.manager.shutdown()
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):

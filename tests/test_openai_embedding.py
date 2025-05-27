@@ -54,8 +54,7 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_multiple_inputs(openai_embedding_request_data_array):
     spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPI(), spec=spec)
-
+    server = ls.LitServer(TestEmbedAPI(spec=spec))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -73,7 +72,7 @@ async def test_openai_embedding_spec_with_multiple_inputs(openai_embedding_reque
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
     spec = OpenAIEmbeddingSpec()
-    server = ls.LitServer(TestEmbedAPIWithUsage(), spec=spec)
+    server = ls.LitServer(TestEmbedAPIWithUsage(spec=spec))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(

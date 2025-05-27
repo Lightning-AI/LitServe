@@ -72,20 +72,22 @@ def inference_worker(
     loop: LitLoop = lit_api.loop
     stream = lit_api.stream
 
+    endpoint = lit_api.api_path.split("/")[-1]
+
     callback_runner.trigger_event(EventTypes.BEFORE_SETUP.value, lit_api=lit_api)
     try:
         lit_api.setup(device)
     except Exception:
         logger.exception(f"Error setting up worker {worker_id}.")
-        workers_setup_status[worker_id] = WorkerSetupStatus.ERROR
+        workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.ERROR
         return
     lit_api.device = device
     callback_runner.trigger_event(EventTypes.AFTER_SETUP.value, lit_api=lit_api)
 
-    print(f"Setup complete for worker {worker_id}.")
+    print(f"Setup complete for worker {f'{endpoint}_{worker_id}'}.")
 
     if workers_setup_status:
-        workers_setup_status[worker_id] = WorkerSetupStatus.READY
+        workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.READY
 
     if lit_spec:
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
