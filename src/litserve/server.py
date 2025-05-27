@@ -605,6 +605,7 @@ class LitServer:
         self.request_queue = manager.Queue()
         if self._logger_connector._loggers:
             self.logger_queue = manager.Queue()
+        self._logger_connector.run(self)
         return manager
 
     def run(
