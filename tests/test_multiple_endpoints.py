@@ -57,3 +57,14 @@ def test_reserved_paths():
     api2 = InferencePipeline(name="api2", api_path="/info")
     with pytest.raises(ValueError, match="api_path /health is already in use by LitServe healthcheck"):
         ls.LitServer([api1, api2])
+
+
+def test_check_mixed_streaming_configuration():
+    api1 = InferencePipeline(name="api1", api_path="/api1", stream=True)
+    api2 = InferencePipeline(name="api2", api_path="/api2", stream=False)
+    with pytest.raises(
+        ValueError,
+        match="Inconsistent streaming configuration: all endpoints must either enable streaming or disable it. "
+        "Mixed configurations are not supported yet.",
+    ):
+        ls.LitServer([api1, api2])
