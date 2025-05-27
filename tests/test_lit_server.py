@@ -234,7 +234,7 @@ def test_start_server(mock_uvicon):
 def server_for_api_worker_test(simple_litapi):
     server = ls.LitServer(simple_litapi, devices=1)
     server.verify_worker_status = MagicMock()
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
     server._start_server = MagicMock()
     server._transport = MagicMock()
     return server
@@ -307,9 +307,7 @@ def test_server_terminate():
 
     with (
         patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start,
-        patch(
-            "litserve.server.LitServer.launch_inference_worker", return_value=(MagicMock(), [MagicMock()])
-        ) as mock_launch,
+        patch("litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])) as mock_launch,
     ):
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
