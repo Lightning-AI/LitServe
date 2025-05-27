@@ -134,13 +134,34 @@ def _migration_warning(feature_name):
 
 
 class _LitAPIConnector:
-    def __init__(self, lit_apis: Union[LitAPI, List[LitAPI]]):
+    """
+    A helper class to manage one or more `LitAPI` instances.
+
+    This class provides utilities for performing setup tasks, managing request
+    and batch timeouts, and interacting with `LitAPI` instances in a unified way.
+    It ensures that all `LitAPI` instances are properly initialized and configured
+    before use.
+
+    Attributes:
+        lit_apis (List[LitAPI]): A list of `LitAPI` instances managed by this connector.
+
+    Methods:
+        pre_setup(): Calls the `pre_setup` method on all managed `LitAPI` instances.
+        set_request_timeout(timeout): Sets the request timeout for all `LitAPI` instances
+            and validates that batch timeouts are within acceptable limits.
+        __iter__(): Allows iteration over the managed `LitAPI` instances.
+        any_stream(): Checks if any of the `LitAPI` instances have streaming enabled.
+        set_logger_queue(queue): Sets a logger queue for all `LitAPI` instances.
+    """
+    def __init__(self, lit_apis: Union[LitAPI, Iterable[LitAPI]]):
         if isinstance(lit_apis, LitAPI):
             self.lit_apis = [lit_apis]
-        elif isinstance(lit_apis, list) and len(lit_apis) > 0:
-            self.lit_apis = lit_apis
+        elif isinstance(lit_apis, Iterable):
+            self.lit_apis = list(lit_apis)
+            if not self.lit_apis:  # Check if the iterable is empty
+                raise ValueError("lit_apis must not be an empty iterable")
         else:
-            raise ValueError(f"lit_apis must be a LitAPI or a list of LitAPI, but got {type(lit_apis)}")
+            raise ValueError(f"lit_apis must be a LitAPI or an iterable of LitAPI, but got {type(lit_apis)}")
 
     def pre_setup(self):
         for lit_api in self.lit_apis:
