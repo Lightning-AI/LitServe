@@ -219,7 +219,6 @@ class BaseRequestHandler(ABC):
     def __init__(self, lit_api: LitAPI, server: "LitServer"):
         self.lit_api = lit_api
         self.server = server
-        self.logger = logging.getLogger(self.__class__.__name__)
 
     async def _prepare_request(self, request, request_type) -> dict:
         """Common request preparation logic."""
@@ -244,7 +243,7 @@ class BaseRequestHandler(ABC):
         )
 
         request_queue.put((response_queue_id, uid, time.monotonic(), payload))
-        self.logger.debug(f"Submitted request uid={uid}")
+        logger.debug(f"Submitted request uid={uid}")
         return uid, response_queue_id
 
     @abstractmethod
@@ -269,7 +268,6 @@ class RegularRequestHandler(BaseRequestHandler):
 
             # Process response
             response, status = self.server.response_buffer.pop(uid)
-            print(type(response))
 
             if status == LitAPIStatus.ERROR:
                 await self._handle_error_response(response)
@@ -283,13 +281,12 @@ class RegularRequestHandler(BaseRequestHandler):
             raise e
 
         except Exception as e:
-            self.logger.error(f"Error handling request: {e}")
+            logger.exception(f"Error handling request: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     async def _handle_error_response(self, response):
-        self.logger.error("Error in request: %s", response)
+        logger.error("Error in request: %s", response)
         if isinstance(response, HTTPException):
-            print("is http exception")
             raise response
 
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -320,7 +317,7 @@ class StreamingRequestHandler(BaseRequestHandler):
             return StreamingResponse(response_generator)
 
         except Exception as e:
-            self.logger.error(f"Error handling streaming request: {e}")
+            logger.exception(f"Error handling streaming request: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
