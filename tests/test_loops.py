@@ -127,7 +127,7 @@ def test_single_loop(loop_args):
 
     lit_loop = SingleLoop()
     with pytest.raises(StopIteration, match="exit loop"):
-        lit_loop.run_single_loop(lit_api_mock, None, requests_queue, transport, callback_runner=NOOP_CB_RUNNER)
+        lit_loop.run_single_loop(lit_api_mock, requests_queue, transport, callback_runner=NOOP_CB_RUNNER)
 
 
 @pytest.mark.asyncio
@@ -140,7 +140,6 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     await loop._process_single_request(
         request,
         lit_api_mock,
-        None,
         mock_transport,
         NOOP_CB_RUNNER,
     )
@@ -162,7 +161,7 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     import contextlib
 
     with contextlib.suppress(KeyboardInterrupt):
-        loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
+        loop._run_single_loop_with_async(lit_api_mock, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK))
@@ -211,7 +210,6 @@ def test_streaming_loop():
     lit_loop = StreamingLoop()
     with pytest.raises(StopIteration, match="exit loop"):
         lit_loop.run_streaming_loop(
-            fake_stream_api,
             fake_stream_api,
             requests_queue,
             transport,
@@ -279,7 +277,6 @@ def test_batched_streaming_loop(mock_transport):
     with pytest.raises(StopIteration, match="finish streaming"):
         lit_loop.run_batched_streaming_loop(
             fake_stream_api,
-            fake_stream_api,
             requests_queue,
             transport=transport,
             callback_runner=NOOP_CB_RUNNER,
@@ -295,14 +292,18 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock.max_batch_size = 2
     lit_api_mock.batch_timeout = 0
     lit_api_mock.enable_async = False
+    lit_api_mock.stream = False
+    lit_api_mock.api_path = "/predict"
+    lit_api_mock.loop = "auto"
 
     inference_worker(
         lit_api_mock,
-        *[MagicMock()] * 5,
-        stream=False,
+        "cpu",
+        0,
+        MagicMock(),
+        MagicMock(),
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
-        loop="auto",
     )
     mock_batched_loop.assert_called_once()
 
@@ -310,14 +311,18 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock.max_batch_size = 1
     lit_api_mock.batch_timeout = 0
     lit_api_mock.enable_async = False
+    lit_api_mock.stream = False
+    lit_api_mock.api_path = "/predict"
+    lit_api_mock.loop = "auto"
 
     inference_worker(
         lit_api_mock,
-        *[MagicMock()] * 5,
-        stream=False,
+        "cpu",
+        0,
+        MagicMock(),
+        MagicMock(),
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
-        loop="auto",
     )
     mock_single_loop.assert_called_once()
 
@@ -335,7 +340,7 @@ async def test_run_single_loop(mock_transport):
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_single_loop, args=(lit_api, request_queue, transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -367,7 +372,7 @@ async def test_run_single_loop_timeout():
 
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_single_loop, args=(lit_api, request_queue, transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -399,7 +404,7 @@ async def test_run_batched_loop():
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER),
+        args=(lit_api, request_queue, transport, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -442,7 +447,7 @@ async def test_run_batched_loop_timeout(mock_transport):
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER),
+        args=(lit_api, request_queue, transport, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
@@ -471,7 +476,7 @@ async def test_run_streaming_loop(mock_transport):
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, mock_transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -502,7 +507,7 @@ async def test_run_streaming_loop_timeout(mock_transport):
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, mock_transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -559,24 +564,20 @@ class TestLoop(LitLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         try:
             self.run(
                 lit_api,
-                lit_spec,
                 device,
                 worker_id,
                 request_queue,
                 transport,
-                stream,
                 workers_setup_status,
                 callback_runner,
             )
@@ -586,12 +587,10 @@ class TestLoop(LitLoop):
     def run(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
@@ -617,7 +616,7 @@ async def test_custom_loop(mock_transport):
     request_queue = Queue()
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
 
-    loop(lit_api, None, "cpu", 0, request_queue, mock_transport, False, {}, NOOP_CB_RUNNER)
+    loop(lit_api, "cpu", 0, request_queue, mock_transport, {}, NOOP_CB_RUNNER)
     response = await mock_transport.areceive(0)
     assert response[0] == "UUID-001"
     assert response[1][0] == {"output": 16.0}
@@ -837,7 +836,7 @@ async def test_continuous_batching_run(continuous_batching_setup):
     response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
     lit_loop.add_request(uid, input, lit_api, None)
     lit_loop.response_queue_ids[uid] = response_queue_id
-    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, mock_transport, True, {}, NOOP_CB_RUNNER)
+    await lit_loop.run(lit_api, "cpu", 0, request_queue, mock_transport, {}, NOOP_CB_RUNNER)
 
     results = []
     for i in range(5):

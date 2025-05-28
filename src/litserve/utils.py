@@ -67,10 +67,16 @@ async def azip(*async_iterables):
 
 @contextmanager
 def wrap_litserve_start(server: "LitServer"):
+    """Pytest utility to start the server in a context manager."""
     server.app.response_queue_id = 0
-    if server.lit_api._spec:
-        server.lit_api._spec.response_queue_id = 0
-    manager, processes = server.launch_inference_worker(num_uvicorn_servers=1)
+    for lit_api in server.litapi_connector:
+        if lit_api.spec:
+            lit_api.spec.response_queue_id = 0
+
+    manager = server._init_manager(1)
+    processes = []
+    for lit_api in server.litapi_connector:
+        processes.extend(server.launch_inference_worker(lit_api))
     server._prepare_app_run(server.app)
     try:
         yield server

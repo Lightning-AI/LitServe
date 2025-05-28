@@ -118,7 +118,7 @@ class LitAPI(ABC):
                 "but the max_batch_size parameter was not set."
             )
 
-        self.api_path = api_path
+        self._api_path = api_path
         self.stream = stream
         self._loop = loop
         self._spec = spec
@@ -158,6 +158,7 @@ class LitAPI(ABC):
     @abstractmethod
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
+        pass
 
     def decode_request(self, request, **kwargs):
         """Convert the request payload to your model input."""
@@ -240,7 +241,8 @@ class LitAPI(ABC):
     def device(self, value):
         self._device = value
 
-    def pre_setup(self, spec: Optional[LitSpec]):
+    def pre_setup(self, spec: Optional[LitSpec] = None):
+        spec = spec or self._spec
         if self.stream:
             self._default_unbatch = self._unbatch_stream
         else:
@@ -304,3 +306,13 @@ class LitAPI(ABC):
     @spec.setter
     def spec(self, value: LitSpec):
         self._spec = value
+
+    @property
+    def api_path(self):
+        if self._spec:
+            return self._spec.api_path
+        return self._api_path
+
+    @api_path.setter
+    def api_path(self, value: str):
+        self._api_path = value

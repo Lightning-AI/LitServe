@@ -33,11 +33,12 @@ class StreamingLoop(DefaultLoop):
     def run_streaming_loop(
         self,
         lit_api: LitAPI,
-        lit_spec: LitSpec,
         request_queue: Queue,
         transport: MessageTransport,
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
     ):
+        lit_spec = lit_api.spec
         while True:
             try:
                 response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
@@ -113,10 +114,11 @@ class StreamingLoop(DefaultLoop):
         self,
         request,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         transport: MessageTransport,
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
     ):
+        lit_spec = lit_api.spec
         response_queue_id, uid, timestamp, x_enc = request
         try:
             context = {}
@@ -179,7 +181,6 @@ class StreamingLoop(DefaultLoop):
     def run_streaming_loop_async(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         request_queue: Queue,
         transport: MessageTransport,
         callback_runner: CallbackRunner,
@@ -214,7 +215,6 @@ class StreamingLoop(DefaultLoop):
                     self._process_streaming_request(
                         (response_queue_id, uid, timestamp, x_enc),
                         lit_api,
-                        lit_spec,
                         transport,
                         callback_runner,
                     ),
@@ -233,30 +233,29 @@ class StreamingLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         if lit_api.enable_async:
-            self.run_streaming_loop_async(lit_api, lit_spec, request_queue, transport, callback_runner)
+            self.run_streaming_loop_async(lit_api, request_queue, transport, callback_runner)
         else:
-            self.run_streaming_loop(lit_api, lit_spec, request_queue, transport, callback_runner)
+            self.run_streaming_loop(lit_api, request_queue, transport, callback_runner)
 
 
 class BatchedStreamingLoop(DefaultLoop):
     def run_batched_streaming_loop(
         self,
         lit_api: LitAPI,
-        lit_spec: LitSpec,
         request_queue: Queue,
         transport: MessageTransport,
         callback_runner: CallbackRunner,
+        lit_spec: Optional[LitSpec] = None,
     ):
+        lit_spec = lit_api.spec
         while True:
             batches, timed_out_uids = collate_requests(
                 lit_api,
@@ -338,18 +337,15 @@ class BatchedStreamingLoop(DefaultLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         self.run_batched_streaming_loop(
             lit_api,
-            lit_spec,
             request_queue,
             transport,
             callback_runner,

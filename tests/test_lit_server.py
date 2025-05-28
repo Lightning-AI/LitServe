@@ -234,7 +234,7 @@ def test_start_server(mock_uvicon):
 def server_for_api_worker_test(simple_litapi):
     server = ls.LitServer(simple_litapi, devices=1)
     server.verify_worker_status = MagicMock()
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
     server._start_server = MagicMock()
     server._transport = MagicMock()
     return server
@@ -246,7 +246,7 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_wor
     server = server_for_api_worker_test
 
     server.run(api_server_worker_type="process", num_api_servers=10)
-    server.launch_inference_worker.assert_called_with(10)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
@@ -258,7 +258,7 @@ def test_server_run_with_process_api_worker(
     server = server_for_api_worker_test
 
     server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
-    server.launch_inference_worker.assert_called_with(num_api_workers)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
     actual = server._start_server.call_args
     assert actual[0][4] == "process", "Server should run in process mode"
     mock_uvicorn.Config.assert_called()
@@ -269,7 +269,7 @@ def test_server_run_with_process_api_worker(
 def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test):
     server = server_for_api_worker_test
     server.run(api_server_worker_type="thread")
-    server.launch_inference_worker.assert_called_with(1)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
     assert server._start_server.call_args[0][4] == "thread", "Server should run in thread mode"
     mock_uvicorn.Config.assert_called()
 
@@ -291,7 +291,7 @@ def test_server_run_windows(mock_uvicorn):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
     server.verify_worker_status = MagicMock()
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
     server._transport = MagicMock()
     server._start_server = MagicMock()
 
@@ -306,14 +306,14 @@ def test_server_terminate():
     server._transport = MagicMock()
 
     with (
+        patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager,
         patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start,
-        patch(
-            "litserve.server.LitServer.launch_inference_worker", return_value=(MagicMock(), [MagicMock()])
-        ) as mock_launch,
+        patch("litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])) as mock_launch,
     ):
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
 
+        mock_init_manager.assert_called()
         mock_launch.assert_called()
         mock_start.assert_called()
         server._transport.close.assert_called()
