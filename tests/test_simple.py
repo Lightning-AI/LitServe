@@ -308,4 +308,4 @@ def test_exception():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 500
-        assert response.json() == {"detail": "Internal Server Error"}
+        assert response.json() == {"detail": "Internal server error"}
