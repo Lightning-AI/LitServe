@@ -24,6 +24,7 @@ import threading
 import time
 import uuid
 import warnings
+from abc import ABC, abstractmethod
 from collections import deque
 from contextlib import asynccontextmanager
 from multiprocessing.context import Process
@@ -212,6 +213,115 @@ class _LitAPIConnector:
     def set_logger_queue(self, queue: Queue):
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
+
+
+class BaseRequestHandler(ABC):
+    def __init__(self, lit_api: LitAPI, server: "LitServer"):
+        self.lit_api = lit_api
+        self.server = server
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    async def _prepare_request(self, request, request_type) -> dict:
+        """Common request preparation logic."""
+        if request_type == Request:
+            content_type = request.headers.get("Content-Type", "")
+            if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
+                return await request.form()
+            return await request.json()
+        return request
+
+    async def _submit_request(self, payload: dict) -> Tuple[str, asyncio.Event]:
+        """Submit request to worker queue."""
+        request_queue = self.server._get_request_queue(self.lit_api.api_path)
+        response_queue_id = self.server.app.response_queue_id
+        uid = str(uuid.uuid4())
+
+        # Trigger callback
+        self.server._callback_runner.trigger_event(
+            EventTypes.ON_REQUEST.value,
+            active_requests=self.server.active_requests,
+            litserver=self.server,
+        )
+
+        request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+        self.logger.debug(f"Submitted request uid={uid}")
+        return uid, response_queue_id
+
+    @abstractmethod
+    async def handle_request(self, request, request_type) -> Response:
+        pass
+
+
+class RegularRequestHandler(BaseRequestHandler):
+    async def handle_request(self, request, request_type) -> Response:
+        try:
+            # Prepare request
+            payload = await self._prepare_request(request, request_type)
+
+            # Submit to worker
+            uid, _ = await self._submit_request(payload)
+
+            # Wait for response
+            event = asyncio.Event()
+            self.server.response_buffer[uid] = event
+
+            await event.wait()
+
+            # Process response
+            response, status = self.server.response_buffer.pop(uid)
+            print(type(response))
+
+            if status == LitAPIStatus.ERROR:
+                await self._handle_error_response(response)
+
+            # Trigger callback
+            self.server._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self.server)
+
+            return response
+
+        except HTTPException as e:
+            raise e
+
+        except Exception as e:
+            self.logger.error(f"Error handling request: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    async def _handle_error_response(self, response):
+        self.logger.error("Error in request: %s", response)
+        if isinstance(response, HTTPException):
+            print("is http exception")
+            raise response
+
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class StreamingRequestHandler(BaseRequestHandler):
+    async def handle_request(self, request, request_type) -> StreamingResponse:
+        try:
+            # Prepare request
+            payload = await self._prepare_request(request, request_type)
+
+            # Submit to worker
+            uid, _ = await self._submit_request(payload)
+
+            # Set up streaming response
+            event = asyncio.Event()
+            response_queue = deque()
+            self.server.response_buffer[uid] = (response_queue, event)
+
+            # Create streaming response
+            response_generator = call_after_stream(
+                self.server.data_streamer(response_queue, data_available=event),
+                self.server._callback_runner.trigger_event,
+                EventTypes.ON_RESPONSE.value,
+                litserver=self.server,
+            )
+
+            return StreamingResponse(response_generator)
+
+        except Exception as e:
+            self.logger.error(f"Error handling streaming request: {e}")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class LitServer:
@@ -531,85 +641,33 @@ class LitServer:
         return self.litapi_request_queues[api_path]
 
     def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
-        """Register endpoint routes for the FastAPI app and setup middlewares."""
+        """Register endpoint routes for the FastAPI app."""
 
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
 
-        async def predict(request: request_type) -> response_type:
-            request_queue = self._get_request_queue(lit_api.api_path)
-            self._callback_runner.trigger_event(
-                EventTypes.ON_REQUEST.value,
-                active_requests=self.active_requests,
-                litserver=self,
-            )
-            response_queue_id = self.app.response_queue_id
-            uid = uuid.uuid4()
-            event = asyncio.Event()
-            self.response_buffer[uid] = event
-            logger.debug(f"Received request uid={uid}")
+        # Create handlers
+        handler = StreamingRequestHandler(lit_api, self) if lit_api.stream else RegularRequestHandler(lit_api, self)
 
-            payload = request
-            if request_type == Request:
-                if request.headers["Content-Type"] == "application/x-www-form-urlencoded" or request.headers[
-                    "Content-Type"
-                ].startswith("multipart/form-data"):
-                    payload = await request.form()
-                else:
-                    payload = await request.json()
+        # Create endpoint function
+        async def endpoint_handler(request: request_type) -> response_type:
+            return await handler.handle_request(request, request_type)
 
-            request_queue.put((response_queue_id, uid, time.monotonic(), payload))
-
-            await event.wait()
-            response, status = self.response_buffer.pop(uid)
-            if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
-                logger.error("Error in request: %s", response)
-                raise response
-            if status == LitAPIStatus.ERROR:
-                logger.error("Error in request: %s", response)
-                raise HTTPException(status_code=500)
-            self._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self)
-            return response
-
-        async def stream_predict(request: request_type) -> response_type:
-            request_queue = self._get_request_queue(lit_api.api_path)
-            self._callback_runner.trigger_event(
-                EventTypes.ON_REQUEST.value,
-                active_requests=self.active_requests,
-                litserver=self,
-            )
-            response_queue_id = self.app.response_queue_id
-            uid = uuid.uuid4()
-            event = asyncio.Event()
-            q = deque()
-            self.response_buffer[uid] = (q, event)
-            logger.debug(f"Received request uid={uid}")
-
-            payload = request
-            if request_type == Request:
-                payload = await request.json()
-            request_queue.put((response_queue_id, uid, time.monotonic(), payload))
-
-            response = call_after_stream(
-                self.data_streamer(q, data_available=event),
-                self._callback_runner.trigger_event,
-                EventTypes.ON_RESPONSE.value,
-                litserver=self,
-            )
-            return StreamingResponse(response)
-
+        # Register endpoint
         if not lit_api.spec:
-            stream = lit_api.stream
-            # In the future we might want to differentiate endpoints for streaming vs non-streaming
-            # For now we allow either one or the other
-            endpoint = lit_api.api_path
-            methods = ["POST"]
             self.app.add_api_route(
-                endpoint,
-                stream_predict if stream else predict,
-                methods=methods,
+                lit_api.api_path,
+                endpoint_handler,
+                methods=["POST"],
                 dependencies=[Depends(self.setup_auth())],
             )
 
+        # Handle specs
+        self._register_spec_endpoints(lit_api)
+
+        # Register middleware
+        self._register_middleware()
+
+    def _register_spec_endpoints(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             spec: LitSpec
@@ -619,6 +677,7 @@ class LitServer:
                     path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
                 )
 
+    def _register_middleware(self):
         for middleware in self.middlewares:
             if isinstance(middleware, tuple):
                 middleware, kwargs = middleware
