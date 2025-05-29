@@ -205,24 +205,8 @@ class _LitAPIConnector:
             if not self.lit_apis:  # Check if the iterable is empty
                 raise ValueError("lit_apis must not be an empty iterable")
             self._detect_path_collision()
-            # self._check_mixed_streaming_configuration()
         else:
             raise ValueError(f"lit_apis must be a LitAPI or an iterable of LitAPI, but got {type(lit_apis)}")
-
-    def _check_mixed_streaming_configuration(self):
-        """Ensure consistent streaming configuration across all endpoints.
-
-        Streaming must be either enabled for all endpoints or disabled for all. Mixing streaming and non-streaming
-        endpoints is currently not supported.
-
-        """
-        streams_enabled = [api.stream for api in self.lit_apis]
-        if any(streams_enabled) and not all(streams_enabled):
-            raise ValueError(
-                "Inconsistent streaming configuration: all endpoints must either "
-                "enable streaming or disable it. "
-                "Mixed configurations are not supported yet."
-            )
 
     def _detect_path_collision(self):
         paths = {"/health": "LitServe healthcheck", "/info": "LitServe info"}
