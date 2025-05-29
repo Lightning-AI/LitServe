@@ -142,7 +142,7 @@ class _BaseLoop(ABC):
             x = lit_api.decode_request(x_enc)
             response = lit_api.predict(x)
             response_enc = lit_api.encode_response(response)
-            response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
+            response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK, LoopResponseType.REGULAR)))
     ```
 
     """
