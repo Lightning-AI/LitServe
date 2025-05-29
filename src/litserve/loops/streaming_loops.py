@@ -55,7 +55,12 @@ class StreamingLoop(DefaultLoop):
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
                 self.put_response(
-                    transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                    transport,
+                    response_queue_id,
+                    uid,
+                    HTTPException(504, "Request timed out"),
+                    LitAPIStatus.ERROR,
+                    LoopResponseType.STREAMING,
                 )
                 continue
 
@@ -113,7 +118,7 @@ class StreamingLoop(DefaultLoop):
                     "Please check the error trace for more details.",
                     uid,
                 )
-                self.put_error_response(transport, response_queue_id, uid, e)
+                self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
 
     async def _process_streaming_request(
         self,
@@ -186,7 +191,7 @@ class StreamingLoop(DefaultLoop):
                 "Please check the error trace for more details.",
                 uid,
             )
-            self.put_error_response(transport, response_queue_id, uid, e)
+            self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
 
     def run_streaming_loop_async(
         self,
@@ -217,7 +222,12 @@ class StreamingLoop(DefaultLoop):
                         "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                     )
                     self.put_response(
-                        transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                        transport,
+                        response_queue_id,
+                        uid,
+                        HTTPException(504, "Request timed out"),
+                        LitAPIStatus.ERROR,
+                        LoopResponseType.STREAMING,
                     )
                     continue
 
@@ -278,7 +288,12 @@ class BatchedStreamingLoop(DefaultLoop):
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
                 self.put_response(
-                    transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                    transport,
+                    response_queue_id,
+                    uid,
+                    HTTPException(504, "Request timed out"),
+                    LitAPIStatus.ERROR,
+                    LoopResponseType.STREAMING,
                 )
 
             if not batches:
@@ -347,7 +362,7 @@ class BatchedStreamingLoop(DefaultLoop):
                     "Please check the error trace for more details."
                 )
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_error_response(transport, response_queue_id, uid, e)
+                    self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
 
     def __call__(
         self,

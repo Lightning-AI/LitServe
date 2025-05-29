@@ -92,7 +92,7 @@ async def _mixed_response_to_buffer(
             if result is None:
                 continue
 
-            uid, response, response_type = result
+            uid, (*response, response_type) = result
             if response_type == LoopResponseType.STREAMING:
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
@@ -205,7 +205,7 @@ class _LitAPIConnector:
             if not self.lit_apis:  # Check if the iterable is empty
                 raise ValueError("lit_apis must not be an empty iterable")
             self._detect_path_collision()
-            self._check_mixed_streaming_configuration()
+            # self._check_mixed_streaming_configuration()
         else:
             raise ValueError(f"lit_apis must be a LitAPI or an iterable of LitAPI, but got {type(lit_apis)}")
 
