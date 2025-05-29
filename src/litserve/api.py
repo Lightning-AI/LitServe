@@ -143,7 +143,7 @@ class LitAPI(ABC):
                 )
                 setattr(self, method, asyncify(method_obj))
 
-    def _validate_async_methods(self):
+    def _validate_async_methods(self, methods: tuple = ("decode_request", "predict", "encode_response")):
         """Validate that async methods are properly implemented when enable_async is True."""
         # check if LitAPI methods are coroutines or async generators
         for method in ["decode_request", "predict", "encode_response"]:
