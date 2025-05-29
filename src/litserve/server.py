@@ -790,7 +790,7 @@ class LitServer:
         port: Union[str, int] = 8000,
         num_api_servers: Optional[int] = None,
         log_level: str = "info",
-        generate_client_file: bool = False,
+        generate_client_file: bool = True,
         api_server_worker_type: Literal["process", "thread"] = "process",
         pretty_logs: bool = False,
         **kwargs,
@@ -813,7 +813,7 @@ class LitServer:
                 Use "debug" for development. Defaults to "info".
 
             generate_client_file (bool, optional):
-                Auto-generate Python client file with typed methods for API interaction. Defaults to False.
+                Auto-generate Python client file with typed methods for API interaction. Defaults to True.
 
             api_server_worker_type (Literal["process", "thread"], optional):
                 Worker type. "process" for better isolation/CPU usage, "thread" for less memory. Defaults to "process".
