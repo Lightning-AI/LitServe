@@ -30,7 +30,7 @@ from contextlib import asynccontextmanager
 from multiprocessing.context import Process
 from queue import Queue
 from threading import Thread
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
@@ -50,7 +50,7 @@ from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
-from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream
+from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
 
 mp.allow_connection_pickling()
 
@@ -371,29 +371,66 @@ class LitServer:
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
     ):
-        """Initialize a LitServer instance.
+        """Initialize a LitServer instance for high-performance model inference.
 
         Args:
-            lit_api: The API instance that handles requests and responses.
-            accelerator: Type of hardware to use, like 'cpu', 'cuda', or 'mps'. 'auto' selects the best available.
-            devices: Number of devices to use, or 'auto' to select automatically.
-            workers_per_device: Number of worker processes per device.
-            max_batch_size: Deprecated. Use `lit_api.max_batch_size` instead.
-            batch_timeout: Deprecated. Use `lit_api.batch_timeout` instead.
-            timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
-            api_path: Deprecated. Use `LitAPI(api_path=...)` instead.
-            healthcheck_path: URL path for the health check endpoint.
-            info_path: URL path for the server and model information endpoint.
-            model_metadata: Metadata about the model, shown at the info endpoint.
-            stream: Whether to enable streaming responses.
-            spec: Specification for the API, such as OpenAISpec or custom specs.
-            max_payload_size: Maximum size of request payloads.
-            track_requests: Whether to track the number of active requests.
-            loop: Inference loop to use, or 'auto' to select based on settings.
-            callbacks: List of callback classes to execute at various stages.
-            middlewares: List of middleware classes to apply to the server.
-            loggers: List of loggers to use for recording server activity.
-            fast_queue: Whether to use ZeroMQ for faster response handling.
+            lit_api (Union[LitAPI, List[LitAPI]]):
+                API instance(s) defining model inference logic. Single instance or list for multi-model serving.
+
+            accelerator (str, optional):
+                Hardware type: 'cpu', 'cuda', 'mps', or 'auto' (detects best available). Defaults to 'auto'.
+
+            devices (Union[int, str], optional):
+                Number of devices to use, or 'auto' for all available. Defaults to 'auto'.
+
+            workers_per_device (int, optional):
+                Worker processes per device. Higher values improve throughput but use more memory. Defaults to 1.
+
+            timeout (Union[float, bool], optional):
+                Request timeout in seconds, or False to disable. Defaults to 30.
+
+            healthcheck_path (str, optional):
+                Health check endpoint path for load balancers. Defaults to "/health".
+
+            info_path (str, optional):
+                Server info endpoint path showing metadata and configuration. Defaults to "/info".
+
+            model_metadata (dict, optional):
+                Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
+
+            max_payload_size (Union[int, str], optional):
+                Maximum request size as bytes or string ("10MB"). Defaults to "100MB".
+
+            track_requests (bool, optional):
+                Enable request tracking for monitoring. Recommended for production. Defaults to False.
+
+            callbacks (List[Callback], optional):
+                Callback instances for lifecycle events (logging, metrics). Defaults to None.
+
+            middlewares (List[Middleware], optional):
+                HTTP middleware for auth, CORS, rate limiting, etc. Defaults to None.
+
+            loggers (List[Logger], optional):
+                Custom loggers for server activity. Defaults to standard logging.
+
+            fast_queue (bool, optional):
+                Enable ZeroMQ for high-throughput (>100 RPS). Requires ZeroMQ installation. Defaults to False.
+
+            max_batch_size, batch_timeout, stream, spec, api_path, loop:
+                **Deprecated**: Configure these in your LitAPI implementation instead.
+
+        Example:
+            >>> # Basic
+            >>> server = LitServer(MyLitAPI())
+
+            >>> # Production
+            >>> server = LitServer(
+            ...     lit_api=MyLitAPI(max_batch_size=4),
+            ...     accelerator="cuda",
+            ...     devices=2,
+            ...     fast_queue=True,
+            ...     track_requests=True
+            ... )
 
         """
         if max_batch_size is not None:
@@ -753,10 +790,56 @@ class LitServer:
         port: Union[str, int] = 8000,
         num_api_servers: Optional[int] = None,
         log_level: str = "info",
-        generate_client_file: bool = True,
-        api_server_worker_type: Optional[str] = None,
+        generate_client_file: bool = False,
+        api_server_worker_type: Literal["process", "thread"] = "process",
+        pretty_logs: bool = False,
         **kwargs,
     ):
+        """Run the LitServe server to handle API requests and distribute them to inference workers.
+
+        Args:
+            host (str, optional):
+                Host address to bind to. "0.0.0.0" for all IPs, "127.0.0.1" for localhost only. Defaults to "0.0.0.0".
+
+            port (Union[str, int], optional):
+                Port number to bind to. Must be available. Defaults to 8000.
+
+            num_api_servers (Optional[int], optional):
+                Number of uvicorn server instances for parallel API handling. Higher values improve
+                throughput but use more resources. Defaults to None (single instance).
+
+            log_level (str, optional):
+                Logging level: "critical", "error", "warning", "info", "debug", "trace".
+                Use "debug" for development. Defaults to "info".
+
+            generate_client_file (bool, optional):
+                Auto-generate Python client file with typed methods for API interaction. Defaults to False.
+
+            api_server_worker_type (Literal["process", "thread"], optional):
+                Worker type. "process" for better isolation/CPU usage, "thread" for less memory. Defaults to "process".
+
+            pretty_logs (bool, optional):
+                Enhanced log formatting with colors using rich library. Good for development. Defaults to False.
+
+            **kwargs:
+                Additional uvicorn server options (ssl_keyfile, ssl_certfile, etc.). See uvicorn docs.
+
+        Example:
+            >>> server.run()  # Basic
+
+            >>> server.run(  # Production
+            ...     port=8080,
+            ...     num_api_servers=4,
+            ...     log_level="warning"
+            ... )
+
+            >>> server.run(  # Development
+            ...     log_level="debug",
+            ...     pretty_logs=True,
+            ...     generate_client_file=True
+            ... )
+
+        """
         if generate_client_file:
             LitServer.generate_client_file(port=port)
 
@@ -773,6 +856,7 @@ class LitServer:
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:
             raise ValueError(host_msg)
 
+        configure_logging(log_level, use_rich=pretty_logs)
         config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
 

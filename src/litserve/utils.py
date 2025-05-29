@@ -21,7 +21,7 @@ import sys
 import uuid
 from contextlib import contextmanager
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, TextIO, Union
 
 from fastapi import HTTPException
 
@@ -118,7 +118,10 @@ def _get_default_handler(stream, format):
 
 
 def configure_logging(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stdout, use_rich=False
+    level: Union[str, int] = logging.INFO,
+    format: str = "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
+    stream: TextIO = sys.stdout,
+    use_rich: bool = False,
 ):
     """Configure logging for the entire library with sensible defaults.
 
@@ -126,9 +129,18 @@ def configure_logging(
         level (int): Logging level (default: logging.INFO)
         format (str): Log message format string
         stream (file-like): Output stream for logs
-        use_rich (bool): Whether to use rich for logging
+        use_rich (bool): Makes the logs more readable by using rich, useful for debugging. Defaults to False.
 
     """
+    if isinstance(level, str):
+        level = level.upper()
+        level = getattr(logging, level)
+
+    # Clear any existing handlers to prevent duplicates
+    library_logger = logging.getLogger("litserve")
+    for handler in library_logger.handlers[:]:
+        library_logger.removeHandler(handler)
+
     if use_rich:
         try:
             from rich.logging import RichHandler
@@ -139,16 +151,12 @@ def configure_logging(
         except ImportError:
             logger.warning("Rich is not installed, using default logging")
             handler = _get_default_handler(stream, format)
-
     else:
         handler = _get_default_handler(stream, format)
 
-    # Configure root library logger
-    library_logger = logging.getLogger("litserve")
+    # Configure library logger
     library_logger.setLevel(level)
     library_logger.addHandler(handler)
-
-    # Prevent propagation to root logger to avoid duplicate logs
     library_logger.propagate = False
 
 
