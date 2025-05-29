@@ -24,7 +24,7 @@ from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import DefaultLoop, _async_inject_context, _inject_context, collate_requests
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus, PickleableHTTPException
+from litserve.utils import LitAPIStatus, LoopResponseType, PickleableHTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,8 @@ class SingleLoop(DefaultLoop):
                 self.kill()
                 return
 
+            logger.debug(f"Received request {uid} from response_queue_id {response_queue_id}")
+
             if (lit_api.request_timeout and lit_api.request_timeout != -1) and (
                 time.monotonic() - timestamp > lit_api.request_timeout
             ):
@@ -62,6 +64,7 @@ class SingleLoop(DefaultLoop):
                     uid=uid,
                     response_data=(HTTPException(504, "Request timed out")),
                     status=LitAPIStatus.ERROR,
+                    response_type=LoopResponseType.REGULAR,
                 )
                 continue
             try:
@@ -98,6 +101,7 @@ class SingleLoop(DefaultLoop):
                     uid=uid,
                     response_data=y_enc,
                     status=LitAPIStatus.OK,
+                    response_type=LoopResponseType.REGULAR,
                 )
 
             except HTTPException as e:
@@ -107,6 +111,7 @@ class SingleLoop(DefaultLoop):
                     uid=uid,
                     response_data=PickleableHTTPException.from_exception(e),
                     status=LitAPIStatus.ERROR,
+                    response_type=LoopResponseType.REGULAR,
                 )
 
             except Exception as e:
@@ -120,6 +125,7 @@ class SingleLoop(DefaultLoop):
                     response_queue_id=response_queue_id,
                     uid=uid,
                     error=e,
+                    response_type=LoopResponseType.REGULAR,
                 )
 
     async def _process_single_request(
@@ -166,6 +172,7 @@ class SingleLoop(DefaultLoop):
                 uid=uid,
                 response_data=y_enc,
                 status=LitAPIStatus.OK,
+                response_type=LoopResponseType.REGULAR,
             )
 
         except HTTPException as e:
@@ -175,6 +182,7 @@ class SingleLoop(DefaultLoop):
                 uid=uid,
                 response_data=PickleableHTTPException.from_exception(e),
                 status=LitAPIStatus.ERROR,
+                response_type=LoopResponseType.REGULAR,
             )
 
         except Exception as e:
@@ -188,6 +196,7 @@ class SingleLoop(DefaultLoop):
                 response_queue_id=response_queue_id,
                 uid=uid,
                 error=e,
+                response_type=LoopResponseType.REGULAR,
             )
 
     def _run_single_loop_with_async(
@@ -224,6 +233,7 @@ class SingleLoop(DefaultLoop):
                         uid=uid,
                         response_data=(HTTPException(504, "Request timed out")),
                         status=LitAPIStatus.ERROR,
+                        response_type=LoopResponseType.REGULAR,
                     )
                     continue
 
@@ -293,7 +303,12 @@ class BatchedLoop(DefaultLoop):
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
                 self.put_response(
-                    transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                    transport,
+                    response_queue_id,
+                    uid,
+                    HTTPException(504, "Request timed out"),
+                    LitAPIStatus.ERROR,
+                    LoopResponseType.REGULAR,
                 )
 
             if not batches:
@@ -344,7 +359,9 @@ class BatchedLoop(DefaultLoop):
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
                 for response_queue_id, uid, y_enc in y_enc_list:
-                    self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)
+                    self.put_response(
+                        transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.REGULAR
+                    )
 
             except HTTPException as e:
                 for response_queue_id, uid in zip(response_queue_ids, uids):
@@ -354,6 +371,7 @@ class BatchedLoop(DefaultLoop):
                         uid,
                         PickleableHTTPException.from_exception(e),
                         LitAPIStatus.ERROR,
+                        LoopResponseType.REGULAR,
                     )
             except KeyboardInterrupt:  # pragma: no cover
                 self.kill()
@@ -364,7 +382,7 @@ class BatchedLoop(DefaultLoop):
                     "Please check the error trace for more details."
                 )
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_error_response(transport, response_queue_id, uid, e)
+                    self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.REGULAR)
 
     def __call__(
         self,

@@ -50,7 +50,7 @@ from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
+from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream
 
 mp.allow_connection_pickling()
 
@@ -76,12 +76,54 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         )
 
 
+async def _mixed_response_to_buffer(
+    transport: MessageTransport,
+    response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    consumer_id: int = 0,
+):
+    """Handle both regular and streaming responses.
+
+    Detect streaming responses by checking if the response is for streaming.
+
+    """
+    while True:
+        try:
+            result = await transport.areceive(consumer_id)
+            if result is None:
+                continue
+
+            uid, response, response_type = result
+            if response_type == LoopResponseType.STREAMING:
+                stream_response_buffer, event = response_buffer[uid]
+                stream_response_buffer.append(response)
+                event.set()
+            else:
+                event = response_buffer.pop(uid)
+                response_buffer[uid] = response
+                event.set()
+        except asyncio.CancelledError:
+            logger.debug("Response queue to buffer task was cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error in response_queue_to_buffer: {e}")
+            break
+
+
 async def response_queue_to_buffer(
     transport: MessageTransport,
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
-    stream: bool,
-    consumer_id: int = 0,
+    consumer_id: int,
+    litapi_connector: "_LitAPIConnector",
 ):
+    mixed_streaming = (
+        len(litapi_connector.lit_apis) > 1
+        and litapi_connector.any_stream()
+        and not all(api.stream for api in litapi_connector)
+    )
+    if mixed_streaming:
+        return await _mixed_response_to_buffer(transport, response_buffer, consumer_id)
+
+    stream = litapi_connector.any_stream()
     if stream:
         while True:
             try:
@@ -89,7 +131,7 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, response = result
+                uid, (*response, _) = result
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
                 event.set()
@@ -107,7 +149,7 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, response = result
+                uid, (*response, _) = result
                 event = response_buffer.pop(uid)
                 response_buffer[uid] = response
                 event.set()
@@ -449,7 +491,6 @@ class LitServer:
         self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
-        self.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not self.litapi_connector.any_stream():
@@ -491,7 +532,6 @@ class LitServer:
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
-            print(self.litapi_request_queues)
             spec.setup(server_copy)
 
         process_list = []
@@ -534,10 +574,13 @@ class LitServer:
         future = response_queue_to_buffer(
             transport,
             self.response_buffer,
-            self.litapi_connector.any_stream(),
             app.response_queue_id,
+            self.litapi_connector,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
+        task.add_done_callback(
+            lambda _: logger.info(f"Response queue to buffer task terminated for consumer_id {app.response_queue_id}")
+        )
 
         try:
             yield
