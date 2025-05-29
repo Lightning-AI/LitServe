@@ -259,7 +259,8 @@ def asyncify(func: Callable):
 
         @wraps(func)
         async def async_gen_wrapper(*args, **kwargs):
-            return await _stream_gen_from_thread(func, *args, **kwargs)
+            async for item in _stream_gen_from_thread(func, *args, **kwargs):
+                yield item
 
         return async_gen_wrapper
 
