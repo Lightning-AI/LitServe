@@ -23,7 +23,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import wraps
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable
 
 from fastapi import HTTPException
 
@@ -235,7 +235,7 @@ async def _stream_gen_from_thread(gen_func, *args, **kwargs):
         yield item
 
 
-def asyncify(func):
+def asyncify(func: Callable):
     """Decorator that converts any function type to a consistent async interface.
 
     - Regular sync functions -> run in thread pool and return via coroutine
