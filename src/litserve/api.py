@@ -130,8 +130,8 @@ class LitAPI(ABC):
             self._asyncify_methods()
             self._validate_async_methods()
 
-    def _asyncify_methods(self, methods: tuple=("decode_request", "encode_response")):
-        """Asyncify decode_request and encode_response if enable_async is True and not already async."""
+    def _asyncify_methods(self, methods: tuple = ("decode_request", "encode_response")):
+        """Asyncify methods if enable_async is True and not already async."""
         for method in methods:
             method_obj = getattr(self, method)
             if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
