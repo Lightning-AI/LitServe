@@ -24,7 +24,7 @@ from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import DefaultLoop, _async_inject_context, _inject_context, collate_requests
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus, PickleableHTTPException
+from litserve.utils import LitAPIStatus, LoopResponseType, PickleableHTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,12 @@ class StreamingLoop(DefaultLoop):
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
                 self.put_response(
-                    transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                    transport,
+                    response_queue_id,
+                    uid,
+                    HTTPException(504, "Request timed out"),
+                    LitAPIStatus.ERROR,
+                    LoopResponseType.STREAMING,
                 )
                 continue
 
@@ -85,8 +90,12 @@ class StreamingLoop(DefaultLoop):
                 )
                 for y_enc in y_enc_gen:
                     y_enc = lit_api.format_encoded_response(y_enc)
-                    self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)
-                self.put_response(transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
+                    self.put_response(
+                        transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
+                    )
+                self.put_response(
+                    transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
+                )
 
                 callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
@@ -98,6 +107,7 @@ class StreamingLoop(DefaultLoop):
                     uid,
                     PickleableHTTPException.from_exception(e),
                     LitAPIStatus.ERROR,
+                    LoopResponseType.STREAMING,
                 )
             except KeyboardInterrupt:  # pragma: no cover
                 self.kill()
@@ -108,7 +118,7 @@ class StreamingLoop(DefaultLoop):
                     "Please check the error trace for more details.",
                     uid,
                 )
-                self.put_error_response(transport, response_queue_id, uid, e)
+                self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
 
     async def _process_streaming_request(
         self,
@@ -157,9 +167,13 @@ class StreamingLoop(DefaultLoop):
                 # encode_response should also return an async generator
                 async for y_enc in enc_result:
                     y_enc = lit_api.format_encoded_response(y_enc)
-                    self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)
+                    self.put_response(
+                        transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
+                    )
 
-            self.put_response(transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
+            self.put_response(
+                transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
+            )
             callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
         except HTTPException as e:
@@ -169,6 +183,7 @@ class StreamingLoop(DefaultLoop):
                 uid=uid,
                 response_data=PickleableHTTPException.from_exception(e),
                 status=LitAPIStatus.ERROR,
+                response_type=LoopResponseType.STREAMING,
             )
         except Exception as e:
             logger.exception(
@@ -176,7 +191,7 @@ class StreamingLoop(DefaultLoop):
                 "Please check the error trace for more details.",
                 uid,
             )
-            self.put_error_response(transport, response_queue_id, uid, e)
+            self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
 
     def run_streaming_loop_async(
         self,
@@ -207,7 +222,12 @@ class StreamingLoop(DefaultLoop):
                         "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                     )
                     self.put_response(
-                        transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                        transport,
+                        response_queue_id,
+                        uid,
+                        HTTPException(504, "Request timed out"),
+                        LitAPIStatus.ERROR,
+                        LoopResponseType.STREAMING,
                     )
                     continue
 
@@ -268,7 +288,12 @@ class BatchedStreamingLoop(DefaultLoop):
                     "You can adjust the timeout by providing the `timeout` argument to LitServe(..., timeout=30)."
                 )
                 self.put_response(
-                    transport, response_queue_id, uid, HTTPException(504, "Request timed out"), LitAPIStatus.ERROR
+                    transport,
+                    response_queue_id,
+                    uid,
+                    HTTPException(504, "Request timed out"),
+                    LitAPIStatus.ERROR,
+                    LoopResponseType.STREAMING,
                 )
 
             if not batches:
@@ -308,10 +333,14 @@ class BatchedStreamingLoop(DefaultLoop):
                 for y_batch in y_enc_iter:
                     for response_queue_id, y_enc, uid in zip(response_queue_ids, y_batch, uids):
                         y_enc = lit_api.format_encoded_response(y_enc)
-                        self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK)
+                        self.put_response(
+                            transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
+                        )
 
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_response(transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING)
+                    self.put_response(
+                        transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
+                    )
             except KeyboardInterrupt:  # pragma: no cover
                 self.kill()
                 return
@@ -324,6 +353,7 @@ class BatchedStreamingLoop(DefaultLoop):
                         uid,
                         PickleableHTTPException.from_exception(e),
                         LitAPIStatus.ERROR,
+                        LoopResponseType.STREAMING,
                     )
 
             except Exception as e:
@@ -332,7 +362,7 @@ class BatchedStreamingLoop(DefaultLoop):
                     "Please check the error trace for more details."
                 )
                 for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_error_response(transport, response_queue_id, uid, e)
+                    self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
 
     def __call__(
         self,

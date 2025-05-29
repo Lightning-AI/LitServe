@@ -20,6 +20,7 @@ import pickle
 import sys
 import uuid
 from contextlib import contextmanager
+from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from fastapi import HTTPException
@@ -34,6 +35,11 @@ class LitAPIStatus:
     OK = "OK"
     ERROR = "ERROR"
     FINISH_STREAMING = "FINISH_STREAMING"
+
+
+class LoopResponseType(Enum):
+    STREAMING = "STREAMING"
+    REGULAR = "REGULAR"
 
 
 class PickleableHTTPException(HTTPException):
