@@ -146,7 +146,7 @@ class LitAPI(ABC):
     def _validate_async_methods(self, methods: tuple = ("decode_request", "predict", "encode_response")):
         """Validate that async methods are properly implemented when enable_async is True."""
         # check if LitAPI methods are coroutines or async generators
-        for method in ["decode_request", "predict", "encode_response"]:
+        for method in methods:
             method_obj = getattr(self, method)
             if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
                 raise ValueError(
