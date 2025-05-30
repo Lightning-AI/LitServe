@@ -338,9 +338,25 @@ class IncorrectAsyncAPI(ls.LitAPI):
         return ChatMessage(role="assistant", content="This is a generated output")
 
 
+class IncorrectDecodeAsyncAPI(IncorrectAsyncAPI):
+    def decode_request(self, request):
+        return request
+
+    def _asyncify_methods(self):
+        return None
+
+    def _validate_async_methods(self):
+        return None
+
+
 class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
     async def predict(self, x):
         yield "This is a generated output"
+
+
+def test_openai_spec_asyncapi_decode_request_validation():
+    with pytest.raises(ValueError, match="decode_request is not a coroutine"):
+        ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
 def test_openai_spec_asyncapi_predict_validation():
@@ -378,6 +394,16 @@ def test_openai_asyncapi_decode_not_async_warning():
         ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
 
 
+class PartialAsyncOpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+        self.sentence = ["This", " is", " a", " sample", " response"]
+
+    async def predict(self, x):
+        for token in self.sentence:
+            yield token
+
+
 class AsyncOpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
@@ -397,7 +423,7 @@ class AsyncOpenAILitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_async_litapi(openai_request_data):
-    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
