@@ -128,11 +128,11 @@ class NewsAgent(ls.LitAPI):
         website_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
 
         # ask the LLM to tell you about the news
-        llm_response = self.openai_client.Completion.create(
-           model="text-davinci-003",
-           prompt=f"Based on this, what is the latest: {website_text}",
+        llm_response = self.openai_client.chat.completions.create(
+           model="gpt-3.5-turbo", 
+           messages=[{"role": "user", "content": f"Based on this, what is the latest: {website_text}"}],
         )
-        output = llm_response.choices[0].text.strip()
+        output = llm_response.choices[0].message.content.strip()
         return {"output": output}
 
     def encode_response(self, output):
