@@ -131,7 +131,6 @@ class NewsAgent(ls.LitAPI):
         llm_response = self.openai_client.chat.completions.create(
            model="gpt-3.5-turbo", 
            messages=[ 
-               {"role": "system", "content": "You are a helpful assistant that extracts the latest information from text."},
                {"role": "user", "content": f"Based on this, what is the latest: {website_text}"},
            ],
         )
