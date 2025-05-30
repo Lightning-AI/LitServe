@@ -22,6 +22,7 @@ import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from enum import Enum
 from functools import wraps
 from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, TextIO, Union
 
