@@ -74,16 +74,52 @@ class LitAPI(ABC):
         spec: Optional[LitSpec] = None,
         enable_async: bool = False,
     ):
-        """Initialize a LitAPI instance.
+        """Initialize a LitAPI instance that defines the model's inference behavior.
 
         Args:
-            max_batch_size: Maximum number of requests to process in a batch.
-            batch_timeout: Maximum time to wait for a batch to fill before processing.
-            api_path: URL path for the prediction endpoint.
-            stream: Whether to enable streaming responses.
-            loop: Inference loop to use, or 'auto' to select based on settings.
-            spec: Specification for the API, such as OpenAISpec or custom specs.
-            enable_async: Enable async support.
+            max_batch_size (int, optional):
+                Maximum requests to batch together for inference. Higher values improve throughput
+                for models that benefit from batching but use more memory. Defaults to 1.
+
+            batch_timeout (float, optional):
+                Maximum seconds to wait for a batch to fill before processing incomplete batches.
+                Lower values reduce latency, higher values improve batching efficiency. Defaults to 0.0.
+
+            api_path (str, optional):
+                URL endpoint path for predictions (e.g., "/predict", "/v1/chat"). Defaults to "/predict".
+
+            stream (bool, optional):
+                Enable streaming responses for real-time output (useful for LLMs, long-running tasks).
+                Requires implementing encode_response() for streaming. Defaults to False.
+
+            loop (Union[str, LitLoop], optional):
+                Inference loop strategy. "auto" selects optimal loop based on batching/streaming settings,
+                or provide custom LitLoop instance for advanced control. Defaults to "auto".
+
+            spec (LitSpec, optional):
+                API specification defining input/output schemas and behavior. Use OpenAISpec for
+                OpenAI-compatible APIs or custom LitSpec implementations. Defaults to None.
+
+            enable_async (bool, optional):
+                Enable async/await support for non-blocking operations in predict() method.
+                Useful for I/O-bound inference or external API calls. Defaults to False.
+
+        Example:
+            >>> # Simple API
+            >>> api = LitAPI()
+
+            >>> # Batched inference
+            >>> api = LitAPI(max_batch_size=8, batch_timeout=0.1)
+
+            >>> # OpenAI-compatible API
+            >>> api = LitAPI(spec=OpenAISpec())
+
+            >>> # Async processing
+            >>> api = LitAPI(enable_async=True)
+
+        Note:
+            You must implement setup(), predict(), and optionally decode_request()/encode_response()
+            methods to define your model's behavior.
 
         """
 

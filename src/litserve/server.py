@@ -30,7 +30,7 @@ from contextlib import asynccontextmanager
 from multiprocessing.context import Process
 from queue import Queue
 from threading import Thread
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
@@ -50,7 +50,7 @@ from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
-from litserve.utils import LitAPIStatus, WorkerSetupStatus, call_after_stream
+from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
 
 mp.allow_connection_pickling()
 
@@ -76,12 +76,54 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         )
 
 
+async def _mixed_response_to_buffer(
+    transport: MessageTransport,
+    response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    consumer_id: int = 0,
+):
+    """Handle both regular and streaming responses.
+
+    Detect streaming responses by checking if the response is for streaming.
+
+    """
+    while True:
+        try:
+            result = await transport.areceive(consumer_id)
+            if result is None:
+                continue
+
+            uid, (*response, response_type) = result
+            if response_type == LoopResponseType.STREAMING:
+                stream_response_buffer, event = response_buffer[uid]
+                stream_response_buffer.append(response)
+                event.set()
+            else:
+                event = response_buffer.pop(uid)
+                response_buffer[uid] = response
+                event.set()
+        except asyncio.CancelledError:
+            logger.debug("Response queue to buffer task was cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error in response_queue_to_buffer: {e}")
+            break
+
+
 async def response_queue_to_buffer(
     transport: MessageTransport,
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
-    stream: bool,
-    consumer_id: int = 0,
+    consumer_id: int,
+    litapi_connector: "_LitAPIConnector",
 ):
+    mixed_streaming = (
+        len(litapi_connector.lit_apis) > 1
+        and litapi_connector.any_stream()
+        and not all(api.stream for api in litapi_connector)
+    )
+    if mixed_streaming:
+        return await _mixed_response_to_buffer(transport, response_buffer, consumer_id)
+
+    stream = litapi_connector.any_stream()
     if stream:
         while True:
             try:
@@ -89,7 +131,7 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, response = result
+                uid, (*response, _) = result
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
                 event.set()
@@ -107,7 +149,7 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, response = result
+                uid, (*response, _) = result
                 event = response_buffer.pop(uid)
                 response_buffer[uid] = response
                 event.set()
@@ -163,24 +205,8 @@ class _LitAPIConnector:
             if not self.lit_apis:  # Check if the iterable is empty
                 raise ValueError("lit_apis must not be an empty iterable")
             self._detect_path_collision()
-            self._check_mixed_streaming_configuration()
         else:
             raise ValueError(f"lit_apis must be a LitAPI or an iterable of LitAPI, but got {type(lit_apis)}")
-
-    def _check_mixed_streaming_configuration(self):
-        """Ensure consistent streaming configuration across all endpoints.
-
-        Streaming must be either enabled for all endpoints or disabled for all. Mixing streaming and non-streaming
-        endpoints is currently not supported.
-
-        """
-        streams_enabled = [api.stream for api in self.lit_apis]
-        if any(streams_enabled) and not all(streams_enabled):
-            raise ValueError(
-                "Inconsistent streaming configuration: all endpoints must either "
-                "enable streaming or disable it. "
-                "Mixed configurations are not supported yet."
-            )
 
     def _detect_path_collision(self):
         paths = {"/health": "LitServe healthcheck", "/info": "LitServe info"}
@@ -345,29 +371,66 @@ class LitServer:
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
     ):
-        """Initialize a LitServer instance.
+        """Initialize a LitServer instance for high-performance model inference.
 
         Args:
-            lit_api: The API instance that handles requests and responses.
-            accelerator: Type of hardware to use, like 'cpu', 'cuda', or 'mps'. 'auto' selects the best available.
-            devices: Number of devices to use, or 'auto' to select automatically.
-            workers_per_device: Number of worker processes per device.
-            max_batch_size: Deprecated. Use `lit_api.max_batch_size` instead.
-            batch_timeout: Deprecated. Use `lit_api.batch_timeout` instead.
-            timeout: Maximum time to wait for a request to complete. Set to False for no timeout.
-            api_path: Deprecated. Use `LitAPI(api_path=...)` instead.
-            healthcheck_path: URL path for the health check endpoint.
-            info_path: URL path for the server and model information endpoint.
-            model_metadata: Metadata about the model, shown at the info endpoint.
-            stream: Whether to enable streaming responses.
-            spec: Specification for the API, such as OpenAISpec or custom specs.
-            max_payload_size: Maximum size of request payloads.
-            track_requests: Whether to track the number of active requests.
-            loop: Inference loop to use, or 'auto' to select based on settings.
-            callbacks: List of callback classes to execute at various stages.
-            middlewares: List of middleware classes to apply to the server.
-            loggers: List of loggers to use for recording server activity.
-            fast_queue: Whether to use ZeroMQ for faster response handling.
+            lit_api (Union[LitAPI, List[LitAPI]]):
+                API instance(s) defining model inference logic. Single instance or list for multi-model serving.
+
+            accelerator (str, optional):
+                Hardware type: 'cpu', 'cuda', 'mps', or 'auto' (detects best available). Defaults to 'auto'.
+
+            devices (Union[int, str], optional):
+                Number of devices to use, or 'auto' for all available. Defaults to 'auto'.
+
+            workers_per_device (int, optional):
+                Worker processes per device. Higher values improve throughput but use more memory. Defaults to 1.
+
+            timeout (Union[float, bool], optional):
+                Request timeout in seconds, or False to disable. Defaults to 30.
+
+            healthcheck_path (str, optional):
+                Health check endpoint path for load balancers. Defaults to "/health".
+
+            info_path (str, optional):
+                Server info endpoint path showing metadata and configuration. Defaults to "/info".
+
+            model_metadata (dict, optional):
+                Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
+
+            max_payload_size (Union[int, str], optional):
+                Maximum request size as bytes or string ("10MB"). Defaults to "100MB".
+
+            track_requests (bool, optional):
+                Enable request tracking for monitoring. Recommended for production. Defaults to False.
+
+            callbacks (List[Callback], optional):
+                Callback instances for lifecycle events (logging, metrics). Defaults to None.
+
+            middlewares (List[Middleware], optional):
+                HTTP middleware for auth, CORS, rate limiting, etc. Defaults to None.
+
+            loggers (List[Logger], optional):
+                Custom loggers for server activity. Defaults to standard logging.
+
+            fast_queue (bool, optional):
+                Enable ZeroMQ for high-throughput (>100 RPS). Requires ZeroMQ installation. Defaults to False.
+
+            max_batch_size, batch_timeout, stream, spec, api_path, loop:
+                **Deprecated**: Configure these in your LitAPI implementation instead.
+
+        Example:
+            >>> # Basic
+            >>> server = LitServer(MyLitAPI())
+
+            >>> # Production
+            >>> server = LitServer(
+            ...     lit_api=MyLitAPI(max_batch_size=4),
+            ...     accelerator="cuda",
+            ...     devices=2,
+            ...     fast_queue=True,
+            ...     track_requests=True
+            ... )
 
         """
         if max_batch_size is not None:
@@ -449,7 +512,6 @@ class LitServer:
         self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
-        self.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not self.litapi_connector.any_stream():
@@ -491,7 +553,6 @@ class LitServer:
             logging.debug(f"shallow copy for Server is created for for spec {spec}")
             server_copy = copy.copy(self)
             del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
-            print(self.litapi_request_queues)
             spec.setup(server_copy)
 
         process_list = []
@@ -534,10 +595,13 @@ class LitServer:
         future = response_queue_to_buffer(
             transport,
             self.response_buffer,
-            self.litapi_connector.any_stream(),
             app.response_queue_id,
+            self.litapi_connector,
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
+        task.add_done_callback(
+            lambda _: logger.info(f"Response queue to buffer task terminated for consumer_id {app.response_queue_id}")
+        )
 
         try:
             yield
@@ -727,9 +791,55 @@ class LitServer:
         num_api_servers: Optional[int] = None,
         log_level: str = "info",
         generate_client_file: bool = True,
-        api_server_worker_type: Optional[str] = None,
+        api_server_worker_type: Literal["process", "thread"] = "process",
+        pretty_logs: bool = False,
         **kwargs,
     ):
+        """Run the LitServe server to handle API requests and distribute them to inference workers.
+
+        Args:
+            host (str, optional):
+                Host address to bind to. "0.0.0.0" for all IPs, "127.0.0.1" for localhost only. Defaults to "0.0.0.0".
+
+            port (Union[str, int], optional):
+                Port number to bind to. Must be available. Defaults to 8000.
+
+            num_api_servers (Optional[int], optional):
+                Number of uvicorn server instances for parallel API handling. Higher values improve
+                throughput but use more resources. Defaults to None (single instance).
+
+            log_level (str, optional):
+                Logging level: "critical", "error", "warning", "info", "debug", "trace".
+                Use "debug" for development. Defaults to "info".
+
+            generate_client_file (bool, optional):
+                Auto-generate Python client file with typed methods for API interaction. Defaults to True.
+
+            api_server_worker_type (Literal["process", "thread"], optional):
+                Worker type. "process" for better isolation/CPU usage, "thread" for less memory. Defaults to "process".
+
+            pretty_logs (bool, optional):
+                Enhanced log formatting with colors using rich library. Good for development. Defaults to False.
+
+            **kwargs:
+                Additional uvicorn server options (ssl_keyfile, ssl_certfile, etc.). See uvicorn docs.
+
+        Example:
+            >>> server.run()  # Basic
+
+            >>> server.run(  # Production
+            ...     port=8080,
+            ...     num_api_servers=4,
+            ...     log_level="warning"
+            ... )
+
+            >>> server.run(  # Development
+            ...     log_level="debug",
+            ...     pretty_logs=True,
+            ...     generate_client_file=True
+            ... )
+
+        """
         if generate_client_file:
             LitServer.generate_client_file(port=port)
 
@@ -746,6 +856,7 @@ class LitServer:
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:
             raise ValueError(host_msg)
 
+        configure_logging(log_level, use_rich=pretty_logs)
         config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
 
