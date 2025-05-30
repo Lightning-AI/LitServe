@@ -173,7 +173,7 @@ class LitAPI(ABC):
             if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
                 warnings.warn(
                     f"enable_async set to True but {method} is not a coroutine or async generator. "
-                    "LitServe will asyncify this method."
+                    "LitServe will automatically convert this method to an 'async function' a.k.a 'coroutine'"
                     f"Consider defining '{method}' as 'async def' for clarity.",
                     UserWarning,
                 )
