@@ -342,6 +342,9 @@ class IncorrectDecodeAsyncAPI(IncorrectAsyncAPI):
     def decode_request(self, request):
         return request
 
+    def _asyncify_methods(self):
+        return None
+
     def _validate_async_methods(self):
         return None
 
@@ -351,25 +354,21 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
         yield "This is a generated output"
 
 
-@pytest.mark.asyncio
 def test_openai_spec_asyncapi_decode_request_validation():
     with pytest.raises(ValueError, match="decode_request is not a coroutine"):
         ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
-@pytest.mark.asyncio
 def test_openai_spec_asyncapi_predict_validation():
-    with pytest.raises(ValueError, match="predict is not a generator"):
+    with pytest.raises(ValueError, match="predict must be an async generator"):
         ls.LitServer(IncorrectAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
-@pytest.mark.asyncio
 def test_openai_spec_asyncapi_encode_response_validation():
-    with pytest.raises(ValueError, match="encode_response is not a generator"):
+    with pytest.raises(ValueError, match="encode_response is neither a generator nor an async generator"):
         ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
-@pytest.mark.asyncio
 def test_openai_asyncapi_enable_async_flag_validation():
     with pytest.raises(ValueError, match="'enable_async' is not set in LitAPI."):
         ls.LitServer(IncorrectAsyncAPI(enable_async=False), spec=OpenAISpec())
@@ -386,10 +385,27 @@ class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
         yield {"role": "assistant", "content": output}
 
 
-@pytest.mark.asyncio
-def test_openai_asyncapi_decode_not_implemented():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+def test_openai_asyncapi_decode_not_async_warning():
+    with pytest.warns(
+        UserWarning,
+        match="enable_async set to True but decode_request is not a coroutine or async generator."
+        " LitServe will asyncify this method.",
+    ):
         ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+
+
+class PartialAsyncOpenAILitAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+        self.sentence = ["This", " is", " a", " sample", " response"]
+
+    async def predict(self, x):
+        for token in self.sentence:
+            yield token
+
+    async def encode_response(self, output_stream, context):
+        for output in output_stream:
+            yield {"role": "assistant", "content": output}
 
 
 class AsyncOpenAILitAPI(ls.LitAPI):
@@ -410,8 +426,23 @@ class AsyncOpenAILitAPI(ls.LitAPI):
 
 
 @pytest.mark.asyncio
+async def test_openai_spec_with_partial_async_litapi(openai_request_data):
+    server = ls.LitServer(PartialAsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a sample response", (
+                "LitAPI predict response should match with the generated output"
+            )
+
+
+@pytest.mark.asyncio
 async def test_openai_spec_with_async_litapi(openai_request_data):
-    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
