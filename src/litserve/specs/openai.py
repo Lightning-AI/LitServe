@@ -347,7 +347,6 @@ class OpenAISpec(LitSpec):
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
 
         if lit_api.enable_async:
-            # warning for decode_request and encode_response
             if not asyncio.iscoroutinefunction(lit_api.decode_request):
                 logger.info("decode_request is not a coroutine function. LitServe will asyncify it.")
             if not inspect.isasyncgenfunction(lit_api.encode_response):
