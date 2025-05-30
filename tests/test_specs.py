@@ -422,6 +422,21 @@ class AsyncOpenAILitAPI(ls.LitAPI):
 
 
 @pytest.mark.asyncio
+async def test_openai_spec_with_partial_async_litapi(openai_request_data):
+    server = ls.LitServer(PartialAsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+
+            assert resp.json()["choices"][0]["message"]["content"] == "This is a sample response", (
+                "LitAPI predict response should match with the generated output"
+            )
+
+
+@pytest.mark.asyncio
 async def test_openai_spec_with_async_litapi(openai_request_data):
     server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
