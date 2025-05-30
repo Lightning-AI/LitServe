@@ -7,8 +7,8 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_INSTALL_DIR=/python \
     UV_PYTHON_PREFERENCE=only-managed
 
-# Install Python before the project for caching
-RUN uv python install 3.12 && uv venv
+# Install specific Python version before the project for caching
+RUN uv python install 3.12.2 && uv venv
 
 WORKDIR /app
 
@@ -20,17 +20,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Final stage
 FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
-# Copy Python installation
+# Copy Python installation and uv binary
 COPY --from=builder --chown=app:app /python /python
-
-# Copy the application from builder
+COPY --from=builder --chown=app:app /usr/local/bin/uv /usr/local/bin/uv
 COPY --from=builder --chown=app:app /app /app
 
-# Add Python and local bin to PATH
-ENV PATH="/python/bin:/app/.venv/bin:$PATH"
+# Add Python and local bin to PATH and disable uv caching
+ENV PATH="/python/bin:/app/.venv/bin:$PATH" \
+    UV_NO_CACHE=1
 
-# Create app user
-RUN groupadd -r app && useradd -r -g app app
+# Create app user and required directories
+RUN groupadd -r app && useradd -r -g app app && \
+    mkdir -p /home/app/.local/share && \
+    chown -R app:app /home/app
 
 # Set working directory
 WORKDIR /app
