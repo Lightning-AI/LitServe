@@ -1,0 +1,44 @@
+# Build stage with uv
+FROM ghcr.io/astral-sh/uv:bookworm-slim AS builder
+
+# Configure uv and Python settings
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_INSTALL_DIR=/python \
+    UV_PYTHON_PREFERENCE=only-managed
+
+# Install Python before the project for caching
+RUN uv python install 3.12 && uv venv
+
+WORKDIR /app
+
+# Install PyTorch with CUDA support
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
+    uv pip install litserve
+
+# Final stage
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+# Copy Python installation
+COPY --from=builder --chown=app:app /python /python
+
+# Copy the application from builder
+COPY --from=builder --chown=app:app /app /app
+
+# Add Python and local bin to PATH
+ENV PATH="/python/bin:/app/.venv/bin:$PATH"
+
+# Create app user
+RUN groupadd -r app && useradd -r -g app app
+
+# Set working directory
+WORKDIR /app
+
+# Switch to non-root user
+USER app
+
+# Expose port
+EXPOSE 8000
+
+ENTRYPOINT ["uv", "run"]
