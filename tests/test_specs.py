@@ -403,6 +403,10 @@ class PartialAsyncOpenAILitAPI(ls.LitAPI):
         for token in self.sentence:
             yield token
 
+    async def encode_response(self, output_stream, context):
+        for output in output_stream:
+            yield {"role": "assistant", "content": output}
+
 
 class AsyncOpenAILitAPI(ls.LitAPI):
     def setup(self, device):
