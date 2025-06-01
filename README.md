@@ -11,7 +11,7 @@
 &nbsp; 
 </div>
 
-Most tools serve one model with rigid abstractions. LitServe lets you build full AI systems - agents, chatbots, RAG, pipelines - with full control, custom logic, multi-model support, and zero YAML. 
+Most serving engines serve one model with rigid abstractions. LitServe lets you serve any model (vision, audio, text) and build full AI systems - agents, chatbots, RAG, pipelines - with full control, batching, multi-GPU, streaming, custom logic, multi-model support, and zero YAML. 
 
 Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
 
@@ -121,22 +121,17 @@ class NewsAgent(ls.LitAPI):
     def setup(self, device):
         self.openai_client = openai.OpenAI(api_key="OPENAI_API_KEY")
 
-    def decode_request(self, request):
-        return request.get("website_url", "https://text.npr.org/")
-
-    def predict(self, website_url):
+    def predict(self, request):
+        website_url = request.get("website_url", "https://text.npr.org/")
         website_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
 
         # ask the LLM to tell you about the news
-        llm_response = self.openai_client.Completion.create(
-           model="text-davinci-003",
-           prompt=f"Based on this, what is the latest: {website_text}",
+        llm_response = self.openai_client.chat.completions.create(
+           model="gpt-3.5-turbo", 
+           messages=[{"role": "user", "content": f"Based on this, what is the latest: {website_text}"}],
         )
-        output = llm_response.choices[0].text.strip()
+        output = llm_response.choices[0].message.content.strip()
         return {"output": output}
-
-    def encode_response(self, output):
-        return {"response": output}
 
 if __name__ == "__main__":
     server = ls.LitServer(NewsAgent())
