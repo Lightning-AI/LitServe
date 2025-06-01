@@ -11,7 +11,7 @@
 &nbsp; 
 </div>
 
-Most tools serve one model with rigid abstractions. LitServe lets you build full AI systems - agents, chatbots, RAG, pipelines - with full control, batching, multi-GPU, streaming, custom logic, multi-model support, and zero YAML. 
+Most serving engines serve one model with rigid abstractions. LitServe lets you serve any model (vision, audio, text) and build full AI systems - agents, chatbots, RAG, pipelines - with full control, batching, multi-GPU, streaming, custom logic, multi-model support, and zero YAML. 
 
 Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
 
