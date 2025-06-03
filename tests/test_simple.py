@@ -15,6 +15,7 @@ import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -24,8 +25,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.utils import wrap_litserve_start   
-from types import SimpleNamespace
+from litserve.utils import wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):
@@ -367,8 +367,8 @@ def test_shutdown_endpoint_disabled():
         # Should get 404 since endpoint doesn't exist
         response = client.post("/shutdown")
         assert response.status_code == 404
-        
-        
+
+
 def test_shutdown_endpoint_multiple_workers():
     """Test shutdown endpoint with multiple workers."""
     server = LitServer(
@@ -379,10 +379,10 @@ def test_shutdown_endpoint_multiple_workers():
         enable_shutdown_api=True,
         shutdown_path="/shutdown",
     )
-    
+
     # Mock the server state
     server.app.state.server = SimpleNamespace(should_exit=False)
-    
+
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         # Test with correct API key - should work with multiple workers
         correct_key = server.shutdown_api_key
