@@ -16,11 +16,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 RUN --mount=type=cache,target=/opt/uv-cache \
     uv pip install \
         torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/cpu
-
-# Install litserve in a separate layer
-RUN --mount=type=cache,target=/opt/uv-cache \
-    uv pip install litserve --no-deps && \
+        --index-url https://download.pytorch.org/whl/cpu && \
     uv pip install litserve
 
 # Start fresh with minimal image
