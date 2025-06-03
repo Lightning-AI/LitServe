@@ -1037,3 +1037,7 @@ class LitServer:
             raise HTTPException(
                 status_code=401, detail=f"Invalid Shutdown API Key. Check that you are passing a correct 'X-Shutdown-API-Key' in your header."
             )
+        """
+        REQUIRED: YOU NEED TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
+        - export SHUTDOWN_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+        """
