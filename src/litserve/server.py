@@ -420,7 +420,7 @@ class LitServer:
 
             max_batch_size, batch_timeout, stream, spec, api_path, loop:
                 **Deprecated**: Configure these in your LitAPI implementation instead.
-                
+
             enable_shutdown_api (bool, optional):
                 Enable the /shutdown endpoint for programmatic server termination. Defaults to False.
 
@@ -503,11 +503,9 @@ class LitServer:
             raise ValueError(
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
-            
+
         if enable_shutdown_api and not shutdown_path.startswith("/"):
-            raise ValueError(
-                "shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'"
-            )
+            raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
         try:
             json.dumps(model_metadata)
@@ -524,17 +522,18 @@ class LitServer:
         self.timeout = timeout
         self.enable_shutdown_api = enable_shutdown_api
         self.shutdown_path = shutdown_path
-        
+
         # Generate shutdown API key if shutdown endpoint is enabled
         if self.enable_shutdown_api:
             import secrets
+
             self.shutdown_api_key = secrets.token_urlsafe(32)
             print(f"🔑 Shutdown API Key: {self.shutdown_api_key}")
             print(f"🛑 Shutdown endpoint: POST {self.shutdown_path}")
             print("   Use: curl -X POST http://localhost:8000/shutdown -H 'Authorization: Bearer YOUR_API_KEY'")
         else:
             self.shutdown_api_key = None
-            
+
         self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan)
         self.app.response_queue_id = None
@@ -708,27 +707,28 @@ class LitServer:
                     },
                 }
             )
-            
+
         # Add shutdown endpoint if enabled
         if self.enable_shutdown_api:
+
             @self.app.post(self.shutdown_path)
             async def shutdown(request: Request):
                 # Validate API key
                 auth_header = request.headers.get("Authorization")
                 if not auth_header or not auth_header.startswith("Bearer "):
                     return Response(content="Unauthorized: Missing or invalid API key", status_code=401)
-                
+
                 provided_key = auth_header.split(" ")[1]
                 if provided_key != self.shutdown_api_key:
                     return Response(content="Unauthorized: Invalid API key", status_code=401)
-                
+
                 # Check if shutdown already in progress
-                if hasattr(self.app.state, 'server') and self.app.state.server.should_exit:
+                if hasattr(self.app.state, "server") and self.app.state.server.should_exit:
                     return Response(content="Shutdown already in progress", status_code=400)
-                
+
                 # Initiate shutdown
                 print("Shutdown endpoint called - initiating graceful shutdown...")
-                if hasattr(self.app.state, 'server'):
+                if hasattr(self.app.state, "server"):
                     self.app.state.server.should_exit = True
                 return Response(content="Server shutdown initiated", status_code=200)
 
