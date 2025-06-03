@@ -76,7 +76,6 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
             status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
         )
 
-
 async def _mixed_response_to_buffer(
     transport: MessageTransport,
     response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
@@ -359,6 +358,7 @@ class LitServer:
         healthcheck_path: str = "/health",
         info_path: str = "/info",
         shutdown_path: str = "/shutdown",
+        enable_shutdown_api: bool = False,
         model_metadata: Optional[dict] = None,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
@@ -372,7 +372,6 @@ class LitServer:
         stream: bool = False,
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
-        uvicorn_graceful_timeout: int = 30,
     ):
         """Initialize a LitServer instance for high-performance model inference.
 
@@ -400,6 +399,9 @@ class LitServer:
                 
             shutdown_path (str, optional):
                 Server shutdown endpoint path that terminates and cleans up all worker and server processes. Defaults to "/shutdown".
+                
+            enable_shutdown_api (bool, optional):
+                Enable the shutdown endpoint. If True, the server will listen for shutdown requests at the specified path. Defaults to False.
 
             model_metadata (dict, optional):
                 Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
@@ -424,10 +426,6 @@ class LitServer:
 
             max_batch_size, batch_timeout, stream, spec, api_path, loop:
                 **Deprecated**: Configure these in your LitAPI implementation instead.
-
-            uvicorn_graceful_timeout (int, optional):
-                Timeout in seconds for Uvicorn to gracefully shut down its workers.
-                Defaults to 30.
 
         Example:
             >>> # Basic
@@ -534,6 +532,7 @@ class LitServer:
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
         self.lit_api = lit_api
+        self.enable_shutdown_api = enable_shutdown_api
         self.workers_per_device = workers_per_device
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
@@ -546,7 +545,7 @@ class LitServer:
         self.uvicorn_workers: List[Union[mp.Process, threading.Thread]] = []
         self.manager: Optional[mp.Manager] = None
         self._shutdown_event: Optional[mp.Event] = None
-        self.uvicorn_graceful_timeout = uvicorn_graceful_timeout
+        self.uvicorn_graceful_timeout = 30  # Default timeout for graceful shutdown
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -700,12 +699,13 @@ class LitServer:
                 }
             )
             
-        @self.app.post(self._shutdown_path, status_code=status.HTTP_200_OK, dependencies=[Depends(self.setup_auth())])
-        async def shutdown_endpoint():
-            if self._shutdown_event:
-                self._shutdown_event.set()
-            return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
-
+        if self.enable_shutdown_api:
+            @self.app.post(self._shutdown_path, status_code=status.HTTP_200_OK, dependencies=[Depends(self.shutdown_api_key_auth)])
+            async def shutdown_endpoint():
+                if self._shutdown_event:
+                    self._shutdown_event.set()
+                return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
+    
     def register_endpoints(self):
         self._register_internal_endpoints()
         for lit_api in self.litapi_connector:
@@ -1031,3 +1031,9 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
+    
+    def shutdown_api_key_auth(self, shutdown_api_key: str = Depends(APIKeyHeader(name="X-Shutdown-API-Key"))):
+        if not SHUTDOWN_API_KEY or shutdown_api_key != SHUTDOWN_API_KEY:
+            raise HTTPException(
+                status_code=401, detail=f"Invalid Shutdown API Key. Check that you are passing a correct 'X-Shutdown-API-Key' in your header."
+            )
