@@ -27,7 +27,9 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 from contextlib import asynccontextmanager
+from multiprocessing.context import Process
 from queue import Queue
+from threading import Thread
 from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import uvicorn
@@ -74,7 +76,6 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
         raise HTTPException(
             status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
         )
-
 
 async def _mixed_response_to_buffer(
     transport: MessageTransport,
@@ -396,10 +397,10 @@ class LitServer:
 
             info_path (str, optional):
                 Server info endpoint path showing metadata and configuration. Defaults to "/info".
-
+                
             shutdown_path (str, optional):
                 Server shutdown endpoint path that terminates and cleans up all worker and server processes. Defaults to "/shutdown".
-
+                
             enable_shutdown_api (bool, optional):
                 Enable the shutdown endpoint. If True, the server will listen for shutdown requests at the specified path. Defaults to False.
 
@@ -449,7 +450,7 @@ class LitServer:
                 "Old usage:\n"
                 "    server = LitServer(api, max_batch_size=N, batch_timeout=T, ...)\n\n"
                 "New usage:\n"
-                "    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
+                f"    api = LitAPI(max_batch_size=N, batch_timeout=T, ...)\n"
                 "    server = LitServer(api, ...)",
                 DeprecationWarning,
                 stacklevel=2,
@@ -503,7 +504,7 @@ class LitServer:
             raise ValueError(
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
-
+            
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
@@ -701,17 +702,14 @@ class LitServer:
                     },
                 }
             )
-
+            
         if self.enable_shutdown_api:
-
-            @self.app.post(
-                self._shutdown_path, status_code=status.HTTP_200_OK, dependencies=[Depends(self.shutdown_api_key_auth)]
-            )
+            @self.app.post(self._shutdown_path, status_code=status.HTTP_200_OK, dependencies=[Depends(self.shutdown_api_key_auth)])
             async def shutdown_endpoint():
                 if self._shutdown_event:
                     self._shutdown_event.set()
                 return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
-
+    
     def register_endpoints(self):
         self._register_internal_endpoints()
         for lit_api in self.litapi_connector:
@@ -814,7 +812,7 @@ class LitServer:
         self._logger_connector.run(self)
         self._transport = create_transport_from_config(self.transport_config)
         return self.manager
-
+    
     def _perform_graceful_shutdown(self):
         """Encapsulates the graceful shutdown logic."""
 
@@ -833,9 +831,7 @@ class LitServer:
                         iw.terminate()
                         iw.join(timeout=5)
                         if iw.is_alive():
-                            logger.warning(
-                                f"Worker {i} (PID: {worker_pid}): Did not terminate gracefully. Forcibly killing (SIGKILL)."
-                            )
+                            logger.warning(f"Worker {i} (PID: {worker_pid}): Did not terminate gracefully. Forcibly killing (SIGKILL).")
                             iw.kill()
                         else:
                             logger.info(f"Worker {i} (PID: {worker_pid}): Terminated gracefully.")
@@ -851,7 +847,7 @@ class LitServer:
                 if uvicorn_runner_pid:
                     log_prefix = f"Uvicorn Master {'Process' if uvicorn_runner_pid else 'Thread'} {i}"
                     log_prefix += f" (PID: {uvicorn_runner_pid})"
-
+                    
                 if uw.is_alive():
                     try:
                         uw.terminate()
@@ -864,9 +860,11 @@ class LitServer:
                 else:
                     logger.info(f"{log_prefix}: Already not alive.")
 
-        # shut down the multiprocessing manager
+
+        #shut down the multiprocessing manager
         if self.manager:
             self.manager.shutdown()
+
 
         def exit_process():
             time.sleep(0.5)
@@ -913,7 +911,7 @@ class LitServer:
 
             **kwargs:
                 Additional uvicorn server options (ssl_keyfile, ssl_certfile, etc.). See uvicorn docs.
-
+                
         Example:
         >>> server.run()  # Basic
         >>> server.run(  # Production
@@ -947,7 +945,7 @@ class LitServer:
         configure_logging(log_level, use_rich=pretty_logs)
         config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
         sockets = [config.bind_socket()]
-
+        
         if num_api_servers is None:
             num_api_servers = len(self.inference_workers_config)
 
@@ -973,7 +971,7 @@ class LitServer:
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-
+            
             while not self._shutdown_event.is_set():
                 time.sleep(0.1)
 
@@ -981,6 +979,7 @@ class LitServer:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
         finally:
             self._perform_graceful_shutdown()
+
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
@@ -1006,7 +1005,7 @@ class LitServer:
                 log_level=log_level,
                 workers=num_uvicorn_servers if uvicorn_worker_type == "process" else 1,
                 timeout_graceful_shutdown=self.uvicorn_graceful_timeout,
-                **kwargs,
+                **kwargs
             )
             if sys.platform == "win32" and num_uvicorn_servers > 1:
                 logger.debug("Enable Windows explicit socket sharing...")
@@ -1036,12 +1035,11 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
-
+    
     def shutdown_api_key_auth(self, shutdown_api_key: str = Depends(oauth2_scheme)):
         if not SHUTDOWN_API_KEY or shutdown_api_key != SHUTDOWN_API_KEY:
             raise HTTPException(
-                status_code=401,
-                detail="Invalid Bearer token for Shutdown API. Check that you are passing a correct 'Authorization: Bearer SHUTDOWN_API_KEY' in your header.",
+                status_code=401, detail="Invalid Bearer token for Shutdown API. Check that you are passing a correct 'Authorization: Bearer SHUTDOWN_API_KEY' in your header."
             )
         """
         REQUIRED: YOU NEED TO RUN THIS COMMAND TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
