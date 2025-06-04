@@ -173,7 +173,7 @@ def test_load(lit_server):
 
 def test_shutdown_endpoint_single_worker():
     """Test the shutdown endpoint with Bearer token authentication."""
-    TEST_API_KEY = os.environ.get("SHUTDOWN_API_KEY")
+    env_api_key = os.environ.get("SHUTDOWN_API_KEY")
 
     server = LitServer(
         SimpleLitAPI(),
@@ -196,7 +196,7 @@ def test_shutdown_endpoint_single_worker():
         assert "Invalid Bearer token for Shutdown API" in response_wrong_key.json()["detail"]
         print(f"Response (wrong key): {response_wrong_key.status_code} - {response_wrong_key.json()['detail']}")
 
-        headers_correct = {"Authorization": f"Bearer {TEST_API_KEY}"}
+        headers_correct = {"Authorization": f"Bearer {env_api_key}"}
         response_correct_key = client.post("/shutdown", headers=headers_correct)
         assert response_correct_key.status_code == status.HTTP_200_OK
         print(f"Response (correct key): {response_correct_key.status_code} - {response_correct_key}")
@@ -204,7 +204,7 @@ def test_shutdown_endpoint_single_worker():
 
 def test_shutdown_endpoint_multiple_workers():
     """Test the shutdown endpoint with >1 worker."""
-    TEST_API_KEY = os.environ.get("SHUTDOWN_API_KEY")
+    env_api_key = os.environ.get("SHUTDOWN_API_KEY")
 
     server = LitServer(
         SimpleLitAPI(),
@@ -227,7 +227,7 @@ def test_shutdown_endpoint_multiple_workers():
         assert "Invalid Bearer token for Shutdown API" in response_wrong_key.json()["detail"]
         print(f"Response (wrong key): {response_wrong_key.status_code} - {response_wrong_key.json()['detail']}")
 
-        headers_correct = {"Authorization": f"Bearer {TEST_API_KEY}"}
+        headers_correct = {"Authorization": f"Bearer {env_api_key}"}
         response_correct_key = client.post("/shutdown", headers=headers_correct)
         assert response_correct_key.status_code == status.HTTP_200_OK
         print(f"Response (correct key): {response_correct_key.status_code} - {response_correct_key}")

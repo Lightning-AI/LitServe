@@ -398,10 +398,12 @@ class LitServer:
                 Server info endpoint path showing metadata and configuration. Defaults to "/info".
 
             shutdown_path (str, optional):
-                Server shutdown endpoint path that terminates and cleans up all worker and server processes. Defaults to "/shutdown".
+                Server shutdown endpoint path that terminates and cleans up all worker and server processes.
+                Defaults to "/shutdown".
 
             enable_shutdown_api (bool, optional):
-                Enable the shutdown endpoint. If True, the server will listen for shutdown requests at the specified path. Defaults to False.
+                Enable the shutdown endpoint. If True, the server will listen for shutdown requests
+                at the specified path. Defaults to False.
 
             model_metadata (dict, optional):
                 Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
@@ -834,7 +836,8 @@ class LitServer:
                         iw.join(timeout=5)
                         if iw.is_alive():
                             logger.warning(
-                                f"Worker {i} (PID: {worker_pid}): Did not terminate gracefully. Forcibly killing (SIGKILL)."
+                                f"Worker {i} (PID: {worker_pid}):"
+                                " Did not terminate gracefully. Forcibly killing (SIGKILL)."
                             )
                             iw.kill()
                         else:
@@ -1013,10 +1016,10 @@ class LitServer:
                 # We make sure sockets is listening...
                 # It prevents further [WinError 10022]
                 for sock in sockets:
-                    sock.listen(config.backlog)
+                    sock.listen(uvicorn_config.backlog)
                 # We add worker to say unicorn to use a shared socket (win32)
                 # https://github.com/encode/uvicorn/pull/802
-                config.workers = num_uvicorn_servers
+                uvicorn_config.workers = num_uvicorn_servers
 
             server = uvicorn.Server(config=uvicorn_config)
             if uvicorn_worker_type == "process":
@@ -1041,9 +1044,10 @@ class LitServer:
         if not SHUTDOWN_API_KEY or shutdown_api_key != SHUTDOWN_API_KEY:
             raise HTTPException(
                 status_code=401,
-                detail="Invalid Bearer token for Shutdown API. Check that you are passing a correct 'Authorization: Bearer SHUTDOWN_API_KEY' in your header.",
+                detail="Invalid Bearer token for Shutdown API."
+                " Check that you are passing a correct 'Authorization: Bearer SHUTDOWN_API_KEY' in your header.",
             )
         """
         REQUIRED: YOU NEED TO RUN THIS COMMAND TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
         - export SHUTDOWN_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))") && echo "SHUTDOWN_API_KEY is: $SHUTDOWN_API_KEY"
-        """
+        """  # noqa: E501
