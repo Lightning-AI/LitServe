@@ -926,13 +926,13 @@ class LitServer:
 
         Example:
         >>> server.run()  # Basic
-        
+
         >>> server.run(  # Production
         ...     port=8080,
         ...     num_api_servers=4,
         ...     log_level="warning"
         ... )
-        
+
         >>> server.run(  # Development
         ...     log_level="debug",
         ...     pretty_logs=True,
