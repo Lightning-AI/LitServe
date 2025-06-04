@@ -67,7 +67,6 @@ def inference_worker(
     workers_setup_status: Dict[int, str],
     callback_runner: CallbackRunner,
 ):
-    print("workers_setup_status", workers_setup_status)
     lit_spec = lit_api.spec
     loop: LitLoop = lit_api.loop
     stream = lit_api.stream

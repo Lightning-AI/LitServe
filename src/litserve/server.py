@@ -49,14 +49,14 @@ from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
-
+import secrets
 mp.allow_connection_pickling()
 
 logger = logging.getLogger(__name__)
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY")
+SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY", None)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -509,13 +509,17 @@ class LitServer:
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
+        global SHUTDOWN_API_KEY
         if enable_shutdown_api and not SHUTDOWN_API_KEY:
-            raise ValueError(
-                "LitServe's Shutdown API is enabled, but the `LIT_SHUTDOWN_API_KEY` environment variable is missing. "
-                "A dedicated API key is required for security purposes to prevent unauthorized shutdowns of your LitServe instance. "
-                "To resolve this, please generate and set the environment variable by running the following command before starting LitServe: "
-                "`export LIT_SHUTDOWN_API_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')`"
+            SHUTDOWN_API_KEY = secrets.token_urlsafe(32)
+            logger.warning(
+                "LitServe's Shutdown API is enabled, but the `LIT_SHUTDOWN_API_KEY` environment variable is missing."
+                f"Generated shutdown API key: {SHUTDOWN_API_KEY}"
             )
+        if enable_shutdown_api:
+            curl_command = "curl -X 'POST' 'http://localhost:8000/shutdown' -H 'accept: application/json' -H 'Authorization: Bearer {}' -d ''"
+            curl_command = curl_command.format(SHUTDOWN_API_KEY)
+            logger.info(f"To shutdown the server, run command: \n{curl_command}\n")
         try:
             json.dumps(model_metadata)
         except (TypeError, ValueError):
@@ -628,7 +632,7 @@ class LitServer:
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
         task.add_done_callback(
-            lambda _: logger.info(f"Response queue to buffer task terminated for consumer_id {app.response_queue_id}")
+            lambda _: logger.debug(f"Response queue to buffer task terminated for consumer_id {app.response_queue_id}")
         )
 
         try:
@@ -848,7 +852,7 @@ class LitServer:
                             )
                             iw.kill()
                         else:
-                            logger.info(f"Worker {i} (PID: {worker_pid}): Terminated gracefully.")
+                            logger.debug(f"Worker {i} (PID: {worker_pid}): Terminated gracefully.")
                     except Exception as e:
                         logger.error(f"Error during termination of worker {i} (PID: {worker_pid}): {e}")
                 else:
