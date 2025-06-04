@@ -721,8 +721,9 @@ class LitServer:
                 self._shutdown_path, status_code=status.HTTP_200_OK, dependencies=[Depends(self.shutdown_api_key_auth)]
             )
             async def shutdown_endpoint():
-                if self._shutdown_event:
-                    self._shutdown_event.set()
+                if not self._shutdown_event:
+                    raise HTTPException(status_code=503, detail="Server is still starting up")
+                self._shutdown_event.set()
                 return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
 
     def register_endpoints(self):
