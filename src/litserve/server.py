@@ -36,7 +36,7 @@ import uvicorn
 import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 SHUTDOWN_API_KEY = os.environ.get("SHUTDOWN_API_KEY")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
@@ -503,6 +504,9 @@ class LitServer:
             raise ValueError(
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
+            
+        if enable_shutdown_api and not shutdown_path.startswith("/"):
+            raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
         try:
             json.dumps(model_metadata)
@@ -1032,12 +1036,12 @@ class LitServer:
             return api_key_auth
         return no_auth
     
-    def shutdown_api_key_auth(self, shutdown_api_key: str = Depends(APIKeyHeader(name="X-Shutdown-API-Key"))):
+    def shutdown_api_key_auth(self, shutdown_api_key: str = Depends(oauth2_scheme)):
         if not SHUTDOWN_API_KEY or shutdown_api_key != SHUTDOWN_API_KEY:
             raise HTTPException(
-                status_code=401, detail=f"Invalid Shutdown API Key. Check that you are passing a correct 'X-Shutdown-API-Key' in your header."
+                status_code=401, detail="Invalid Bearer token for Shutdown API. Check that you are passing a correct 'Authorization: Bearer SHUTDOWN_API_KEY' in your header."
             )
         """
-        REQUIRED: YOU NEED TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
-        - export SHUTDOWN_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+        REQUIRED: YOU NEED TO RUN THIS COMMAND TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
+        - export SHUTDOWN_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))") && echo "SHUTDOWN_API_KEY is: $SHUTDOWN_API_KEY"
         """
