@@ -525,10 +525,17 @@ class LitServer:
 
         # Generate shutdown API key if shutdown endpoint is enabled
         if self.enable_shutdown_api:
-            import secrets
-
-            self.shutdown_api_key = secrets.token_urlsafe(32)
-            print(f"🔑 Shutdown API Key: {self.shutdown_api_key}")
+            import os
+            # Try to get key from environment, generate if not provided
+            self.shutdown_api_key = os.getenv("LITSERVE_SHUTDOWN_KEY")
+            if not self.shutdown_api_key:
+                import secrets
+                self.shutdown_api_key = secrets.token_urlsafe(32)
+                print(f"⚠️  No LITSERVE_SHUTDOWN_KEY environment variable set.")
+                print(f"🔑 Generated temporary API key: {self.shutdown_api_key}")
+                print(f"💡 For production, set: export LITSERVE_SHUTDOWN_KEY=your_secure_key")
+            else:
+                print(f"🔑 Using LITSERVE_SHUTDOWN_KEY from environment")
             print(f"🛑 Shutdown endpoint: POST {self.shutdown_path}")
             print("   Use: curl -X POST http://localhost:8000/shutdown -H 'Authorization: Bearer YOUR_API_KEY'")
         else:
