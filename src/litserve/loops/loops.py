@@ -83,7 +83,6 @@ def inference_worker(
     lit_api.device = device
     callback_runner.trigger_event(EventTypes.AFTER_SETUP.value, lit_api=lit_api)
 
-    print(f"Setup complete for worker {f'{endpoint}_{worker_id}'}.")
 
     if workers_setup_status:
         workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.READY

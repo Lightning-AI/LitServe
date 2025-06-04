@@ -518,8 +518,12 @@ class LitServer:
                 f"Generated shutdown API key: {SHUTDOWN_API_KEY}"
             )
         if enable_shutdown_api:
-            curl_command = "curl -X 'POST' 'http://localhost:8000/shutdown' -H 'accept: application/json' -H 'Authorization: Bearer {}' -d ''"
-            curl_command = curl_command.format(SHUTDOWN_API_KEY)
+            curl_command = (
+                "curl -X 'POST' 'http://localhost:8000/shutdown' "
+                "-H 'accept: application/json' "
+                f"-H 'Authorization: Bearer {SHUTDOWN_API_KEY}' "
+                "-d ''"
+            )
             logger.info(f"To shutdown the server, run command: \n{curl_command}\n")
         try:
             json.dumps(model_metadata)
@@ -835,6 +839,26 @@ class LitServer:
         """Encapsulates the graceful shutdown logic."""
         logger.info("Shutting down LitServe...")
 
+        # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
+        if self.uvicorn_workers:
+            for i, uw in enumerate(self.uvicorn_workers):
+                uvicorn_pid = uw.pid
+                uvicorn_name = uw.name
+
+                log_prefix = f"{uvicorn_name} (PID: {uvicorn_pid})"
+
+                if not uw.is_alive():
+                    logger.warning(f"{log_prefix}: Already not alive.")
+                    continue
+                try:
+                    uw.terminate()
+                    uw.join(timeout=self.uvicorn_graceful_timeout)
+                    if uw.is_alive():
+                        logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
+                        uw.kill()
+                except Exception as e:
+                    logger.error(f"Error during termination of {log_prefix}: {e}")
+
         # close the message transport to stop new messages
         self._transport.close()
 
@@ -857,33 +881,8 @@ class LitServer:
             except Exception as e:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
 
-            self.manager.shutdown()
+        self.manager.shutdown()
 
-        # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
-        if self.uvicorn_workers:
-            for i, uw in enumerate(self.uvicorn_workers):
-                uvicorn_pid = uw.pid
-                uvicorn_name = uw.name
-
-                log_prefix = f"Uvicorn {'Process' if uvicorn_pid else 'Thread'} {uvicorn_name} (PID: {uvicorn_pid})"
-
-                if not uw.is_alive():
-                    logger.warning(f"{log_prefix}: Already not alive.")
-                    continue
-                try:
-                    uw.terminate()
-                    uw.join(timeout=self.uvicorn_graceful_timeout)
-                    if uw.is_alive():
-                        logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
-                        uw.kill()
-                except Exception as e:
-                    logger.error(f"Error during termination of {log_prefix}: {e}")
-
-        def exit_process():
-            time.sleep(1)
-            os._exit(0)
-
-        threading.Thread(target=exit_process).start()
 
     def run(
         self,
@@ -990,10 +989,10 @@ class LitServer:
             self._shutdown_event.wait()
 
         except KeyboardInterrupt:
-            self._shutdown_event.set()
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
         finally:
             self._perform_graceful_shutdown()
+
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
