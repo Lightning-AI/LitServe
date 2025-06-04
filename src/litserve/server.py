@@ -576,7 +576,7 @@ class LitServer:
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
         self.inference_workers_config = self.devices * self.workers_per_device
-        self.transport_config = TransportConfig(transport_type="zmq" if self.use_zmq else "mp")
+        self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
 
     def launch_inference_worker(self, lit_api: LitAPI):
