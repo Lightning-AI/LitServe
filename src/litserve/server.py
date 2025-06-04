@@ -831,10 +831,12 @@ class LitServer:
         self._transport = create_transport_from_config(self.transport_config)
         return manager
 
-    def _perform_graceful_shutdown(self, uvicorn_workers: List[Union[mp.Process, threading.Thread]], inference_workers: List[mp.Process]):
+    def _perform_graceful_shutdown(
+        self, uvicorn_workers: List[Union[mp.Process, threading.Thread]], inference_workers: List[mp.Process]
+    ):
         """Encapsulates the graceful shutdown logic."""
         logger.info("Shutting down LitServe...")
-        
+
         manager = self.transport_config.manager
         # close the message transport to stop new messages
         self._transport.close()
