@@ -92,6 +92,7 @@ def wrap_litserve_start(server: "LitServer"):
             p.join()
         manager.shutdown()
 
+
 @contextmanager
 def test_litserve_shutdown(server: "LitServer"):
     """Pytest utility to start the server in a context manager and perform graceful shutdown."""
@@ -103,11 +104,11 @@ def test_litserve_shutdown(server: "LitServer"):
             lit_api.spec.response_queue_id = 0
 
     # Initialize manager and launch workers as done in server.run()
-    server._init_manager(num_api_servers=1) # Assume 1 API server for TestClient context
-    
+    server._init_manager(num_api_servers=1)  # Assume 1 API server for TestClient context
+
     for lit_api in server.litapi_connector:
         server.launch_inference_worker(lit_api)
-    
+
     # Verify workers are ready before yielding to the test
     server.verify_worker_status()
 
@@ -125,9 +126,10 @@ def test_litserve_shutdown(server: "LitServer"):
         # Use the server's built-in graceful shutdown logic
         server._perform_graceful_shutdown()
         logger.info("LitServer gracefully shut down by context manager.")
-        
+
         # Give a small moment for logs to flush before process exits
         time.sleep(0.5)
+
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
     try:

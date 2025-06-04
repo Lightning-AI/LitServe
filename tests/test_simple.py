@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.utils import wrap_litserve_start, test_litserve_shutdown
+from litserve.utils import test_litserve_shutdown, wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):
@@ -169,7 +169,8 @@ def test_load(lit_server):
         t.join()
         for i, el in enumerate(outputs):
             assert el == {"output": i**2}
-            
+
+
 def test_shutdown_endpoint_single_worker():
     """Test the shutdown endpoint with Bearer token authentication."""
     TEST_API_KEY = os.environ.get("SHUTDOWN_API_KEY")
@@ -197,8 +198,9 @@ def test_shutdown_endpoint_single_worker():
 
         headers_correct = {"Authorization": f"Bearer {TEST_API_KEY}"}
         response_correct_key = client.post("/shutdown", headers=headers_correct)
-        assert response_correct_key.status_code == status.HTTP_200_OK 
+        assert response_correct_key.status_code == status.HTTP_200_OK
         print(f"Response (correct key): {response_correct_key.status_code} - {response_correct_key}")
+
 
 def test_shutdown_endpoint_multiple_workers():
     """Test the shutdown endpoint with >1 worker."""
@@ -227,7 +229,7 @@ def test_shutdown_endpoint_multiple_workers():
 
         headers_correct = {"Authorization": f"Bearer {TEST_API_KEY}"}
         response_correct_key = client.post("/shutdown", headers=headers_correct)
-        assert response_correct_key.status_code == status.HTTP_200_OK 
+        assert response_correct_key.status_code == status.HTTP_200_OK
         print(f"Response (correct key): {response_correct_key.status_code} - {response_correct_key}")
 
 
