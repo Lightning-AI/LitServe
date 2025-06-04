@@ -17,6 +17,7 @@ import logging
 import os
 import pdb
 import pickle
+import psutil
 import sys
 import time
 import uuid
@@ -126,9 +127,60 @@ def test_litserve_shutdown(server: "LitServer"):
         # Use the server's built-in graceful shutdown logic
         server._perform_graceful_shutdown()
         logger.info("LitServer gracefully shut down by context manager.")
+        python_process_still_running = live_process_detector(
+            exclude_current_pid=True,
+            target_script_name=None
+        )
 
-        # Give a small moment for logs to flush before process exits
+        print("\n--- Processes detected after shutdown attempt ---")
+        if python_process_still_running:
+            print("WARNING: The following Python processes were still running:")
+            print(len(python_process_still_running))
+            for proc in python_process_still_running:
+                try:
+                    # Print relevant process details
+                    print(f"  PID: {proc.pid}, Name: {proc.name()}, Status: {proc.status()}")
+                    print(f"    Command: {' '.join(proc.cmdline())}")
+                    # Optionally, you can add more details like CPU/memory usage
+                    # print(f"    CPU: {proc.cpu_percent()}%, Mem: {proc.memory_info().rss / (1024 * 1024):.2f} MB")
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    print(f"  Process {proc.pid} vanished or access denied while printing details.")
+        else:
+            print("No relevant Python processes detected as still running.")
+        print("--------------------------------------------------\n")
+
         time.sleep(0.5)
+        
+def live_process_detector(exclude_current_pid=True, target_script_name=None):
+    current_pid = os.getpid() if exclude_current_pid else None
+    found_processes = []
+
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            is_python = 'python' in proc.name().lower() or \
+                        (proc.exe() and 'python' in proc.exe().lower())
+
+            if not is_python:
+                continue
+
+            if current_pid is not None and proc.pid == current_pid:
+                continue
+
+            if target_script_name:
+                cmdline = proc.cmdline()
+                if not cmdline:
+                    continue
+                if not any(target_script_name in arg for arg in cmdline):
+                    continue
+
+            found_processes.append(proc) 
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+        except Exception as e:
+            continue
+
+    return found_processes # Return the list of found processes
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
