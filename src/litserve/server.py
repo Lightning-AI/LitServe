@@ -508,7 +508,7 @@ class LitServer:
 
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
-        
+
         if enable_shutdown_api and not SHUTDOWN_API_KEY:
             raise ValueError(
                 "LitServe's Shutdown API is enabled, but the `LIT_SHUTDOWN_API_KEY` environment variable is missing. "
