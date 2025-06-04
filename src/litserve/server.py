@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-SHUTDOWN_API_KEY = os.environ.get("SHUTDOWN_API_KEY")
+SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -508,12 +508,14 @@ class LitServer:
 
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
-
+        
         if enable_shutdown_api and not SHUTDOWN_API_KEY:
             raise ValueError(
-                "You must create a dedicated API key before enabling LitServe's shutdown API. Run the following command before starting LitServe: `export SHUTDOWN_API_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')`"
+                "LitServe's Shutdown API is enabled, but the `LIT_SHUTDOWN_API_KEY` environment variable is missing. "
+                "A dedicated API key is required for security purposes to prevent unauthorized shutdowns of your LitServe instance. "
+                "To resolve this, please generate and set the environment variable by running the following command before starting LitServe: "
+                "`export LIT_SHUTDOWN_API_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')`"
             )
-
         try:
             json.dumps(model_metadata)
         except (TypeError, ValueError):
@@ -1052,7 +1054,3 @@ class LitServer:
                 detail="Invalid Bearer token for Shutdown API."
                 " Check that you are passing a correct 'Authorization: Bearer <SHUTDOWN_API_KEY>' in your header.",
             )
-        """
-        REQUIRED: YOU NEED TO RUN THIS COMMAND TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
-        - export SHUTDOWN_API_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))") && echo "SHUTDOWN_API_KEY is: $SHUTDOWN_API_KEY"
-        """  # noqa: E501
