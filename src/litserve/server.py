@@ -19,6 +19,7 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import secrets
 import sys
 import threading
 import time
@@ -49,7 +50,7 @@ from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
-import secrets
+
 mp.allow_connection_pickling()
 
 logger = logging.getLogger(__name__)
