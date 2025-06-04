@@ -879,7 +879,7 @@ class LitServer:
             self.manager.shutdown()
 
         def exit_process():
-            time.sleep(0.5)
+            time.sleep(1)
             os._exit(0)
 
         threading.Thread(target=exit_process).start()
@@ -926,11 +926,13 @@ class LitServer:
 
         Example:
         >>> server.run()  # Basic
+        
         >>> server.run(  # Production
         ...     port=8080,
         ...     num_api_servers=4,
         ...     log_level="warning"
         ... )
+        
         >>> server.run(  # Development
         ...     log_level="debug",
         ...     pretty_logs=True,
