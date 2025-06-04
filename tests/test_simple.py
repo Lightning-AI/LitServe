@@ -315,10 +315,11 @@ def test_exception():
 def test_shutdown_endpoint():
     """Test the shutdown endpoint with API key authentication."""
     import os
+
     # Set a test API key in environment
     test_key = "test_shutdown_key_12345"
     os.environ["LITSERVE_SHUTDOWN_KEY"] = test_key
-    
+
     try:
         # Create server with shutdown endpoint enabled
         server = LitServer(
@@ -329,27 +330,27 @@ def test_shutdown_endpoint():
             enable_shutdown_api=True,
             shutdown_path="/shutdown",
         )
-        
+
         # Mock the server state to avoid actually shutting down during tests
         server.app.state.server = SimpleNamespace(should_exit=False)
-        
+
         with wrap_litserve_start(server) as server, TestClient(server.app) as client:
             # Test without API key - should fail
             response = client.post("/shutdown")
             assert response.status_code == 401
             assert "Unauthorized" in response.text
-            
+
             # Test with wrong API key - should fail
             response = client.post("/shutdown", headers={"Authorization": "Bearer wrong_key"})
             assert response.status_code == 401
             assert "Invalid API key" in response.text
-            
+
             # Test with correct API key - should succeed
             response = client.post("/shutdown", headers={"Authorization": f"Bearer {test_key}"})
             assert response.status_code == 200
             assert "shutdown initiated" in response.text.lower()
             assert server.app.state.server.should_exit is True
-            
+
             # Test shutdown already in progress - should return 400
             response = client.post("/shutdown", headers={"Authorization": f"Bearer {test_key}"})
             assert response.status_code == 400
@@ -369,7 +370,7 @@ def test_shutdown_endpoint_disabled():
         workers_per_device=1,
         enable_shutdown_api=False,  # Disabled by default
     )
-    
+
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         # Should get 404 since endpoint doesn't exist
         response = client.post("/shutdown")
@@ -379,10 +380,11 @@ def test_shutdown_endpoint_disabled():
 def test_shutdown_endpoint_multiple_workers():
     """Test shutdown endpoint with multiple workers."""
     import os
+
     # Set a test API key in environment
     test_key = "test_shutdown_key_workers_12345"
     os.environ["LITSERVE_SHUTDOWN_KEY"] = test_key
-    
+
     try:
         server = LitServer(
             SimpleLitAPI(),
@@ -392,10 +394,10 @@ def test_shutdown_endpoint_multiple_workers():
             enable_shutdown_api=True,
             shutdown_path="/shutdown",
         )
-        
+
         # Mock the server state
         server.app.state.server = SimpleNamespace(should_exit=False)
-        
+
         with wrap_litserve_start(server) as server, TestClient(server.app) as client:
             # Test with correct API key - should work
             response = client.post("/shutdown", headers={"Authorization": f"Bearer {test_key}"})
