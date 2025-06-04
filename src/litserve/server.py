@@ -879,7 +879,6 @@ class LitServer:
 
         manager.shutdown()
 
-
     def run(
         self,
         host: str = "0.0.0.0",
@@ -990,7 +989,6 @@ class LitServer:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
         finally:
             self._perform_graceful_shutdown(uvicorn_workers, inference_workers)
-
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
