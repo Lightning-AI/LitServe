@@ -575,6 +575,7 @@ class LitServer:
                     self.workers_setup_status,
                     self._callback_runner,
                 ),
+                name=f"lit-inference-{endpoint}_{worker_id}",
             )
             process.start()
             process_list.append(process)
@@ -933,9 +934,9 @@ class LitServer:
             server = uvicorn.Server(config=config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
-                w = ctx.Process(target=server.run, args=(sockets,))
+                w = ctx.Process(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
             elif uvicorn_worker_type == "thread":
-                w = threading.Thread(target=server.run, args=(sockets,))
+                w = threading.Thread(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
