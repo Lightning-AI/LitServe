@@ -17,7 +17,6 @@ import logging
 import os
 import pdb
 import pickle
-import psutil
 import sys
 import time
 import uuid
@@ -25,6 +24,7 @@ from contextlib import contextmanager
 from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator, TextIO, Union
 
+import psutil
 from fastapi import HTTPException
 
 if TYPE_CHECKING:
@@ -127,10 +127,7 @@ def test_litserve_shutdown(server: "LitServer"):
         # Use the server's built-in graceful shutdown logic
         server._perform_graceful_shutdown()
         logger.info("LitServer gracefully shut down by context manager.")
-        python_process_still_running = live_process_detector(
-            exclude_current_pid=True,
-            target_script_name=None
-        )
+        python_process_still_running = live_process_detector(exclude_current_pid=True, target_script_name=None)
 
         print("\n--- Processes detected after shutdown attempt ---")
         if python_process_still_running:
@@ -150,15 +147,15 @@ def test_litserve_shutdown(server: "LitServer"):
         print("--------------------------------------------------\n")
 
         time.sleep(0.5)
-        
+
+
 def live_process_detector(exclude_current_pid=True, target_script_name=None):
     current_pid = os.getpid() if exclude_current_pid else None
     found_processes = []
 
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
         try:
-            is_python = 'python' in proc.name().lower() or \
-                        (proc.exe() and 'python' in proc.exe().lower())
+            is_python = "python" in proc.name().lower() or (proc.exe() and "python" in proc.exe().lower())
 
             if not is_python:
                 continue
@@ -173,14 +170,14 @@ def live_process_detector(exclude_current_pid=True, target_script_name=None):
                 if not any(target_script_name in arg for arg in cmdline):
                     continue
 
-            found_processes.append(proc) 
+            found_processes.append(proc)
 
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
-        except Exception as e:
+        except Exception:
             continue
 
-    return found_processes # Return the list of found processes
+    return found_processes  # Return the list of found processes
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):

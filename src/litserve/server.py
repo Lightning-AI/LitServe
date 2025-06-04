@@ -508,9 +508,11 @@ class LitServer:
 
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
-        
+
         if enable_shutdown_api and not SHUTDOWN_API_KEY:
-            raise ValueError("You must create a dedicated API key before enabling LitServe's shutdown API. Run the following command before starting LitServe: `export SHUTDOWN_API_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')`")
+            raise ValueError(
+                "You must create a dedicated API key before enabling LitServe's shutdown API. Run the following command before starting LitServe: `export SHUTDOWN_API_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')`"
+            )
 
         try:
             json.dumps(model_metadata)

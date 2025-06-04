@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.utils import test_litserve_shutdown, wrap_litserve_start, live_process_detector
+from litserve.utils import test_litserve_shutdown, wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):
