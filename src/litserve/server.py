@@ -723,12 +723,12 @@ class LitServer:
 
         if self.enable_shutdown_api:
 
-            @self.app.post(
-                self._shutdown_path, dependencies=[Depends(self.shutdown_api_key_auth)]
-            )
+            @self.app.post(self._shutdown_path, dependencies=[Depends(self.shutdown_api_key_auth)])
             async def shutdown_endpoint():
                 if not self._shutdown_event:
-                    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Server is still starting up")
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Server is still starting up"
+                    )
                 self._shutdown_event.set()
                 return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
 
@@ -872,8 +872,7 @@ class LitServer:
                 iw.join(timeout=5)
                 if iw.is_alive():
                     logger.warning(
-                        f"Worker {worker_name} (PID: {worker_pid}):"
-                        " Did not terminate gracefully. Killing (SIGKILL)."
+                        f"Worker {worker_name} (PID: {worker_pid}): Did not terminate gracefully. Killing (SIGKILL)."
                     )
                     iw.kill()
                 else:
