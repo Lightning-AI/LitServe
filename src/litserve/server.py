@@ -1045,7 +1045,7 @@ class LitServer:
             raise HTTPException(
                 status_code=401,
                 detail="Invalid Bearer token for Shutdown API."
-                " Check that you are passing a correct 'Authorization: Bearer SHUTDOWN_API_KEY' in your header.",
+                " Check that you are passing a correct 'Authorization: Bearer <SHUTDOWN_API_KEY>' in your header.",
             )
         """
         REQUIRED: YOU NEED TO RUN THIS COMMAND TO GENERATE THE SHUTDOWN_API_KEY BEFORE USING IN LITSERVE
