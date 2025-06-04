@@ -720,11 +720,11 @@ class LitServer:
         if self.enable_shutdown_api:
 
             @self.app.post(
-                self._shutdown_path, status_code=status.HTTP_200_OK, dependencies=[Depends(self.shutdown_api_key_auth)]
+                self._shutdown_path, dependencies=[Depends(self.shutdown_api_key_auth)]
             )
             async def shutdown_endpoint():
                 if not self._shutdown_event:
-                    raise HTTPException(status_code=503, detail="Server is still starting up")
+                    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Server is still starting up")
                 self._shutdown_event.set()
                 return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
 
@@ -833,57 +833,51 @@ class LitServer:
 
     def _perform_graceful_shutdown(self):
         """Encapsulates the graceful shutdown logic."""
+        logger.info("Shutting down LitServe...")
 
         # close the message transport to stop new messages
-        if self._transport:
-            self._transport.close()
+        self._transport.close()
 
         # terminate and join inference worker processes
-        if self.inference_workers:
-            logger.info(f"Terminating {len(self.inference_workers)} inference workers...")
-            for i, iw in enumerate(self.inference_workers):
-                worker_pid = iw.pid
-
+        logger.debug(f"Terminating {len(self.inference_workers)} inference workers...")
+        for i, iw in enumerate(self.inference_workers):
+            worker_pid = iw.pid
+            worker_name = iw.name
+            try:
+                iw.terminate()
+                iw.join(timeout=5)
                 if iw.is_alive():
-                    try:
-                        iw.terminate()
-                        iw.join(timeout=5)
-                        if iw.is_alive():
-                            logger.warning(
-                                f"Worker {i} (PID: {worker_pid}):"
-                                " Did not terminate gracefully. Forcibly killing (SIGKILL)."
-                            )
-                            iw.kill()
-                        else:
-                            logger.debug(f"Worker {i} (PID: {worker_pid}): Terminated gracefully.")
-                    except Exception as e:
-                        logger.error(f"Error during termination of worker {i} (PID: {worker_pid}): {e}")
+                    logger.warning(
+                        f"Worker {worker_name} (PID: {worker_pid}):"
+                        " Did not terminate gracefully. Killing (SIGKILL)."
+                    )
+                    iw.kill()
                 else:
-                    logger.info(f"Worker {i} (PID: {worker_pid}): Was already not alive before termination attempt.")
+                    logger.debug(f"Worker {worker_name} (PID: {worker_pid}): Terminated gracefully.")
+            except Exception as e:
+                logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
 
-        # terminate Uvicorn API server workers tracked by LitServe (the master processes/threads)
+            self.manager.shutdown()
+
+        # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
         if self.uvicorn_workers:
             for i, uw in enumerate(self.uvicorn_workers):
-                uvicorn_runner_pid = uw.pid
-                if uvicorn_runner_pid:
-                    log_prefix = f"Uvicorn Master {'Process' if uvicorn_runner_pid else 'Thread'} {i}"
-                    log_prefix += f" (PID: {uvicorn_runner_pid})"
+                uvicorn_pid = uw.pid
+                uvicorn_name = uw.name
 
-                if uw.is_alive():
-                    try:
-                        uw.terminate()
-                        uw.join(timeout=self.uvicorn_graceful_timeout)
-                        if uw.is_alive():
-                            logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
-                            uw.kill()
-                    except Exception as e:
-                        logger.error(f"Error during termination of {log_prefix}: {e}")
-                else:
-                    logger.info(f"{log_prefix}: Already not alive.")
+                log_prefix = f"Uvicorn {'Process' if uvicorn_pid else 'Thread'} {uvicorn_name} (PID: {uvicorn_pid})"
 
-        # shut down the multiprocessing manager
-        if self.manager:
-            self.manager.shutdown()
+                if not uw.is_alive():
+                    logger.warning(f"{log_prefix}: Already not alive.")
+                    continue
+                try:
+                    uw.terminate()
+                    uw.join(timeout=self.uvicorn_graceful_timeout)
+                    if uw.is_alive():
+                        logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
+                        uw.kill()
+                except Exception as e:
+                    logger.error(f"Error during termination of {log_prefix}: {e}")
 
         def exit_process():
             time.sleep(1)
@@ -993,10 +987,10 @@ class LitServer:
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
 
-            while not self._shutdown_event.is_set():
-                time.sleep(0.1)
+            self._shutdown_event.wait()
 
         except KeyboardInterrupt:
+            self._shutdown_event.set()
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
         finally:
             self._perform_graceful_shutdown()
