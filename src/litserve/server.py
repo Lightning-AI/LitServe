@@ -562,11 +562,8 @@ class LitServer:
         self.use_zmq = fast_queue
         self.transport_config = None
         self.litapi_request_queues = {}
-        self.inference_workers: List[mp.Process] = []
-        self.uvicorn_workers: List[Union[mp.Process, threading.Thread]] = []
-        self.manager: Optional[mp.Manager] = None
         self._shutdown_event: Optional[mp.Event] = None
-        self.uvicorn_graceful_timeout = 30  # Default timeout for graceful shutdown
+        self.uvicorn_graceful_timeout = 30
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -615,7 +612,6 @@ class LitServer:
             )
             process.start()
             process_list.append(process)
-        self.inference_workers.extend(process_list)
         return process_list
 
     @asynccontextmanager
@@ -819,29 +815,33 @@ class LitServer:
         logger.debug("One or more workers are ready to serve requests")
 
     def _init_manager(self, num_api_servers: int):
-        self.manager = mp.Manager()
-        self.transport_config.manager = self.manager
+        manager = self.transport_config.manager = mp.Manager()
+        self.transport_config.manager = manager
         self.transport_config.num_consumers = num_api_servers
-        self.workers_setup_status = self.manager.dict()
-        self._shutdown_event = self.manager.Event()
+        self.workers_setup_status = manager.dict()
+        self._shutdown_event = manager.Event()
 
         # create request queues for each unique lit_api api_path
         for lit_api in self.litapi_connector:
-            self.litapi_request_queues[lit_api.api_path] = self.manager.Queue()
+            self.litapi_request_queues[lit_api.api_path] = manager.Queue()
 
         if self._logger_connector._loggers:
-            self.logger_queue = self.manager.Queue()
+            self.logger_queue = manager.Queue()
         self._logger_connector.run(self)
         self._transport = create_transport_from_config(self.transport_config)
-        return self.manager
+        return manager
 
-    def _perform_graceful_shutdown(self):
+    def _perform_graceful_shutdown(self, uvicorn_workers: List[Union[mp.Process, threading.Thread]], inference_workers: List[mp.Process]):
         """Encapsulates the graceful shutdown logic."""
         logger.info("Shutting down LitServe...")
+        
+        manager = self.transport_config.manager
+        # close the message transport to stop new messages
+        self._transport.close()
 
         # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
-        if self.uvicorn_workers:
-            for i, uw in enumerate(self.uvicorn_workers):
+        if uvicorn_workers:
+            for i, uw in enumerate(uvicorn_workers):
                 uvicorn_pid = uw.pid
                 uvicorn_name = uw.name
 
@@ -859,12 +859,9 @@ class LitServer:
                 except Exception as e:
                     logger.error(f"Error during termination of {log_prefix}: {e}")
 
-        # close the message transport to stop new messages
-        self._transport.close()
-
         # terminate and join inference worker processes
-        logger.debug(f"Terminating {len(self.inference_workers)} inference workers...")
-        for i, iw in enumerate(self.inference_workers):
+        logger.debug(f"Terminating {len(inference_workers)} inference workers...")
+        for i, iw in enumerate(inference_workers):
             worker_pid = iw.pid
             worker_name = iw.name
             try:
@@ -880,7 +877,7 @@ class LitServer:
             except Exception as e:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
 
-        self.manager.shutdown()
+        manager.shutdown()
 
 
     def run(
@@ -975,12 +972,14 @@ class LitServer:
 
         self._init_manager(num_api_servers)
         self._logger_connector.run(self)
+        inference_workers = []
         for lit_api in self.litapi_connector:
-            self.launch_inference_worker(lit_api)
+            _inference_workers = self.launch_inference_worker(lit_api)
+            inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
         try:
-            self.uvicorn_workers = self._start_server(
+            uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
@@ -990,7 +989,7 @@ class LitServer:
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
         finally:
-            self._perform_graceful_shutdown()
+            self._perform_graceful_shutdown(uvicorn_workers, inference_workers)
 
 
     def _prepare_app_run(self, app: FastAPI):
