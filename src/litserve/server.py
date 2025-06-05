@@ -989,6 +989,7 @@ class LitServer:
         self.verify_worker_status()
 
         shutdown_reason = "normal"
+        uvicorn_workers = []
         try:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
