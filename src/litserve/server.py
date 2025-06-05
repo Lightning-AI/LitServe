@@ -19,6 +19,7 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import secrets
 import sys
 import threading
 import time
@@ -27,16 +28,14 @@ import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 from contextlib import asynccontextmanager
-from multiprocessing.context import Process
 from queue import Queue
-from threading import Thread
 from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -58,6 +57,8 @@ logger = logging.getLogger(__name__)
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
+SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
@@ -357,6 +358,8 @@ class LitServer:
         timeout: Union[float, bool] = 30,
         healthcheck_path: str = "/health",
         info_path: str = "/info",
+        shutdown_path: str = "/shutdown",
+        enable_shutdown_api: bool = False,
         model_metadata: Optional[dict] = None,
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
@@ -394,6 +397,14 @@ class LitServer:
 
             info_path (str, optional):
                 Server info endpoint path showing metadata and configuration. Defaults to "/info".
+
+            shutdown_path (str, optional):
+                Server shutdown endpoint path that terminates and cleans up all worker and server processes.
+                Defaults to "/shutdown".
+
+            enable_shutdown_api (bool, optional):
+                Enable the shutdown endpoint. If True, the server will listen for shutdown requests
+                at the specified path. Defaults to False.
 
             model_metadata (dict, optional):
                 Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
@@ -496,6 +507,24 @@ class LitServer:
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
 
+        if enable_shutdown_api and not shutdown_path.startswith("/"):
+            raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
+
+        global SHUTDOWN_API_KEY
+        if enable_shutdown_api and not SHUTDOWN_API_KEY:
+            SHUTDOWN_API_KEY = secrets.token_urlsafe(32)
+            logger.warning(
+                "LitServe's Shutdown API is enabled, but the `LIT_SHUTDOWN_API_KEY` environment variable is missing."
+                f"Generated shutdown API key: {SHUTDOWN_API_KEY}"
+            )
+        if enable_shutdown_api:
+            curl_command = (
+                "curl -X 'POST' 'http://localhost:8000/shutdown' "
+                "-H 'accept: application/json' "
+                f"-H 'Authorization: Bearer {SHUTDOWN_API_KEY}' "
+                "-d ''"
+            )
+            logger.info(f"To shutdown the server, run command: \n{curl_command}\n")
         try:
             json.dumps(model_metadata)
         except (TypeError, ValueError):
@@ -507,6 +536,7 @@ class LitServer:
 
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path
+        self._shutdown_path = shutdown_path
         self.track_requests = track_requests
         self.timeout = timeout
         self.litapi_connector.set_request_timeout(timeout)
@@ -523,6 +553,7 @@ class LitServer:
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
         self.lit_api = lit_api
+        self.enable_shutdown_api = enable_shutdown_api
         self.workers_per_device = workers_per_device
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
@@ -531,6 +562,8 @@ class LitServer:
         self.use_zmq = fast_queue
         self.transport_config = None
         self.litapi_request_queues = {}
+        self._shutdown_event: Optional[mp.Event] = None
+        self.uvicorn_graceful_timeout = 30
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -542,7 +575,7 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.inference_workers = self.devices * self.workers_per_device
+        self.inference_workers_config = self.devices * self.workers_per_device
         self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
 
@@ -557,7 +590,7 @@ class LitServer:
 
         process_list = []
         endpoint = lit_api.api_path.split("/")[-1]
-        for worker_id, device in enumerate(self.inference_workers):
+        for worker_id, device in enumerate(self.inference_workers_config):
             if len(device) == 1:
                 device = device[0]
 
@@ -601,7 +634,7 @@ class LitServer:
         )
         task = loop.create_task(future, name=f"response_queue_to_buffer-{app.response_queue_id}")
         task.add_done_callback(
-            lambda _: logger.info(f"Response queue to buffer task terminated for consumer_id {app.response_queue_id}")
+            lambda _: logger.debug(f"Response queue to buffer task terminated for consumer_id {app.response_queue_id}")
         )
 
         try:
@@ -683,6 +716,17 @@ class LitServer:
                     },
                 }
             )
+
+        if self.enable_shutdown_api:
+
+            @self.app.post(self._shutdown_path, dependencies=[Depends(self.shutdown_api_key_auth)])
+            async def shutdown_endpoint():
+                if not self._shutdown_event:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Server is still starting up"
+                    )
+                self._shutdown_event.set()
+                return Response(content="Server is initiating graceful shutdown.", status_code=status.HTTP_200_OK)
 
     def register_endpoints(self):
         self._register_internal_endpoints()
@@ -771,9 +815,11 @@ class LitServer:
         logger.debug("One or more workers are ready to serve requests")
 
     def _init_manager(self, num_api_servers: int):
-        manager = self.transport_config.manager = mp.Manager()
+        manager = mp.Manager()
+        self.transport_config.manager = manager
         self.transport_config.num_consumers = num_api_servers
         self.workers_setup_status = manager.dict()
+        self._shutdown_event = manager.Event()
 
         # create request queues for each unique lit_api api_path
         for lit_api in self.litapi_connector:
@@ -784,6 +830,63 @@ class LitServer:
         self._logger_connector.run(self)
         self._transport = create_transport_from_config(self.transport_config)
         return manager
+
+    def _perform_graceful_shutdown(
+        self,
+        manager: mp.Manager,
+        uvicorn_workers: List[Union[mp.Process, threading.Thread]],
+        inference_workers: List[mp.Process],
+        shutdown_reason: str = "normal",
+    ):
+        """Encapsulates the graceful shutdown logic."""
+        logger.info("Shutting down LitServe...")
+
+        # Handle transport closure based on shutdown reason
+        if shutdown_reason == "keyboard_interrupt":
+            logger.debug("KeyboardInterrupt detected - skipping transport cleanup to avoid hanging")
+            self._transport.close(send_sentinel=False)
+        else:
+            self._transport.close(send_sentinel=True)
+
+        # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
+        if uvicorn_workers:
+            for i, uw in enumerate(uvicorn_workers):
+                uvicorn_pid = uw.ident if isinstance(uw, threading.Thread) else uw.pid
+                uvicorn_name = uw.name
+
+                log_prefix = f"{uvicorn_name} (PID: {uvicorn_pid})"
+
+                if not uw.is_alive():
+                    logger.warning(f"{log_prefix}: Already not alive.")
+                    continue
+                try:
+                    uw.terminate()
+                    uw.join(timeout=self.uvicorn_graceful_timeout)
+                    if uw.is_alive():
+                        logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
+                        uw.kill()
+                except Exception as e:
+                    logger.error(f"Error during termination of {log_prefix}: {e}")
+
+        # terminate and join inference worker processes
+        logger.debug(f"Terminating {len(inference_workers)} inference workers...")
+        for i, iw in enumerate(inference_workers):
+            worker_pid = iw.pid
+            worker_name = iw.name
+            try:
+                iw.terminate()
+                iw.join(timeout=5)
+                if iw.is_alive():
+                    logger.warning(
+                        f"Worker {worker_name} (PID: {worker_pid}): Did not terminate gracefully. Killing (SIGKILL)."
+                    )
+                    iw.kill()
+                else:
+                    logger.debug(f"Worker {worker_name} (PID: {worker_pid}): Terminated gracefully.")
+            except Exception as e:
+                logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
+
+        manager.shutdown()
 
     def run(
         self,
@@ -826,19 +929,19 @@ class LitServer:
                 Additional uvicorn server options (ssl_keyfile, ssl_certfile, etc.). See uvicorn docs.
 
         Example:
-            >>> server.run()  # Basic
+        >>> server.run()  # Basic
 
-            >>> server.run(  # Production
-            ...     port=8080,
-            ...     num_api_servers=4,
-            ...     log_level="warning"
-            ... )
+        >>> server.run(  # Production
+        ...     port=8080,
+        ...     num_api_servers=4,
+        ...     log_level="warning"
+        ... )
 
-            >>> server.run(  # Development
-            ...     log_level="debug",
-            ...     pretty_logs=True,
-            ...     generate_client_file=True
-            ... )
+        >>> server.run(  # Development
+        ...     log_level="debug",
+        ...     pretty_logs=True,
+        ...     generate_client_file=True
+        ... )
 
         """
         if generate_client_file:
@@ -862,7 +965,7 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.inference_workers)
+            num_api_servers = len(self.inference_workers_config)
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
@@ -883,26 +986,22 @@ class LitServer:
             inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
+
+        shutdown_reason = "normal"
+        uvicorn_workers = []
         try:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-            # On Linux, kill signal will be captured by uvicorn.
-            # => They will join and raise a KeyboardInterrupt, allowing to Shutdown server.
-            for i, uw in enumerate(uvicorn_workers):
-                uw: Union[Process, Thread]
-                if isinstance(uw, Process):
-                    print(f"Uvicorn worker {i} : [{uw.pid}]")
-                uw.join()
+
+            self._shutdown_event.wait()
+
+        except KeyboardInterrupt:
+            logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
+            shutdown_reason = "keyboard_interrupt"
         finally:
-            print("Shutting down LitServe")
-            self._transport.close()
-            for iw in inference_workers:
-                iw: Process
-                iw.terminate()
-                iw.join()
-            manager.shutdown()
+            self._perform_graceful_shutdown(manager, uvicorn_workers, inference_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
@@ -921,17 +1020,25 @@ class LitServer:
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
-            config = uvicorn.Config(app=app, host="0.0.0.0", port=port, log_level=log_level, **kwargs)
+            uvicorn_config = uvicorn.Config(
+                app=app,
+                host="0.0.0.0",
+                port=port,
+                log_level=log_level,
+                timeout_graceful_shutdown=self.uvicorn_graceful_timeout,
+                **kwargs,
+            )
             if sys.platform == "win32" and num_uvicorn_servers > 1:
                 logger.debug("Enable Windows explicit socket sharing...")
                 # We make sure sockets is listening...
                 # It prevents further [WinError 10022]
                 for sock in sockets:
-                    sock.listen(config.backlog)
+                    sock.listen(uvicorn_config.backlog)
                 # We add worker to say unicorn to use a shared socket (win32)
                 # https://github.com/encode/uvicorn/pull/802
-                config.workers = num_uvicorn_servers
-            server = uvicorn.Server(config=config)
+                uvicorn_config.workers = num_uvicorn_servers
+
+            server = uvicorn.Server(config=uvicorn_config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
                 w = ctx.Process(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
@@ -949,3 +1056,11 @@ class LitServer:
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
+
+    def shutdown_api_key_auth(self, shutdown_api_key: str = Depends(oauth2_scheme)):
+        if not SHUTDOWN_API_KEY or shutdown_api_key != SHUTDOWN_API_KEY:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid Bearer token for Shutdown API."
+                " Check that you are passing a correct 'Authorization: Bearer <SHUTDOWN_API_KEY>' in your header.",
+            )
