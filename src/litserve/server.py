@@ -679,7 +679,7 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "stream": {lit_api.api_path : lit_api.stream for lit_api in api_list},
+                        "stream": {lit_api.api_path: lit_api.stream for lit_api in api_list},
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
                     },
