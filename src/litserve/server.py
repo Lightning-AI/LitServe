@@ -662,7 +662,7 @@ class LitServer:
             if not workers_ready:
                 workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
-            lit_api_health_status = self.lit_api.health()
+            lit_api_health_status = all(lit_api.health() for lit_api in self.litapi_connector)
             if workers_ready and lit_api_health_status:
                 return Response(content="ok", status_code=200)
 
@@ -677,7 +677,7 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "stream": self.lit_api.stream,
+                        "stream": {lit_api.api_path: lit_api.stream for lit_api in self.litapi_connector},
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
                     },
