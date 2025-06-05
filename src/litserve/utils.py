@@ -18,7 +18,6 @@ import os
 import pdb
 import pickle
 import sys
-import time
 import uuid
 from contextlib import contextmanager
 from enum import Enum
@@ -91,44 +90,6 @@ def wrap_litserve_start(server: "LitServer"):
             p.terminate()
             p.join()
         manager.shutdown()
-
-
-@contextmanager
-def test_litserve_shutdown(server: "LitServer"):
-    """Pytest utility to start the server in a context manager and perform graceful shutdown."""
-    # These lines are related to Uvicorn workers, which TestClient doesn't fully simulate.
-    # They might be removed or adapted if they cause issues with TestClient lifecycle.
-    server.app.response_queue_id = 0
-    for lit_api in server.litapi_connector:
-        if lit_api.spec:
-            lit_api.spec.response_queue_id = 0
-
-    # Initialize manager and launch workers as done in server.run()
-    server._init_manager(num_api_servers=1)  # Assume 1 API server for TestClient context
-
-    for lit_api in server.litapi_connector:
-        server.launch_inference_worker(lit_api)
-
-    # Verify workers are ready before yielding to the test
-    server.verify_worker_status()
-
-    # Prepare the app with middleware, as done in _start_server
-    server._prepare_app_run(server.app)
-
-    try:
-        yield server
-    finally:
-        # Trigger the shutdown event (if the test didn't already)
-        if server._shutdown_event and not server._shutdown_event.is_set():
-            server._shutdown_event.set()
-            logger.info("Shutdown event explicitly set by context manager teardown.")
-
-        # Use the server's built-in graceful shutdown logic
-        server._perform_graceful_shutdown()
-        logger.info("LitServer gracefully shut down by context manager.")
-
-        # Give a small moment for logs to flush before process exits
-        time.sleep(0.5)
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):

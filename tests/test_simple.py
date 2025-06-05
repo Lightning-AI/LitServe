@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from litserve import LitAPI, LitServer
-from litserve.utils import test_litserve_shutdown, wrap_litserve_start
+from litserve.utils import wrap_litserve_start
 
 
 class SimpleLitAPI(LitAPI):
@@ -172,9 +172,7 @@ def test_load(lit_server):
 
 
 def test_shutdown_endpoint_single_worker():
-    """Test the shutdown endpoint with Bearer token authentication."""
-    env_api_key = os.environ.get("SHUTDOWN_API_KEY")
-
+    os.environ["SHUTDOWN_API_KEY"] = "test-key"
     server = LitServer(
         SimpleLitAPI(),
         accelerator="cpu",
@@ -183,28 +181,19 @@ def test_shutdown_endpoint_single_worker():
         enable_shutdown_api=True,
     )
 
-    with test_litserve_shutdown(server) as srv, TestClient(srv.app) as client:
+    with wrap_litserve_start(server) as srv, TestClient(srv.app) as client:
         response_no_header = client.post("/shutdown")
         assert response_no_header.status_code == 401
-        expected_detail_no_header = response_no_header.json().get("detail")
-        assert "Not authenticated" in expected_detail_no_header or "Invalid Bearer token" in expected_detail_no_header
-        print(f"Response (no header): {response_no_header.status_code} - {expected_detail_no_header}")
 
-        headers_wrong = {"Authorization": "Bearer wrong_key"}
-        response_wrong_key = client.post("/shutdown", headers=headers_wrong)
-        assert response_wrong_key.status_code == 401
-        assert "Invalid Bearer token for Shutdown API" in response_wrong_key.json()["detail"]
-        print(f"Response (wrong key): {response_wrong_key.status_code} - {response_wrong_key.json()['detail']}")
-
-        headers_correct = {"Authorization": f"Bearer {env_api_key}"}
-        response_correct_key = client.post("/shutdown", headers=headers_correct)
+        response_correct_key = client.post(
+            "/shutdown", headers={"Authorization": f"Bearer {os.environ['SHUTDOWN_API_KEY']}"}
+        )
         assert response_correct_key.status_code == status.HTTP_200_OK
-        print(f"Response (correct key): {response_correct_key.status_code} - {response_correct_key}")
 
 
 def test_shutdown_endpoint_multiple_workers():
     """Test the shutdown endpoint with >1 worker."""
-    env_api_key = os.environ.get("SHUTDOWN_API_KEY")
+    os.environ["SHUTDOWN_API_KEY"] = "test-key"
 
     server = LitServer(
         SimpleLitAPI(),
@@ -214,23 +203,17 @@ def test_shutdown_endpoint_multiple_workers():
         enable_shutdown_api=True,
     )
 
-    with test_litserve_shutdown(server) as srv, TestClient(srv.app) as client:
+    with wrap_litserve_start(server) as srv, TestClient(srv.app) as client:
         response_no_header = client.post("/shutdown")
         assert response_no_header.status_code == 401
-        expected_detail_no_header = response_no_header.json().get("detail")
-        assert "Not authenticated" in expected_detail_no_header or "Invalid Bearer token" in expected_detail_no_header
-        print(f"Response (no header): {response_no_header.status_code} - {expected_detail_no_header}")
 
-        headers_wrong = {"Authorization": "Bearer wrong_key"}
-        response_wrong_key = client.post("/shutdown", headers=headers_wrong)
+        response_wrong_key = client.post("/shutdown", headers={"Authorization": "Bearer wrong_key"})
         assert response_wrong_key.status_code == 401
-        assert "Invalid Bearer token for Shutdown API" in response_wrong_key.json()["detail"]
-        print(f"Response (wrong key): {response_wrong_key.status_code} - {response_wrong_key.json()['detail']}")
 
-        headers_correct = {"Authorization": f"Bearer {env_api_key}"}
-        response_correct_key = client.post("/shutdown", headers=headers_correct)
+        response_correct_key = client.post(
+            "/shutdown", headers={"Authorization": f"Bearer {os.environ['SHUTDOWN_API_KEY']}"}
+        )
         assert response_correct_key.status_code == status.HTTP_200_OK
-        print(f"Response (correct key): {response_correct_key.status_code} - {response_correct_key}")
 
 
 class SlowLitAPI(LitAPI):

@@ -832,14 +832,22 @@ class LitServer:
         return manager
 
     def _perform_graceful_shutdown(
-        self, uvicorn_workers: List[Union[mp.Process, threading.Thread]], inference_workers: List[mp.Process]
+        self,
+        uvicorn_workers: List[Union[mp.Process, threading.Thread]],
+        inference_workers: List[mp.Process],
+        shutdown_reason: str = "normal",
     ):
         """Encapsulates the graceful shutdown logic."""
         logger.info("Shutting down LitServe...")
 
         manager = self.transport_config.manager
-        # close the message transport to stop new messages
-        self._transport.close()
+
+        # Handle transport closure based on shutdown reason
+        if shutdown_reason == "keyboard_interrupt":
+            logger.debug("KeyboardInterrupt detected - skipping transport cleanup to avoid hanging")
+            self._transport.close(send_sentinel=False)
+        else:
+            self._transport.close(send_sentinel=True)
 
         # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
         if uvicorn_workers:
@@ -979,6 +987,8 @@ class LitServer:
             inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
+
+        shutdown_reason = "normal"
         try:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
@@ -989,8 +999,9 @@ class LitServer:
 
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
+            shutdown_reason = "keyboard_interrupt"
         finally:
-            self._perform_graceful_shutdown(uvicorn_workers, inference_workers)
+            self._perform_graceful_shutdown(uvicorn_workers, inference_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
