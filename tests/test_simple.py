@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -24,9 +23,9 @@ from fastapi import Request, Response, status
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
+import litserve.server
 from litserve import LitAPI, LitServer
 from litserve.utils import wrap_litserve_start
-import litserve.server
 
 
 class SimpleLitAPI(LitAPI):
@@ -175,7 +174,7 @@ def test_load(lit_server):
 def test_shutdown_endpoint_single_worker():
     LIT_SHUTDOWN_API_KEY = "test-key"
     litserve.server.SHUTDOWN_API_KEY = "test-key"
-    
+
     server = LitServer(
         SimpleLitAPI(),
         accelerator="cpu",
@@ -188,9 +187,7 @@ def test_shutdown_endpoint_single_worker():
         response_no_header = client.post("/shutdown")
         assert response_no_header.status_code == 401
 
-        response_correct_key = client.post(
-            "/shutdown", headers={"Authorization": f"Bearer {LIT_SHUTDOWN_API_KEY}"}
-        )
+        response_correct_key = client.post("/shutdown", headers={"Authorization": f"Bearer {LIT_SHUTDOWN_API_KEY}"})
         assert response_correct_key.status_code == status.HTTP_200_OK
 
 
@@ -198,7 +195,7 @@ def test_shutdown_endpoint_multiple_workers():
     """Test the shutdown endpoint with >1 worker."""
     LIT_SHUTDOWN_API_KEY = "test-key"
     litserve.server.SHUTDOWN_API_KEY = "test-key"
-    
+
     server = LitServer(
         SimpleLitAPI(),
         accelerator="cpu",
@@ -206,7 +203,6 @@ def test_shutdown_endpoint_multiple_workers():
         workers_per_device=3,
         enable_shutdown_api=True,
     )
-    
 
     with wrap_litserve_start(server) as srv, TestClient(srv.app) as client:
         response_no_header = client.post("/shutdown")
@@ -215,9 +211,7 @@ def test_shutdown_endpoint_multiple_workers():
         response_wrong_key = client.post("/shutdown", headers={"Authorization": "Bearer wrong_key"})
         assert response_wrong_key.status_code == 401
 
-        response_correct_key = client.post(
-            "/shutdown", headers={"Authorization": f"Bearer {LIT_SHUTDOWN_API_KEY}"}
-        )
+        response_correct_key = client.post("/shutdown", headers={"Authorization": f"Bearer {LIT_SHUTDOWN_API_KEY}"})
         assert response_correct_key.status_code == status.HTTP_200_OK
 
 
