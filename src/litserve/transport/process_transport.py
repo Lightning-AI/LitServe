@@ -31,14 +31,16 @@ class MPQueueTransport(MessageTransport):
                 raise
             return None
 
-    def close(self) -> None:
+    def close(self, send_sentinel: bool = True) -> None:
         # Mark the transport as closed
         self._closed = True
 
-        # Put sentinel values in the queues as a backup mechanism
-        for queue in self._queues:
-            with suppress(Exception):
-                queue.put(None)
+        # Only send sentinel values if requested and safe to do so
+        if send_sentinel:
+            # Put sentinel values in the queues as a backup mechanism
+            for queue in self._queues:
+                with suppress(Exception):
+                    queue.put(None, block=False)
 
     def __reduce__(self):
         return (MPQueueTransport, (None, self._queues))

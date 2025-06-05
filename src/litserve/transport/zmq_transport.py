@@ -32,7 +32,7 @@ class ZMQTransport(MessageTransport):
             self.setup(zmq.SUB, consumer_id)
         return await self._zmq.get(timeout=timeout)
 
-    def close(self) -> None:
+    def close(self, **kwargs) -> None:
         if self._zmq:
             self._zmq.close()
         else:
