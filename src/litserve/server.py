@@ -662,7 +662,8 @@ class LitServer:
             if not workers_ready:
                 workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
-            lit_api_health_status = self.lit_api.health()
+            api_list = self.lit_api if isinstance(self.lit_api, list) else [self.lit_api]
+            lit_api_health_status = all(lit_api.health() for lit_api in api_list)
             if workers_ready and lit_api_health_status:
                 return Response(content="ok", status_code=200)
 
@@ -670,6 +671,7 @@ class LitServer:
 
         @self.app.get(self.info_path, dependencies=[Depends(self.setup_auth())])
         async def info(request: Request) -> Response:
+            api_list = self.lit_api if isinstance(self.lit_api, list) else [self.lit_api]
             return JSONResponse(
                 content={
                     "model": self.model_metadata,
@@ -677,7 +679,7 @@ class LitServer:
                         "devices": self.devices,
                         "workers_per_device": self.workers_per_device,
                         "timeout": self.timeout,
-                        "stream": self.lit_api.stream,
+                        "stream": {lit_api.api_path : lit_api.stream for lit_api in api_list},
                         "max_payload_size": self.max_payload_size,
                         "track_requests": self.track_requests,
                     },
