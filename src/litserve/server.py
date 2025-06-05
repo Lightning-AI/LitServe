@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 # if defined, it will require clients to auth with X-API-Key in the header
 LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY", None)
+SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing

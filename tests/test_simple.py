@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -171,10 +172,15 @@ def test_load(lit_server):
             assert el == {"output": i**2}
 
 
-def test_shutdown_endpoint_single_worker():
-    LIT_SHUTDOWN_API_KEY = "test-key"
-    litserve.server.SHUTDOWN_API_KEY = "test-key"
+@pytest.fixture
+def shutdown_api_key():
+    api_key = f"test-key-{random.randint(100, 1000000)}"
+    litserve.server.SHUTDOWN_API_KEY = api_key
+    yield api_key
+    litserve.server.SHUTDOWN_API_KEY = None
 
+
+def test_shutdown_endpoint_single_worker(shutdown_api_key):
     server = LitServer(
         SimpleLitAPI(),
         accelerator="cpu",
@@ -187,15 +193,11 @@ def test_shutdown_endpoint_single_worker():
         response_no_header = client.post("/shutdown")
         assert response_no_header.status_code == 401
 
-        response_correct_key = client.post("/shutdown", headers={"Authorization": f"Bearer {LIT_SHUTDOWN_API_KEY}"})
+        response_correct_key = client.post("/shutdown", headers={"Authorization": f"Bearer {shutdown_api_key}"})
         assert response_correct_key.status_code == status.HTTP_200_OK
 
 
-def test_shutdown_endpoint_multiple_workers():
-    """Test the shutdown endpoint with >1 worker."""
-    LIT_SHUTDOWN_API_KEY = "test-key"
-    litserve.server.SHUTDOWN_API_KEY = "test-key"
-
+def test_shutdown_endpoint_multiple_workers(shutdown_api_key):
     server = LitServer(
         SimpleLitAPI(),
         accelerator="cpu",
@@ -211,7 +213,7 @@ def test_shutdown_endpoint_multiple_workers():
         response_wrong_key = client.post("/shutdown", headers={"Authorization": "Bearer wrong_key"})
         assert response_wrong_key.status_code == 401
 
-        response_correct_key = client.post("/shutdown", headers={"Authorization": f"Bearer {LIT_SHUTDOWN_API_KEY}"})
+        response_correct_key = client.post("/shutdown", headers={"Authorization": f"Bearer {shutdown_api_key}"})
         assert response_correct_key.status_code == status.HTTP_200_OK
 
 
