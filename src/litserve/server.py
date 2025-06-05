@@ -833,14 +833,13 @@ class LitServer:
 
     def _perform_graceful_shutdown(
         self,
+        manager: mp.Manager,
         uvicorn_workers: List[Union[mp.Process, threading.Thread]],
         inference_workers: List[mp.Process],
         shutdown_reason: str = "normal",
     ):
         """Encapsulates the graceful shutdown logic."""
         logger.info("Shutting down LitServe...")
-
-        manager = self.transport_config.manager
 
         # Handle transport closure based on shutdown reason
         if shutdown_reason == "keyboard_interrupt":
@@ -979,7 +978,7 @@ class LitServer:
         elif api_server_worker_type is None:
             api_server_worker_type = "process"
 
-        self._init_manager(num_api_servers)
+        manager = self._init_manager(num_api_servers)
         self._logger_connector.run(self)
         inference_workers = []
         for lit_api in self.litapi_connector:
@@ -1002,7 +1001,7 @@ class LitServer:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
             shutdown_reason = "keyboard_interrupt"
         finally:
-            self._perform_graceful_shutdown(uvicorn_workers, inference_workers, shutdown_reason)
+            self._perform_graceful_shutdown(manager, uvicorn_workers, inference_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests

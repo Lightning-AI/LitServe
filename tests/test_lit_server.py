@@ -250,10 +250,11 @@ def server_for_api_worker_test(simple_litapi):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
-def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_worker_test):
+def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_worker_test, mock_manager):
     server = server_for_api_worker_test
 
-    server.run(api_server_worker_type="process", num_api_servers=10)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type="process", num_api_servers=10)
     server.launch_inference_worker.assert_called_with(server.lit_api)
 
 
@@ -261,11 +262,12 @@ def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_wor
 @pytest.mark.parametrize(("api_server_worker_type", "num_api_workers"), [(None, 1), ("process", 1)])
 @patch("litserve.server.uvicorn")
 def test_server_run_with_process_api_worker(
-    mock_uvicorn, api_server_worker_type, num_api_workers, server_for_api_worker_test
+    mock_uvicorn, api_server_worker_type, num_api_workers, server_for_api_worker_test, mock_manager
 ):
     server = server_for_api_worker_test
 
-    server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
     server.launch_inference_worker.assert_called_with(server.lit_api)
     actual = server._start_server.call_args
     assert actual[0][4] == "process", "Server should run in process mode"
@@ -274,9 +276,10 @@ def test_server_run_with_process_api_worker(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
-def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test):
+def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test, mock_manager):
     server = server_for_api_worker_test
-    server.run(api_server_worker_type="thread")
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type="thread")
     server.launch_inference_worker.assert_called_with(server.lit_api)
     assert server._start_server.call_args[0][4] == "thread", "Server should run in thread mode"
     mock_uvicorn.Config.assert_called()
