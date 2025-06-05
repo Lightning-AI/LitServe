@@ -1025,7 +1025,6 @@ class LitServer:
                 host="0.0.0.0",
                 port=port,
                 log_level=log_level,
-                workers=num_uvicorn_servers if uvicorn_worker_type == "process" else 1,
                 timeout_graceful_shutdown=self.uvicorn_graceful_timeout,
                 **kwargs,
             )
