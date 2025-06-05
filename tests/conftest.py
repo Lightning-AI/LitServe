@@ -338,3 +338,33 @@ def openai_embedding_request_data():
 @pytest.fixture
 def openai_embedding_request_data_array():
     return {"input": ["A beautiful sunset over the beach."] * 4, "model": "lit", "encoding_format": "float"}
+
+
+class MockEvent:
+    def set(self):
+        pass
+
+    def wait(self):
+        pass
+
+
+class MockQueue:
+    def put(self, item):
+        pass
+
+    def get(self):
+        pass
+
+
+@pytest.fixture
+def mock_manager():
+    class MockManager:
+        def __init__(self):
+            self.Queue = MockQueue
+            self.Event = MockEvent
+            self.dict = dict
+
+        def shutdown(self):
+            pass
+
+    return MockManager()

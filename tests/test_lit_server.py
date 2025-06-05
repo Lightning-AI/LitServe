@@ -199,7 +199,7 @@ def test_mocked_accelerator():
 
 
 @patch("litserve.server.uvicorn")
-def test_server_run(mock_uvicorn):
+def test_server_run(mock_uvicorn, mock_manager):
     server = LitServer(SimpleLitAPI())
     server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
@@ -211,12 +211,20 @@ def test_server_run(mock_uvicorn):
     with pytest.raises(ValueError, match="host must be '0.0.0.0', '127.0.0.1', or '::' but got"):
         server.run(host="127.0.0.2")
 
-    server.run(port=8000)
+    # test port 8000
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(port=8000)
     mock_uvicorn.Config.assert_called()
     mock_uvicorn.reset_mock()
-    server.run(port="8001")
+
+    # test port 8001
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(port="8001")
     mock_uvicorn.Config.assert_called()
-    server.run(host="::", port="8000")
+
+    # test host "::" and port 8000
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(host="::", port="8000")
     mock_uvicorn.Config.assert_called()
 
 

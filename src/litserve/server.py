@@ -815,7 +815,7 @@ class LitServer:
         logger.debug("One or more workers are ready to serve requests")
 
     def _init_manager(self, num_api_servers: int):
-        manager = self.transport_config.manager = mp.Manager()
+        manager = mp.Manager()
         self.transport_config.manager = manager
         self.transport_config.num_consumers = num_api_servers
         self.workers_setup_status = manager.dict()
