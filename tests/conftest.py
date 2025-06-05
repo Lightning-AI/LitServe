@@ -352,7 +352,7 @@ class MockQueue:
     def put(self, item):
         pass
 
-    def get(self):
+    def get(self, block=True, timeout=None):
         pass
 
 
