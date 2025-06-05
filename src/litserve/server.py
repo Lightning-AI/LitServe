@@ -851,7 +851,7 @@ class LitServer:
         # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
         if uvicorn_workers:
             for i, uw in enumerate(uvicorn_workers):
-                uvicorn_pid = uw.pid
+                uvicorn_pid = uw.ident if isinstance(uw, threading.Thread) else uw.pid
                 uvicorn_name = uw.name
 
                 log_prefix = f"{uvicorn_name} (PID: {uvicorn_pid})"
