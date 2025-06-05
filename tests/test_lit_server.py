@@ -298,7 +298,7 @@ def test_server_run_with_invalid_api_worker(simple_litapi):
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
 @patch("litserve.server.uvicorn")
-def test_server_run_windows(mock_uvicorn):
+def test_server_run_windows(mock_uvicorn, mock_manager):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
     server.verify_worker_status = MagicMock()
@@ -306,7 +306,8 @@ def test_server_run_windows(mock_uvicorn):
     server._transport = MagicMock()
     server._start_server = MagicMock()
 
-    server.run(api_server_worker_type=None)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type=None)
     actual = server._start_server.call_args
     assert actual[0][4] == "thread", "Windows only supports thread mode"
 
