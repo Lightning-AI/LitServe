@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import logging
 import os
 import pickle
@@ -9,6 +11,7 @@ import pytest
 from fastapi import HTTPException
 
 from litserve.utils import (
+    asyncify,
     call_after_stream,
     configure_logging,
     dump_exception,
@@ -85,3 +88,120 @@ def test_set_trace_if_debug_not_set(mock_forked_pdb):
     with mock.patch("litserve.utils.os.environ", {"LITSERVE_DEBUG": "0"}):
         set_trace_if_debug()
     mock_forked_pdb.assert_not_called()
+
+
+# Tests for asyncify function
+def sync_function(x):
+    """Test sync function."""
+    return x * 2
+
+
+def sync_generator(n):
+    """Test sync generator."""
+    yield from range(n)
+
+
+async def async_function(x):
+    """Test async function."""
+    return x * 2
+
+
+async def async_generator(n):
+    """Test async generator."""
+    for i in range(n):
+        yield i
+
+
+@pytest.mark.asyncio
+async def test_asyncify_sync_function():
+    """Test asyncify with regular sync function."""
+    async_func = asyncify(sync_function)
+    assert asyncio.iscoroutinefunction(async_func)
+    result = await async_func(5)
+    assert result == 10
+
+
+@pytest.mark.asyncio
+async def test_asyncify_sync_generator():
+    """Test asyncify with sync generator."""
+    async_gen = asyncify(sync_generator)
+    assert inspect.isasyncgenfunction(async_gen)
+    results = []
+    async for value in async_gen(3):
+        results.append(value)
+    assert results == [0, 1, 2]
+
+
+@pytest.mark.asyncio
+async def test_asyncify_async_function_passthrough():
+    """Test asyncify preserves async functions as-is."""
+    async_func = asyncify(async_function)
+    assert async_func is async_function  # Should be the same object
+    result = await async_func(5)
+    assert result == 10
+
+
+@pytest.mark.asyncio
+async def test_asyncify_async_generator_passthrough():
+    """Test asyncify preserves async generators as-is."""
+    async_gen = asyncify(async_generator)
+    assert async_gen is async_generator  # Should be the same object
+    results = []
+    async for value in async_gen(3):
+        results.append(value)
+    assert results == [0, 1, 2]
+
+
+@pytest.mark.asyncio
+async def test_asyncify_preserves_function_metadata():
+    """Test that asyncify preserves function metadata using functools.wraps."""
+    async_func = asyncify(sync_function)
+    assert async_func.__name__ == sync_function.__name__
+    assert async_func.__doc__ == sync_function.__doc__
+
+
+@pytest.mark.asyncio
+async def test_asyncify_with_args_and_kwargs():
+    """Test asyncify works with functions that take args and kwargs."""
+
+    def sync_func_with_args(a, b, c=10, d=20):
+        return a + b + c + d
+
+    async_func = asyncify(sync_func_with_args)
+    result = await async_func(1, 2, c=3, d=4)
+    assert result == 10
+
+
+@pytest.mark.asyncio
+async def test_asyncify_sync_generator_with_exception():
+    """Test asyncify handles exceptions in sync generators."""
+
+    def failing_generator():
+        yield 1
+        yield 2
+        raise ValueError("Test error")
+
+    async_gen = asyncify(failing_generator)
+
+    # Collect values until exception
+    async def collect_values():
+        results = []
+        async for value in async_gen():
+            results.append(value)
+        return results
+
+    with pytest.raises(ValueError, match="Test error"):
+        await collect_values()
+
+
+@pytest.mark.asyncio
+async def test_asyncify_sync_function_with_exception():
+    """Test asyncify handles exceptions in sync functions."""
+
+    def failing_function():
+        raise RuntimeError("Test sync error")
+
+    async_func = asyncify(failing_function)
+
+    with pytest.raises(RuntimeError, match="Test sync error"):
+        await async_func()

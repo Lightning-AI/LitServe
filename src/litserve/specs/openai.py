@@ -263,13 +263,15 @@ class ExampleAPI(ls.LitAPI):
 ```
 """
 
-ASYNC_LITAPI_VALIDATION_MSG = """LitAPI.decode_request, LitAPI.predict, and LitAPI.encode_response must all be async
-coroutines (use 'async def') while using the OpenAISpec with async enabled in LitAPI.
-
-Additionally, LitAPI.predict and LitAPI.encode_response must be async generators (use 'yield' or 'yield from' inside
- an 'async def' function).
+ASYNC_LITAPI_VALIDATION_MSG = """
+`enable_async` turns on async mode and recommends using async functions and generators for LitAPI.
 
 Error: {}
+
+- LitAPI.decode_request can be a regular function or an async function.
+- LitAPI.predict must be an async generator (use 'yield' or 'yield from' inside an 'async def' function).
+- LitAPI.encode_response can be a regular function or an async generator.
+
 
 Please follow the examples below for guidance on how to use the spec in async mode:
 
@@ -347,12 +349,20 @@ class OpenAISpec(LitSpec):
         if lit_api.enable_async:
             if not asyncio.iscoroutinefunction(lit_api.decode_request):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("decode_request is not a coroutine"))
-
-            if not inspect.isasyncgenfunction(lit_api.predict):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict is not a generator"))
-
             if not inspect.isasyncgenfunction(lit_api.encode_response):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+
+            if not inspect.isasyncgenfunction(lit_api.predict):
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict must be an async generator"))
+
+            if (
+                not is_encode_response_original
+                and not inspect.isgeneratorfunction(lit_api.encode_response)
+                and not inspect.isasyncgenfunction(lit_api.encode_response)
+            ):
+                raise ValueError(
+                    ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is neither a generator nor an async generator")
+                )
 
         else:
             for method in ["decode_request", "predict", "encode_response"]:
