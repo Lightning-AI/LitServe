@@ -79,10 +79,10 @@ def wrap_litserve_start(server: "LitServer"):
         if lit_api.spec:
             lit_api.spec.response_queue_id = 0
 
-    manager = server._init_manager(1)
-    processes = []
+    server.manager = server._init_manager(1)
+    server.inference_workers = []
     for lit_api in server.litapi_connector:
-        processes.extend(server.launch_inference_worker(lit_api))
+        server.inference_workers.extend(server.launch_inference_worker(lit_api))
     server._prepare_app_run(server.app)
     try:
         yield server
@@ -90,10 +90,10 @@ def wrap_litserve_start(server: "LitServer"):
         server._shutdown_event.set()
         # First close the transport to signal to the response_queue_to_buffer task that it should stop
         server._transport.close()
-        for p in processes:
+        for p in server.inference_workers:
             p.terminate()
             p.join()
-        manager.shutdown()
+        server.manager.shutdown()
 
 
 async def call_after_stream(streamer: AsyncIterator, callback, *args, **kwargs):
