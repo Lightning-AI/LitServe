@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, get_origin
 
 import mcp.types as types
 from fastapi import FastAPI
+from mcp.server.fastmcp.server import _convert_to_content
 from mcp.server.lowlevel import Server as MCPServer
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.types import Tool as ToolType
@@ -182,6 +183,17 @@ def _param_name_to_title(param_name: str) -> str:
     return " ".join(word.capitalize() for word in words)
 
 
+async def _call_handler(handler, **kwargs):
+    sig = inspect.signature(handler)
+    bound = sig.bind_partial(**{
+        k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
+        for k, v in kwargs.items()
+        for name, p in sig.parameters.items()
+        if k == name
+    })
+    return _convert_to_content(await handler(*bound.args, **bound.kwargs))
+
+
 class LitMCPSpec:
     """LitMCPSpec is a spec that can be used to create MCP tools for LitServe endpoints.
 
@@ -231,6 +243,7 @@ class LitMCPSpec:
             name=name,
             description=description,
             inputSchema=input_schema,
+            endpoint=self.lit_api.api_path,
         )
 
 
@@ -296,7 +309,6 @@ class _MCPRequestHandler:
         routes: List[Mount] = [Mount("/mcp/", app=handle_streamable_http)]
         return Starlette(
             routes=routes,
-            # lifespan=self.lifespan,
         )
 
 
@@ -305,12 +317,17 @@ class _LitMCPServer:
         self.mcp_app = MCPServer("mcp-streamable-http-stateless")
         self.tools = []
         self.request_handler = _MCPRequestHandler(self.mcp_app)
+        self.tool_endpoint_connections = {}
 
     def add_tool(self, tool: types.Tool):
+        self.tool_endpoint_connections[tool.name] = tool.endpoint
         self.tools.append(tool)
 
     def list_tools(self) -> List[types.Tool]:
         return self.tools
+
+    def call_tools(self, name: str, arguments: dict):
+        return _convert_to_content(f"echo {name} {arguments}")
 
     @asynccontextmanager
     async def lifespan(self, app: Starlette):
@@ -332,6 +349,27 @@ class _LitMCPServer:
             tools = self.list_tools()
             logger.debug(f"list tools called, returning: {tools}")
             return tools
+
+        @self.mcp_app.call_tool()
+        async def _call_tool(name: str, arguments: dict):
+            try:
+                endpoint_path = self.tool_endpoint_connections[name]
+                logger.info(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
+                if endpoint_path is None:
+                    raise ValueError(f"Tool {name} not found")
+
+                logger.info(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
+                for route in app.routes:
+                    if route.path == endpoint_path:
+                        handler = route.endpoint
+                        break
+                else:
+                    raise ValueError(f"Endpoint {endpoint_path} not found")
+                logger.info(f"call tool called, returning: {handler}")
+                return await _call_handler(handler, **arguments)
+            except Exception as e:
+                logger.error(f"Error calling tool {name}: {e}")
+                raise e
 
         starlette_app = self.request_handler.streamable_http_app()
 
