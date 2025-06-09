@@ -13,58 +13,84 @@
 # limitations under the License.
 """This module helps create MCP servers for LitServe endpoints."""
 
-from typing import List
-from fastapi import FastAPI
+import logging
+import weakref
+from typing import TYPE_CHECKING, Optional
+
 import httpx
-from starlette.routing import Mount, BaseRoute, Host
-from mcp import Tool
-from mcp.server.fastmcp import FastMCP
-from mcp.server.sse import SseServerTransport
-from starlette.applications import Starlette
+from mcp.server.fastmcp.tools.base import Tool, func_metadata
+
+from litserve.utils import is_package_installed
+
+logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp.tools.base import Tool
+
+    from litserve.api import LitAPI
 
 
-class LitMCPServer:
-    def __init__(self, app: FastAPI):
-        self._fastapi_app = app
+class LitMCPSpec:
+    """LitMCPSpec is a spec that can be used to create MCP tools for LitServe endpoints.
 
-    def _get_endpoints(self) -> List[BaseRoute]:
-        return self._fastapi_app.routes
+    It doesn't affect LitAPI.
 
-    def endpoint_to_tools(self) -> List[Tool]:
-        tools = []
-        for endpoint in self._get_endpoints():
-            tool_name = endpoint.path.replace("/", "_")
-            tool = Tool(
-                name=tool_name,
-                description="generates predictions",
-                inputSchema={"type": "object", "properties": {"input": {"type": "string"}}},
-            )
-            tools.append(tool)
-        return tools
+    """
 
-    def connect_mcp_server(self):
-        mcp_server = FastMCP("LitServeMCP")
+    def __init__(
+        self,
+        description: Optional[str] = None,
+        input_schema: Optional[dict] = None,
+        name: Optional[str] = None,
+    ):
+        """
+        Args:
+            name: The name of the MCP tool.
+            description: The description of the MCP tool.
+            input_schema: The input schema of the MCP tool.
+        """
+        self.name = name
+        self.description = description
+        self.input_schema = input_schema
 
-        # Access type-safe lifespan context in tools
-        @mcp_server.tool()
-        def query_db() -> str:
-            return "This is an awesome MCP server example!"
+    def _connect(self, lit_api: "LitAPI"):
+        # avoid tight coupling between LitAPI and LitMCPSpec
+        self.lit_api = weakref.proxy(lit_api)
 
-        @mcp_server.tool()
-        def calculate_bmi(weight_kg: float, height_m: float) -> float:
-            """Calculate BMI given weight in kg and height in meters"""
-            return weight_kg / (height_m**2)
+    async def client_fn(self, request: dict) -> dict:
+        # get port from LitServer
+        endpoint = f"http://localhost:8000{self.lit_api.api_path}"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(endpoint, json=request)
+            return response.json()
 
-        @mcp_server.tool()
-        async def fetch_weather(city: str) -> str:
-            """Fetch current weather for a city"""
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"https://api.weather.com/{city}")
-                return response.text
+    def as_tool(self) -> "Tool":
+        if not is_package_installed("mcp"):
+            raise RuntimeError("MCP is not installed. Please install it with `uv pip install mcp[cli]`")
 
-        # app = Starlette(
-        #     routes=[
-        #         Mount('/', app=mcp_server.sse_app()),
-        #     ]
-        # )
-        self._fastapi_app.mount("/mcp", mcp_server.sse_app())
+        name = self.name or self.lit_api.api_path
+        description = self.description or self.lit_api.__doc__
+
+        if not name or len(name) == 0:
+            raise ValueError("Name is required for MCP tool")
+        if not description or len(description) == 0:
+            raise ValueError("Description is required for MCP tool")
+
+        logger.info(f"Creating MCP tool for `{name}` with description `{description}`")
+
+        func_arg_metadata = func_metadata(
+            self.client_fn,
+            skip_names=[],
+        )
+        parameters = func_arg_metadata.arg_model.model_json_schema()
+
+        # create a tool for the lit_api
+        name = name.replace("/", "_")
+        return Tool(
+            fn=self.client_fn,
+            name=name,
+            description=self.description,
+            parameters=parameters,
+            fn_metadata=func_arg_metadata,
+            is_async=True,
+        )

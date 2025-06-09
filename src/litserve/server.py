@@ -1108,9 +1108,7 @@ class LitServer:
         if len(mcp_tools) == 0:
             return
 
-        mcp_server = FastMCP("LitServeMCP")
-        for endpoint, tool in mcp_tools.items():
-            mcp_server.add_tool(tool.fn, name=tool.name, description=tool.description, annotations=tool.annotations)
+        mcp_server = FastMCP("LitServeMCP", tools=list(mcp_tools.values()))
 
         self.app.mount("/", mcp_server.sse_app())
 
