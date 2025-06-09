@@ -13,18 +13,18 @@
 # limitations under the License.
 """This module helps create MCP servers for LitServe endpoints."""
 
-import contextlib
 import inspect
+import json
 import logging
 import weakref
-from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, get_origin
 
 import httpx
 import mcp.types as types
 from fastapi import FastAPI
-from mcp.server.lowlevel import Server
-from mcp.server.sse import SseServerTransport
+from mcp.server.lowlevel import Server as MCPServer
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.types import Tool as ToolType
 from pydantic import BaseModel
 from starlette.applications import Starlette
@@ -234,6 +234,8 @@ class LitMCPSpec:
         logger.info(f"Creating MCP tool for `{name}` with description `{description}`")
 
         input_schema = extract_input_schema(self.lit_api.decode_request)
+        if name.startswith("/"):
+            name = name[1:]
         name = name.replace("/", "_")
         return ToolType(
             name=name,
@@ -244,17 +246,9 @@ class LitMCPSpec:
 
 class _LitMCPServer:
     def __init__(self):
-        self.mcp_app = Server("mcp-streamable-http-stateless")
+        self.mcp_app = MCPServer("mcp-streamable-http-stateless")
         self.tools = []
-        self.sse = SseServerTransport("/messages")
-
-    @contextlib.asynccontextmanager
-    async def lifespan(self, app: Starlette) -> AsyncIterator[None]:
-        """Context manager for session manager."""
-        try:
-            yield
-        finally:
-            logger.info("MCP server shutting down...")
+        self._session_manager = None
 
     def add_tool(self, tool: types.Tool):
         self.tools.append(tool)
@@ -262,33 +256,86 @@ class _LitMCPServer:
     def list_tools(self) -> List[types.Tool]:
         return self.tools
 
-    async def handle_streamable_http(self, scope: Scope, receive: Receive, send: Send) -> None:
-        # Add logging to see incoming requests
-        if scope["type"] == "http":
-            headers = dict(scope.get("headers", []))
-            accept_header = headers.get(b"accept", b"").decode()
-            print(f"Received request with Accept header: {accept_header}")
+    @property
+    def session_manager(self):
+        if self._session_manager is None:
+            raise RuntimeError("Session manager not initialized")
 
-        await self.session_manager.handle_request(scope, receive, send)
+        return self._session_manager
 
-    async def handle_sse(self, scope: Scope, receive: Receive, send: Send) -> None:
-        async with self.sse.connect_sse(scope, receive, send) as streams:
-            await self.mcp_app.run(streams[0], streams[1], self.mcp_app.create_initialization_options())
+    @asynccontextmanager
+    async def lifespan(self, app: Starlette):
+        if self._session_manager is None:
+            # Ensure session manager exists
+            self._session_manager = StreamableHTTPSessionManager(
+                app=self.mcp_app,
+                event_store=None,
+                json_response=True,
+                stateless=True,
+            )
+        logger.info(f"run mcp server, app: {app}")
+        async with self._session_manager.run():
+            yield
 
-    async def handle_messages(self, scope: Scope, receive: Receive, send: Send) -> None:
-        await self.sse.handle_post_message(scope, receive, send)
+    # https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/server/fastmcp/server.py
+    def streamable_http_app(self) -> Starlette:
+        # Create session manager on first call (lazy initialization)
+        if self._session_manager is None:
+            self._session_manager = StreamableHTTPSessionManager(
+                app=self.mcp_app,
+                event_store=None,
+                json_response=True,
+                stateless=True,  # Use the stateless setting
+            )
 
-    def launch_with_fastapi(self, app: FastAPI):
-        self.mcp_app.list_tools()(self.list_tools)
+        # Create the ASGI handler
+        async def handle_streamable_http(scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] == "lifespan":
+                # Handle lifespan events (startup/shutdown)
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                return
 
-        # Create an ASGI application using the transport
-        starlette_app = Starlette(
-            debug=True,
-            routes=[
-                Mount("/sse", app=self.handle_sse),
-                Mount("/messages", app=self.handle_messages),
-            ],
+            if scope["type"] != "http":
+                # We only handle HTTP requests
+                return
+
+            try:
+                # Handle the HTTP request through the session manager
+                await self.session_manager.handle_request(scope, receive, send)
+            except Exception as e:
+                logger.error(f"Error handling request: {e}")
+                # Properly handle errors by sending an error response
+                error_message = {
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [(b"content-type", b"application/json")],
+                }
+                await send(error_message)
+
+                body = json.dumps({"error": str(e)}).encode("utf-8")
+                await send({
+                    "type": "http.response.body",
+                    "body": body,
+                })
+
+        # Create routes
+        routes: List[Mount] = [Mount("/mcp/", app=handle_streamable_http)]
+        return Starlette(
+            routes=routes,
             lifespan=self.lifespan,
         )
 
-        app.mount("/mcp", starlette_app)
+    def launch_with_fastapi(self, app: FastAPI):
+        @self.mcp_app.list_tools()
+        async def _list_tools():  # must be async, TODO: handle nicely!
+            tools = self.list_tools()
+            logger.info(f"_list_tools called, returning: {tools}")
+            return tools
+
+        starlette_app = self.streamable_http_app()
+
+        app.mount("/", starlette_app)

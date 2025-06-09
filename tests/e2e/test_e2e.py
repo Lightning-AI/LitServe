@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 import os
 import subprocess
@@ -20,6 +21,8 @@ from functools import wraps
 
 import psutil
 import requests
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
 from openai import OpenAI
 
 
@@ -414,3 +417,18 @@ def test_e2e_openai_embedding_with_batching():
             f"Expected 768 dimensions but got {len(response.data[0].embedding)}"
         )
     assert len(responses) == 4, f"Expected 4 responses but got {len(responses)}"
+
+
+@e2e_from_file("tests/e2e/default_mcp.py")
+def test_mcp_server():
+    async def main():
+        async with streamablehttp_client("http://localhost:8000/mcp/") as (
+            read_stream,
+            write_stream,
+            _,
+        ), ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            result = await session.list_tools()
+            assert len(result.tools) == 1, f"Expected 1 tool. Result: {result}"
+
+    asyncio.run(main())
