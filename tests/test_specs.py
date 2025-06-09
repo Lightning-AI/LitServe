@@ -355,12 +355,14 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 
 
 def test_openai_spec_asyncapi_decode_request_validation():
-    with pytest.raises(ValueError, match="decode_request is not a coroutine"):
+    with pytest.raises(ValueError, match="decode_request is not a coroutine"):  # reason: skipped the asyncify methods
         ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
 def test_openai_spec_asyncapi_predict_validation():
-    with pytest.raises(ValueError, match="predict must be an async generator"):
+    with pytest.raises(
+        ValueError, match="predict must be an async generator"
+    ):  # reason: asyncified but not a generator yet
         ls.LitServer(IncorrectAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
