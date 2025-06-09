@@ -234,38 +234,49 @@ class LitMCPSpec:
         )
 
 
-class _LitMCPServer:
-    def __init__(self):
-        self.mcp_app = MCPServer("mcp-streamable-http-stateless")
-        self.tools = []
+class _MCPRequestHandler:
+    def __init__(self, mcp_app: MCPServer):
+        self.mcp_app = mcp_app
         self._session_manager = None
-
-    def add_tool(self, tool: types.Tool):
-        self.tools.append(tool)
-
-    def list_tools(self) -> List[types.Tool]:
-        return self.tools
 
     @property
     def session_manager(self):
         if self._session_manager is None:
             raise RuntimeError("Session manager not initialized")
-
         return self._session_manager
 
-    @asynccontextmanager
-    async def lifespan(self, app: Starlette):
-        if self._session_manager is None:
-            # Ensure session manager exists
-            self._session_manager = StreamableHTTPSessionManager(
-                app=self.mcp_app,
-                event_store=None,
-                json_response=True,
-                stateless=True,
-            )
-        logger.info(f"run mcp server, app: {app}")
-        async with self._session_manager.run():
-            yield
+    async def handle_streamable_http(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            # Handle lifespan events (startup/shutdown)
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                await send({"type": "lifespan.startup.complete"})
+            elif message["type"] == "lifespan.shutdown":
+                await send({"type": "lifespan.shutdown.complete"})
+            return
+
+        if scope["type"] != "http":
+            # We only handle HTTP requests
+            return
+
+        try:
+            # Handle the HTTP request through the session manager
+            await self.session_manager.handle_request(scope, receive, send)
+        except Exception as e:
+            logger.error(f"Error handling request: {e}")
+            # Properly handle errors by sending an error response
+            error_message = {
+                "type": "http.response.start",
+                "status": 500,
+                "headers": [(b"content-type", b"application/json")],
+            }
+            await send(error_message)
+
+            body = json.dumps({"error": str(e)}).encode("utf-8")
+            await send({
+                "type": "http.response.body",
+                "body": body,
+            })
 
     # https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/server/fastmcp/server.py
     def streamable_http_app(self) -> Starlette:
@@ -279,45 +290,41 @@ class _LitMCPServer:
             )
 
         # Create the ASGI handler
-        async def handle_streamable_http(scope: Scope, receive: Receive, send: Send) -> None:
-            if scope["type"] == "lifespan":
-                # Handle lifespan events (startup/shutdown)
-                message = await receive()
-                if message["type"] == "lifespan.startup":
-                    await send({"type": "lifespan.startup.complete"})
-                elif message["type"] == "lifespan.shutdown":
-                    await send({"type": "lifespan.shutdown.complete"})
-                return
-
-            if scope["type"] != "http":
-                # We only handle HTTP requests
-                return
-
-            try:
-                # Handle the HTTP request through the session manager
-                await self.session_manager.handle_request(scope, receive, send)
-            except Exception as e:
-                logger.error(f"Error handling request: {e}")
-                # Properly handle errors by sending an error response
-                error_message = {
-                    "type": "http.response.start",
-                    "status": 500,
-                    "headers": [(b"content-type", b"application/json")],
-                }
-                await send(error_message)
-
-                body = json.dumps({"error": str(e)}).encode("utf-8")
-                await send({
-                    "type": "http.response.body",
-                    "body": body,
-                })
+        handle_streamable_http = self.handle_streamable_http
 
         # Create routes
         routes: List[Mount] = [Mount("/mcp/", app=handle_streamable_http)]
         return Starlette(
             routes=routes,
-            lifespan=self.lifespan,
+            # lifespan=self.lifespan,
         )
+
+
+class _LitMCPServer:
+    def __init__(self):
+        self.mcp_app = MCPServer("mcp-streamable-http-stateless")
+        self.tools = []
+        self.request_handler = _MCPRequestHandler(self.mcp_app)
+
+    def add_tool(self, tool: types.Tool):
+        self.tools.append(tool)
+
+    def list_tools(self) -> List[types.Tool]:
+        return self.tools
+
+    @asynccontextmanager
+    async def lifespan(self, app: Starlette):
+        if self.request_handler._session_manager is None:
+            # Ensure session manager exists
+            self.request_handler._session_manager = StreamableHTTPSessionManager(
+                app=self.mcp_app,
+                event_store=None,
+                json_response=True,
+                stateless=True,
+            )
+        logger.info(f"run mcp server, app: {app}")
+        async with self.request_handler._session_manager.run():
+            yield
 
     def launch_with_fastapi(self, app: FastAPI):
         @self.mcp_app.list_tools()
@@ -326,6 +333,6 @@ class _LitMCPServer:
             logger.debug(f"list tools called, returning: {tools}")
             return tools
 
-        starlette_app = self.streamable_http_app()
+        starlette_app = self.request_handler.streamable_http_app()
 
         app.mount("/", starlette_app)
