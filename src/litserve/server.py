@@ -1079,7 +1079,7 @@ class LitServer:
                         continue
 
                     if not self.restart_workers:
-                        logging.error(f"⚠️ Worker {proc.name} died; shutting down")
+                        logger.error(f"⚠️ Worker {proc.name} died; shutting down")
                         self._perform_graceful_shutdown(manager, uvicorn_workers, f"⚠️ Worker {proc.name} died)")
                         return
 
