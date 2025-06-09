@@ -16,6 +16,7 @@ from litserve.__about__ import *  # noqa: F403
 from litserve.api import LitAPI
 from litserve.callbacks import Callback
 from litserve.loggers import Logger
+from litserve.mcp import LitMCPSpec
 from litserve.server import LitServer, Request, Response
 from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec
 from litserve.utils import configure_logging, set_trace, set_trace_if_debug
@@ -23,15 +24,16 @@ from litserve.utils import configure_logging, set_trace, set_trace_if_debug
 configure_logging()
 
 __all__ = [
+    "Callback",
     "LitAPI",
     "LitServer",
-    "Request",
-    "Response",
+    "LitMCPSpec",
+    "Logger",
     "OpenAISpec",
     "OpenAIEmbeddingSpec",
-    "test_examples",
-    "Callback",
-    "Logger",
+    "Request",
+    "Response",
     "set_trace",
     "set_trace_if_debug",
+    "test_examples",
 ]
