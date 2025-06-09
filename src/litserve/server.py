@@ -564,6 +564,7 @@ class LitServer:
         self.litapi_request_queues = {}
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
+        self.restart_workers = False
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -835,7 +836,6 @@ class LitServer:
         self,
         manager: mp.Manager,
         uvicorn_workers: List[Union[mp.Process, threading.Thread]],
-        inference_workers: List[mp.Process],
         shutdown_reason: str = "normal",
     ):
         """Encapsulates the graceful shutdown logic."""
@@ -869,8 +869,8 @@ class LitServer:
                     logger.error(f"Error during termination of {log_prefix}: {e}")
 
         # terminate and join inference worker processes
-        logger.debug(f"Terminating {len(inference_workers)} inference workers...")
-        for i, iw in enumerate(inference_workers):
+        logger.debug(f"Terminating {len(self.inference_workers)} inference workers...")
+        for i, iw in enumerate(self.inference_workers):
             worker_pid = iw.pid
             worker_name = iw.name
             try:
@@ -980,10 +980,10 @@ class LitServer:
 
         manager = self._init_manager(num_api_servers)
         self._logger_connector.run(self)
-        inference_workers = []
+        self.inference_workers = []
         for lit_api in self.litapi_connector:
             _inference_workers = self.launch_inference_worker(lit_api)
-            inference_workers.extend(_inference_workers)
+            self.inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
 
@@ -995,13 +995,15 @@ class LitServer:
             )
             print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
 
+            self._start_worker_monitoring(manager, uvicorn_workers)
+
             self._shutdown_event.wait()
 
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
             shutdown_reason = "keyboard_interrupt"
         finally:
-            self._perform_graceful_shutdown(manager, uvicorn_workers, inference_workers, shutdown_reason)
+            self._perform_graceful_shutdown(manager, uvicorn_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
         # Add middleware to count active requests
@@ -1064,3 +1066,25 @@ class LitServer:
                 detail="Invalid Bearer token for Shutdown API."
                 " Check that you are passing a correct 'Authorization: Bearer <SHUTDOWN_API_KEY>' in your header.",
             )
+
+    def _start_worker_monitoring(
+        self,
+        manager: mp.Manager,
+        uvicorn_workers: List[Union[mp.Process, threading.Thread]],
+    ):
+        def monitor():
+            while not self._shutdown_event.is_set():
+                for proc in self.inference_workers:
+                    if proc.is_alive():
+                        continue
+
+                    if not self.restart_workers:
+                        logger.error(f"⚠️ Worker {proc.name} died; shutting down")
+                        self._perform_graceful_shutdown(manager, uvicorn_workers, f"⚠️ Worker {proc.name} died)")
+                        return
+
+                    # TODO: Handle restarting failed workers
+                time.sleep(5)
+
+        t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
+        t.start()
