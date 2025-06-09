@@ -21,8 +21,8 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from pydantic import BaseModel
 
+from litserve.mcp import LitMCPSpec
 from litserve.specs.base import LitSpec
-from litserve.specs.mcp import LitMCPSpec
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop

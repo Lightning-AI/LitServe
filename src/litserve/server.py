@@ -36,6 +36,7 @@ import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
+from mcp import types
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -44,6 +45,7 @@ from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import LitLoop, inference_worker
+from litserve.mcp import _LitMCPServer
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
@@ -52,7 +54,7 @@ from litserve.transport.factory import TransportConfig, create_transport_from_co
 from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp.tools.base import Tool
+    pass
 
 mp.allow_connection_pickling()
 
@@ -244,11 +246,11 @@ class _LitAPIConnector:
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
 
-    def get_mcp_tools(self) -> Dict[str, "Tool"]:
-        mcp_tools = {}
+    def get_mcp_tools(self) -> List[types.Tool]:
+        mcp_tools = []
         for lit_api in self.lit_apis:
             if lit_api.mcp_spec:
-                mcp_tools[lit_api.api_path] = lit_api.mcp_spec.as_tool()
+                mcp_tools.append(lit_api.mcp_spec.as_tool())
         return mcp_tools
 
 
@@ -291,6 +293,7 @@ class BaseRequestHandler(ABC):
 class RegularRequestHandler(BaseRequestHandler):
     async def handle_request(self, request, request_type) -> Response:
         try:
+            logger.info(f"Handling request: {request}")
             # Prepare request
             payload = await self._prepare_request(request, request_type)
 
@@ -575,7 +578,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = False
-        self._mcp_servers = []
+        self.mcp_server = _LitMCPServer()
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -650,7 +653,8 @@ class LitServer:
         )
 
         try:
-            yield
+            async with self.mcp_server.lifespan(app):
+                yield
         finally:
             self._callback_runner.trigger_event(EventTypes.ON_SERVER_END.value, litserver=self)
 
@@ -1102,15 +1106,16 @@ class LitServer:
         t.start()
 
     def _connect_mcp_server(self):
-        from mcp.server.fastmcp import FastMCP
+        mcp_server = self.mcp_server
 
         mcp_tools = self.litapi_connector.get_mcp_tools()
         if len(mcp_tools) == 0:
             return
 
-        mcp_server = FastMCP("LitServeMCP", tools=list(mcp_tools.values()))
+        for tool in mcp_tools:
+            mcp_server.add_tool(tool)
 
-        self.app.mount("/", mcp_server.sse_app())
+        mcp_server.launch_with_fastapi(self.app)
 
         print(
             "================================================"
