@@ -1084,7 +1084,7 @@ class LitServer:
                         return
 
                     # TODO: Handle restarting failed workers
-                time.sleep(1)
+                time.sleep(5)
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()
