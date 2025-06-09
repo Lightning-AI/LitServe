@@ -18,6 +18,7 @@ import weakref
 from typing import TYPE_CHECKING, Optional
 
 import httpx
+from mcp.server.fastmcp.tools.base import Tool, func_metadata
 
 from litserve.utils import is_package_installed
 
@@ -67,23 +68,29 @@ class LitMCPSpec:
         if not is_package_installed("mcp"):
             raise RuntimeError("MCP is not installed. Please install it with `uv pip install mcp[cli]`")
 
-        from mcp.server.fastmcp.tools.base import Tool
-
         name = self.name or self.lit_api.api_path
-        decode_tool = Tool.from_function(self.lit_api.decode_request)
         description = self.description or self.lit_api.__doc__
-        input_schema = self.input_schema or decode_tool.parameters
+
+        if not name or len(name) == 0:
+            raise ValueError("Name is required for MCP tool")
+        if not description or len(description) == 0:
+            raise ValueError("Description is required for MCP tool")
+
         logger.info(f"Creating MCP tool for {name} with description {description}")
-        logger.info(f"Input schema: {input_schema}")
+
+        func_arg_metadata = func_metadata(
+            self.client_fn,
+            skip_names=[],
+        )
+        parameters = func_arg_metadata.arg_model.model_json_schema()
 
         # create a tool for the lit_api
+        name = name.replace("/", "_")
         return Tool(
             fn=self.client_fn,
             name=name,
             description=self.description,
-            parameters=decode_tool.parameters,
-            fn_metadata=decode_tool.fn_metadata,
-            input_schema=input_schema,
-            annotations=decode_tool.annotations,
+            parameters=parameters,
+            fn_metadata=func_arg_metadata,
             is_async=True,
         )

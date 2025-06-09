@@ -31,7 +31,6 @@ from contextlib import asynccontextmanager
 from queue import Queue
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
-import httpx
 import uvicorn
 import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -1110,22 +1109,7 @@ class LitServer:
             return
 
         mcp_server = FastMCP("LitServeMCP")
-
-        @mcp_server.tool()
-        def query_db() -> str:
-            return "This is an awesome MCP server example!"
-
-        @mcp_server.tool()
-        def calculate_bmi(weight_kg: float, height_m: float) -> float:
-            """Calculate BMI given weight in kg and height in meters."""
-            return weight_kg / (height_m**2)
-
-        @mcp_server.tool()
-        async def fetch_weather(city: str) -> str:
-            """Fetch current weather for a city."""
-
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"https://api.weather.com/{city}")
-                return response.text
+        for endpoint, tool in mcp_tools.items():
+            mcp_server.add_tool(tool.fn, name=tool.name, description=tool.description, annotations=tool.annotations)
 
         self.app.mount("/", mcp_server.sse_app())
