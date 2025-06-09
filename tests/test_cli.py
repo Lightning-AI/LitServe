@@ -33,10 +33,10 @@ def test_dockerize_command(monkeypatch, capsys):
     assert os.path.exists("Dockerfile"), "CLI did not create Dockerfile"
 
 
-@patch("importlib.util.find_spec")
+@patch("litserve.cli.is_package_installed")
 @patch("subprocess.check_call")
-def test_ensure_lightning_installed(mock_check_call, mock_find_spec):
-    mock_find_spec.return_value = False
+def test_ensure_lightning_installed(mock_check_call, mock_is_package_installed):
+    mock_is_package_installed.return_value = False
     _ensure_lightning_installed()
     mock_check_call.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
 

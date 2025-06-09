@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import dataclasses
+import importlib.util
 import logging
 import os
 import pdb
@@ -215,3 +216,8 @@ def set_trace_if_debug(debug_env_var="LITSERVE_DEBUG", debug_env_var_value="1"):
     """Set a tracepoint in the code if the environment variable LITSERVE_DEBUG is set."""
     if os.environ.get(debug_env_var) == debug_env_var_value:
         set_trace()
+
+
+def is_package_installed(package_name: str) -> bool:
+    spec = importlib.util.find_spec(package_name)
+    return spec is not None
