@@ -20,7 +20,6 @@ import weakref
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, get_origin
 
-import httpx
 import mcp.types as types
 from fastapi import FastAPI
 from mcp.server.lowlevel import Server as MCPServer
@@ -209,15 +208,6 @@ class LitMCPSpec:
     def _connect(self, lit_api: "LitAPI"):
         # avoid tight coupling between LitAPI and LitMCPSpec
         self.lit_api = weakref.proxy(lit_api)
-
-    async def client_fn(self, request):
-        # TODO: directly send the request to the endpoint handler
-        endpoint = f"http://localhost:8000{self.lit_api.api_path}"
-        async with httpx.AsyncClient() as client:
-            response = await client.post(endpoint, json=request)
-            result = response.json()
-            print(result)
-            return result
 
     def as_tool(self) -> ToolType:
         if not is_package_installed("mcp"):
