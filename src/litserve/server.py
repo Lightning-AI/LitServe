@@ -29,8 +29,9 @@ from abc import ABC, abstractmethod
 from collections import deque
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
+import httpx
 import uvicorn
 import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -50,6 +51,9 @@ from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp.tools.base import Tool
 
 mp.allow_connection_pickling()
 
@@ -240,6 +244,13 @@ class _LitAPIConnector:
     def set_logger_queue(self, queue: Queue):
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
+
+    def get_mcp_tools(self) -> Dict[str, "Tool"]:
+        mcp_tools = {}
+        for lit_api in self.lit_apis:
+            if lit_api.mcp_spec:
+                mcp_tools[lit_api.api_path] = lit_api.mcp_spec.as_tool()
+        return mcp_tools
 
 
 class BaseRequestHandler(ABC):
@@ -565,6 +576,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = False
+        self._mcp_servers = []
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -1019,6 +1031,7 @@ class LitServer:
                 if lit_api.spec:
                     lit_api.spec.response_queue_id = response_queue_id
 
+            self._connect_mcp_server()
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
@@ -1088,3 +1101,31 @@ class LitServer:
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()
+
+    def _connect_mcp_server(self):
+        from mcp.server.fastmcp import FastMCP
+
+        mcp_tools = self.litapi_connector.get_mcp_tools()
+        if len(mcp_tools) == 0:
+            return
+
+        mcp_server = FastMCP("LitServeMCP")
+
+        @mcp_server.tool()
+        def query_db() -> str:
+            return "This is an awesome MCP server example!"
+
+        @mcp_server.tool()
+        def calculate_bmi(weight_kg: float, height_m: float) -> float:
+            """Calculate BMI given weight in kg and height in meters."""
+            return weight_kg / (height_m**2)
+
+        @mcp_server.tool()
+        async def fetch_weather(city: str) -> str:
+            """Fetch current weather for a city."""
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"https://api.weather.com/{city}")
+                return response.text
+
+        self.app.mount("/", mcp_server.sse_app())

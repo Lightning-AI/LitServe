@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 from pydantic import BaseModel
 
 from litserve.specs.base import LitSpec
+from litserve.specs.mcp import LitMCPSpec
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
@@ -43,6 +44,7 @@ class LitAPI(ABC):
         stream: bool = False,
         loop: Optional[Union[str, "LitLoop"]] = "auto",
         spec: Optional[LitSpec] = None,
+        mcp_spec: Optional["LitMCPSpec"] = None,
         enable_async: bool = False,
     ):
         """Initialize a LitAPI instance that defines the model's inference behavior.
@@ -70,6 +72,9 @@ class LitAPI(ABC):
             spec (LitSpec, optional):
                 API specification defining input/output schemas and behavior. Use OpenAISpec for
                 OpenAI-compatible APIs or custom LitSpec implementations. Defaults to None.
+
+            mcp_spec (LitMCPSpec, optional):
+                Enable MCP server for the API. Provide tool description and input schema. Defaults to None.
 
             enable_async (bool, optional):
                 Enable async/await support for non-blocking operations in predict() method.
@@ -133,6 +138,9 @@ class LitAPI(ABC):
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
         self._validate_async_methods()
+        if mcp_spec:
+            mcp_spec._connect(self)
+            self.mcp_spec = mcp_spec
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
