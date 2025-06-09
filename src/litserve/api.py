@@ -138,9 +138,9 @@ class LitAPI(ABC):
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
         self._validate_async_methods()
+        self.mcp_spec = mcp_spec
         if mcp_spec:
             mcp_spec._connect(self)
-            self.mcp_spec = mcp_spec
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
