@@ -349,9 +349,6 @@ class OpenAISpec(LitSpec):
         if lit_api.enable_async:
             if not asyncio.iscoroutinefunction(lit_api.decode_request):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("decode_request is not a coroutine"))
-            if not inspect.isasyncgenfunction(lit_api.encode_response):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
-
             if not inspect.isasyncgenfunction(lit_api.predict):
                 raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict must be an async generator"))
 
@@ -363,6 +360,9 @@ class OpenAISpec(LitSpec):
                 raise ValueError(
                     ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is neither a generator nor an async generator")
                 )
+
+            if not inspect.isasyncgenfunction(lit_api.encode_response):
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not an async generator"))
 
         else:
             for method in ["decode_request", "predict", "encode_response"]:
