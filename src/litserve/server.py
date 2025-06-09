@@ -1113,3 +1113,21 @@ class LitServer:
             mcp_server.add_tool(tool.fn, name=tool.name, description=tool.description, annotations=tool.annotations)
 
         self.app.mount("/", mcp_server.sse_app())
+
+        print(
+            "================================================"
+            "\nEnabled MCP server at /sse\n"
+            "To integrate with Claude desktop, add the following to your Claude desktop settings:\n"
+            """{
+  "mcpServers": {
+    "litserve": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://8000-YOUR_HOST_NAME.cloudspaces.litng.ai/sse"
+      ]
+    }
+  }
+}\n"""
+            "================================================\n"
+        )
