@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
+from contextlib import suppress
 
 import numpy as np
 import pytest
@@ -284,6 +286,40 @@ def test_log():
     assert server.logger_queue.get() == ("time", 0.1)
 
 
-def test_enable_async_not_set():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+def test_api_asyncification_warnings_for_decode_and_encode_methods():
+    with suppress(ValueError), pytest.warns(UserWarning, match="LitServe will asyncify this method.") as warning_record:
         ls.test_examples.SimpleLitAPI(enable_async=True)
+
+    assert len(warning_record) == 2, "Should have exactly 2 warnings for decode_request and encode_response"
+    warn_msgs = [str(w.message) for w in warning_record]
+    expected_messages = [
+        "decode_request is not a coroutine",
+        "encode_response is not a coroutine",
+    ]
+    for expected in expected_messages:
+        assert any(expected in msg for msg in warn_msgs), f"Expected warning containing '{expected}'"
+
+
+def test_api_predict_async_enforcement():
+    # Check that an error is raised when predict is not async and enable_async is True
+    with pytest.raises(ValueError, match="enable_async set to True but predict is not a coroutine or async generator."):
+        ls.test_examples.SimpleLitAPI(enable_async=True)
+
+
+class AsyncPredictLitAPI(ls.test_examples.SimpleLitAPI):
+    async def predict(self, x):
+        return x
+
+
+@pytest.mark.asyncio
+async def test_api_async_predict():
+    api = AsyncPredictLitAPI(enable_async=True)
+    result = await api.predict("test")
+    assert result == "test"
+
+
+@pytest.mark.asyncio
+async def test_asyncified_decode_and_encode_methods():
+    api = AsyncPredictLitAPI(enable_async=True)
+    assert asyncio.iscoroutinefunction(api.decode_request), "decode_request should have asyncified."
+    assert asyncio.iscoroutinefunction(api.encode_response), "encode_response should have asyncified."
