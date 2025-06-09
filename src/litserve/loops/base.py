@@ -225,7 +225,7 @@ class LitLoop(_BaseLoop):
 
     def kill(self):
         try:
-            logger.info(f"Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]")
+            logger.debug(f"Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]")
             if sys.platform == "win32":
                 os.kill(self._server_pid, signal.SIGTERM)
         except PermissionError:

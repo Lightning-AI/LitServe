@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import contextlib
 import inspect
 import io
 import json
@@ -161,8 +162,6 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     monkeypatch.setattr(loop, "kill", lambda: None)
 
     # Expected to break the loop in test
-    import contextlib
-
     with contextlib.suppress(KeyboardInterrupt):
         loop._run_single_loop_with_async(lit_api_mock, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
@@ -222,6 +221,66 @@ def test_streaming_loop():
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
+
+
+class AsyncTestStreamLitAPI(LitAPI):
+    def setup(self, device) -> None:
+        pass
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        for i in range(x):
+            yield {"output": i}
+
+    async def encode_response(self, output):
+        for out in output:
+            yield out["output"]
+
+
+@pytest.mark.asyncio
+async def test_streaming_loop_process_streaming_request(mock_transport):
+    request = (0, "UUID-1234", time.monotonic(), {"input": 5})
+
+    lit_api = AsyncTestStreamLitAPI()
+    loop = StreamingLoop()
+    await loop._process_streaming_request(
+        request,
+        lit_api,
+        mock_transport,
+        NOOP_CB_RUNNER,
+    )
+
+    for i in range(5):
+        response = await mock_transport.areceive(consumer_id=request[0])
+        assert response == (
+            request[1],
+            (i, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING),
+        )
+
+
+def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
+    requests_queue = TestQueue()
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
+    requests_queue.put((None, None, None, None))  # Sentinel to stop the loop
+
+    lit_api = AsyncTestStreamLitAPI()
+    loop = StreamingLoop()
+
+    # Patch kill to do nothing in test
+    monkeypatch.setattr(loop, "kill", lambda: None)
+
+    # Expected to break the loop in test
+    with contextlib.suppress(KeyboardInterrupt):
+        loop.run_streaming_loop_async(lit_api, requests_queue, mock_transport, NOOP_CB_RUNNER)
+
+    for i in range(5):
+        response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+        assert response == (
+            "uuid-123",
+            (i, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING),
+        )
 
 
 class FakeBatchStreamTransport(DummyMessageTransport):
