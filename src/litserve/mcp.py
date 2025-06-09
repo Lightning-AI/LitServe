@@ -333,7 +333,7 @@ class _LitMCPServer:
         @self.mcp_app.list_tools()
         async def _list_tools():  # must be async, TODO: handle nicely!
             tools = self.list_tools()
-            logger.info(f"_list_tools called, returning: {tools}")
+            logger.debug(f"list tools called, returning: {tools}")
             return tools
 
         starlette_app = self.streamable_http_app()
