@@ -430,6 +430,10 @@ class _LitMCPServer:
         for tool in mcp_tools:
             self.add_tool(tool)
 
+        logger.warning(
+            "MCP support is in beta and APIs are subject to change. Please report any issues to https://github.com/Lightning-AI/litserve/issues"
+        )
+
         self._launch_with_fastapi(app)
 
         logger.info(
