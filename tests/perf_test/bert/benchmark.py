@@ -2,14 +2,31 @@ import logging
 import time
 
 import requests
+from requests.adapters import HTTPAdapter
 from tenacity import retry, stop_after_attempt
+from urllib3.util import Retry
 from utils import benchmark
 
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"
 MAX_SPEED = 390  # Nvidia 3090
 
-session = requests.Session()
+
+def create_session(pool_connections, pool_maxsize, max_retries=3):
+    """Create a session object with custom connection pool settings."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=0.1,
+    )
+    adapter = HTTPAdapter(pool_connections=pool_connections, pool_maxsize=pool_maxsize, max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+# Initialize session with reasonable defaults
+session = create_session(pool_connections=50, pool_maxsize=50)
 
 
 def get_average_throughput(num_requests=100, num_samples=10):
@@ -34,7 +51,7 @@ def get_average_throughput(num_requests=100, num_samples=10):
 def main():
     for i in range(10):
         try:
-            resp = requests.get("http://localhost:8000/health")
+            resp = session.get("http://localhost:8000/health")
             if resp.status_code == 200:
                 break
         except requests.exceptions.ConnectionError as e:
