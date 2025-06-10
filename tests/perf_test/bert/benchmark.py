@@ -41,11 +41,11 @@ def get_average_throughput(num_requests=100, num_samples=10):
     # warmup
     benchmark(num_requests=50, concurrency_level=10, print_metrics=False)
     for i in range(num_samples):
-        bnmk = benchmark(num_requests=num_requests, concurrency_level=num_requests)
+        bnmk = benchmark(num_requests=num_requests, concurrency_level=num_requests, print_metrics=False)
         metric += bnmk[key]
         latency += bnmk[latency_key]
-        if i % 10 == 0:
-            console.print(f"Completed {i} samples", style="bold green")
+        if (i + 1) % 10 == 0:
+            console.print(f"Completed {i + 1} samples", style="bold green")
     avg = metric / num_samples
     console.print("-" * 50, style="bold blue")
     console.print("BERT Performance Test Results", style="bold blue")
@@ -68,6 +68,8 @@ def main():
         time.sleep(10)
 
     rps = get_average_throughput(100, num_samples=10)
+    if rps < MAX_SPEED:
+        console.print(f"\nPerformance test failed. Retrying... (Expected: {MAX_SPEED}, Got: {rps})", style="bold red")
     assert rps >= MAX_SPEED, f"Expected RPS to be greater than {MAX_SPEED}, got {rps}"
 
 
