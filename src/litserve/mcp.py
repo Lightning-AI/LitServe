@@ -15,7 +15,7 @@
 
 import inspect
 import logging
-from typing import TYPE_CHECKING, Any, Dict, get_origin
+from typing import TYPE_CHECKING, Any, Dict, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -88,7 +88,11 @@ def extract_input_schema(func) -> Dict[str, Any]:
         schema_type = _python_type_to_json_schema(param_type)
 
         # Create property entry
-        property_schema = {"title": _param_name_to_title(param_name), "type": schema_type}
+        property_schema = {"title": _param_name_to_title(param_name)}
+        if isinstance(schema_type, str):
+            property_schema["type"] = schema_type
+        else:
+            property_schema.update(schema_type)
 
         # Add Field metadata if available
         if field_info is not None:
@@ -136,13 +140,20 @@ def extract_input_schema(func) -> Dict[str, Any]:
     return schema
 
 
-def _python_type_to_json_schema(python_type) -> str:
-    """Convert Python type annotation to JSON schema type string."""
+def _python_type_to_json_schema(python_type) -> str | dict:
+    """Convert Python type annotation to JSON schema type string or dict."""
     if python_type == inspect.Parameter.empty:
         return "string"  # Default to string if no type annotation
 
     # Handle basic types
-    type_mapping = {int: "integer", float: "number", str: "string", bool: "boolean", list: "array", dict: "object"}
+    type_mapping = {
+        int: "integer",
+        float: "number",
+        str: "string",
+        bool: "boolean",
+        list: "array",
+        dict: "object",
+    }
 
     # Check if it's a basic type
     if python_type in type_mapping:
@@ -151,6 +162,18 @@ def _python_type_to_json_schema(python_type) -> str:
     # Handle typing module types (List, Dict, Optional, etc.)
     origin = get_origin(python_type)
     if origin is not None:
+        # Handle Optional types (Union[T, None])
+        if origin is Union:
+            args = get_args(python_type)
+            if len(args) == 2 and type(None) in args:
+                # Get the non-None type
+                actual_type = next(arg for arg in args if arg is not type(None))
+                base_type = _python_type_to_json_schema(actual_type)
+                if isinstance(base_type, str):
+                    return {"type": base_type, "nullable": True}
+                base_type["nullable"] = True
+                return base_type
+
         if origin in type_mapping:
             return type_mapping[origin]
         if origin is list:
