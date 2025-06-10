@@ -58,7 +58,7 @@ def main(
         api,
         workers_per_device=workers_per_device,
         accelerator="auto",
-        devices=1,
+        devices=devices,
         timeout=200,
         fast_queue=True,
     )
