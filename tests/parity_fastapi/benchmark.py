@@ -7,6 +7,8 @@ import numpy as np
 import requests
 import torch
 from PIL import Image
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 device = "mps" if torch.backends.mps.is_available() else device
@@ -24,12 +26,26 @@ for file in ["image1.jpg", "image2.jpg"]:
         payloads.append(encoded_string)
 
 
-def send_request(port):
+def create_session(pool_connections, pool_maxsize, max_retries=3):
+    """Create a session object with custom connection pool settings."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=0.1,
+    )
+    adapter = HTTPAdapter(pool_connections=pool_connections, pool_maxsize=pool_maxsize, max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+def send_request(args):
     """Function to send a single request and measure the response time."""
+    session, port = args
     url = SERVER_URL.format(port)
     payload = {"image_data": random.choice(payloads)}
     start_time = time.time()
-    response = requests.post(url, json=payload)
+    response = session.post(url, json=payload)
     end_time = time.time()
     return end_time - start_time, response.status_code
 
@@ -37,9 +53,13 @@ def send_request(port):
 def benchmark(num_requests=100, concurrency_level=100, port=8000):
     """Benchmark the ML server."""
 
+    # Create a session with appropriate pool size
+    session = create_session(pool_connections=min(concurrency_level, 100), pool_maxsize=min(concurrency_level, 100))
+
     start_benchmark_time = time.time()  # Start benchmark timing
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency_level) as executor:
-        futures = [executor.submit(send_request, port) for _ in range(num_requests)]
+        # Pass session to each request
+        futures = [executor.submit(send_request, (session, port)) for _ in range(num_requests)]
         response_times = []
         status_codes = []
 
@@ -47,6 +67,8 @@ def benchmark(num_requests=100, concurrency_level=100, port=8000):
             response_time, status_code = future.result()
             response_times.append(response_time)
             status_codes.append(status_code)
+
+    session.close()  # Clean up the session
 
     end_benchmark_time = time.time()  # End benchmark timing
     total_benchmark_time = end_benchmark_time - start_benchmark_time  # Time in seconds
