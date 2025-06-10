@@ -5,6 +5,8 @@ import time
 import gpustat
 import psutil
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 from tests.perf_test.bert.data import phrases
 
@@ -20,7 +22,22 @@ def create_random_batch(size: int):
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"
 
-session = requests.Session()
+
+def create_session(pool_connections, pool_maxsize, max_retries=3):
+    """Create a session object with custom connection pool settings."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=0.1,
+    )
+    adapter = HTTPAdapter(pool_connections=pool_connections, pool_maxsize=pool_maxsize, max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+# Initialize session with reasonable defaults
+session = create_session(pool_connections=50, pool_maxsize=50)
 
 executor = None
 
@@ -36,7 +53,12 @@ def send_request():
 
 def benchmark(num_requests=1000, concurrency_level=50, print_metrics=True):
     """Benchmark the ML server."""
-    global executor
+    global executor, session
+
+    # Update session if concurrency level changes
+    if session.adapters["http://"].poolmanager.connection_pool_kw["maxsize"] < concurrency_level:
+        session = create_session(pool_connections=min(concurrency_level, 100), pool_maxsize=min(concurrency_level, 100))
+
     if executor is None:
         print("creating executor")
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency_level)

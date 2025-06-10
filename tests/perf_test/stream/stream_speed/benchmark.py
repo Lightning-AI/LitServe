@@ -4,7 +4,9 @@ import logging
 import time
 
 import requests
+from requests.adapters import HTTPAdapter
 from tenacity import retry, stop_after_attempt
+from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 # Configuration
@@ -15,7 +17,24 @@ EXPECTED_TTFT = 0.005  # time to first token
 # tokens per second
 MAX_SPEED = 3600  # 3600 on GitHub CI, 10000 on M3 Pro
 
-session = requests.Session()
+
+def create_session(pool_connections=10, pool_maxsize=10, max_retries=3):
+    """Create a session object with custom connection pool settings."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=0.1,
+        # Don't retry on streaming requests
+        allowed_methods=frozenset(["GET", "POST"]),
+    )
+    adapter = HTTPAdapter(pool_connections=pool_connections, pool_maxsize=pool_maxsize, max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+# Initialize session with reasonable defaults for streaming
+session = create_session(pool_connections=10, pool_maxsize=10)
 
 
 def speed_test():
@@ -42,7 +61,7 @@ def speed_test():
 def main():
     for i in range(10):
         try:
-            resp = requests.get("http://localhost:8000/health")
+            resp = session.get("http://localhost:8000/health")
             if resp.status_code == 200:
                 break
         except requests.exceptions.ConnectionError as e:
