@@ -21,11 +21,11 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from pydantic import BaseModel
 
-from litserve.mcp import LitMCPSpec
 from litserve.specs.base import LitSpec
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
+    from litserve.mcp import LitMCPSpec
 
 
 class LitAPI(ABC):

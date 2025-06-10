@@ -25,7 +25,6 @@ from fastapi import FastAPI
 from mcp.server.fastmcp.server import _convert_to_content
 from mcp.server.lowlevel import Server as MCPServer
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from mcp.types import Tool as ToolType
 from pydantic import BaseModel
 from starlette.applications import Starlette
 from starlette.routing import Mount
@@ -271,7 +270,7 @@ class LitMCPSpec:
         # avoid tight coupling between LitAPI and LitMCPSpec
         self.lit_api = weakref.proxy(lit_api)
 
-    def as_tool(self) -> ToolType:
+    def as_tool(self) -> types.Tool:
         if not is_package_installed("mcp"):
             raise RuntimeError("MCP is not installed. Please install it with `uv pip install mcp[cli]`")
 
@@ -283,13 +282,13 @@ class LitMCPSpec:
         if not description or len(description) == 0:
             raise ValueError("Description is required for MCP tool")
 
-        logger.info(f"Creating MCP tool for `{name}` with description `{description}`")
+        logger.debug(f"Creating MCP tool for `{name}` with description `{description}`")
 
         input_schema = extract_input_schema(self.lit_api.decode_request)
         if name.startswith("/"):
             name = name[1:]
         name = name.replace("/", "_")
-        return ToolType(
+        return types.Tool(
             name=name,
             description=description,
             inputSchema=input_schema,
@@ -389,11 +388,11 @@ class _LitMCPServer:
                 json_response=True,
                 stateless=True,
             )
-        logger.info(f"run mcp server, app: {app}")
+        logger.debug(f"run mcp server, app: {app}")
         async with self.request_handler._session_manager.run():
             yield
 
-    def launch_with_fastapi(self, app: FastAPI):
+    def _launch_with_fastapi(self, app: FastAPI):
         @self.mcp_app.list_tools()
         async def _list_tools():  # must be async, TODO: handle nicely!
             tools = self.list_tools()
@@ -404,23 +403,48 @@ class _LitMCPServer:
         async def _call_tool(name: str, arguments: dict):
             try:
                 endpoint_path = self.tool_endpoint_connections[name]
-                logger.info(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
+                logger.debug(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
                 if endpoint_path is None:
                     raise ValueError(f"Tool {name} not found")
 
-                logger.info(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
+                logger.debug(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
                 for route in app.routes:
                     if route.path == endpoint_path:
                         handler = route.endpoint
                         break
                 else:
                     raise ValueError(f"Endpoint {endpoint_path} not found")
-                logger.info(f"call tool called, returning: {handler}")
+                logger.debug(f"call tool called, returning: {handler}")
                 return await _call_handler(handler, **arguments)
             except Exception as e:
                 logger.error(f"Error calling tool {name}: {e}")
                 raise e
 
         starlette_app = self.request_handler.streamable_http_app()
-
         app.mount("/", starlette_app)
+
+    def connect_mcp_server(self, mcp_tools: List[types.Tool], app: FastAPI):
+        if len(mcp_tools) == 0:
+            return
+
+        for tool in mcp_tools:
+            self.add_tool(tool)
+
+        self._launch_with_fastapi(app)
+
+        logger.info(
+            "================================================"
+            "\n🎉 Enabled MCP server ⚡\n"
+            ""
+            "To integrate with Claude desktop, add the following to your Claude desktop settings:\n"
+            "Install mcp-remote with `npm install -g mcp-remote`\n\n"
+            """{
+  "mcpServers": {
+    "litserve": {
+      "command": "npx",
+      "args": [ "mcp-remote", "https://8000-YOUR_HOST_NAME.cloudspaces.litng.ai/mcp/"] # replace url with your server url + /mcp/
+    }
+  }
+}\n"""  # noqa: E501
+            "================================================\n"
+        )

@@ -36,7 +36,6 @@ import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
-from mcp import types
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -54,7 +53,7 @@ from litserve.transport.factory import TransportConfig, create_transport_from_co
 from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
 
 if TYPE_CHECKING:
-    pass
+    from mcp import types
 
 mp.allow_connection_pickling()
 
@@ -246,7 +245,7 @@ class _LitAPIConnector:
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
 
-    def get_mcp_tools(self) -> List[types.Tool]:
+    def get_mcp_tools(self) -> List["types.Tool"]:
         mcp_tools = []
         for lit_api in self.lit_apis:
             if lit_api.mcp_spec:
@@ -578,7 +577,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = False
-        self.mcp_server = _LitMCPServer()
+        self.mcp_server = None
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -1034,7 +1033,8 @@ class LitServer:
                 if lit_api.spec:
                     lit_api.spec.response_queue_id = response_queue_id
 
-            self._connect_mcp_server()
+            self.mcp_server = _LitMCPServer()
+            self.mcp_server.connect_mcp_server(self.litapi_connector.get_mcp_tools(), self.app)
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
@@ -1104,33 +1104,3 @@ class LitServer:
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()
-
-    def _connect_mcp_server(self):
-        mcp_server = self.mcp_server
-
-        mcp_tools = self.litapi_connector.get_mcp_tools()
-        if len(mcp_tools) == 0:
-            return
-
-        for tool in mcp_tools:
-            mcp_server.add_tool(tool)
-
-        mcp_server.launch_with_fastapi(self.app)
-
-        print(
-            "================================================"
-            "\nEnabled MCP server at /sse\n"
-            "To integrate with Claude desktop, add the following to your Claude desktop settings:\n"
-            """{
-  "mcpServers": {
-    "litserve": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://8000-YOUR_HOST_NAME.cloudspaces.litng.ai/sse"
-      ]
-    }
-  }
-}\n"""
-            "================================================\n"
-        )
