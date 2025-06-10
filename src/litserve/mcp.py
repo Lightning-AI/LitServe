@@ -18,7 +18,7 @@ import json
 import logging
 import weakref
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, get_origin
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, get_args, get_origin
 
 import mcp.types as types
 from fastapi import FastAPI
@@ -33,10 +33,10 @@ from starlette.types import Receive, Scope, Send
 
 from litserve.utils import is_package_installed
 
-logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from litserve.api import LitAPI
+
+logger = logging.getLogger(__name__)
 
 
 def extract_input_schema(func) -> Dict[str, Any]:
@@ -54,6 +54,33 @@ def extract_input_schema(func) -> Dict[str, Any]:
     properties = {}
     required = []
     defs = {}
+
+    # If func is a Pydantic model class, use its schema directly
+    if isinstance(func, type) and issubclass(func, BaseModel):
+        model_schema = func.model_json_schema()
+        model_name = func.__name__
+
+        # Extract definitions if they exist
+        if "$defs" in model_schema:
+            defs.update(model_schema["$defs"])
+
+        # Remove $defs from the model schema and add it to our defs
+        model_schema_clean = {k: v for k, v in model_schema.items() if k != "$defs"}
+        defs[model_name] = model_schema_clean
+
+        # Reference the model in properties
+        properties[model_name.lower()] = {"$ref": f"#/$defs/{model_name}"}
+        required.append(model_name.lower())
+
+        schema = {
+            "properties": properties,
+            "required": required,
+            "title": f"{func.__name__}Arguments",
+            "type": "object",
+        }
+        if defs:
+            schema["$defs"] = defs
+        return schema
 
     for param_name, param in signature.parameters.items():
         # Skip *args and **kwargs
@@ -102,7 +129,11 @@ def extract_input_schema(func) -> Dict[str, Any]:
         schema_type = _python_type_to_json_schema(param_type)
 
         # Create property entry
-        property_schema = {"title": _param_name_to_title(param_name), "type": schema_type}
+        property_schema = {"title": _param_name_to_title(param_name)}
+        if isinstance(schema_type, str):
+            property_schema["type"] = schema_type
+        else:
+            property_schema.update(schema_type)
 
         # Add Field metadata if available
         if field_info is not None:
@@ -150,13 +181,20 @@ def extract_input_schema(func) -> Dict[str, Any]:
     return schema
 
 
-def _python_type_to_json_schema(python_type) -> str:
-    """Convert Python type annotation to JSON schema type string."""
+def _python_type_to_json_schema(python_type) -> Union[str, dict]:
+    """Convert Python type annotation to JSON schema type string or dict."""
     if python_type == inspect.Parameter.empty:
         return "string"  # Default to string if no type annotation
 
     # Handle basic types
-    type_mapping = {int: "integer", float: "number", str: "string", bool: "boolean", list: "array", dict: "object"}
+    type_mapping = {
+        int: "integer",
+        float: "number",
+        str: "string",
+        bool: "boolean",
+        list: "array",
+        dict: "object",
+    }
 
     # Check if it's a basic type
     if python_type in type_mapping:
@@ -165,6 +203,18 @@ def _python_type_to_json_schema(python_type) -> str:
     # Handle typing module types (List, Dict, Optional, etc.)
     origin = get_origin(python_type)
     if origin is not None:
+        # Handle Optional types (Union[T, None])
+        if origin is Union:
+            args = get_args(python_type)
+            if len(args) == 2 and type(None) in args:
+                # Get the non-None type
+                actual_type = next(arg for arg in args if arg is not type(None))
+                base_type = _python_type_to_json_schema(actual_type)
+                if isinstance(base_type, str):
+                    return {"type": base_type, "nullable": True}
+                base_type["nullable"] = True
+                return base_type
+
         if origin in type_mapping:
             return type_mapping[origin]
         if origin is list:
