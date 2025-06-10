@@ -3,6 +3,7 @@ import time
 
 import requests
 from requests.adapters import HTTPAdapter
+from rich.console import Console
 from tenacity import retry, stop_after_attempt
 from urllib3.util import Retry
 from utils import benchmark
@@ -10,6 +11,8 @@ from utils import benchmark
 # Configuration
 SERVER_URL = "http://0.0.0.0:8000/predict"
 MAX_SPEED = 390  # Nvidia 3090
+
+console = Console()
 
 
 def create_session(pool_connections, pool_maxsize, max_retries=3):
@@ -36,14 +39,20 @@ def get_average_throughput(num_requests=100, num_samples=10):
     latency = 0
 
     # warmup
-    benchmark(num_requests=50, concurrency_level=10)
+    benchmark(num_requests=50, concurrency_level=10, print_metrics=False)
     for i in range(num_samples):
         bnmk = benchmark(num_requests=num_requests, concurrency_level=num_requests)
         metric += bnmk[key]
         latency += bnmk[latency_key]
+        if i % 10 == 0:
+            console.print(f"Completed {i} samples", style="bold green")
     avg = metric / num_samples
-    print("avg RPS:", avg)
-    print("avg latency:", latency / num_samples)
+    console.print("-" * 50, style="bold blue")
+    console.print("BERT Performance Test Results", style="bold blue")
+    console.print("-" * 50, style="bold blue")
+    console.print("avg RPS:", avg)
+    console.print("avg latency:", latency / num_samples)
+    console.print("-" * 50, style="bold blue")
     return avg
 
 
