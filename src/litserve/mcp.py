@@ -17,7 +17,6 @@ import inspect
 import logging
 from typing import TYPE_CHECKING, Any, Dict, get_origin
 
-from mcp.server.fastmcp.server import _convert_to_content
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -168,14 +167,3 @@ def _param_name_to_title(param_name: str) -> str:
     # Split on underscores and capitalize each word
     words = param_name.split("_")
     return " ".join(word.capitalize() for word in words)
-
-
-async def _call_handler(handler, **kwargs):
-    sig = inspect.signature(handler)
-    bound = sig.bind_partial(**{
-        k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
-        for k, v in kwargs.items()
-        for name, p in sig.parameters.items()
-        if k == name
-    })
-    return _convert_to_content(await handler(*bound.args, **bound.kwargs))
