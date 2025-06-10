@@ -1,5 +1,5 @@
 import inspect
-from typing import Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -35,13 +35,18 @@ class MCPTestModel(BaseModel):
 def test_mcp_schema():
     schema = extract_input_schema(MCPTestModel)
     assert schema == {
-        "properties": {
-            "age": {"title": "Age", "type": "integer"},
-            "name": {"title": "Name", "type": "string"},
-        },
-        "required": ["name", "age"],
+        "properties": {"mcptestmodel": {"$ref": "#/$defs/MCPTestModel"}},
+        "required": ["mcptestmodel"],
         "title": "MCPTestModelArguments",
         "type": "object",
+        "$defs": {
+            "MCPTestModel": {
+                "properties": {"name": {"title": "Name", "type": "string"}, "age": {"title": "Age", "type": "integer"}},
+                "required": ["name", "age"],
+                "title": "MCPTestModel",
+                "type": "object",
+            }
+        },
     }, "Must adhere with MCP inputSchema format."
 
 
@@ -86,10 +91,21 @@ class MCPTestModelWithFields(BaseModel):
 def test_mcp_schema_with_fields():
     schema = extract_input_schema(MCPTestModelWithFields)
     assert schema == {
-        "properties": {"name": {"title": "Name", "type": "string"}, "age": {"title": "Age", "type": "string"}},
-        "required": ["age"],
+        "properties": {"mcptestmodelwithfields": {"$ref": "#/$defs/MCPTestModelWithFields"}},
+        "required": ["mcptestmodelwithfields"],
         "title": "MCPTestModelWithFieldsArguments",
         "type": "object",
+        "$defs": {
+            "MCPTestModelWithFields": {
+                "properties": {
+                    "name": {"default": "John", "title": "Name", "type": "string"},
+                    "age": {"maximum": 100, "minimum": 0, "title": "Age", "type": "integer"},
+                },
+                "required": ["age"],
+                "title": "MCPTestModelWithFields",
+                "type": "object",
+            }
+        },
     }
 
 
@@ -110,5 +126,62 @@ def test_mcp_schema_with_default_values():
     }, "Must adhere with MCP inputSchema format."
 
 
-if __name__ == "__main__":
-    test_mcp_schema_with_fields()
+def test_python_type_to_json_schema_complex():
+    # Test generic types
+    assert _python_type_to_json_schema(List[str]) == "array"
+    assert _python_type_to_json_schema(Dict[str, int]) == "object"
+
+    # Test nested optional types
+    assert _python_type_to_json_schema(Optional[List[str]]) == {"type": "array", "nullable": True}
+
+
+class ModelWithConstraints(BaseModel):
+    name: str = Field(min_length=3, max_length=50, description="User's full name")
+    age: int = Field(
+        gt=0,  # exclusive minimum
+        lt=150,  # exclusive maximum
+        description="User's age in years",
+    )
+
+
+def test_field_constraints():
+    schema = extract_input_schema(ModelWithConstraints)
+    print(schema)
+    assert schema == {
+        "properties": {"modelwithconstraints": {"$ref": "#/$defs/ModelWithConstraints"}},
+        "required": ["modelwithconstraints"],
+        "title": "ModelWithConstraintsArguments",
+        "type": "object",
+        "$defs": {
+            "ModelWithConstraints": {
+                "properties": {
+                    "name": {
+                        "description": "User's full name",
+                        "maxLength": 50,
+                        "minLength": 3,
+                        "title": "Name",
+                        "type": "string",
+                    },
+                    "age": {
+                        "description": "User's age in years",
+                        "exclusiveMaximum": 150,
+                        "exclusiveMinimum": 0,
+                        "title": "Age",
+                        "type": "integer",
+                    },
+                },
+                "required": ["name", "age"],
+                "title": "ModelWithConstraints",
+                "type": "object",
+            }
+        },
+    }
+
+
+def func_with_special_params(*args, **kwargs):
+    pass
+
+
+def test_args_kwargs_handling():
+    schema = extract_input_schema(func_with_special_params)
+    assert schema == {"properties": {}, "required": [], "title": "func_with_special_paramsArguments", "type": "object"}

@@ -41,6 +41,33 @@ def extract_input_schema(func) -> Dict[str, Any]:
     required = []
     defs = {}
 
+    # If func is a Pydantic model class, use its schema directly
+    if isinstance(func, type) and issubclass(func, BaseModel):
+        model_schema = func.model_json_schema()
+        model_name = func.__name__
+
+        # Extract definitions if they exist
+        if "$defs" in model_schema:
+            defs.update(model_schema["$defs"])
+
+        # Remove $defs from the model schema and add it to our defs
+        model_schema_clean = {k: v for k, v in model_schema.items() if k != "$defs"}
+        defs[model_name] = model_schema_clean
+
+        # Reference the model in properties
+        properties[model_name.lower()] = {"$ref": f"#/$defs/{model_name}"}
+        required.append(model_name.lower())
+
+        schema = {
+            "properties": properties,
+            "required": required,
+            "title": f"{func.__name__}Arguments",
+            "type": "object",
+        }
+        if defs:
+            schema["$defs"] = defs
+        return schema
+
     for param_name, param in signature.parameters.items():
         # Skip *args and **kwargs
         if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
