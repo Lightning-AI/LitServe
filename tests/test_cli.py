@@ -43,10 +43,10 @@ def test_ensure_lightning_installed(mock_check_call, mock_is_package_installed):
 
 # TODO: Remove this once we have a fix for Python 3.9 and 3.10
 @pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
-@patch("importlib.util.find_spec")
+@patch("litserve.cli.is_package_installed")
 @patch("subprocess.check_call")
 @patch("builtins.__import__")
-def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_find_spec):
+def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_is_package_installed):
     # Create a mock for the lightning_sdk module and its components
     mock_lightning_sdk = MagicMock()
     mock_lightning_sdk.cli.entrypoint.main_cli = MagicMock()
@@ -60,7 +60,7 @@ def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_fin
     mock_import.side_effect = side_effect
 
     # Test when lightning_sdk is not installed but gets installed dynamically
-    mock_find_spec.side_effect = [False, True]  # First call returns False, second call returns True
+    mock_is_package_installed.side_effect = [False, True]  # First call returns False, second call returns True
     test_args = ["lightning", "run", "app", "app.py"]
 
     with patch.object(sys, "argv", test_args):
