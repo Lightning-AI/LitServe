@@ -82,6 +82,13 @@ def wrap_litserve_start(server: "LitServer"):
     for lit_api in server.litapi_connector:
         server.inference_workers.extend(server.launch_inference_worker(lit_api))
     server._prepare_app_run(server.app)
+    if is_package_installed("mcp"):
+        from litserve.mcp import _LitMCPServer
+
+        server.mcp_server = _LitMCPServer()
+    else:
+        server.mcp_server = None
+
     try:
         yield server
     finally:
