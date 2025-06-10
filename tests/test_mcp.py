@@ -1,7 +1,13 @@
 import inspect
+import sys
 from typing import Dict, List, Optional
 
+import pytest
 from pydantic import BaseModel, Field
+
+if sys.version_info < (3, 10):
+    pytest.skip("Skipping test_mcp.py on Python < 3.10", allow_module_level=True)
+
 
 from litserve.mcp import _param_name_to_title, _python_type_to_json_schema, extract_input_schema
 
