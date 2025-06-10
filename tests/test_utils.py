@@ -13,6 +13,7 @@ from litserve.utils import (
     configure_logging,
     dump_exception,
     generate_random_zmq_address,
+    is_package_installed,
     set_trace_if_debug,
 )
 
@@ -85,3 +86,8 @@ def test_set_trace_if_debug_not_set(mock_forked_pdb):
     with mock.patch("litserve.utils.os.environ", {"LITSERVE_DEBUG": "0"}):
         set_trace_if_debug()
     mock_forked_pdb.assert_not_called()
+
+
+def test_is_package_installed():
+    assert is_package_installed("pytest")
+    assert not is_package_installed("nonexistent_package")
