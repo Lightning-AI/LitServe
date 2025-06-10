@@ -26,6 +26,7 @@ def main(gh_run_id: str = ""):
 
     finally:
         s.stop()
+        s.delete()
 
 
 if __name__ == "__main__":
