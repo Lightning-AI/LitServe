@@ -140,7 +140,7 @@ def extract_input_schema(func) -> Dict[str, Any]:
     return schema
 
 
-def _python_type_to_json_schema(python_type) -> str | dict:
+def _python_type_to_json_schema(python_type) -> Union[str, dict]:
     """Convert Python type annotation to JSON schema type string or dict."""
     if python_type == inspect.Parameter.empty:
         return "string"  # Default to string if no type annotation
