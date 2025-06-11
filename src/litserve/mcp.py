@@ -243,12 +243,22 @@ async def _call_handler(handler, **kwargs):
     return _convert_to_content(await handler(*bound.args, **bound.kwargs))
 
 
-class LitMCPSpec:
-    """LitMCPSpec is a spec that can be used to create MCP tools for LitServe endpoints.
+class ToolEndpointType(types.Tool):
+    endpoint: str
 
-    It doesn't affect LitAPI.
 
-    """
+class MCP:
+    """MCP is a spec that can be used to create MCP tools for LitServe endpoints. It doesn't affect LitAPI.
+
+    Example:
+        >>> api = LitAPI(mcp=MCP(description="A simple API", input_schema={"name": "string"}))
+
+
+    Spec vs MCP:
+        - specs (like the OpenAI spec) affects the API endpoint, the request-response format, and the LitAPI methods.
+        - MCP, on the other hand, works differently. It doesn't follow the OpenAI spec. Instead, it only uses metadata like the name and description to generate an additional endpoint via MCPServer.
+
+    """  # noqa: E501
 
     def __init__(
         self,
@@ -265,14 +275,21 @@ class LitMCPSpec:
         self.name = name
         self.description = description
         self.input_schema = input_schema
+        self._connected = False
 
     def _connect(self, lit_api: "LitAPI"):
         # avoid tight coupling between LitAPI and LitMCPSpec
         self.lit_api = weakref.proxy(lit_api)
+        self._connected = True
 
-    def as_tool(self) -> types.Tool:
+    def as_tool(self) -> ToolEndpointType:
         if not is_package_installed("mcp"):
-            raise RuntimeError("MCP is not installed. Please install it with `uv pip install mcp[cli]`")
+            raise RuntimeError(
+                "MCP is not installed. Please install it with `pip install mcp[cli]` or `uv pip install mcp[cli]`"
+            )
+
+        if not self._connected:
+            raise RuntimeError("MCP is not connected to a LitAPI.")
 
         name = self.name or self.lit_api.api_path
         description = self.description or self.lit_api.__doc__
@@ -284,11 +301,16 @@ class LitMCPSpec:
 
         logger.debug(f"Creating MCP tool for `{name}` with description `{description}`")
 
-        input_schema = extract_input_schema(self.lit_api.decode_request)
+        if self.input_schema:
+            input_schema = self.input_schema
+        else:
+            logger.warning("No input schema provided for MCP tool. Using decode_request to extract it.")
+            input_schema = extract_input_schema(self.lit_api.decode_request)
+
         if name.startswith("/"):
             name = name[1:]
         name = name.replace("/", "_")
-        return types.Tool(
+        return ToolEndpointType(
             name=name,
             description=description,
             inputSchema=input_schema,
@@ -368,11 +390,11 @@ class _LitMCPServer:
         self.request_handler = _MCPRequestHandler(self.mcp_app)
         self.tool_endpoint_connections = {}
 
-    def add_tool(self, tool: types.Tool):
+    def add_tool(self, tool: ToolEndpointType):
         self.tool_endpoint_connections[tool.name] = tool.endpoint
         self.tools.append(tool)
 
-    def list_tools(self) -> List[types.Tool]:
+    def list_tools(self) -> List[ToolEndpointType]:
         return self.tools
 
     def call_tools(self, name: str, arguments: dict):

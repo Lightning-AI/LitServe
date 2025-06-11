@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 import litserve as ls
-from litserve.mcp import LitMCPSpec
+from litserve.mcp import MCP
 
 
 class PowerRequest(BaseModel):
@@ -15,6 +15,6 @@ class MyLitAPI(ls.test_examples.SimpleLitAPI):
 
 
 if __name__ == "__main__":
-    api = MyLitAPI(mcp_spec=LitMCPSpec(description="Returns the power of a number."))
+    api = MyLitAPI(mcp_spec=MCP(description="Returns the power of a number."))
     server = ls.LitServer(api)
     server.run(port=8000)

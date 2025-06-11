@@ -20,10 +20,11 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 
 import psutil
+import pytest
 import requests
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
 from openai import OpenAI
+
+from litserve.utils import is_package_installed
 
 
 def e2e_from_file(filename):
@@ -419,8 +420,12 @@ def test_e2e_openai_embedding_with_batching():
     assert len(responses) == 4, f"Expected 4 responses but got {len(responses)}"
 
 
+@pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
 @e2e_from_file("tests/e2e/default_mcp.py")
 def test_mcp_server():
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
     async def main():
         async with streamablehttp_client("http://localhost:8000/mcp/") as (
             read_stream,

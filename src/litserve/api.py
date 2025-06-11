@@ -25,7 +25,7 @@ from litserve.specs.base import LitSpec
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
-    from litserve.mcp import LitMCPSpec
+    from litserve.mcp import MCP
 
 
 class LitAPI(ABC):
@@ -44,7 +44,7 @@ class LitAPI(ABC):
         stream: bool = False,
         loop: Optional[Union[str, "LitLoop"]] = "auto",
         spec: Optional[LitSpec] = None,
-        mcp_spec: Optional["LitMCPSpec"] = None,
+        mcp: Optional["MCP"] = None,
         enable_async: bool = False,
     ):
         """Initialize a LitAPI instance that defines the model's inference behavior.
@@ -73,7 +73,7 @@ class LitAPI(ABC):
                 API specification defining input/output schemas and behavior. Use OpenAISpec for
                 OpenAI-compatible APIs or custom LitSpec implementations. Defaults to None.
 
-            mcp_spec (LitMCPSpec, optional):
+            mcp (MCP, optional):
                 Enable MCP server for the API. Provide tool description and input schema. Defaults to None.
 
             enable_async (bool, optional):
@@ -92,6 +92,9 @@ class LitAPI(ABC):
 
             >>> # Async processing
             >>> api = LitAPI(enable_async=True)
+
+            >>> # MCP server
+            >>> api = LitAPI(mcp=MCP(description="A simple API", input_schema={"name": "string"}))
 
         Note:
             You must implement setup(), predict(), and optionally decode_request()/encode_response()
@@ -138,9 +141,9 @@ class LitAPI(ABC):
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
         self._validate_async_methods()
-        self.mcp_spec = mcp_spec
-        if mcp_spec:
-            mcp_spec._connect(self)
+        self.mcp = mcp
+        if mcp:
+            mcp._connect(self)
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""

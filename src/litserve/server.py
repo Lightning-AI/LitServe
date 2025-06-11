@@ -61,7 +61,7 @@ from litserve.utils import (
 _MCP_AVAILABLE = is_package_installed("mcp")
 
 if TYPE_CHECKING:
-    from mcp import types
+    from litserve.mcp import ToolEndpointType
 
 mp.allow_connection_pickling()
 
@@ -253,11 +253,11 @@ class _LitAPIConnector:
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
 
-    def get_mcp_tools(self) -> List["types.Tool"]:
+    def get_mcp_tools(self) -> List["ToolEndpointType"]:
         mcp_tools = []
         for lit_api in self.lit_apis:
-            if lit_api.mcp_spec:
-                mcp_tools.append(lit_api.mcp_spec.as_tool())
+            if lit_api.mcp:
+                mcp_tools.append(lit_api.mcp.as_tool())
         return mcp_tools
 
 
