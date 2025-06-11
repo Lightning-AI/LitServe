@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import asyncio
 import json
 import os
 import subprocess
@@ -422,18 +421,16 @@ def test_e2e_openai_embedding_with_batching():
 
 @pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
 @e2e_from_file("tests/e2e/default_mcp.py")
-def test_mcp_server():
+@pytest.mark.asyncio
+async def test_mcp_server():
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
-    async def main():
-        async with streamablehttp_client("http://localhost:8000/mcp/") as (
-            read_stream,
-            write_stream,
-            _,
-        ), ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            result = await session.list_tools()
-            assert len(result.tools) == 1, f"Expected 1 tool. Result: {result}"
-
-    asyncio.run(main())
+    async with streamablehttp_client("http://localhost:8000/mcp/") as (
+        read_stream,
+        write_stream,
+        _,
+    ), ClientSession(read_stream, write_stream) as session:
+        await session.initialize()
+        result = await session.list_tools()
+        assert len(result.tools) == 1, f"Expected 1 tool. Result: {result}"
