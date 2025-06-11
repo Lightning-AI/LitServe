@@ -3,13 +3,21 @@ import sys
 from typing import Dict, List, Optional
 
 import pytest
+from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from starlette.applications import Starlette
 
 if sys.version_info < (3, 10):
     pytest.skip("Skipping test_mcp.py on Python < 3.10", allow_module_level=True)
 
 import litserve as ls
-from litserve.mcp import MCP, _param_name_to_title, _python_type_to_json_schema, extract_input_schema
+from litserve.mcp import (
+    MCP,
+    _LitMCPServerConnector,
+    _param_name_to_title,
+    _python_type_to_json_schema,
+    extract_input_schema,
+)
 
 
 def test_python_type_to_json_schema():
@@ -241,3 +249,19 @@ def test_mcp_cls_with_lit_api_no_input_schema():
             }
         },
     }
+
+
+def test_mcp_litserve_connector():
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API", input_schema={"name": "string"})
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool)
+    assert api.mcp is mcp
+    assert connector.list_tools() == [tool]
+    assert connector.tool_endpoint_connections == {"predict": "/predict"}
+
+    app = FastAPI()
+    connector.connect_mcp_server([tool], app)
+    mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
+    assert isinstance(mcp_mount.app, Starlette)

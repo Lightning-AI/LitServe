@@ -263,7 +263,7 @@ class MCP:
     def __init__(
         self,
         description: Optional[str] = None,
-        input_schema: Optional[dict] = None,
+        input_schema: Optional[Dict[str, Any]] = None,
         name: Optional[str] = None,
     ):
         """
@@ -272,10 +272,21 @@ class MCP:
             description: The description of the MCP tool.
             input_schema: The input schema of the MCP tool.
         """
+        self._name = None
         self.name = name
         self.description = description
         self.input_schema = input_schema
         self._connected = False
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        if value and value.startswith("/"):
+            value = value[1:]
+        self._name = value.replace("/", "_") if value else None
 
     def _connect(self, lit_api: "LitAPI"):
         # avoid tight coupling between LitAPI and LitMCPSpec
@@ -299,7 +310,7 @@ class MCP:
         if not description or len(description) == 0:
             raise ValueError("Description is required for MCP tool")
 
-        logger.debug(f"Creating MCP tool for `{name}` with description `{description}`")
+        logger.debug("Creating MCP tool", extra={"name": name, "description": description})
 
         if self.input_schema:
             input_schema = self.input_schema
@@ -403,9 +414,6 @@ class _LitMCPServerConnector:
     def list_tools(self) -> List[ToolEndpointType]:
         return self.tools
 
-    def call_tools(self, name: str, arguments: dict):
-        return _convert_to_content(f"echo {name} {arguments}")
-
     @asynccontextmanager
     async def lifespan(self, app: Starlette):
         if self.request_handler._session_manager is None:
@@ -420,7 +428,7 @@ class _LitMCPServerConnector:
         async with self.request_handler._session_manager.run():
             yield
 
-    def _launch_with_fastapi(self, app: FastAPI):
+    def _mount_with_fastapi(self, app: FastAPI):
         """Mounts MCP server's Starlette app to the FastAPI app.
 
         Args:
@@ -456,7 +464,7 @@ class _LitMCPServerConnector:
                 raise e
 
         starlette_app = self.request_handler.streamable_http_app()
-        app.mount("/", starlette_app)
+        app.mount("/", starlette_app, name="mcp")
 
     def connect_mcp_server(self, mcp_tools: List[types.Tool], app: FastAPI):
         """LitServer calls this method to connect MCP server to the FastAPI app.
@@ -477,7 +485,7 @@ class _LitMCPServerConnector:
             "MCP support is in beta and APIs are subject to change. Please report any issues to https://github.com/Lightning-AI/litserve/issues"
         )
 
-        self._launch_with_fastapi(app)
+        self._mount_with_fastapi(app)
 
         logger.info(
             "================================================"
