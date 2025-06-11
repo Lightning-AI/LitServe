@@ -128,7 +128,7 @@ def _get_default_handler(stream, format):
 
 def configure_logging(
     level: Union[str, int] = logging.INFO,
-    format: str = "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
+    format: str = "%(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
     stream: TextIO = sys.stdout,
     use_rich: bool = False,
 ):
