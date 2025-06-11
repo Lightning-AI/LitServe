@@ -254,7 +254,7 @@ class SingleLoop(DefaultLoop):
                 task.add_done_callback(pending_tasks.discard)
 
         # Get the current event loop
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
 
         # Run the async process
         try:
