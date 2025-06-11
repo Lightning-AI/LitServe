@@ -207,6 +207,7 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 | Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
 | Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
 | [(2x)+ faster than plain FastAPI](#performance)                                               | ✅       | ✅                                 |
+| [Asynchronous support](https://lightning.ai/docs/litserve/features/async-concurrency)         | ✅       | ✅                                 |
 | [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)              | ✅       | ✅                                 |
 | [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)                 | ✅       | ✅                                 |
 | [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)                  | ✅       | ✅                                 |
@@ -217,8 +218,8 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 | [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control) | ✅       | ✅                                 |
 | [OpenAPI compliant](https://www.openapis.org/)                                                | ✅       | ✅                                 |
 | [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)             | ✅       | ✅                                 |
+| [MCP support](https://lightning.ai/docs/litserve/features/mcp)                                | ✅       | ✅                                 |
 | [Authentication](https://lightning.ai/docs/litserve/features/authentication)                  | ❌ DIY   | ✅ Token, password, custom         |
-| [MCP support](https://lightning.ai/docs/litserve/features/mcp)                                                            | ✅       | ✅                                 |
 | GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
 | Load balancing                   | ❌                                 | ✅ Built-in                        |
 | Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
