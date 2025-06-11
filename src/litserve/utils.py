@@ -82,6 +82,13 @@ def wrap_litserve_start(server: "LitServer"):
     for lit_api in server.litapi_connector:
         server.inference_workers.extend(server.launch_inference_worker(lit_api))
     server._prepare_app_run(server.app)
+    if is_package_installed("mcp"):
+        from litserve.mcp import _LitMCPServerConnector
+
+        server.mcp_server = _LitMCPServerConnector()
+    else:
+        server.mcp_server = None
+
     try:
         yield server
     finally:
@@ -121,7 +128,7 @@ def _get_default_handler(stream, format):
 
 def configure_logging(
     level: Union[str, int] = logging.INFO,
-    format: str = "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
+    format: str = "%(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
     stream: TextIO = sys.stdout,
     use_rich: bool = False,
 ):

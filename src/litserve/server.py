@@ -29,7 +29,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
@@ -49,7 +49,19 @@ from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
-from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
+from litserve.utils import (
+    LitAPIStatus,
+    LoopResponseType,
+    WorkerSetupStatus,
+    call_after_stream,
+    configure_logging,
+    is_package_installed,
+)
+
+_MCP_AVAILABLE = is_package_installed("mcp")
+
+if TYPE_CHECKING:
+    from litserve.mcp import ToolEndpointType
 
 mp.allow_connection_pickling()
 
@@ -241,6 +253,13 @@ class _LitAPIConnector:
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
 
+    def get_mcp_tools(self) -> List["ToolEndpointType"]:
+        mcp_tools = []
+        for lit_api in self.lit_apis:
+            if lit_api.mcp:
+                mcp_tools.append(lit_api.mcp.as_tool())
+        return mcp_tools
+
 
 class BaseRequestHandler(ABC):
     def __init__(self, lit_api: LitAPI, server: "LitServer"):
@@ -281,6 +300,7 @@ class BaseRequestHandler(ABC):
 class RegularRequestHandler(BaseRequestHandler):
     async def handle_request(self, request, request_type) -> Response:
         try:
+            logger.info(f"Handling request: {request}")
             # Prepare request
             payload = await self._prepare_request(request, request_type)
 
@@ -565,6 +585,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = False
+        self.mcp_server = None
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -639,7 +660,11 @@ class LitServer:
         )
 
         try:
-            yield
+            if _MCP_AVAILABLE:
+                async with self.mcp_server.lifespan(app):
+                    yield
+            else:
+                yield
         finally:
             self._callback_runner.trigger_event(EventTypes.ON_SERVER_END.value, litserver=self)
 
@@ -1019,6 +1044,11 @@ class LitServer:
                 if lit_api.spec:
                     lit_api.spec.response_queue_id = response_queue_id
 
+            if _MCP_AVAILABLE:
+                from litserve.mcp import _LitMCPServerConnector
+
+                self.mcp_server = _LitMCPServerConnector()
+                self.mcp_server.connect_mcp_server(self.litapi_connector.get_mcp_tools(), self.app)
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)

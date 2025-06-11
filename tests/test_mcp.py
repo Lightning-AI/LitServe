@@ -1,9 +1,23 @@
 import inspect
+import sys
 from typing import Dict, List, Optional
 
+import pytest
+from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from starlette.applications import Starlette
 
-from litserve.mcp import _param_name_to_title, _python_type_to_json_schema, extract_input_schema
+if sys.version_info < (3, 10):
+    pytest.skip("Skipping test_mcp.py on Python < 3.10", allow_module_level=True)
+
+import litserve as ls
+from litserve.mcp import (
+    MCP,
+    _LitMCPServerConnector,
+    _param_name_to_title,
+    _python_type_to_json_schema,
+    extract_input_schema,
+)
 
 
 def test_python_type_to_json_schema():
@@ -185,3 +199,69 @@ def func_with_special_params(*args, **kwargs):
 def test_args_kwargs_handling():
     schema = extract_input_schema(func_with_special_params)
     assert schema == {"properties": {}, "required": [], "title": "func_with_special_paramsArguments", "type": "object"}
+
+
+class MCPLitAPI(ls.test_examples.SimpleLitAPI):
+    def decode_request(self, request: MCPTestModel) -> int:
+        return request.age
+
+
+def test_mcp_cls():
+    mc = MCP(description="A simple API", input_schema={"name": "string"})
+    assert mc.description == "A simple API"
+    assert mc.input_schema == {"name": "string"}
+    assert mc.name is None
+
+    with pytest.raises(RuntimeError, match="MCP is not connected to a LitAPI."):
+        mc.as_tool()
+
+
+def test_mcp_cls_with_lit_api():
+    mcp = MCP(description="A simple API", input_schema={"name": "string"})
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    assert api.mcp is mcp
+    assert tool.name == "predict"
+    assert tool.endpoint == "/predict"
+    assert tool.description == "A simple API"
+    assert tool.inputSchema == {"name": "string"}
+
+
+def test_mcp_cls_with_lit_api_no_input_schema():
+    mcp = MCP(description="A simple API")
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    assert api.mcp is mcp
+    assert tool.name == "predict"
+    assert tool.endpoint == "/predict"
+    assert tool.description == "A simple API"
+    assert tool.inputSchema == {
+        "properties": {"request": {"$ref": "#/$defs/MCPTestModel"}},
+        "required": ["request"],
+        "title": "decode_requestArguments",
+        "type": "object",
+        "$defs": {
+            "MCPTestModel": {
+                "properties": {"name": {"title": "Name", "type": "string"}, "age": {"title": "Age", "type": "integer"}},
+                "required": ["name", "age"],
+                "title": "MCPTestModel",
+                "type": "object",
+            }
+        },
+    }
+
+
+def test_mcp_litserve_connector():
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API", input_schema={"name": "string"})
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool)
+    assert api.mcp is mcp
+    assert connector.list_tools() == [tool]
+    assert connector.tool_endpoint_connections == {"predict": "/predict"}
+
+    app = FastAPI()
+    connector.connect_mcp_server([tool], app)
+    mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
+    assert isinstance(mcp_mount.app, Starlette)

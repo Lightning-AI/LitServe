@@ -243,7 +243,7 @@ class StreamingLoop(DefaultLoop):
                 pending_tasks.add(task)
                 task.add_done_callback(pending_tasks.discard)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
 
         try:
             loop.run_until_complete(process_requests())

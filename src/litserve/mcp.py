@@ -14,15 +14,28 @@
 """This module helps create MCP servers for LitServe endpoints."""
 
 import inspect
+import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Union, get_args, get_origin
+import weakref
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, get_args, get_origin
 
+import mcp.types as types
+from fastapi import FastAPI
+from mcp.server.fastmcp.server import _convert_to_content
+from mcp.server.lowlevel import Server as MCPServer
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from pydantic import BaseModel
+from starlette.applications import Starlette
+from starlette.routing import Mount
+from starlette.types import Receive, Scope, Send
 
-logger = logging.getLogger(__name__)
+from litserve.utils import is_package_installed
 
 if TYPE_CHECKING:
-    pass
+    from litserve.api import LitAPI
+
+logger = logging.getLogger(__name__)
 
 
 def extract_input_schema(func) -> Dict[str, Any]:
@@ -217,3 +230,276 @@ def _param_name_to_title(param_name: str) -> str:
     # Split on underscores and capitalize each word
     words = param_name.split("_")
     return " ".join(word.capitalize() for word in words)
+
+
+async def _call_handler(handler, **kwargs):
+    sig = inspect.signature(handler)
+    bound = sig.bind_partial(**{
+        k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
+        for k, v in kwargs.items()
+        for name, p in sig.parameters.items()
+        if k == name
+    })
+    return _convert_to_content(await handler(*bound.args, **bound.kwargs))
+
+
+class ToolEndpointType(types.Tool):
+    endpoint: str
+
+
+class MCP:
+    """MCP is a spec that can be used to create MCP tools for LitServe endpoints. It doesn't affect LitAPI.
+
+    Example:
+        >>> api = LitAPI(mcp=MCP(description="A simple API", input_schema={"name": "string"}))
+
+
+    Spec vs MCP:
+        - specs (like the OpenAI spec) affects the API endpoint, the request-response format, and the LitAPI methods.
+        - MCP, on the other hand, works differently. It doesn't follow the OpenAI spec. Instead, it only uses metadata like the name and description to generate an additional endpoint via MCPServer.
+
+    """  # noqa: E501
+
+    def __init__(
+        self,
+        description: Optional[str] = None,
+        input_schema: Optional[Dict[str, Any]] = None,
+        name: Optional[str] = None,
+    ):
+        """
+        Args:
+            name: The name of the MCP tool.
+            description: The description of the MCP tool.
+            input_schema: The input schema of the MCP tool.
+        """
+        self._name = None
+        self.name = name
+        self.description = description
+        self.input_schema = input_schema
+        self._connected = False
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        if value and value.startswith("/"):
+            value = value[1:]
+        self._name = value.replace("/", "_") if value else None
+
+    def _connect(self, lit_api: "LitAPI"):
+        # avoid tight coupling between LitAPI and LitMCPSpec
+        self.lit_api = weakref.proxy(lit_api)
+        self._connected = True
+
+    def as_tool(self) -> ToolEndpointType:
+        if not is_package_installed("mcp"):
+            raise RuntimeError(
+                "MCP is not installed. Please install it with `pip install mcp[cli]` or `uv pip install mcp[cli]`"
+            )
+
+        if not self._connected:
+            raise RuntimeError("MCP is not connected to a LitAPI.")
+
+        name = self.name or self.lit_api.api_path
+        description = self.description or self.lit_api.__doc__
+
+        if not name or len(name) == 0:
+            raise ValueError("Name is required for MCP tool")
+        if not description or len(description) == 0:
+            raise ValueError("Description is required for MCP tool")
+
+        logger.debug("Creating MCP tool", extra={"name": name, "description": description})
+
+        if self.input_schema:
+            input_schema = self.input_schema
+        else:
+            logger.warning("No input schema provided for MCP tool. Using decode_request to extract it.")
+            input_schema = extract_input_schema(self.lit_api.decode_request)
+
+        if name.startswith("/"):
+            name = name[1:]
+        name = name.replace("/", "_")
+        return ToolEndpointType(
+            name=name,
+            description=description,
+            inputSchema=input_schema,
+            endpoint=self.lit_api.api_path,
+        )
+
+
+class _MCPRequestHandler:
+    def __init__(self, mcp_server: MCPServer):
+        self.mcp_server = mcp_server
+        self._session_manager = None
+
+    @property
+    def session_manager(self):
+        if self._session_manager is None:
+            raise RuntimeError("Session manager not initialized")
+        return self._session_manager
+
+    async def handle_streamable_http(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            # Handle lifespan events (startup/shutdown)
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                await send({"type": "lifespan.startup.complete"})
+            elif message["type"] == "lifespan.shutdown":
+                await send({"type": "lifespan.shutdown.complete"})
+            return
+
+        if scope["type"] != "http":
+            # We only handle HTTP requests
+            return
+
+        try:
+            # Handle the HTTP request through the session manager
+            await self.session_manager.handle_request(scope, receive, send)
+        except Exception as e:
+            logger.error(f"Error handling request: {e}")
+            # Properly handle errors by sending an error response
+            error_message = {
+                "type": "http.response.start",
+                "status": 500,
+                "headers": [(b"content-type", b"application/json")],
+            }
+            await send(error_message)
+
+            body = json.dumps({"error": str(e)}).encode("utf-8")
+            await send({
+                "type": "http.response.body",
+                "body": body,
+            })
+
+    # https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/server/fastmcp/server.py
+    def streamable_http_app(self) -> Starlette:
+        # Create session manager on first call (lazy initialization)
+        if self._session_manager is None:
+            self._session_manager = StreamableHTTPSessionManager(
+                app=self.mcp_server,
+                event_store=None,
+                json_response=True,
+                stateless=True,  # Use the stateless setting
+            )
+
+        # Create the ASGI handler
+        handle_streamable_http = self.handle_streamable_http
+
+        # Create routes
+        routes: List[Mount] = [Mount("/mcp/", app=handle_streamable_http)]
+        return Starlette(
+            routes=routes,
+        )
+
+
+class _LitMCPServerConnector:
+    """Connects LitServer to MCP server.
+
+    It creates HTTP streamable MCP server with Starlette and mounts to the FastAPI app.
+
+    """
+
+    def __init__(self):
+        self.mcp_server = MCPServer("mcp-streamable-http-stateless")
+        self.tools = []
+        self.request_handler = _MCPRequestHandler(self.mcp_server)
+        self.tool_endpoint_connections = {}
+
+    def add_tool(self, tool: ToolEndpointType):
+        self.tool_endpoint_connections[tool.name] = tool.endpoint
+        self.tools.append(tool)
+
+    def list_tools(self) -> List[ToolEndpointType]:
+        return self.tools
+
+    @asynccontextmanager
+    async def lifespan(self, app: Starlette):
+        if self.request_handler._session_manager is None:
+            # Ensure session manager exists
+            self.request_handler._session_manager = StreamableHTTPSessionManager(
+                app=self.mcp_server,
+                event_store=None,
+                json_response=True,
+                stateless=True,
+            )
+        logger.debug(f"run mcp server, app: {app}")
+        async with self.request_handler._session_manager.run():
+            yield
+
+    def _mount_with_fastapi(self, app: FastAPI):
+        """Mounts MCP server's Starlette app to the FastAPI app.
+
+        Args:
+            app: LitServer's FastAPI app to mount the MCP server to.
+
+        """
+
+        @self.mcp_server.list_tools()
+        async def _list_tools():  # must be async
+            tools = self.list_tools()
+            logger.debug(f"list tools called, returning: {tools}")
+            return tools
+
+        @self.mcp_server.call_tool()
+        async def _call_tool(name: str, arguments: dict):
+            try:
+                endpoint_path = self.tool_endpoint_connections[name]
+                logger.debug(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
+                if endpoint_path is None:
+                    raise ValueError(f"Tool {name} not found")
+
+                logger.debug(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
+                for route in app.routes:
+                    if route.path == endpoint_path:
+                        handler = route.endpoint
+                        break
+                else:
+                    raise ValueError(f"Endpoint {endpoint_path} not found")
+                logger.debug(f"call tool called, returning: {handler}")
+                return await _call_handler(handler, **arguments)
+            except Exception as e:
+                logger.error(f"Error calling tool {name}: {e}")
+                raise e
+
+        starlette_app = self.request_handler.streamable_http_app()
+        app.mount("/", starlette_app, name="mcp")
+
+    def connect_mcp_server(self, mcp_tools: List[types.Tool], app: FastAPI):
+        """LitServer calls this method to connect MCP server to the FastAPI app.
+
+        Args:
+            mcp_tools: List of MCP tools to connect to the MCP server.
+            app: LitServer's FastAPI app to mount the MCP server to.
+
+        """
+
+        if len(mcp_tools) == 0:
+            return
+
+        for tool in mcp_tools:
+            self.add_tool(tool)
+
+        logger.warning(
+            "MCP support is in beta and APIs are subject to change. Please report any issues to https://github.com/Lightning-AI/litserve/issues"
+        )
+
+        self._mount_with_fastapi(app)
+
+        logger.info(
+            "================================================"
+            "\n🎉 Enabled MCP server ⚡\n"
+            ""
+            "To integrate with Claude desktop, add the following to your Claude desktop settings:\n"
+            "Install mcp-remote with `npm install -g mcp-remote`\n\n"
+            """{
+  "mcpServers": {
+    "litserve": {
+      "command": "npx",
+      "args": [ "mcp-remote", "https://8000-YOUR_HOST_NAME.cloudspaces.litng.ai/mcp/"] # replace url with your server url + /mcp/
+    }
+  }
+}\n"""  # noqa: E501
+            "================================================\n"
+        )
