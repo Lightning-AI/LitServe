@@ -218,6 +218,7 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 | [OpenAPI compliant](https://www.openapis.org/)                                                | ✅       | ✅                                 |
 | [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)             | ✅       | ✅                                 |
 | [Authentication](https://lightning.ai/docs/litserve/features/authentication)                  | ❌ DIY   | ✅ Token, password, custom         |
+| [MCP support](https://lightning.ai/docs/litserve/features/mcp)                                                            | ✅       | ✅                                 |
 | GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
 | Load balancing                   | ❌                                 | ✅ Built-in                        |
 | Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
