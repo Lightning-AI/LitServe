@@ -1045,9 +1045,9 @@ class LitServer:
                     lit_api.spec.response_queue_id = response_queue_id
 
             if _MCP_AVAILABLE:
-                from litserve.mcp import _LitMCPServer
+                from litserve.mcp import _LitMCPServerConnector
 
-                self.mcp_server = _LitMCPServer()
+                self.mcp_server = _LitMCPServerConnector()
                 self.mcp_server.connect_mcp_server(self.litapi_connector.get_mcp_tools(), self.app)
             app: FastAPI = copy.copy(self.app)
 

@@ -319,8 +319,8 @@ class MCP:
 
 
 class _MCPRequestHandler:
-    def __init__(self, mcp_app: MCPServer):
-        self.mcp_app = mcp_app
+    def __init__(self, mcp_server: MCPServer):
+        self.mcp_server = mcp_server
         self._session_manager = None
 
     @property
@@ -367,7 +367,7 @@ class _MCPRequestHandler:
         # Create session manager on first call (lazy initialization)
         if self._session_manager is None:
             self._session_manager = StreamableHTTPSessionManager(
-                app=self.mcp_app,
+                app=self.mcp_server,
                 event_store=None,
                 json_response=True,
                 stateless=True,  # Use the stateless setting
@@ -383,11 +383,17 @@ class _MCPRequestHandler:
         )
 
 
-class _LitMCPServer:
+class _LitMCPServerConnector:
+    """Connects LitServer to MCP server.
+
+    It creates HTTP streamable MCP server with Starlette and mounts to the FastAPI app.
+
+    """
+
     def __init__(self):
-        self.mcp_app = MCPServer("mcp-streamable-http-stateless")
+        self.mcp_server = MCPServer("mcp-streamable-http-stateless")
         self.tools = []
-        self.request_handler = _MCPRequestHandler(self.mcp_app)
+        self.request_handler = _MCPRequestHandler(self.mcp_server)
         self.tool_endpoint_connections = {}
 
     def add_tool(self, tool: ToolEndpointType):
@@ -405,7 +411,7 @@ class _LitMCPServer:
         if self.request_handler._session_manager is None:
             # Ensure session manager exists
             self.request_handler._session_manager = StreamableHTTPSessionManager(
-                app=self.mcp_app,
+                app=self.mcp_server,
                 event_store=None,
                 json_response=True,
                 stateless=True,
@@ -415,13 +421,20 @@ class _LitMCPServer:
             yield
 
     def _launch_with_fastapi(self, app: FastAPI):
-        @self.mcp_app.list_tools()
-        async def _list_tools():  # must be async, TODO: handle nicely!
+        """Mounts MCP server's Starlette app to the FastAPI app.
+
+        Args:
+            app: LitServer's FastAPI app to mount the MCP server to.
+
+        """
+
+        @self.mcp_server.list_tools()
+        async def _list_tools():  # must be async
             tools = self.list_tools()
             logger.debug(f"list tools called, returning: {tools}")
             return tools
 
-        @self.mcp_app.call_tool()
+        @self.mcp_server.call_tool()
         async def _call_tool(name: str, arguments: dict):
             try:
                 endpoint_path = self.tool_endpoint_connections[name]
@@ -446,6 +459,14 @@ class _LitMCPServer:
         app.mount("/", starlette_app)
 
     def connect_mcp_server(self, mcp_tools: List[types.Tool], app: FastAPI):
+        """LitServer calls this method to connect MCP server to the FastAPI app.
+
+        Args:
+            mcp_tools: List of MCP tools to connect to the MCP server.
+            app: LitServer's FastAPI app to mount the MCP server to.
+
+        """
+
         if len(mcp_tools) == 0:
             return
 

@@ -83,9 +83,9 @@ def wrap_litserve_start(server: "LitServer"):
         server.inference_workers.extend(server.launch_inference_worker(lit_api))
     server._prepare_app_run(server.app)
     if is_package_installed("mcp"):
-        from litserve.mcp import _LitMCPServer
+        from litserve.mcp import _LitMCPServerConnector
 
-        server.mcp_server = _LitMCPServer()
+        server.mcp_server = _LitMCPServerConnector()
     else:
         server.mcp_server = None
 
