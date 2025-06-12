@@ -394,74 +394,243 @@ class LitServer:
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
     ):
-        """Initialize a LitServer instance for high-performance model inference.
+        """Initialize a LitServer for high-performance AI model serving.
+
+        LitServer transforms AI models into production-ready APIs with automatic scaling,
+        batching, streaming, and multi-GPU support. It's designed to be simple for beginners
+        yet powerful enough for production deployments.
+
+        Quick Start:
+            ```python
+            import litserve as ls
+
+            # Define inference pipeline
+            class MyAPI(ls.LitAPI):
+                def setup(self, device):
+                    self.model = load_model()  # model loading logic
+
+                def predict(self, x):
+                    return self.model(x)
+
+            # Create and run server
+            server = ls.LitServer(MyAPI())
+            server.run(port=8000)
+            ```
 
         Args:
-            lit_api (Union[LitAPI, List[LitAPI]]):
-                API instance(s) defining model inference logic. Single instance or list for multi-model serving.
+            lit_api:
+                The core component - one or more LitAPI instances defining model logic.
 
-            accelerator (str, optional):
-                Hardware type: 'cpu', 'cuda', 'mps', or 'auto' (detects best available). Defaults to 'auto'.
+                - Single API: `MyAPI()` for serving one model
+                - Multiple APIs: `[API1(), API2()]` for multi-model serving
 
-            devices (Union[int, str], optional):
-                Number of devices to use, or 'auto' for all available. Defaults to 'auto'.
+                Each LitAPI must implement:
+                - `setup(device)`: Initialize the model
+                - `predict(x)`: Run inference
+                - Optional: `decode_request()`, `encode_response()` for custom I/O
 
-            workers_per_device (int, optional):
-                Worker processes per device. Higher values improve throughput but use more memory. Defaults to 1.
+        Hardware Configuration:
+            accelerator:
+                Hardware type for inference. Defaults to "auto".
 
-            timeout (Union[float, bool], optional):
-                Request timeout in seconds, or False to disable. Defaults to 30.
+                - "auto": Automatically detects best available (CUDA > MPS > CPU)
+                - "cpu": Force CPU usage
+                - "cuda": Use NVIDIA GPUs
+                - "mps": Use Apple Metal Performance Shaders
 
-            healthcheck_path (str, optional):
-                Health check endpoint path for load balancers. Defaults to "/health".
+            devices:
+                Number of devices to use. Defaults to "auto".
 
-            info_path (str, optional):
-                Server info endpoint path showing metadata and configuration. Defaults to "/info".
+                - "auto": Use all available devices
+                - int: Use specific number (e.g., 2 for 2 GPUs)
 
-            shutdown_path (str, optional):
-                Server shutdown endpoint path that terminates and cleans up all worker and server processes.
-                Defaults to "/shutdown".
+            workers_per_device:
+                Worker processes per device for parallel inference. Defaults to 1.
 
-            enable_shutdown_api (bool, optional):
-                Enable the shutdown endpoint. If True, the server will listen for shutdown requests
-                at the specified path. Defaults to False.
+                - Higher values = better throughput but more memory usage
+                - Good starting point: 1-4 depending on model size
+                - For CPU, set to the number of cores available on the machine (e.g., 8 for 8-core CPU)
+                - Monitor GPU memory when increasing
 
-            model_metadata (dict, optional):
-                Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
+        Performance & Scaling:
+            timeout:
+                Request timeout in seconds. Defaults to 30.
 
-            max_payload_size (Union[int, str], optional):
-                Maximum request size as bytes or string ("10MB"). Defaults to "100MB".
+                - Set to False or -1 to disable timeouts
+                - Increase for slow models (e.g., 300 for large LLMs)
+                - Decrease for fast models (e.g., 5 for lightweight models)
 
-            track_requests (bool, optional):
-                Enable request tracking for monitoring. Recommended for production. Defaults to False.
+            fast_queue:
+                Enable ZeroMQ for high-throughput scenarios (>100 RPS). Defaults to False.
 
-            callbacks (List[Callback], optional):
-                Callback instances for lifecycle events (logging, metrics). Defaults to None.
+                - Use when serving hundreds of requests per second
+                - Not supported on Windows
 
-            middlewares (List[Middleware], optional):
-                HTTP middleware for auth, CORS, rate limiting, etc. Defaults to None.
+            track_requests:
+                Track active requests across all API servers for monitoring and load management. Defaults to False.
 
-            loggers (List[Logger], optional):
-                Custom loggers for server activity. Defaults to standard logging.
+                When enabled, tracks the total number of active requests in the queue across all API servers
+                and makes this count available via callbacks using the `on_request` hook. Essential for
+                monitoring concurrent request load and implementing custom load management logic.
 
-            fast_queue (bool, optional):
-                Enable ZeroMQ for high-throughput (>100 RPS). Requires ZeroMQ installation. Defaults to False.
+                - Recommended for production deployments
+                - Access count via callbacks or `server.active_requests` property
+                - Useful for monitoring and handling concurrent requests effectively
 
-            max_batch_size, batch_timeout, stream, spec, api_path, loop:
-                **Deprecated**: Configure these in your LitAPI implementation instead.
+        API Configuration:
+            healthcheck_path:
+                Health check endpoint for load balancers. Defaults to "/health".
 
-        Example:
-            >>> # Basic
-            >>> server = LitServer(MyLitAPI())
+                - Returns 200 when all workers are ready
+                - Critical for Kubernetes/Docker deployments
 
-            >>> # Production
-            >>> server = LitServer(
-            ...     lit_api=MyLitAPI(max_batch_size=4),
-            ...     accelerator="cuda",
-            ...     devices=2,
-            ...     fast_queue=True,
-            ...     track_requests=True
-            ... )
+            info_path:
+                Server information endpoint. Defaults to "/info".
+
+                - Shows model metadata, device info, server config
+                - Useful for debugging and monitoring
+
+            shutdown_path:
+                Graceful shutdown endpoint. Defaults to "/shutdown".
+
+            enable_shutdown_api:
+                Enable remote shutdown capability. Defaults to False.
+
+                - Requires authentication token (set LIT_SHUTDOWN_API_KEY env var)
+                - Useful for automated deployment pipelines
+
+        Content & Middleware:
+            max_payload_size:
+                Maximum request size. Defaults to "100MB".
+
+                - String format: "10MB", "1GB"
+                - Integer format: bytes (1048576 for 1MB)
+                - Increase for large images/videos
+
+            middlewares:
+                HTTP middleware for cross-cutting concerns. Defaults to None.
+
+                Example:
+                ```python
+                from starlette.middleware.cors import CORSMiddleware
+
+                server = LitServer(
+                    api,
+                    middlewares=[
+                        (CORSMiddleware, {"allow_origins": ["*"]}),
+                        # Add more middleware as needed
+                    ]
+                )
+                ```
+
+            model_metadata:
+                Metadata about the model displayed at info endpoint. Defaults to None.
+
+                Example:
+                ```python
+                metadata = {
+                    "model_name": "bert-base-uncased",
+                    "version": "1.0.0",
+                    "description": "Text classification model"
+                }
+                ```
+
+        Monitoring & Debugging:
+            callbacks:
+                Event handlers for server lifecycle. Defaults to None.
+
+                - Built-in callbacks for logging, metrics, custom logic
+                - Triggers on request start/end, server start/stop
+
+            loggers:
+                Custom loggers for metrics and events. Defaults to None.
+
+                - Integrate with monitoring stack
+                - Track performance metrics, error rates
+
+        Advanced Configuration:
+            max_batch_size, batch_timeout, spec, stream, api_path, loop:
+                **Deprecated**: Configure these in LitAPI implementation instead.
+
+                Migration example:
+                ```python
+                # Old way (deprecated)
+                server = LitServer(api, max_batch_size=8, stream=True)
+
+                # New way (recommended)
+                api = MyAPI(max_batch_size=8, stream=True)
+                server = LitServer(api)
+                ```
+
+        Examples:
+            Basic Usage:
+            ```python
+            import litserve as ls
+
+            class SimpleAPI(ls.LitAPI):
+                def setup(self, device):
+                    self.model = lambda x: x * 2  # model here
+
+                def predict(self, x):
+                    return self.model(x)
+
+            server = ls.LitServer(SimpleAPI())
+            server.run()
+            ```
+
+            Production Setup:
+            ```python
+            server = ls.LitServer(
+                MyAPI(max_batch_size=8),
+                accelerator="cuda",
+                devices=2,
+                workers_per_device=4,
+                fast_queue=True,
+                track_requests=True,
+                max_payload_size="50MB",
+                timeout=60
+            )
+            server.run(port=8000, num_api_servers=4)
+            ```
+
+            Multi-Model Serving:
+            ```python
+            # Serve multiple models on different endpoints
+            text_api = TextClassifierAPI(api_path="/classify")
+            image_api = ImageClassifierAPI(api_path="/vision")
+
+            server = ls.LitServer([text_api, image_api])
+            server.run()
+            ```
+
+            Streaming Response:
+            ```python
+            class StreamingAPI(ls.LitAPI):
+                def setup(self, device):
+                    self.model = load_llm()
+
+                def predict(self, prompt):
+                    for token in self.model.generate(prompt):
+                        yield {"token": token}
+
+            server = ls.LitServer(StreamingAPI(stream=True))
+            ```
+
+        Deployment:
+            Self-hosted:
+            ```bash
+            python server.py  # Run locally
+            ```
+
+            Lightning AI Cloud:
+            ```bash
+            lightning deploy server.py --cloud  # One-click deploy
+            ```
+
+        See Also:
+            - LitAPI: Base class for defining model logic
+            - LitSpec: API specifications (OpenAI compatibility)
+            - Documentation: https://lightning.ai/docs/litserve
 
         """
         if max_batch_size is not None:
