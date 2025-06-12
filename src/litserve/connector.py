@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class _Connector:
     def __init__(self, accelerator: str = "auto", devices: Union[List[int], int, str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
-        if accelerator in ("cpu", "cuda", "mps", "jax"):
+        if accelerator in ("cpu", "cuda", "mps"):
             self._accelerator = accelerator
         elif accelerator == "auto":
             self._accelerator = self._choose_auto_accelerator()
@@ -40,17 +40,16 @@ class _Connector:
 
     def check_devices_and_accelerators(self):
         """Check if the devices are in a valid fomra and raise an error if they are not."""
-        if self._accelerator in ("cuda", "mps", "jax"):
+        if self._accelerator in ("cuda", "mps"):
             if not isinstance(self._devices, int) and not (
                 isinstance(self._devices, list) and all(isinstance(device, int) for device in self._devices)
             ):
                 raise ValueError(
-                    "devices must be an integer or a list of integers when using 'cuda', 'mps', or 'jax', "
+                    "devices must be an integer or a list of integers when using 'cuda' or 'mps', "
                     f"instead got {self._devices}"
                 )
         elif self._accelerator != "cpu":
-            # Updated error message to include 'jax'
-            raise ValueError(f"accelerator must be one of (cuda, mps, cpu, jax), instead got {self._accelerator}")
+            raise ValueError(f"accelerator must be one of (cuda, mps, cpu), instead got {self._accelerator}")
 
     @property
     def accelerator(self):
@@ -64,11 +63,9 @@ class _Connector:
     def _sanitize_accelerator(accelerator: Optional[str]):
         if isinstance(accelerator, str):
             accelerator = accelerator.lower()
-
-        if accelerator not in ["auto", "cpu", "mps", "cuda", "gpu", "jax", None]:
-            raise ValueError(
-                f"accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', 'gpu', or 'jax'. Found: {accelerator}"
-            )
+            
+        if accelerator not in ["auto", "cpu", "mps", "cuda", "gpu", None]:
+            raise ValueError(f"accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'. Found: {accelerator}")
 
         if accelerator is None:
             return "auto"
@@ -92,16 +89,6 @@ class _Connector:
     def _accelerator_device_count(self) -> int:
         if self._accelerator == "cuda":
             return check_cuda_with_nvidia_smi()
-        if self._accelerator == "mps":
-            return 1  # MPS typically only has 1 GPU
-        if self._accelerator == "jax":
-            try:
-                import jax
-
-                return jax.device_count()
-            except ImportError:
-                logger.warning("JAX not installed, cannot determine JAX device count. Defaulting to 1.")
-                return 1
         return 1
 
     @staticmethod

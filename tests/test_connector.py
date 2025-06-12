@@ -125,18 +125,6 @@ def test_check_cuda_with_nvidia_smi_mock_gpu(mock_subprocess):
         ),
         # --- JAX CUDA Tests  ---
         pytest.param(
-            "jax",
-            "jax",
-            lambda: jax.device_count() if JAX_AVAILABLE else 0,
-            marks=pytest.mark.skipif(
-                not JAX_AVAILABLE
-                or not any(d.device_kind == "gpu" for d in jax.devices())
-                or check_cuda_with_nvidia_smi() == 0,
-                reason="Only tested on Nvidia GPU with JAX",
-            ),
-            id="jax_cuda_explicit",
-        ),
-        pytest.param(
             "auto",
             "cuda",
             lambda: jax.device_count() if JAX_AVAILABLE else 0,
@@ -161,13 +149,6 @@ def test_check_cuda_with_nvidia_smi_mock_gpu(mock_subprocess):
             id="jax_gpu_auto_cuda",
         ),
         # --- JAX MPS Tests ---
-        pytest.param(
-            "jax",
-            "jax",
-            lambda: jax.device_count() if JAX_AVAILABLE else 0,
-            marks=pytest.mark.skipif(not jax_mps_check(), reason="Only tested on Apple MPS with JAX"),
-            id="jax_mps_check_explicit",
-        ),
         pytest.param(
             "auto",
             "mps",
@@ -226,15 +207,14 @@ def test_connector(input_accelerator, expected_accelerator, expected_devices):
         f"devices mismatch - expected {expected_devices}, actual: {connector.devices}"
     )
 
-    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', 'gpu', or 'jax'"):
+    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'"):
         _Connector(accelerator="SUPER_CHIP")
 
 
 def test__sanitize_accelerator():
     assert _Connector._sanitize_accelerator(None) == "auto"
     assert _Connector._sanitize_accelerator("CPU") == "cpu"
-    assert _Connector._sanitize_accelerator("JAX") == "jax"
-    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', 'gpu', or 'jax'"):
+    with pytest.raises(ValueError, match="accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'"):
         _Connector._sanitize_accelerator("SUPER_CHIP")
 
 
