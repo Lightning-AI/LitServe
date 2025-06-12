@@ -13,8 +13,8 @@
 # limitations under the License.
 import os
 import platform
-import subprocess # Keep subprocess for check_cuda_with_nvidia_smi, although not used in tests
-import sys # Keep sys for _choose_auto_accelerator
+import subprocess
+import sys
 from functools import lru_cache
 from typing import List, Optional, Union
 from unittest.mock import patch, MagicMock
