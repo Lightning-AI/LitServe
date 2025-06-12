@@ -1093,49 +1093,169 @@ class LitServer:
         pretty_logs: bool = False,
         **kwargs,
     ):
-        """Run the LitServe server to handle API requests and distribute them to inference workers.
+        """Start the LitServer to serve AI model requests with production-ready performance.
+
+        This method launches the complete serving infrastructure: initializes worker processes,
+        starts the HTTP server, and begins handling requests. The server runs until manually
+        stopped (Ctrl+C) or programmatically shut down.
+
+        Quick Start:
+            ```python
+            # Basic usage - starts server on localhost:8000
+            server.run()
+
+            # Production - multiple servers and custom port
+            server.run(port=8080, num_api_servers=4)
+            ```
+
+        Server Lifecycle:
+            1. **Initialize**: Sets up worker processes and communication queues
+            2. **Health Check**: Verifies all workers are ready to serve requests
+            3. **Start HTTP Server**: Begins accepting requests on specified host/port
+            4. **Serve Requests**: Distributes requests to workers and returns responses
+            5. **Graceful Shutdown**: Properly terminates workers when stopped
 
         Args:
-            host (str, optional):
-                Host address to bind to. "0.0.0.0" for all IPs, "127.0.0.1" for localhost only. Defaults to "0.0.0.0".
+            host:
+                Network interface to bind the server to. Defaults to "0.0.0.0".
 
-            port (Union[str, int], optional):
-                Port number to bind to. Must be available. Defaults to 8000.
+                - "0.0.0.0": Accept connections from any IP (public access)
+                - "127.0.0.1": Only accept local connections (localhost only)
+                - "::": IPv6 equivalent of "0.0.0.0"
 
-            num_api_servers (Optional[int], optional):
-                Number of uvicorn server instances for parallel API handling. Higher values improve
-                throughput but use more resources. Defaults to None (single instance).
+                For development, use "127.0.0.1" for security. For production/Docker, use "0.0.0.0".
 
-            log_level (str, optional):
-                Logging level: "critical", "error", "warning", "info", "debug", "trace".
-                Use "debug" for development. Defaults to "info".
+            port:
+                Port number to listen on. Defaults to 8000.
 
-            generate_client_file (bool, optional):
-                Auto-generate Python client file with typed methods for API interaction. Defaults to True.
+                - Must be between 1024-65535 (privileged ports require admin)
+                - Ensure the port is available and not blocked by firewalls
+                - Common choices: 8000, 8080, 3000, 5000
 
-            api_server_worker_type (Literal["process", "thread"], optional):
-                Worker type. "process" for better isolation/CPU usage, "thread" for less memory. Defaults to "process".
+        Performance Configuration:
+            num_api_servers:
+                Number of parallel HTTP server processes. Defaults to None (auto-detect).
 
-            pretty_logs (bool, optional):
-                Enhanced log formatting with colors using rich library. Good for development. Defaults to False.
+                - None: Uses same count as inference workers (recommended)
+                - Higher values improve HTTP throughput but use more memory
+                - Good starting point: 2-8 depending on expected load
+                - Each server handles HTTP requests independently
 
+            api_server_worker_type:
+                Process architecture for HTTP servers. Defaults to "process".
+
+                - "process": Better isolation, CPU utilization, and fault tolerance
+                - "thread": Lower memory usage but shared memory space
+                - Windows automatically uses "thread" (process forking not supported)
+
+        Development & Debugging:
+            log_level:
+                Logging verbosity level. Defaults to "info".
+
+                - "critical": Only severe errors
+                - "error": Error conditions
+                - "warning": Warning messages (good for production)
+                - "info": General information (default)
+                - "debug": Detailed debugging info (development)
+                - "trace": Very verbose output (troubleshooting)
+
+            pretty_logs:
+                Enable enhanced log formatting with colors and rich formatting. Defaults to False.
+
+                - Requires: `pip install rich`
+                - Great for development and local debugging
+                - May not display properly in some production log aggregators
+
+            generate_client_file:
+                Auto-generate a Python client file for easy API interaction. Defaults to True.
+
+                - Creates `client.py` in current directory with typed methods
+                - Useful for testing and integration
+                - Safe to disable in production environments
+
+        Advanced Configuration:
             **kwargs:
-                Additional uvicorn server options (ssl_keyfile, ssl_certfile, etc.). See uvicorn docs.
+                Additional uvicorn server configuration options.
 
-        Example:
-        >>> server.run()  # Basic
+                Common SSL options:
+                ```python
+                server.run(
+                    ssl_keyfile="path/to/key.pem",
+                    ssl_certfile="path/to/cert.pem"
+                )
+                ```
 
-        >>> server.run(  # Production
-        ...     port=8080,
-        ...     num_api_servers=4,
-        ...     log_level="warning"
-        ... )
+                Other uvicorn options: ssl_ca_certs, ssl_ciphers, ssl_version,
+                workers, backlog, etc. See uvicorn documentation for full list.
 
-        >>> server.run(  # Development
-        ...     log_level="debug",
-        ...     pretty_logs=True,
-        ...     generate_client_file=True
-        ... )
+        Examples:
+            Basic Development:
+            ```python
+            # Simple local development
+            server.run()
+            # Access at: http://localhost:8000
+            # API docs at: http://localhost:8000/docs
+            ```
+
+            Production Configuration:
+            ```python
+            # High-performance production setup
+            server.run(
+                host="0.0.0.0",
+                port=8000,
+                num_api_servers=8,
+                log_level="warning",
+                pretty_logs=False,
+                generate_client_file=False
+            )
+            ```
+
+            Development with Debug:
+            ```python
+            # Development with detailed logging
+            server.run(
+                host="127.0.0.1",
+                port=8000,
+                log_level="debug",
+                pretty_logs=True,
+                num_api_servers=1
+            )
+            ```
+
+            Multi-API Server:
+            ```python
+            # Balance load across multiple HTTP servers
+            server.run(
+                port=8000,
+                num_api_servers=4,  # 4 parallel HTTP servers
+                api_server_worker_type="process"
+            )
+            ```
+
+        Server Endpoints:
+            Once running, the server provides several built-in endpoints:
+
+            - **Main API**: `POST /predict` (or custom path from LitAPI)
+            - **Health Check**: `GET /health` - Returns 200 when ready
+            - **Server Info**: `GET /info` - Shows configuration and metadata
+            - **API Documentation**: `GET /docs` - Interactive Swagger UI
+            - **OpenAPI Schema**: `GET /openapi.json` - API specification
+
+        Stopping the Server:
+            - **Ctrl+C**: Graceful shutdown (recommended)
+            - **SIGTERM**: Graceful shutdown in Docker/Kubernetes
+            - **Shutdown API**: POST to `/shutdown` (if enabled)
+
+        Common Issues:
+            - **Port in use**: Choose different port or stop conflicting process
+            - **Permission denied**: Use port > 1024 or run with appropriate permissions
+            - **Workers not ready**: Check model loading in LitAPI.setup() method
+            - **Memory issues**: Reduce num_api_servers or workers_per_device
+
+        Notes:
+            - Server blocks execution until stopped (use threads for non-blocking)
+            - Logs show startup progress and any configuration issues
+            - Swagger UI provides interactive API testing interface
 
         """
         if generate_client_file:
