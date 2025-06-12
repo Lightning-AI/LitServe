@@ -63,7 +63,7 @@ class _Connector:
     def _sanitize_accelerator(accelerator: Optional[str]):
         if isinstance(accelerator, str):
             accelerator = accelerator.lower()
-            
+
         if accelerator not in ["auto", "cpu", "mps", "cuda", "gpu", None]:
             raise ValueError(f"accelerator must be one of 'auto', 'cpu', 'mps', 'cuda', or 'gpu'. Found: {accelerator}")
 
