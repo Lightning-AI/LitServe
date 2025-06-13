@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from queue import Empty, Queue
-from typing import Dict, Optional
+from typing import AsyncGenerator, Dict, Optional
 
 from fastapi import HTTPException
 
@@ -144,32 +144,35 @@ class StreamingLoop(DefaultLoop):
             callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
             callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
-            y_gen = await _async_inject_context(
+            y_gen: AsyncGenerator = await _async_inject_context(
                 context,
                 lit_api.predict,
                 x,
             )
             callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
+            """Regular flow.
+
+            x ---------decode_request----------> y1
+
+            y1 --------predict-----------------> y_gen
+
+            y_gen -----encode_resonse-----------> y_enc_gen
+
+            y_enc_gen --for item in y_enc_gen--> put_response(item)
+
+            """
 
             callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
-
-            # When using async, predict should return an async generator
-            # and encode_response should handle async generators
-            async for item in y_gen:
-                # For each item from predict, pass to encode_response
-                # The _async_inject_context already handles async generators correctly
-                enc_result = await _async_inject_context(
-                    context,
-                    lit_api.encode_response,
-                    item,
-                )
-
-                # encode_response should also return an async generator
-                async for y_enc in enc_result:
-                    y_enc = lit_api.format_encoded_response(y_enc)
-                    self.put_response(
-                        transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
-                    )
+            # Pass the entire async generator to encode_response
+            y_enc_gen = await _async_inject_context(
+                context,
+                lit_api.encode_response,
+                y_gen,
+            )
+            # Process the encoded responses
+            async for y_enc in y_enc_gen:
+                y_enc = lit_api.format_encoded_response(y_enc)
+                self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING)
 
             self.put_response(
                 transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
