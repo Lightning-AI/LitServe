@@ -161,7 +161,7 @@ class StreamingLoop(DefaultLoop):
                 enc_result = await _async_inject_context(
                     context,
                     lit_api.encode_response,
-                    [item],  # Wrap in list since encode_response expects an iterable
+                    item,
                 )
 
                 # encode_response should also return an async generator
