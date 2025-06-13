@@ -24,6 +24,7 @@ from litserve.test_examples.openai_spec_example import (
     OpenAIWithUsageEncodeResponse,
     TestAPI,
     TestAPIWithCustomEncode,
+    TestAPIWithReasoningEffort,
     TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
 )
@@ -250,6 +251,23 @@ async def test_openai_spec_metadata_required_fail(openai_request_data):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data)
             assert resp.status_code == 500
             assert "Missing required metadata" in resp.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reasoning_effort", ["low", "medium", "high", None, "random"])
+async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_data):
+    server = ls.LitServer(TestAPIWithReasoningEffort(), spec=OpenAISpec())
+    openai_request_data["reasoning_effort"] = reasoning_effort
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data)
+            assert resp.status_code == 200 if reasoning_effort != "random" else 422
+            assert (
+                resp.json()["choices"][0]["message"]["content"]
+                == f"This is a generated output with reasoning effort: {reasoning_effort}"
+            )
 
 
 class IncorrectAPI1(ls.LitAPI):
