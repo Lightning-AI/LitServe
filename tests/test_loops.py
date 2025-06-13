@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import contextlib
 import inspect
 import io
 import json
@@ -42,7 +43,7 @@ from litserve.specs.base import LitSpec
 from litserve.test_examples.openai_spec_example import OpenAIBatchingWithUsage
 from litserve.transport import MPQueueTransport
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus, wrap_litserve_start
+from litserve.utils import LitAPIStatus, LoopResponseType, wrap_litserve_start
 
 NOOP_CB_RUNNER = CallbackRunner()
 
@@ -127,7 +128,7 @@ def test_single_loop(loop_args):
 
     lit_loop = SingleLoop()
     with pytest.raises(StopIteration, match="exit loop"):
-        lit_loop.run_single_loop(lit_api_mock, None, requests_queue, transport, callback_runner=NOOP_CB_RUNNER)
+        lit_loop.run_single_loop(lit_api_mock, requests_queue, transport, callback_runner=NOOP_CB_RUNNER)
 
 
 @pytest.mark.asyncio
@@ -140,13 +141,15 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     await loop._process_single_request(
         request,
         lit_api_mock,
-        None,
         mock_transport,
         NOOP_CB_RUNNER,
     )
     response = await mock_transport.areceive(consumer_id=request[0])
     expected_output = request[3]["input"] ** 2
-    assert response == (request[1], ({"output": expected_output}, ls.utils.LitAPIStatus.OK))
+    assert response == (
+        request[1],
+        ({"output": expected_output}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR),
+    )
 
 
 def test_run_single_loop_with_async(async_loop_args, monkeypatch):
@@ -159,15 +162,13 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     monkeypatch.setattr(loop, "kill", lambda: None)
 
     # Expected to break the loop in test
-    import contextlib
-
     with contextlib.suppress(KeyboardInterrupt):
-        loop._run_single_loop_with_async(lit_api_mock, None, requests_queue, mock_transport, NOOP_CB_RUNNER)
+        loop._run_single_loop_with_async(lit_api_mock, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
-    assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK))
+    assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR))
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
-    assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK))
+    assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR))
 
 
 class FakeStreamSender(DummyMessageTransport):
@@ -178,10 +179,11 @@ class FakeStreamSender(DummyMessageTransport):
 
     def send(self, item, consumer_id, block=False, timeout=None):
         uid, args = item
-        response, status = args
+        response, status, response_type = args
         if self.count >= self.num_streamed_outputs:
             raise StopIteration("exit loop")
         assert response == f"{self.count}", "This streaming loop generates number from 0 to 9 which is sent via Queue"
+        assert response_type == LoopResponseType.STREAMING, "Streaming loop must return streaming response"
         self.count += 1
 
 
@@ -212,7 +214,6 @@ def test_streaming_loop():
     with pytest.raises(StopIteration, match="exit loop"):
         lit_loop.run_streaming_loop(
             fake_stream_api,
-            fake_stream_api,
             requests_queue,
             transport,
             callback_runner=NOOP_CB_RUNNER,
@@ -220,6 +221,66 @@ def test_streaming_loop():
 
     fake_stream_api.predict.assert_called_once_with("Hello")
     fake_stream_api.encode_response.assert_called_once()
+
+
+class AsyncTestStreamLitAPI(LitAPI):
+    def setup(self, device) -> None:
+        pass
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x):
+        for i in range(x):
+            yield {"output": i}
+
+    async def encode_response(self, output):
+        for out in output:
+            yield out["output"]
+
+
+@pytest.mark.asyncio
+async def test_streaming_loop_process_streaming_request(mock_transport):
+    request = (0, "UUID-1234", time.monotonic(), {"input": 5})
+
+    lit_api = AsyncTestStreamLitAPI()
+    loop = StreamingLoop()
+    await loop._process_streaming_request(
+        request,
+        lit_api,
+        mock_transport,
+        NOOP_CB_RUNNER,
+    )
+
+    for i in range(5):
+        response = await mock_transport.areceive(consumer_id=request[0])
+        assert response == (
+            request[1],
+            (i, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING),
+        )
+
+
+def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
+    requests_queue = TestQueue()
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
+    requests_queue.put((None, None, None, None))  # Sentinel to stop the loop
+
+    lit_api = AsyncTestStreamLitAPI()
+    loop = StreamingLoop()
+
+    # Patch kill to do nothing in test
+    monkeypatch.setattr(loop, "kill", lambda: None)
+
+    # Expected to break the loop in test
+    with contextlib.suppress(KeyboardInterrupt):
+        loop.run_streaming_loop_async(lit_api, requests_queue, mock_transport, NOOP_CB_RUNNER)
+
+    for i in range(5):
+        response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+        assert response == (
+            "uuid-123",
+            (i, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING),
+        )
 
 
 class FakeBatchStreamTransport(DummyMessageTransport):
@@ -230,7 +291,7 @@ class FakeBatchStreamTransport(DummyMessageTransport):
 
     def send(self, item, consumer_id=0, block=False, timeout=None):
         uid, args = item
-        response, status = args
+        response, status, response_type = args
         if status == LitAPIStatus.FINISH_STREAMING:
             raise StopIteration("interrupt iteration")
         if status == LitAPIStatus.ERROR:
@@ -242,6 +303,7 @@ class FakeBatchStreamTransport(DummyMessageTransport):
         assert response == f"{self.count // 2}", (
             f"streaming loop generates number from 0 to 9 which is sent via Queue. {args}, count:{self.count}"
         )
+        assert response_type == LoopResponseType.STREAMING, "Streaming loop must return streaming response"
         self.count += 1
 
 
@@ -279,7 +341,6 @@ def test_batched_streaming_loop(mock_transport):
     with pytest.raises(StopIteration, match="finish streaming"):
         lit_loop.run_batched_streaming_loop(
             fake_stream_api,
-            fake_stream_api,
             requests_queue,
             transport=transport,
             callback_runner=NOOP_CB_RUNNER,
@@ -295,14 +356,18 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock.max_batch_size = 2
     lit_api_mock.batch_timeout = 0
     lit_api_mock.enable_async = False
+    lit_api_mock.stream = False
+    lit_api_mock.api_path = "/predict"
+    lit_api_mock.loop = "auto"
 
     inference_worker(
         lit_api_mock,
-        *[MagicMock()] * 5,
-        stream=False,
+        "cpu",
+        0,
+        MagicMock(),
+        MagicMock(),
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
-        loop="auto",
     )
     mock_batched_loop.assert_called_once()
 
@@ -310,14 +375,18 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock.max_batch_size = 1
     lit_api_mock.batch_timeout = 0
     lit_api_mock.enable_async = False
+    lit_api_mock.stream = False
+    lit_api_mock.api_path = "/predict"
+    lit_api_mock.loop = "auto"
 
     inference_worker(
         lit_api_mock,
-        *[MagicMock()] * 5,
-        stream=False,
+        "cpu",
+        0,
+        MagicMock(),
+        MagicMock(),
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
-        loop="auto",
     )
     mock_single_loop.assert_called_once()
 
@@ -335,7 +404,7 @@ async def test_run_single_loop(mock_transport):
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_single_loop, args=(lit_api, request_queue, transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -347,7 +416,7 @@ async def test_run_single_loop(mock_transport):
     loop_thread.join()
 
     response = await transport.areceive(consumer_id=0)
-    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR))
 
 
 @pytest.mark.asyncio
@@ -367,11 +436,11 @@ async def test_run_single_loop_timeout():
 
     lit_loop = SingleLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_single_loop, args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_single_loop, args=(lit_api, request_queue, transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
-    _, (response, status) = await transport.areceive(consumer_id=0)
+    _, (response, status, _) = await transport.areceive(consumer_id=0)
     assert isinstance(response, HTTPException)
     assert response.status_code == 504
     assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
@@ -399,13 +468,13 @@ async def test_run_batched_loop():
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER),
+        args=(lit_api, request_queue, transport, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
     expected_responses = [
-        ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK)),
-        ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK)),
+        ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR)),
+        ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK, LoopResponseType.REGULAR)),
     ]
 
     for expected in expected_responses:
@@ -442,17 +511,17 @@ async def test_run_batched_loop_timeout(mock_transport):
     lit_loop = BatchedLoop()
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
-        args=(lit_api, None, request_queue, transport, NOOP_CB_RUNNER),
+        args=(lit_api, request_queue, transport, NOOP_CB_RUNNER),
     )
     loop_thread.start()
 
     # First response should be timeout error
-    _, (response1, _) = await transport.areceive(0, timeout=10)
+    _, (response1, _, _) = await transport.areceive(0, timeout=10)
     assert isinstance(response1, HTTPException)
     assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
 
     # Second response should succeed
-    _, (response2, _) = await transport.areceive(consumer_id=0, timeout=10)
+    _, (response2, _, _) = await transport.areceive(consumer_id=0, timeout=10)
     assert response2 == {"output": 25.0}
 
     request_queue.put((None, None, None, None))
@@ -471,7 +540,7 @@ async def test_run_streaming_loop(mock_transport):
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, mock_transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -502,7 +571,7 @@ async def test_run_streaming_loop_timeout(mock_transport):
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
     loop_thread = threading.Thread(
-        target=lit_loop.run_streaming_loop, args=(lit_api, None, request_queue, mock_transport, NOOP_CB_RUNNER)
+        target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, NOOP_CB_RUNNER)
     )
     loop_thread.start()
 
@@ -559,24 +628,20 @@ class TestLoop(LitLoop):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         try:
             self.run(
                 lit_api,
-                lit_spec,
                 device,
                 worker_id,
                 request_queue,
                 transport,
-                stream,
                 workers_setup_status,
                 callback_runner,
             )
@@ -586,12 +651,10 @@ class TestLoop(LitLoop):
     def run(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
@@ -604,7 +667,7 @@ class TestLoop(LitLoop):
         x = lit_api.decode_request(x_enc) * cache
         response = lit_api.predict(x)
         response_enc = lit_api.encode_response(response)
-        transport.send((uid, (response_enc, LitAPIStatus.OK)), consumer_id=response_queue_id)
+        transport.send((uid, (response_enc, LitAPIStatus.OK, LoopResponseType.REGULAR)), consumer_id=response_queue_id)
         raise StopIteration("exit loop")
 
 
@@ -617,7 +680,7 @@ async def test_custom_loop(mock_transport):
     request_queue = Queue()
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
 
-    loop(lit_api, None, "cpu", 0, request_queue, mock_transport, False, {}, NOOP_CB_RUNNER)
+    loop(lit_api, "cpu", 0, request_queue, mock_transport, {}, NOOP_CB_RUNNER)
     response = await mock_transport.areceive(0)
     assert response[0] == "UUID-001"
     assert response[1][0] == {"output": 16.0}
@@ -727,9 +790,9 @@ def test_lit_loop_get_request(lit_loop_setup):
 @pytest.mark.asyncio
 async def test_lit_loop_put_response(lit_loop_setup, mock_transport):
     lit_loop, _, request_queue = lit_loop_setup
-    lit_loop.put_response(mock_transport, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK)
+    lit_loop.put_response(mock_transport, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR)
     response = await mock_transport.areceive(0)
-    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK))
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR))
 
 
 def test_notify_timed_out_requests():
@@ -837,12 +900,12 @@ async def test_continuous_batching_run(continuous_batching_setup):
     response_queue_id, uid, _, input = (0, "UUID-001", time.monotonic(), {"input": "Hello"})
     lit_loop.add_request(uid, input, lit_api, None)
     lit_loop.response_queue_ids[uid] = response_queue_id
-    await lit_loop.run(lit_api, None, "cpu", 0, request_queue, mock_transport, True, {}, NOOP_CB_RUNNER)
+    await lit_loop.run(lit_api, "cpu", 0, request_queue, mock_transport, {}, NOOP_CB_RUNNER)
 
     results = []
     for i in range(5):
         response = await mock_transport.areceive(0)
-        uid, (response_data, status) = response
+        uid, (response_data, status, response_type) = response
         o = json.loads(response_data)["output"]
         assert o == i
         assert status == LitAPIStatus.OK
@@ -850,7 +913,8 @@ async def test_continuous_batching_run(continuous_batching_setup):
         results.append(o)
     assert results == list(range(5)), "API must return a sequence of numbers from 0 to 4"
     response = await mock_transport.areceive(0)
-    uid, (response_data, status) = response
+    uid, (response_data, status, response_type) = response
     o = json.loads(response_data)["output"]
     assert o == ""
     assert status == LitAPIStatus.FINISH_STREAMING
+    assert response_type == LoopResponseType.STREAMING

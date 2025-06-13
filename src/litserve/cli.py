@@ -1,10 +1,11 @@
-import importlib.util
 import subprocess
 import sys
 
+from litserve.utils import is_package_installed
+
 
 def _ensure_lightning_installed():
-    if not importlib.util.find_spec("lightning_sdk"):
+    if not is_package_installed("lightning_sdk"):
         print("Lightning CLI not found. Installing...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
 

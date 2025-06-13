@@ -13,6 +13,6 @@ class MessageTransport(ABC):
         """Receive a message from model workers or any publisher."""
         pass
 
-    def close(self) -> None:
+    def close(self, **kwargs) -> None:
         """Clean up resources if needed (e.g., sockets, processes)."""
         pass

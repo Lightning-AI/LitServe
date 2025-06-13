@@ -142,7 +142,7 @@ class _LoggerConnector:
     @functools.cache  # Run once per LitServer instance
     def run(self, lit_server: "LitServer"):
         queue = lit_server.logger_queue
-        lit_server.lit_api.set_logger_queue(queue)
+        lit_server.litapi_connector.set_logger_queue(queue)
 
         # Disconnect the logger connector from the LitServer to avoid pickling issues
         self._lit_server = None

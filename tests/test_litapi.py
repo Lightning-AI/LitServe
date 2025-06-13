@@ -277,7 +277,9 @@ def test_log():
     api.request_timeout = 30
     assert api._logger_queue is None, "Logger queue should be None"
     server = ls.LitServer(api, loggers=TestLogger())
-    server.launch_inference_worker(1)
+    server._init_manager(1)
+    server._logger_connector.run(server)
+    server.launch_inference_worker(api)
     api.log("time", 0.1)
     assert server.logger_queue.get() == ("time", 0.1)
 

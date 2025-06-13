@@ -199,7 +199,7 @@ def test_mocked_accelerator():
 
 
 @patch("litserve.server.uvicorn")
-def test_server_run(mock_uvicorn):
+def test_server_run(mock_uvicorn, mock_manager):
     server = LitServer(SimpleLitAPI())
     server.verify_worker_status = MagicMock()
     with pytest.raises(ValueError, match="port must be a value from 1024 to 65535 but got"):
@@ -211,12 +211,20 @@ def test_server_run(mock_uvicorn):
     with pytest.raises(ValueError, match="host must be '0.0.0.0', '127.0.0.1', or '::' but got"):
         server.run(host="127.0.0.2")
 
-    server.run(port=8000)
+    # test port 8000
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(port=8000)
     mock_uvicorn.Config.assert_called()
     mock_uvicorn.reset_mock()
-    server.run(port="8001")
+
+    # test port 8001
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(port="8001")
     mock_uvicorn.Config.assert_called()
-    server.run(host="::", port="8000")
+
+    # test host "::" and port 8000
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(host="::", port="8000")
     mock_uvicorn.Config.assert_called()
 
 
@@ -227,14 +235,14 @@ def test_start_server(mock_uvicon):
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
     mock_uvicon.Server.assert_called()
-    assert server.lit_spec.response_queue_id is not None, "response_queue_id must be generated"
+    assert server.lit_api._spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
 @pytest.fixture
 def server_for_api_worker_test(simple_litapi):
     server = ls.LitServer(simple_litapi, devices=1)
     server.verify_worker_status = MagicMock()
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
     server._start_server = MagicMock()
     server._transport = MagicMock()
     return server
@@ -242,23 +250,25 @@ def server_for_api_worker_test(simple_litapi):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
-def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_worker_test):
+def test_server_run_with_api_server_worker_type(mock_uvicorn, server_for_api_worker_test, mock_manager):
     server = server_for_api_worker_test
 
-    server.run(api_server_worker_type="process", num_api_servers=10)
-    server.launch_inference_worker.assert_called_with(10)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type="process", num_api_servers=10)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @pytest.mark.parametrize(("api_server_worker_type", "num_api_workers"), [(None, 1), ("process", 1)])
 @patch("litserve.server.uvicorn")
 def test_server_run_with_process_api_worker(
-    mock_uvicorn, api_server_worker_type, num_api_workers, server_for_api_worker_test
+    mock_uvicorn, api_server_worker_type, num_api_workers, server_for_api_worker_test, mock_manager
 ):
     server = server_for_api_worker_test
 
-    server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
-    server.launch_inference_worker.assert_called_with(num_api_workers)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type=api_server_worker_type, num_api_workers=num_api_workers)
+    server.launch_inference_worker.assert_called_with(server.lit_api)
     actual = server._start_server.call_args
     assert actual[0][4] == "process", "Server should run in process mode"
     mock_uvicorn.Config.assert_called()
@@ -266,10 +276,11 @@ def test_server_run_with_process_api_worker(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
-def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test):
+def test_server_run_with_thread_api_worker(mock_uvicorn, server_for_api_worker_test, mock_manager):
     server = server_for_api_worker_test
-    server.run(api_server_worker_type="thread")
-    server.launch_inference_worker.assert_called_with(1)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type="thread")
+    server.launch_inference_worker.assert_called_with(server.lit_api)
     assert server._start_server.call_args[0][4] == "thread", "Server should run in thread mode"
     mock_uvicorn.Config.assert_called()
 
@@ -287,15 +298,16 @@ def test_server_run_with_invalid_api_worker(simple_litapi):
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Test is only for Windows")
 @patch("litserve.server.uvicorn")
-def test_server_run_windows(mock_uvicorn):
+def test_server_run_windows(mock_uvicorn, mock_manager):
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
     server.verify_worker_status = MagicMock()
-    server.launch_inference_worker = MagicMock(return_value=[MagicMock(), [MagicMock()]])
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
     server._transport = MagicMock()
     server._start_server = MagicMock()
 
-    server.run(api_server_worker_type=None)
+    with patch("litserve.server.mp.Manager", return_value=mock_manager):
+        server.run(api_server_worker_type=None)
     actual = server._start_server.call_args
     assert actual[0][4] == "thread", "Windows only supports thread mode"
 
@@ -306,14 +318,14 @@ def test_server_terminate():
     server._transport = MagicMock()
 
     with (
+        patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager,
         patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start,
-        patch(
-            "litserve.server.LitServer.launch_inference_worker", return_value=(MagicMock(), [MagicMock()])
-        ) as mock_launch,
+        patch("litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])) as mock_launch,
     ):
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
 
+        mock_init_manager.assert_called()
         mock_launch.assert_called()
         mock_start.assert_called()
         server._transport.close.assert_called()
@@ -402,7 +414,7 @@ def test_custom_api_path():
         LitServer(ls.test_examples.SimpleLitAPI(), api_path="predict")
 
     server = LitServer(ls.test_examples.SimpleLitAPI(), api_path="/v1/custom_predict")
-    url = server.api_path
+    url = server.lit_api.api_path
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post(url, json={"input": 4.0})
         assert response.status_code == 200, "Server response should be 200 (OK)"
@@ -434,7 +446,7 @@ def test_custom_info_path():
             "devices": ["cpu"],
             "workers_per_device": 1,
             "timeout": 30,
-            "stream": False,
+            "stream": {"/predict": False},
             "max_payload_size": None,
             "track_requests": False,
         },
@@ -460,7 +472,7 @@ def test_info_route():
             "devices": ["cpu"],
             "workers_per_device": 1,
             "timeout": 30,
-            "stream": False,
+            "stream": {"/predict": False},
             "max_payload_size": None,
             "track_requests": False,
         },

@@ -1,24 +1,30 @@
 <div align='center'>
 
-# Deploy AI models and inference pipelines - ⚡ fast    
+<h2>
+  The easiest way to deploy agents, MCP servers, RAG, pipelines, any model. 
+  <br/>
+  No MLOps. No YAML.
+</h2>    
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
 &nbsp; 
 </div>
 
-**LitServe** lets you build high-performance AI inference pipelines on top of FastAPI - no boilerplate. Define one or more models, connect vector DBs, stream responses, batch requests, and autoscale on GPUs out of the box.
+Most serving engines serve one model with rigid abstractions. LitServe lets you serve any model (vision, audio, text) and build full AI systems - agents, chatbots, MCP servers, RAG, pipelines - with full control, batching, multi-GPU, streaming, custom logic, multi-model support, and zero YAML. 
 
-LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-specific multi-worker handling.    
+Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
+
+&nbsp;
 
 <div align='center'>
   
 <pre>
-✅ (2x)+ faster serving  ✅ Easy to use               ✅ LLMs, non LLMs and more
-✅ Bring your own model  ✅ PyTorch/JAX/TF/...        ✅ Built on FastAPI       
-✅ GPU autoscaling       ✅ Batching, Streaming       ✅ Self-host or ⚡️ managed
-✅ Inference pipeline    ✅ Integrate with vLLM, etc  ✅ Serverless             
-   
+✅ Build full AI systems   ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
+✅ Custom logic + control  ✅ Any PyTorch model          ✅ Self-host or managed        
+✅ Multi-GPU autoscaling   ✅ Batching + streaming       ✅ BYO model or vLLM           
+✅ No MLOps glue code      ✅ Easy setup in Python       ✅ Serverless support          
+
 </pre>
 
 <div align='center'>
@@ -37,7 +43,7 @@ LitServe is at least [2x faster](#performance) than plain FastAPI due to AI-spec
     <a target="_blank" href="#featured-examples" style="margin: 0 10px;">Examples</a> •
     <a target="_blank" href="#features" style="margin: 0 10px;">Features</a> •
     <a target="_blank" href="#performance" style="margin: 0 10px;">Performance</a> •
-    <a target="_blank" href="#hosting-options" style="margin: 0 10px;">Hosting</a> •
+    <a target="_blank" href="#host-anywhere" style="margin: 0 10px;">Hosting</a> •
     <a target="_blank" href="https://lightning.ai/docs/litserve" style="margin: 0 10px;">Docs</a>
   </div>
 </div>
@@ -59,81 +65,98 @@ Install LitServe via pip ([more options](https://lightning.ai/docs/litserve/home
 ```bash
 pip install litserve
 ```
-    
-### Define a server    
-This toy example with 2 models (inference pipeline) shows LitServe's flexibility ([see real examples](#featured-examples)):    
+
+[Example 1](#inference-pipeline-example): Toy inference pipeline with multiple models.   
+[Example 2](#agent-example): Minimal agent to fetch the news (with OpenAI API).    
+([Advanced examples](#featured-examples)):    
+
+### Inference pipeline example   
 
 ```python
-# server.py
 import litserve as ls
 
-# (STEP 1) - DEFINE THE API ("inference" pipeline)
-class SimpleLitAPI(ls.LitAPI):
+# define the api to include any number of models, dbs, etc...
+class InferencePipeline(ls.LitAPI):
     def setup(self, device):
-        # setup is called once at startup. Defines elements of the pipeline: models, connect DBs, load data, etc...
         self.model1 = lambda x: x**2
         self.model2 = lambda x: x**3
 
-    def decode_request(self, request):
-        # Convert the request payload to model input.
-        return request["input"] 
-
-    def predict(self, x):
-        # Run the inference pipeline and return the output
+    def predict(self, request):
+        x = request["input"]    
+        # perform calculations using both models
         a = self.model1(x)
         b = self.model2(x)
         c = a + b
         return {"output": c}
 
-    def encode_response(self, output):
-        # Convert the model output to a response payload.
-        return {"output": output} 
-
-# (STEP 2) - START THE SERVER
 if __name__ == "__main__":
-    # scale with advanced features (batching, GPUs, etc...)
-    server = ls.LitServer(SimpleLitAPI(max_batch_size=1), accelerator="auto")
+    # 12+ features like batching, streaming, etc...
+    server = ls.LitServer(InferencePipeline(max_batch_size=1), accelerator="auto")
     server.run(port=8000)
 ```
 
-Now run the server anywhere (local or cloud) via the command-line.
+Deploy for free to [Lightning cloud](#hosting-options) (or self host anywhere):
 
 ```bash
-# Deploy to the cloud of your choice via Lightning AI (serverless, autoscaling, etc.)
+# Deploy for free with autoscaling, monitoring, etc...
 lightning deploy server.py --cloud
 
 # Or run locally (self host anywhere)
 lightning deploy server.py
-```
-Learn more about managed hosting on [Lightning AI](#hosting-options).
-
-You can also run the server manually:
-
-```bash 
-python server.py
+# python server.py
 ```
 
-### Test the server
-Simulate an http request (run this on any terminal):
+Test the server: Simulate an http request (run this on any terminal):
 ```bash
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"input": 4.0}'
 ```
 
-### LLM serving
-LitServe isn’t *just* for LLMs like vLLM or Ollama; it serves any AI model with full control over internals ([learn more](https://lightning.ai/docs/litserve/features/serve-llms)).    
-For easy LLM serving, integrate [vLLM with LitServe](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api), or use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm) (built on LitServe). 
+### Agent example
 
+```python
+import re, requests, openai
+import litserve as ls
+
+class NewsAgent(ls.LitAPI):
+    def setup(self, device):
+        self.openai_client = openai.OpenAI(api_key="OPENAI_API_KEY")
+
+    def predict(self, request):
+        website_url = request.get("website_url", "https://text.npr.org/")
+        website_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
+
+        # ask the LLM to tell you about the news
+        llm_response = self.openai_client.chat.completions.create(
+           model="gpt-3.5-turbo", 
+           messages=[{"role": "user", "content": f"Based on this, what is the latest: {website_text}"}],
+        )
+        output = llm_response.choices[0].message.content.strip()
+        return {"output": output}
+
+if __name__ == "__main__":
+    server = ls.LitServer(NewsAgent())
+    server.run(port=8000)
 ```
-litgpt serve microsoft/phi-2
+Test it:
+```bash
+curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"website_url": "https://text.npr.org/"}'
 ```
 
-### Summary
-- LitAPI lets you easily build complex AI systems with one or more models ([docs](https://lightning.ai/docs/litserve/api-reference/litapi)).
-- Use the setup method for one-time tasks like connecting models, DBs, and loading data ([docs](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).        
-- LitServer handles optimizations like batching, GPU autoscaling, streaming, etc... ([docs](https://lightning.ai/docs/litserve/api-reference/litserver)).
-- Self host on your machines or create a fully managed deployment with Lightning ([learn more](https://lightning.ai/docs/litserve/features/deploy-on-cloud)).
+&nbsp;
 
-[Learn how to make this server 200x faster](https://lightning.ai/docs/litserve/home/speed-up-serving-by-200x).    
+# Key benefits   
+
+A few key benefits:
+
+- **Deploy any pipeline or model**: Agents, pipelines, RAG, chatbots, image models, video, speech, text, etc...
+- **No MLOps glue:** LitAPI lets you build full AI systems (multi-model, agent, RAG) in one place ([more](https://lightning.ai/docs/litserve/api-reference/litapi)).   
+- **Instant setup:** Connect models, DBs, and data in a few lines with `setup()` ([more](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).    
+- **Optimized:** autoscaling, GPU support, and fast inference included ([more](https://lightning.ai/docs/litserve/api-reference/litserver)).    
+- **Deploy anywhere:** self-host or one-click deploy with Lightning ([more](https://lightning.ai/docs/litserve/features/deploy-on-cloud)).
+- **FastAPI for AI:** Built on FastAPI but optimized for AI - 2× faster with AI-specific multi-worker handling ([more]((#performance))).   
+- **Expert-friendly:** Use vLLM, or build your own with full control over batching, caching, and logic ([more](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api)).    
+
+> ⚠️ Not a vLLM or Ollama alternative out of the box. LitServe gives you lower-level flexibility to build what they do (and more) if you need it.
 
 &nbsp;
 
@@ -159,24 +182,20 @@ Here are examples of inference pipelines for common model types and use cases.
 
 &nbsp;
 
+# Host anywhere
 
-# Hosting options   
-Self host LitServe anywhere or deploy to your favorite cloud via [Lightning AI](http://lightning.ai/deploy).
+Self-host with full control, or deploy with [Lightning AI](https://lightning.ai/) in seconds with autoscaling, security, and 99.995% uptime.  
+**Free tier included. No setup required. Run on your cloud**   
 
-https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
-
-Self-hosting is ideal for hackers, students, and DIY developers while fully managed hosting is ideal for enterprise developers needing easy autoscaling, security, release management, and 99.995% uptime and observability.
-
-*Note:* Lightning offers a generous free tier for developers.
-
-To host on [Lightning AI](https://lightning.ai/deploy), simply run the command, login and choose the cloud of your choice.
 ```bash
 lightning deploy server.py --cloud
 ```
 
+https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
+
 &nbsp;
 
-## Features
+# Features
 
 <div align='center'>
 
@@ -198,6 +217,8 @@ lightning deploy server.py --cloud
 | [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control) | ✅       | ✅                                 |
 | [OpenAPI compliant](https://www.openapis.org/)                                                | ✅       | ✅                                 |
 | [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)             | ✅       | ✅                                 |
+| [MCP server support](https://lightning.ai/docs/litserve/features/mcp)                         | ✅       | ✅                                 |
+| [Asynchronous](https://lightning.ai/docs/litserve/features/async-concurrency)                 | ✅       | ✅                                 |
 | [Authentication](https://lightning.ai/docs/litserve/features/authentication)                  | ❌ DIY   | ✅ Token, password, custom         |
 | GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
 | Load balancing                   | ❌                                 | ✅ Built-in                        |

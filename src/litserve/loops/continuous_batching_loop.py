@@ -24,7 +24,7 @@ from litserve.callbacks import CallbackRunner
 from litserve.loops.base import LitLoop
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, LoopResponseType
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,10 @@ def notify_timed_out_requests(
 ):
     for response_queue_id, uid in timed_out_uids:
         logger.error(f"Request {uid} was waiting in the queue for too long and has been timed out.")
-        response_queues[response_queue_id].put((uid, (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR)))
+        response_queues[response_queue_id].put((
+            uid,
+            (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR, LoopResponseType.STREAMING),
+        ))
 
 
 @dataclass
@@ -68,7 +71,7 @@ class ContinuousBatchingLoop(LitLoop):
         self.max_sequence_length = max_sequence_length
         self.response_queue_ids: Dict[str, int] = {}  # uid -> response_queue_id
 
-    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         """Check if the lit_api has the necessary methods and if streaming is enabled."""
         if not lit_api.stream:
             raise ValueError(
@@ -180,16 +183,15 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
     async def run(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
         """Main loop that processes batches of requests."""
+        lit_spec = lit_api.spec
         try:
             prev_outputs = None
             while lit_api.has_active_requests():
@@ -211,19 +213,25 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
                     response_data = lit_api.format_encoded_response(response_data)
                     if status == LitAPIStatus.ERROR:
-                        self.put_error_response(transport, response_queue_id, uid, response_data)
+                        self.put_error_response(
+                            transport, response_queue_id, uid, response_data, LoopResponseType.STREAMING
+                        )
                         self.mark_completed(uid)
                     elif status == LitAPIStatus.FINISH_STREAMING:
-                        self.put_response(transport, response_queue_id, uid, response_data, status)
+                        self.put_response(
+                            transport, response_queue_id, uid, response_data, status, LoopResponseType.STREAMING
+                        )
                         self.mark_completed(uid)
                     else:
-                        self.put_response(transport, response_queue_id, uid, response_data, status)
+                        self.put_response(
+                            transport, response_queue_id, uid, response_data, status, LoopResponseType.STREAMING
+                        )
 
         except Exception as e:
             logger.exception(f"Error in continuous batching loop: {e}")
             # Handle any errors by sending error responses for all tracked requests
             for uid, response_queue_id in self.response_queue_ids.items():
-                self.put_error_response(transport, response_queue_id, uid, e)
+                self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
             self.response_queue_ids.clear()
             self.active_sequences.clear()
 

@@ -29,7 +29,7 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, LoopResponseType
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -142,12 +142,12 @@ class _BaseLoop(ABC):
             x = lit_api.decode_request(x_enc)
             response = lit_api.predict(x)
             response_enc = lit_api.encode_response(response)
-            response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK)))
+            response_queues[response_queue_id].put((uid, (response_enc, LitAPIStatus.OK, LoopResponseType.REGULAR)))
     ```
 
     """
 
-    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         pass
 
     async def schedule_task(
@@ -162,15 +162,14 @@ class _BaseLoop(ABC):
     def __call__(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
+        lit_spec = lit_api.spec
         if asyncio.iscoroutinefunction(self.run):
             event_loop = asyncio.new_event_loop()
 
@@ -182,12 +181,10 @@ class _BaseLoop(ABC):
                     try:
                         await self.run(
                             lit_api,
-                            lit_spec,
                             device,
                             worker_id,
                             request_queue,
                             transport,
-                            stream,
                             workers_setup_status,
                             callback_runner,
                         )
@@ -200,12 +197,10 @@ class _BaseLoop(ABC):
             while True:
                 self.run(
                     lit_api,
-                    lit_spec,
                     device,
                     worker_id,
                     request_queue,
                     transport,
-                    stream,
                     workers_setup_status,
                     callback_runner,
                 )
@@ -213,12 +208,10 @@ class _BaseLoop(ABC):
     def run(
         self,
         lit_api: LitAPI,
-        lit_spec: Optional[LitSpec],
         device: str,
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        stream: bool,
         workers_setup_status: Dict[int, str],
         callback_runner: CallbackRunner,
     ):
@@ -232,7 +225,7 @@ class LitLoop(_BaseLoop):
 
     def kill(self):
         try:
-            logger.info(f"Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]")
+            logger.debug(f"Stop Server Requested - Kill parent pid [{self._server_pid}] from [{os.getpid()}]")
             if sys.platform == "win32":
                 os.kill(self._server_pid, signal.SIGTERM)
         except PermissionError:
@@ -261,26 +254,36 @@ class LitLoop(_BaseLoop):
             lit_spec.populate_context(self._context, request)
 
     def put_response(
-        self, transport: MessageTransport, response_queue_id: int, uid: str, response_data: Any, status: LitAPIStatus
+        self,
+        transport: MessageTransport,
+        response_queue_id: int,
+        uid: str,
+        response_data: Any,
+        status: LitAPIStatus,
+        response_type: LoopResponseType,
     ) -> None:
-        transport.send((uid, (response_data, status)), consumer_id=response_queue_id)
+        transport.send((uid, (response_data, status, response_type)), consumer_id=response_queue_id)
 
     def put_error_response(
-        self, transport: MessageTransport, response_queue_id: int, uid: str, error: Exception
+        self,
+        transport: MessageTransport,
+        response_queue_id: int,
+        uid: str,
+        error: Exception,
+        response_type: LoopResponseType = LoopResponseType.REGULAR,
     ) -> None:
         error = pickle.dumps(error)
-        self.put_response(transport, response_queue_id, uid, error, LitAPIStatus.ERROR)
+        self.put_response(transport, response_queue_id, uid, error, LitAPIStatus.ERROR, response_type)
 
 
 class DefaultLoop(LitLoop):
-    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec]):
+    def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         # we will sanitize regularly if no spec
         # in case, we have spec then:
         # case 1: spec implements a streaming API
         # Case 2: spec implements a non-streaming API
-        if spec:
+        if lit_api.spec:
             # TODO: Implement sanitization
-            lit_api._spec = spec
             return
 
         original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
