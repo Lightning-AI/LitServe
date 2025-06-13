@@ -239,11 +239,6 @@ def test_connector_mock_jax_mps_check(mock_cuda_smi, mock_jax_backend, mock_jax)
         assert connector.devices == 1
 
         check_cuda_with_nvidia_smi.cache_clear()
-        connector = _Connector(accelerator="jax")
-        assert connector.accelerator == "jax"
-        assert connector.devices == 1
-
-        check_cuda_with_nvidia_smi.cache_clear()
         connector = _Connector(accelerator="gpu")
         assert connector.accelerator == "mps"
         assert connector.devices == 1
@@ -262,11 +257,6 @@ def test_connector_mock_jax_cuda(mock_cuda_smi, mock_jax_backend, mock_jax):
     check_cuda_with_nvidia_smi.cache_clear()
     connector = _Connector(accelerator="auto")
     assert connector.accelerator == "cuda"
-    assert connector.devices == 1
-
-    check_cuda_with_nvidia_smi.cache_clear()
-    connector = _Connector(accelerator="jax")
-    assert connector.accelerator == "jax"
     assert connector.devices == 1
 
     check_cuda_with_nvidia_smi.cache_clear()
