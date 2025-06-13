@@ -53,6 +53,14 @@ class TestAPIWithStructuredOutput(TestAPI):
         )
 
 
+class TestAPIWithReasoningEffort(TestAPI):
+    def encode_response(self, output, context):
+        yield ChatMessage(
+            role="assistant",
+            content=f"This is a generated output with reasoning effort: {context.get('reasoning_effort', None)}",
+        )
+
+
 class OpenAIBatchContext(LitAPI):
     def setup(self, device: str) -> None:
         self.model = None
