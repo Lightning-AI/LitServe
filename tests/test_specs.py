@@ -264,7 +264,7 @@ async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_dat
         ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data)
             if reasoning_effort == "random":
-                assert resp.status_code == 422
+                assert resp.status_code == 422  # as random is not a valid reasoning effort
             else:
                 assert resp.status_code == 200
                 assert (
