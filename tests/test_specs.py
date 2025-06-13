@@ -263,11 +263,14 @@ async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_dat
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             resp = await ac.post("/v1/chat/completions", json=openai_request_data)
-            assert resp.status_code == 200 if reasoning_effort != "random" else 422
-            assert (
-                resp.json()["choices"][0]["message"]["content"]
-                == f"This is a generated output with reasoning effort: {reasoning_effort}"
-            )
+            if reasoning_effort == "random":
+                assert resp.status_code == 422
+            else:
+                assert resp.status_code == 200
+                assert (
+                    resp.json()["choices"][0]["message"]["content"]
+                    == f"This is a generated output with reasoning effort: {reasoning_effort}"
+                )
 
 
 class IncorrectAPI1(ls.LitAPI):
