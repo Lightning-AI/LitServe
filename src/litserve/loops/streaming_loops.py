@@ -144,12 +144,6 @@ class StreamingLoop(DefaultLoop):
             callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
             callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
-            y_gen: AsyncGenerator = await _async_inject_context(
-                context,
-                lit_api.predict,
-                x,
-            )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
             """Regular flow.
 
             x ---------decode_request----------> y1
@@ -162,6 +156,12 @@ class StreamingLoop(DefaultLoop):
 
             """
 
+            y_gen: AsyncGenerator = await _async_inject_context(
+                context,
+                lit_api.predict,
+                x,
+            )
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
             callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
             # Pass the entire async generator to encode_response
             y_enc_gen = await _async_inject_context(
