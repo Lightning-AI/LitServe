@@ -529,6 +529,14 @@ print(f"Status: {response.status_code}\\nResponse:\\n {response.text}")"""
         assert expected in fr.read(), "Shouldn't replace existing client.py"
 
 
+def test_generate_client_file_custom_path(tmp_path):
+    dest = tmp_path / "my_client.py"
+    LitServer.generate_client_file(8123, dest_path=dest)
+    with open(dest) as fr:
+        content = fr.read()
+    assert "http://127.0.0.1:8123/predict" in content
+
+
 class FailFastAPI(ls.test_examples.SimpleLitAPI):
     def setup(self, device):
         raise ValueError("setup failed")

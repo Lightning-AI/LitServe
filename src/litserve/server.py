@@ -987,11 +987,19 @@ class LitServer:
                 self.app.add_middleware(middleware)
 
     @staticmethod
-    def generate_client_file(port: Union[str, int] = 8000):
-        dest_path = os.path.join(os.getcwd(), "client.py")
+    def generate_client_file(port: Union[str, int] = 8000, dest_path: Optional[str] = None):
+        """Generate a small Python client for interacting with the server.
+
+        Args:
+            port: The port the server is running on.
+            dest_path: Path to write the client file to. Defaults to ``client.py`` in the
+                current working directory.
+
+        """
+        dest_path = dest_path or os.path.join(os.getcwd(), "client.py")
 
         if os.path.exists(dest_path):
-            logger.debug("client.py already exists in the current directory. Skipping generation.")
+            logger.debug(f"{dest_path} already exists. Skipping generation.")
             return
 
         try:
@@ -1169,7 +1177,7 @@ class LitServer:
             generate_client_file:
                 Auto-generate a Python client file for easy API interaction. Defaults to True.
 
-                - Creates `client.py` in current directory with typed methods
+                - Creates a client file (default `client.py` in current directory)
                 - Useful for testing and integration
                 - Safe to disable in production environments
 
