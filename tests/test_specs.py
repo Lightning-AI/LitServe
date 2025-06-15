@@ -24,7 +24,6 @@ from litserve.test_examples.openai_spec_example import (
     OpenAIWithUsageEncodeResponse,
     TestAPI,
     TestAPIWithCustomEncode,
-    TestAPIWithReasoningEffort,
     TestAPIWithStructuredOutput,
     TestAPIWithToolCalls,
 )
@@ -251,6 +250,14 @@ async def test_openai_spec_metadata_required_fail(openai_request_data):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data)
             assert resp.status_code == 500
             assert "Missing required metadata" in resp.text
+
+
+class TestAPIWithReasoningEffort(TestAPI):
+    def encode_response(self, output, context):
+        yield ChatMessage(
+            role="assistant",
+            content=f"This is a generated output with reasoning effort: {context.get('reasoning_effort', None)}",
+        )
 
 
 @pytest.mark.asyncio
