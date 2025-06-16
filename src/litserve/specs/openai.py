@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from litserve.specs.base import LitSpec
+from litserve.specs.base import LitSpec, _AsyncSpecWrapper
 from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
@@ -264,13 +264,14 @@ class ExampleAPI(ls.LitAPI):
 ```
 """
 
-ASYNC_LITAPI_VALIDATION_MSG = """LitAPI.decode_request, LitAPI.predict, and LitAPI.encode_response must all be async
-coroutines (use 'async def') while using the OpenAISpec with async enabled in LitAPI.
+ASYNC_LITAPI_VALIDATION_MSG = """Error: {}
 
-Additionally, LitAPI.predict and LitAPI.encode_response must be async generators (use 'yield' or 'yield from' inside
- an 'async def' function).
+`enable_async` is set but LitAPI method is not async. To use async with OpenAISpec, you need to make the following changes:
 
-Error: {}
+- LitAPI.decode_request can be a regular function or an async function.
+- LitAPI.predict must be an async generator (use 'yield' or 'yield from' inside an 'async def' function).
+- LitAPI.encode_response can be a regular function or an async generator.
+
 
 Please follow the examples below for guidance on how to use the spec in async mode:
 
@@ -323,7 +324,7 @@ class ExampleAPI(ls.LitAPI):
         async for out in output:
             yield ChatMessage(role="assistant", content=out)
 ```
-"""
+"""  # noqa: E501
 
 
 class OpenAISpec(LitSpec):
@@ -346,14 +347,23 @@ class OpenAISpec(LitSpec):
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
 
         if lit_api.enable_async:
+            # warning for decode_request and encode_response
             if not asyncio.iscoroutinefunction(lit_api.decode_request):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("decode_request is not a coroutine"))
+                logger.info("decode_request is not a coroutine function. LitServe will asyncify it.")
+            if not inspect.isasyncgenfunction(lit_api.encode_response):
+                logger.info("encode_response is not an async generator. LitServe will asyncify it.")
 
             if not inspect.isasyncgenfunction(lit_api.predict):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict is not a generator"))
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict must be an async generator"))
 
-            if not inspect.isasyncgenfunction(lit_api.encode_response):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+            if (
+                not is_encode_response_original
+                and not inspect.isgeneratorfunction(lit_api.encode_response)
+                and not inspect.isasyncgenfunction(lit_api.encode_response)
+            ):
+                raise ValueError(
+                    ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is neither a generator nor an async generator")
+                )
 
         else:
             for method in ["decode_request", "predict", "encode_response"]:
@@ -374,6 +384,9 @@ class OpenAISpec(LitSpec):
     def setup(self, server: "LitServer"):
         super().setup(server)
         print("OpenAI spec setup complete")
+
+    def as_async(self) -> "_AsyncOpenAISpecWrapper":
+        return _AsyncOpenAISpecWrapper(self)
 
     def populate_context(self, context, request):
         data = request.dict()
@@ -550,3 +563,9 @@ class OpenAISpec(LitSpec):
             choices.append(choice)
 
         return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
+
+
+class _AsyncOpenAISpecWrapper(_AsyncSpecWrapper):
+    async def encode_response(self, output_generator: AsyncGenerator, context_kwargs: Optional[dict] = None):
+        async for output in output_generator:
+            yield self._spec._encode_response(output)

@@ -26,7 +26,7 @@ class AsyncAPI(ls.LitAPI):
             yield self.model(i)
 
     async def encode_response(self, output):
-        for out in output:
+        async for out in output:
             yield {"output": out}
 
 

@@ -285,5 +285,7 @@ def test_log():
 
 
 def test_enable_async_not_set():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+    with pytest.raises(
+        ValueError, match=r"predict must be an async generator or async function when enable_async=True"
+    ):
         ls.test_examples.SimpleLitAPI(enable_async=True)

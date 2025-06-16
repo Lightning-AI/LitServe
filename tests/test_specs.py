@@ -370,9 +370,6 @@ class IncorrectDecodeAsyncAPI(IncorrectAsyncAPI):
     def decode_request(self, request):
         return request
 
-    def _validate_async_methods(self):
-        return None
-
 
 class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
     async def predict(self, x):
@@ -380,20 +377,14 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 
 
 @pytest.mark.asyncio
-def test_openai_spec_asyncapi_decode_request_validation():
-    with pytest.raises(ValueError, match="decode_request is not a coroutine"):
-        ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
-
-
-@pytest.mark.asyncio
-def test_openai_spec_asyncapi_predict_validation():
-    with pytest.raises(ValueError, match="predict is not a generator"):
+async def test_openai_spec_asyncapi_predict_validation():
+    with pytest.raises(ValueError, match="predict must be an async generator"):
         ls.LitServer(IncorrectAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
 @pytest.mark.asyncio
 def test_openai_spec_asyncapi_encode_response_validation():
-    with pytest.raises(ValueError, match="encode_response is not a generator"):
+    with pytest.raises(ValueError, match="encode_response is neither a generator nor an async generator"):
         ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
@@ -414,12 +405,6 @@ class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
         yield {"role": "assistant", "content": output}
 
 
-@pytest.mark.asyncio
-def test_openai_asyncapi_decode_not_implemented():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
-        ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
-
-
 class AsyncOpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
@@ -433,7 +418,7 @@ class AsyncOpenAILitAPI(ls.LitAPI):
             yield token
 
     async def encode_response(self, output_stream, context):
-        for output in output_stream:
+        async for output in output_stream:
             yield {"role": "assistant", "content": output}
 
 
