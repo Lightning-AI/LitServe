@@ -196,7 +196,9 @@ class StreamingLoop(DefaultLoop):
         transport: MessageTransport,
         callback_runner: CallbackRunner,
     ):
-        lit_api.spec = lit_api.spec.as_async()
+        if lit_api.spec:
+            # wrap the default implementation of the spec in an async spec wrapper
+            lit_api.spec = lit_api.spec.as_async()
 
         async def process_requests():
             event_loop = asyncio.get_running_loop()
