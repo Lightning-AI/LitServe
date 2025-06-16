@@ -264,10 +264,9 @@ class ExampleAPI(ls.LitAPI):
 ```
 """
 
-ASYNC_LITAPI_VALIDATION_MSG = """
-`enable_async` turns on async mode and recommends using async functions and generators for LitAPI.
+ASYNC_LITAPI_VALIDATION_MSG = """Error: {}
 
-Error: {}
+`enable_async` is set but LitAPI method is not async. To use async with OpenAISpec, you need to make the following changes:
 
 - LitAPI.decode_request can be a regular function or an async function.
 - LitAPI.predict must be an async generator (use 'yield' or 'yield from' inside an 'async def' function).
@@ -325,7 +324,7 @@ class ExampleAPI(ls.LitAPI):
         async for out in output:
             yield ChatMessage(role="assistant", content=out)
 ```
-"""
+"""  # noqa: E501
 
 
 class OpenAISpec(LitSpec):
