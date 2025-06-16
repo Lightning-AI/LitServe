@@ -192,22 +192,53 @@ class LitAPI(ABC):
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
-        if self.enable_async:
-            # check if LitAPI methods are coroutines or async generators
-            for method in ["decode_request", "encode_response"]:
-                method_obj = getattr(self, method)
-                if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
-                    warnings.warn(
-                        f"enable_async set to True but {method} is not a coroutine or async generator. "
-                        "LitServe will asyncify the method.",
-                        UserWarning,
-                    )
+        if not self.enable_async:
+            return
 
-            if not inspect.isasyncgenfunction(self.predict):
-                raise ValueError(
-                    "enable_async set to True but predict is not an async generator. "
-                    "Make sure the method is an async generator."
-                )
+        # Define validation rules for each method
+        validation_rules = {
+            "decode_request": {
+                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
+                "error_type": "warning",
+                "message": "should be an async function or async generator when enable_async=True",
+            },
+            "encode_response": {
+                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
+                "error_type": "warning",
+                "message": "should be an async function or async generator when enable_async=True",
+            },
+            "predict": {
+                "required_types": [inspect.isasyncgenfunction, asyncio.iscoroutinefunction],
+                "error_type": "error",
+                "message": "must be an async generator or async function when enable_async=True",
+            },
+        }
+
+        errors = []
+        warnings_list = []
+
+        for method_name, rules in validation_rules.items():
+            method_obj = getattr(self, method_name)
+
+            # Check if method satisfies any of the required types
+            is_valid = any(check_func(method_obj) for check_func in rules["required_types"])
+
+            if not is_valid:
+                message = f"{method_name} {rules['message']}"
+
+                if rules["error_type"] == "error":
+                    errors.append(message)
+                else:
+                    warnings_list.append(message)
+
+        # Emit warnings
+        for warning_msg in warnings_list:
+            warnings.warn(f"{warning_msg}. LitServe will asyncify the method.", UserWarning)
+
+        # Raise errors if any
+        if errors:
+            error_msg = "Async validation failed:\n" + "\n".join(f"- {err}" for err in errors)
+            raise ValueError(error_msg)
 
     @abstractmethod
     def setup(self, device):
