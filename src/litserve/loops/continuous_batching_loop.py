@@ -35,12 +35,10 @@ def notify_timed_out_requests(
 ):
     for response_queue_id, uid in timed_out_uids:
         logger.error(f"Request {uid} was waiting in the queue for too long and has been timed out.")
-        response_queues[response_queue_id].put(
-            (
-                uid,
-                (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR, LoopResponseType.STREAMING),
-            )
-        )
+        response_queues[response_queue_id].put((
+            uid,
+            (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR, LoopResponseType.STREAMING),
+        ))
 
 
 @dataclass

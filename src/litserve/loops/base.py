@@ -287,13 +287,10 @@ class DefaultLoop(LitLoop):
             return
 
         original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
-        if not lit_api.stream and any(
-            [
-                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response)
-                or inspect.isasyncgenfunction(lit_api.encode_response),
-            ]
-        ):
+        if not lit_api.stream and any([
+            inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response) or inspect.isasyncgenfunction(lit_api.encode_response),
+        ]):
             raise ValueError(
                 """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` must not be
                 generator or async generator functions.
@@ -326,18 +323,16 @@ class DefaultLoop(LitLoop):
         if (
             lit_api.stream
             and lit_api.max_batch_size > 1
-            and not all(
-                [
-                    inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
-                    inspect.isgeneratorfunction(lit_api.encode_response)
-                    or inspect.isasyncgenfunction(lit_api.encode_response),
-                    (
-                        original
-                        or inspect.isgeneratorfunction(lit_api.unbatch)
-                        or inspect.isasyncgenfunction(lit_api.unbatch)
-                    ),
-                ]
-            )
+            and not all([
+                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response)
+                or inspect.isasyncgenfunction(lit_api.encode_response),
+                (
+                    original
+                    or inspect.isgeneratorfunction(lit_api.unbatch)
+                    or inspect.isasyncgenfunction(lit_api.unbatch)
+                ),
+            ])
         ):
             raise ValueError(
                 """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
@@ -369,13 +364,10 @@ class DefaultLoop(LitLoop):
              """
             )
 
-        if lit_api.stream and not all(
-            [
-                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response)
-                or inspect.isasyncgenfunction(lit_api.encode_response),
-            ]
-        ):
+        if lit_api.stream and not all([
+            inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+            inspect.isgeneratorfunction(lit_api.encode_response) or inspect.isasyncgenfunction(lit_api.encode_response),
+        ]):
             raise ValueError(
                 """When `stream=True` both `lit_api.predict` and
              `lit_api.encode_response` must generate values using `yield` (can be regular or async generators).

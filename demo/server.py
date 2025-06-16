@@ -1,10 +1,13 @@
-from transformers import pipeline
 from pydantic import BaseModel
-from litserve.mcp import MCP
+from transformers import pipeline
+
 import litserve as ls
+from litserve.mcp import MCP
+
 
 class TextClassificationRequest(BaseModel):
     input: str
+
 
 class TextClassificationAPI(ls.LitAPI):
     def setup(self, device):
@@ -18,6 +21,7 @@ class TextClassificationAPI(ls.LitAPI):
 
     def encode_response(self, output):
         return output[0]
+
 
 if __name__ == "__main__":
     api = TextClassificationAPI(mcp=MCP(description="Classifies sentiment in text"))

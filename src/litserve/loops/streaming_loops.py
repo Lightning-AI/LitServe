@@ -18,7 +18,6 @@ from queue import Empty, Queue
 from typing import AsyncGenerator, Dict, Optional
 
 from fastapi import HTTPException
-import inspect
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
@@ -169,7 +168,7 @@ class StreamingLoop(DefaultLoop):
 
             Approach 1:
                 We convert encode_response to async dynamically.
-                Error prone because the OpenAISpec.encode_response implementation is sync so 
+                Error prone because the OpenAISpec.encode_response implementation is sync so
                 it can't iterate through an async generator.
 
                 If we can do dynamic inheritance somehow then that would be great!

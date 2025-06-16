@@ -234,14 +234,12 @@ def _param_name_to_title(param_name: str) -> str:
 
 async def _call_handler(handler, **kwargs):
     sig = inspect.signature(handler)
-    bound = sig.bind_partial(
-        **{
-            k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
-            for k, v in kwargs.items()
-            for name, p in sig.parameters.items()
-            if k == name
-        }
-    )
+    bound = sig.bind_partial(**{
+        k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
+        for k, v in kwargs.items()
+        for name, p in sig.parameters.items()
+        if k == name
+    })
     return _convert_to_content(await handler(*bound.args, **bound.kwargs))
 
 
@@ -440,12 +438,10 @@ class _MCPRequestHandler:
             await send(error_message)
 
             body = json.dumps({"error": str(e)}).encode("utf-8")
-            await send(
-                {
-                    "type": "http.response.body",
-                    "body": body,
-                }
-            )
+            await send({
+                "type": "http.response.body",
+                "body": body,
+            })
 
     # https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/server/fastmcp/server.py
     def streamable_http_app(self) -> Starlette:
