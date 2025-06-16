@@ -639,7 +639,7 @@ class TestAsyncStreamLitAPI(ls.LitAPI):
             yield self.model(i)
 
     async def encode_response(self, output_stream):
-        for output in output_stream:
+        async for output in output_stream:
             yield {"output": output}
 
 
