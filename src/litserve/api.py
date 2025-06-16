@@ -194,7 +194,7 @@ class LitAPI(ABC):
         """Validate that async methods are properly implemented when enable_async is True."""
         if self.enable_async:
             # check if LitAPI methods are coroutines or async generators
-            for method in ["decode_request", "predict", "encode_response"]:
+            for method in ["decode_request", "encode_response"]:
                 method_obj = getattr(self, method)
                 if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
                     warnings.warn(
@@ -202,6 +202,12 @@ class LitAPI(ABC):
                         "LitServe will asyncify the method.",
                         UserWarning,
                     )
+
+            if not inspect.isasyncgenfunction(self.predict):
+                raise ValueError(
+                    "enable_async set to True but predict is not an async generator. "
+                    "Make sure the method is an async generator."
+                )
 
     @abstractmethod
     def setup(self, device):
