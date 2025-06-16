@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Callable, List
+from typing import TYPE_CHECKING, AsyncGenerator, Callable, Generator, List, Optional, Union
 
 if TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -65,5 +65,20 @@ class LitSpec:
         """
         pass
 
-    def as_async(self):
-        raise NotImplementedError("This spec does not support async mode")
+    def as_async(self) -> "_AsyncSpecWrapper":
+        return _AsyncSpecWrapper(self)
+
+
+class _AsyncSpecWrapper:
+    def __init__(self, spec: LitSpec):
+        self._spec = spec
+
+    def __getattr__(self, name):
+        # Delegate all other attributes/methods to the wrapped spec
+        return getattr(self._spec, name)
+
+    async def decode_request(self, request, context_kwargs: Optional[dict] = None):
+        return self._spec.decode_request(request, context_kwargs)
+
+    async def encode_response(self, output: Union[Generator, AsyncGenerator], context_kwargs: Optional[dict] = None):
+        return self._spec.encode_response(output, context_kwargs)

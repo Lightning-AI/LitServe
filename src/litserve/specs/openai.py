@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from litserve.specs.base import LitSpec
+from litserve.specs.base import LitSpec, _AsyncSpecWrapper
 from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
@@ -566,17 +566,7 @@ class OpenAISpec(LitSpec):
         return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
 
 
-class _AsyncOpenAISpecWrapper:
-    def __init__(self, spec: OpenAISpec):
-        self._spec = spec
-
-    def __getattr__(self, name):
-        # Delegate all other attributes/methods to the wrapped spec
-        return getattr(self._spec, name)
-
-    async def decode_request(self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None):
-        return self._spec.decode_request(request, context_kwargs)
-
+class _AsyncOpenAISpecWrapper(_AsyncSpecWrapper):
     async def encode_response(self, output_generator: AsyncGenerator, context_kwargs: Optional[dict] = None):
         async for output in output_generator:
             yield self._spec._encode_response(output)
