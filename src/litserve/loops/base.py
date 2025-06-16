@@ -47,14 +47,24 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
 
 async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
-    is_async_gen = inspect.isasyncgenfunction(func)
 
+    # Determine if we need to inject context
     if "context" in sig.parameters:
-        result = (
-            await func(*args, **kwargs, context=context) if not is_async_gen else func(*args, **kwargs, context=context)
-        )
-    else:
-        result = await func(*args, **kwargs) if not is_async_gen else func(*args, **kwargs)
+        kwargs["context"] = context
+
+    # Call the function based on its type
+    if inspect.isasyncgenfunction(func):
+        # Async generator - return directly (don't await)
+        return func(*args, **kwargs)
+    if asyncio.iscoroutinefunction(func):
+        # Async function - await the result
+        return await func(*args, **kwargs)
+    # Sync function - call directly, then await if result is awaitable
+    result = func(*args, **kwargs)
+
+    # Check if the result is awaitable (coroutine)
+    if asyncio.iscoroutine(result):
+        return await result
 
     return result
 

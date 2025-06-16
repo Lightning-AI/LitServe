@@ -64,3 +64,6 @@ class LitSpec:
 
         """
         pass
+
+    def as_async(self):
+        raise NotImplementedError("This spec does not support async mode")

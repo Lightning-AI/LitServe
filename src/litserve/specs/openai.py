@@ -27,7 +27,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus, asyncify, azip
+from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -385,12 +385,14 @@ class OpenAISpec(LitSpec):
         super().setup(server)
         print("OpenAI spec setup complete")
 
+    def as_async(self) -> "_AsyncOpenAISpecWrapper":
+        return _AsyncOpenAISpecWrapper(self)
+
     def populate_context(self, context, request):
         data = request.dict()
         data.pop("messages")
         context.update(data)
 
-    @asyncify
     def decode_request(
         self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
     ) -> List[Dict[str, str]]:
@@ -439,7 +441,6 @@ class OpenAISpec(LitSpec):
         usage_info = self.extract_usage_info(message)
         return {**message, **usage_info}
 
-    @asyncify
     def encode_response(
         self, output_generator: Union[Dict[str, str], List[Dict[str, str]]], context_kwargs: Optional[dict] = None
     ) -> Iterator[Union[ChatMessage, ChatMessageWithUsage]]:
@@ -562,3 +563,19 @@ class OpenAISpec(LitSpec):
             choices.append(choice)
 
         return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
+
+
+class _AsyncOpenAISpecWrapper:
+    def __init__(self, spec: OpenAISpec):
+        self._spec = spec
+
+    def __getattr__(self, name):
+        # Delegate all other attributes/methods to the wrapped spec
+        return getattr(self._spec, name)
+
+    async def decode_request(self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None):
+        return self._spec.decode_request(request, context_kwargs)
+
+    async def encode_response(self, output_generator: AsyncGenerator, context_kwargs: Optional[dict] = None):
+        async for output in output_generator:
+            yield self._spec._encode_response(output)
