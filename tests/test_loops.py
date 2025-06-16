@@ -235,7 +235,7 @@ class AsyncTestStreamLitAPI(LitAPI):
             yield {"output": i}
 
     async def encode_response(self, output):
-        for out in output:
+        async for out in output:
             yield out["output"]
 
 
