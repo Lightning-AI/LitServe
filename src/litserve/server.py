@@ -611,8 +611,8 @@ class LitServer:
     def __init__(
         self,
         lit_api: Union[LitAPI, List[LitAPI]],
-        accelerator: Literal["cpu", "cuda", "mps", "auto"] = "auto",
-        devices: Union[int, Literal["auto"]] = "auto",
+        accelerator: str = "auto",
+        devices: Union[str, int] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
         healthcheck_path: str = "/health",
@@ -627,7 +627,6 @@ class LitServer:
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         fast_queue: bool = False,
-        # All the following arguments are deprecated and will be removed in v0.3.0
         max_batch_size: Optional[int] = None,
         batch_timeout: float = 0.0,
         stream: bool = False,
