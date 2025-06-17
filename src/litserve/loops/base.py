@@ -45,13 +45,7 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
-    sig = inspect.signature(func)
-
-    # Determine if we need to inject context
-    if "context" in sig.parameters:
-        kwargs["context"] = context
-
+async def _handle_async_function(func, *args, **kwargs):
     # Call the function based on its type
     if inspect.isasyncgenfunction(func):
         # Async generator - return directly (don't await)
@@ -67,6 +61,16 @@ async def _async_inject_context(context: Union[List[dict], dict], func, *args, *
         return await result
 
     return result
+
+
+async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
+    sig = inspect.signature(func)
+
+    # Determine if we need to inject context
+    if "context" in sig.parameters:
+        kwargs["context"] = context
+
+    return await _handle_async_function(func, *args, **kwargs)
 
 
 def collate_requests(

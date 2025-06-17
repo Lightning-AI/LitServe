@@ -20,7 +20,7 @@ import re
 import threading
 import time
 from queue import Empty, Queue
-from typing import Dict, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -33,7 +33,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import BatchedStreamingLoop, LitLoop, Output, StreamingLoop, inference_worker
-from litserve.loops.base import DefaultLoop
+from litserve.loops.base import DefaultLoop, _async_inject_context, _handle_async_function
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
     notify_timed_out_requests,
@@ -918,3 +918,30 @@ async def test_continuous_batching_run(continuous_batching_setup):
     assert o == ""
     assert status == LitAPIStatus.FINISH_STREAMING
     assert response_type == LoopResponseType.STREAMING
+
+
+@pytest.mark.asyncio
+async def test_handle_async_function():
+    async def async_func():
+        return "async"
+
+    def sync_func():
+        return "sync"
+
+    async def async_gen():
+        for i in range(3):
+            yield i
+
+    assert await _handle_async_function(async_func) == "async"
+    assert await _handle_async_function(sync_func) == "sync"
+    async_gen = await _handle_async_function(async_gen)
+    assert isinstance(async_gen, AsyncGenerator)
+
+
+@pytest.mark.asyncio
+async def test_async_inject_context():
+    async def async_func(x, context=0):
+        return x * context["a"]
+
+    context = {"a": 1}
+    assert await _async_inject_context(context, async_func, 2) == 2

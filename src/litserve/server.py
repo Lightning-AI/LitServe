@@ -300,7 +300,7 @@ class BaseRequestHandler(ABC):
 class RegularRequestHandler(BaseRequestHandler):
     async def handle_request(self, request, request_type) -> Response:
         try:
-            logger.info(f"Handling request: {request}")
+            logger.debug(f"Handling request: {request}")
             # Prepare request
             payload = await self._prepare_request(request, request_type)
 
