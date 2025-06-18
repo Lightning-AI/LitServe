@@ -33,7 +33,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import BatchedStreamingLoop, LitLoop, Output, StreamingLoop, inference_worker
-from litserve.loops.base import DefaultLoop, _async_inject_context, _handle_async_function
+from litserve.loops.base import DefaultLoop, _async_inject_context, _handle_async_function, _sync_fn_to_async_fn
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
     notify_timed_out_requests,
@@ -945,3 +945,17 @@ async def test_async_inject_context():
 
     context = {"a": 1}
     assert await _async_inject_context(context, async_func, 2) == 2
+
+
+@pytest.mark.asyncio
+async def test_sync_fn_to_async_fn():
+    def sync_func():
+        return "sync-to-async"
+
+    def sync_gen():
+        for i in range(3):
+            yield f"sync-to-async-{i}"
+
+    assert await _sync_fn_to_async_fn(sync_func) == "sync-to-async"
+    async_gen = await _sync_fn_to_async_fn(sync_gen)
+    assert isinstance(async_gen, AsyncGenerator)
