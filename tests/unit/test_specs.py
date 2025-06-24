@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
+
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
-from litserve.specs.openai import ChatMessage, OpenAISpec
+from litserve.specs.openai import ChatCompletionRequest, ChatMessage, OpenAISpec
 from litserve.test_examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsage,
@@ -30,20 +32,55 @@ from litserve.test_examples.openai_spec_example import (
 from litserve.utils import wrap_litserve_start
 
 
+class TestOpenAISpecAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        assert isinstance(x, ChatCompletionRequest), "decode_request returns a ChatCompletionRequest"
+        for e in ["This", "is", "a", "generated", "output"]:
+            yield e + " "
+
+
+class TestAsyncAPI(TestOpenAISpecAPI):
+    async def predict(self, x):
+        assert isinstance(x, ChatCompletionRequest), "decode_request returns a ChatCompletionRequest"
+        for e in ["This", "is", "a", "generated", "output"]:
+            yield e + " "
+
+
+@pytest.mark.parametrize(
+    "api", [TestOpenAISpecAPI(spec=OpenAISpec()), TestAsyncAPI(enable_async=True, spec=OpenAISpec())]
+)
 @pytest.mark.asyncio
-async def test_openai_spec(openai_request_data):
-    spec = OpenAISpec()
-    server = ls.LitServer(TestAPI(), spec=spec)
+async def test_openai_spec(openai_request_data, api):
+    server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
+            transport=ASGITransport(app=manager.app),
+            base_url="http://test",
         ) as ac:
+            openai_request_data["stream"] = True
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
+            messages = []
+            async for chunk in resp.aiter_lines():
+                if not chunk.startswith("data: "):
+                    continue
+                content = chunk[6:].strip()
+                if content == "[DONE]" or not content:
+                    break
+                try:
+                    chunk = json.loads(content)
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    content_piece = delta.get("content")
+                    if content_piece is not None:
+                        messages.append(content_piece)
+                except json.JSONDecodeError:
+                    continue  # Optionally log or handle bad JSON chunks
 
-            assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
-                "LitAPI predict response should match with the generated output"
-            )
+            final_output = "".join(messages)
+            assert final_output == "This is a generated output ", f"final_output: {final_output}"
 
 
 # OpenAIWithUsage
