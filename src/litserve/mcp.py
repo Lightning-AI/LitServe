@@ -20,17 +20,23 @@ import weakref
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, get_args, get_origin
 
-import mcp.types as types
-from fastapi import FastAPI
-from mcp.server.fastmcp.server import _convert_to_content
-from mcp.server.lowlevel import Server as MCPServer
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from pydantic import BaseModel
 from starlette.applications import Starlette
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 
 from litserve.utils import is_package_installed
+
+if not is_package_installed("fastmcp"):
+    raise RuntimeError(
+        "mcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal."
+    )
+
+import mcp.types as types
+from fastapi import FastAPI
+from mcp.server.fastmcp.server import _convert_to_content
+from mcp.server.lowlevel import Server as MCPServer
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 if TYPE_CHECKING:
     from litserve.api import LitAPI
@@ -364,9 +370,9 @@ class MCP:
         self._connected = True
 
     def as_tool(self) -> ToolEndpointType:
-        if not is_package_installed("mcp"):
+        if not is_package_installed("fastmcp"):
             raise RuntimeError(
-                "MCP is not installed. Please install it with `pip install mcp[cli]` or `uv pip install mcp[cli]`"
+                "fastmcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal."
             )
 
         if not self._connected:
