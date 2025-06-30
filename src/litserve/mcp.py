@@ -27,9 +27,9 @@ from starlette.types import Receive, Scope, Send
 
 from litserve.utils import is_package_installed
 
-if not is_package_installed("fastmcp"):
+if not is_package_installed("mcp"):
     raise RuntimeError(
-        "mcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal."
+        "mcp package is required for MCP support. To install, run `pip install mcp[cli]` in the terminal."
     )
 
 import mcp.types as types
@@ -370,9 +370,9 @@ class MCP:
         self._connected = True
 
     def as_tool(self) -> ToolEndpointType:
-        if not is_package_installed("fastmcp"):
+        if not is_package_installed("mcp"):
             raise RuntimeError(
-                "fastmcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal."
+                "fastmcp package is required for MCP support. To install, run `pip install mcp[cli]` in the terminal."
             )
 
         if not self._connected:
