@@ -20,6 +20,7 @@ import weakref
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, get_args, get_origin
 
+from fastapi import FastAPI
 from pydantic import BaseModel
 from starlette.applications import Starlette
 from starlette.routing import Mount
@@ -27,16 +28,18 @@ from starlette.types import Receive, Scope, Send
 
 from litserve.utils import is_package_installed
 
-if not is_package_installed("mcp"):
-    raise RuntimeError(
-        "mcp package is required for MCP support. To install, run `pip install mcp[cli]` in the terminal."
-    )
+_is_mcp_installed = is_package_installed("fastmcp")
 
-import mcp.types as types
-from fastapi import FastAPI
-from mcp.server.fastmcp.server import _convert_to_content
-from mcp.server.lowlevel import Server as MCPServer
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+if _is_mcp_installed:
+    from fastapi import FastAPI
+    from mcp.server.fastmcp.server import _convert_to_content
+    from mcp.server.lowlevel import Server as MCPServer
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+    from mcp.types import Tool as ToolType
+
+else:
+    ToolType = object
 
 if TYPE_CHECKING:
     from litserve.api import LitAPI
@@ -249,7 +252,7 @@ async def _call_handler(handler, **kwargs):
     return _convert_to_content(await handler(*bound.args, **bound.kwargs))
 
 
-class ToolEndpointType(types.Tool):
+class ToolEndpointType(ToolType):
     endpoint: str
 
 
@@ -354,6 +357,11 @@ class MCP:
         self.input_schema = input_schema
         self._connected = False
 
+        if not is_package_installed("fastmcp"):
+            raise RuntimeError(
+                "mcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal."
+            )
+
     @property
     def name(self) -> str:
         return self._name
@@ -370,11 +378,6 @@ class MCP:
         self._connected = True
 
     def as_tool(self) -> ToolEndpointType:
-        if not is_package_installed("mcp"):
-            raise RuntimeError(
-                "fastmcp package is required for MCP support. To install, run `pip install mcp[cli]` in the terminal."
-            )
-
         if not self._connected:
             raise RuntimeError("MCP is not connected to a LitAPI.")
 
@@ -406,7 +409,7 @@ class MCP:
 
 
 class _MCPRequestHandler:
-    def __init__(self, mcp_server: MCPServer):
+    def __init__(self, mcp_server: "MCPServer"):
         self.mcp_server = mcp_server
         self._session_manager = None
 
@@ -542,7 +545,7 @@ class _LitMCPServerConnector:
         starlette_app = self.request_handler.streamable_http_app()
         app.mount("/", starlette_app, name="mcp")
 
-    def connect_mcp_server(self, mcp_tools: List[types.Tool], app: FastAPI):
+    def connect_mcp_server(self, mcp_tools: List[ToolType], app: FastAPI):
         """LitServer calls this method to connect MCP server to the FastAPI app.
 
         Args:

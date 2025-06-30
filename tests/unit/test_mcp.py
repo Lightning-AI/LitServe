@@ -25,10 +25,9 @@ from litserve.mcp import (
 def test_mcp_not_installed(mock_is_package_installed):
     with pytest.raises(
         RuntimeError,
-        match="fastmcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal.",
+        match="mcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal.",
     ):
-        MCP().as_tool()
-    mock_is_package_installed.assert_called_once_with("fastmcp")
+        MCP()
 
 
 def test_python_type_to_json_schema():
