@@ -31,6 +31,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_LOG_FORMAT = (
+    "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+)
+
 
 class LitAPIStatus:
     OK = "OK"
@@ -128,7 +132,7 @@ def _get_default_handler(stream, format):
 
 def configure_logging(
     level: Union[str, int] = logging.INFO,
-    format: str = "%(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
+    format: str = _DEFAULT_LOG_FORMAT,
     stream: TextIO = sys.stdout,
     use_rich: bool = False,
 ):
