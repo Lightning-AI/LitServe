@@ -19,6 +19,7 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import pickle
 import secrets
 import sys
 import threading
@@ -325,16 +326,22 @@ class RegularRequestHandler(BaseRequestHandler):
             return response
 
         except HTTPException as e:
-            raise e
+            return e
 
         except Exception as e:
-            logger.exception(f"Error handling request: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
+            logger.error(f"Unhandled exception: {e}", exc_info=True)
+            return HTTPException(status_code=500, detail="Internal server error")
 
     async def _handle_error_response(self, response):
-        logger.error("Error in request: %s", response)
+        """Raise HTTPException as is and rest as 500 after logging the error."""
+        if isinstance(response, bytes):
+            response = pickle.loads(response)
+
         if isinstance(response, HTTPException):
             raise response
+
+        if isinstance(response, Exception):
+            logger.exception(f"Error while handling request: {response}")
 
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -800,7 +807,7 @@ class LitServer:
                     self.workers_setup_status,
                     self._callback_runner,
                 ),
-                name=f"lit-inference-{endpoint}_{worker_id}",
+                name="inference-worker",
             )
             process.start()
             process_list.append(process)
@@ -1363,9 +1370,9 @@ class LitServer:
             server = uvicorn.Server(config=uvicorn_config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
-                w = ctx.Process(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
+                w = ctx.Process(target=server.run, args=(sockets,), name=f"LitServer-{response_queue_id}")
             elif uvicorn_worker_type == "thread":
-                w = threading.Thread(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
+                w = threading.Thread(target=server.run, args=(sockets,), name=f"LitServer-{response_queue_id}")
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
