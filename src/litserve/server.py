@@ -334,8 +334,11 @@ class RegularRequestHandler(BaseRequestHandler):
 
     async def _handle_error_response(self, response):
         """Raise HTTPException as is and rest as 500 after logging the error."""
-        if isinstance(response, bytes):
-            response = pickle.loads(response)
+        try:
+            if isinstance(response, bytes):
+                response = pickle.loads(response)
+        except Exception as e:
+            logger.debug(f"couldn't unpickle error response {e}")
 
         if isinstance(response, HTTPException):
             raise response
