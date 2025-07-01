@@ -46,7 +46,7 @@ jobs:
       - name: Install package & dependencies
         run: |
           uv pip install -e '.[test]' -U -q --find-links $TORCH_URL
-          uv pip list
+          pip list
 
       - name: Tests
         timeout-minutes: 15
