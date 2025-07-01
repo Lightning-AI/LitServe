@@ -31,7 +31,7 @@ def e2e_from_file(filename):
         @wraps(test_fn)
         def wrapper(*args, **kwargs):
             process = subprocess.Popen(
-                ["python", filename],
+                ["uv run", filename],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
