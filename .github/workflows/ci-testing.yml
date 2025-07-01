@@ -35,12 +35,13 @@ jobs:
           activate-environment: true
           python-version: ${{ matrix.python-version }}
           enable-cache: true
-      - run: uv pip install --python=${{ matrix.python-version }} pip
+      - name: Install the project
+        run: uv sync --all-extras --dev
 
       - name: Set min. dependencies
         if: matrix.requires == 'oldest'
         run: |
-          pip install 'lightning-utilities[cli]'
+          uv pip install 'lightning-utilities[cli]'
           uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
 
       - name: Install package & dependencies
