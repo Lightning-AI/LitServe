@@ -2,11 +2,31 @@
 license_file = "LICENSE"
 description-file = "README.md"
 
-[build-system]
-requires = [
-    "setuptools",
-    "wheel",
+[project]
+name="litserve"
+dynamic = ["version"]
+readme = "README.md"
+requires-python = ">=3.9"
+
+dependencies = [
+    "fastapi>=0.100",
+    "pyzmq>=22.0.0",
+    "uvicorn[standard]>=0.29.0",
 ]
+
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.version]
+path = "src/litserve/__about__.py"
+pattern = "__version__ = \"(?P<version>.+)\""
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 
 [tool.check-manifest]
@@ -128,3 +148,25 @@ convention = "google"
 [tool.ruff.lint.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
+
+[dependency-groups]
+dev = [
+    "asgi-lifespan>=2.1.0",
+    "coverage[toml]>=7.5.3",
+    "fastmcp>=2.9.2 ; python_full_version >= '3.10'",
+    "httpx>=0.27.0",
+    "lightning>2.0.0",
+    "mypy==1.16.0",
+    "numpy<3.0",
+    "openai>=1.12.0",
+    "pillow>=11.3.0",
+    "psutil>=7.0.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
+    "pytest-retry>=1.6.3",
+    "python-multipart>=0.0.20",
+    "requests>=2.32.4",
+    "torch>2.0.0",
+    "transformers>=4.53.0",
+]
