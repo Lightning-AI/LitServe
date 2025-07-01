@@ -64,15 +64,6 @@ def dump_exception(exception):
     return pickle.dumps(exception)
 
 
-def unpickle_exception(error):
-    try:
-        if isinstance(error, bytes):
-            parsed_error = pickle.loads(error)
-        return parsed_error
-    except Exception as _:
-        return error
-
-
 async def azip(*async_iterables):
     iterators = [ait.__aiter__() for ait in async_iterables]
     while True:
