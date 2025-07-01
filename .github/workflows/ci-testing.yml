@@ -46,7 +46,7 @@ jobs:
         if: matrix.requires == 'oldest'
         run: |
           uv pip install 'lightning-utilities[cli]'
-          uv python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
+          uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
 
       - name: Install package & dependencies
         run: |
