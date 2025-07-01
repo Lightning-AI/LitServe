@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, "release/*"]
 
+env:
+  UV_SYSTEM_PYTHON: 1
+
 defaults:
   run:
     shell: bash
@@ -29,33 +32,36 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          enable-cache: true
 
       - name: Set min. dependencies
         if: matrix.requires == 'oldest'
         run: |
-          pip install 'lightning-utilities[cli]'
-          python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
+          uv pip install 'lightning-utilities[cli]'
+          uv python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
 
       - name: Install package & dependencies
         run: |
-          pip --version
-          pip install -e '.[test]' -U -q --find-links $TORCH_URL
-          pip list
+          uv pip install -e '.[test]' -U -q --find-links $TORCH_URL
+          uv pip list
 
       - name: Tests
         timeout-minutes: 15
         run: |
-          python -m pytest --cov=litserve src/ tests/ -v -s --durations=100
+          uv run pytest --cov=litserve src/ tests/ -v -s --durations=100
 
       - name: Statistics
         run: |
-          coverage report
-          coverage xml
+          uv run coverage report
+          uv run coverage xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
