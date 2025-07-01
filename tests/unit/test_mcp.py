@@ -1,6 +1,7 @@
 import inspect
 import sys
 from typing import Dict, List, Optional
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
@@ -18,6 +19,15 @@ from litserve.mcp import (
     _python_type_to_json_schema,
     extract_input_schema,
 )
+
+
+@patch("litserve.mcp.is_package_installed", return_value=False)
+def test_mcp_not_installed(mock_is_package_installed):
+    with pytest.raises(
+        RuntimeError,
+        match="mcp package is required for MCP support. To install, run `pip install fastmcp` in the terminal.",
+    ):
+        MCP()
 
 
 def test_python_type_to_json_schema():
