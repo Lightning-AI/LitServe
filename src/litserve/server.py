@@ -326,11 +326,11 @@ class RegularRequestHandler(BaseRequestHandler):
             return response
 
         except HTTPException as e:
-            return e
+            raise e from None
 
         except Exception as e:
             logger.error(f"Unhandled exception: {e}", exc_info=True)
-            return HTTPException(status_code=500, detail="Internal server error")
+            raise HTTPException(status_code=500, detail="Internal server error") from e
 
     async def _handle_error_response(self, response):
         """Raise HTTPException as is and rest as 500 after logging the error."""
@@ -341,7 +341,7 @@ class RegularRequestHandler(BaseRequestHandler):
             raise response
 
         if isinstance(response, Exception):
-            logger.exception(f"Error while handling request: {response}")
+            logger.error(f"Error while handling request: {response}")
 
         raise HTTPException(status_code=500, detail="Internal server error")
 
