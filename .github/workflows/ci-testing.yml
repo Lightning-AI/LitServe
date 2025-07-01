@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main, "release/*"]
 
-env:
-  UV_SYSTEM_PYTHON: 1
-
 defaults:
   run:
     shell: bash
