@@ -11,7 +11,7 @@ license = {text = "Apache-2.0"}
 authors = [
     {name = "Lightning-AI et al.", email = "community@lightning.ai"}
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 keywords = ["deep learning", "pytorch", "AI"]
 classifiers = [
     "Environment :: Console",
