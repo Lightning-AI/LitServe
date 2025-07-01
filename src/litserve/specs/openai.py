@@ -588,6 +588,8 @@ class OpenAISpec(LitSpec):
                 choices.append(choice)
 
             return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
+        except HTTPException as e:
+            raise e
         except Exception as e:
             logger.error("Error in non-streaming response: %s", e, exc_info=True)
             raise HTTPException(status_code=500)

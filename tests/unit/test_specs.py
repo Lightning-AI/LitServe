@@ -379,13 +379,13 @@ class WrongLitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_fail_http(openai_request_data):
-    server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
+    server = ls.LitServer(WrongLitAPI(spec=ls.OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
-            assert res.status_code == 501, "Server raises 501 error"
+            assert res.status_code == 501, f"Server raises 501 error: {res.content}"
             assert res.text == '{"detail":"test LitAPI.predict error"}'
 
 

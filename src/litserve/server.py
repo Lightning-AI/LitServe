@@ -318,7 +318,7 @@ class RegularRequestHandler(BaseRequestHandler):
             response, status = self.server.response_buffer.pop(uid)
 
             if status == LitAPIStatus.ERROR:
-                await self._handle_error_response(response)
+                self._handle_error_response(response)
 
             # Trigger callback
             self.server._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self.server)
@@ -332,11 +332,13 @@ class RegularRequestHandler(BaseRequestHandler):
             logger.error(f"Unhandled exception: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Internal server error") from e
 
-    async def _handle_error_response(self, response):
+    @staticmethod
+    def _handle_error_response(response):
         """Raise HTTPException as is and rest as 500 after logging the error."""
         try:
             if isinstance(response, bytes):
                 response = pickle.loads(response)
+                raise HTTPException(status_code=response.status_code, detail=response.detail)
         except Exception as e:
             logger.debug(f"couldn't unpickle error response {e}")
 
