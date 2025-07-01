@@ -17,7 +17,7 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from litserve.server import BaseRequestHandler, RegularRequestHandler
 from litserve.test_examples import SimpleLitAPI
@@ -92,3 +92,15 @@ async def test_request_handler_streaming(mock_event, mock_lit_api):
     response = await handler.handle_request(mock_request, Request)
     assert mock_server.request_queue.qsize() == 1
     assert response == "test-response"
+
+
+def test_regular_handler_error_response():
+    with pytest.raises(HTTPException) as e:
+        RegularRequestHandler._handle_error_response(HTTPException(status_code=500, detail="test error response"))
+    assert e.value.status_code == 500
+    assert e.value.detail == "test error response"
+
+    with pytest.raises(HTTPException) as e:
+        RegularRequestHandler._handle_error_response(Exception("test exception"))
+    assert e.value.status_code == 500
+    assert e.value.detail == "Internal server error"
