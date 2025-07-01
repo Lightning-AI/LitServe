@@ -3,10 +3,32 @@ license_file = "LICENSE"
 description-file = "README.md"
 
 [project]
-name="litserve"
+name = "litserve"
 dynamic = ["version"]
+description = "Lightweight AI server."
 readme = "README.md"
-requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Lightning-AI et al.", email = "community@lightning.ai"}
+]
+requires-python = ">=3.8"
+keywords = ["deep learning", "pytorch", "AI"]
+classifiers = [
+    "Environment :: Console",
+    "Natural Language :: English",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 
 dependencies = [
     "fastapi>=0.100",
@@ -14,20 +36,29 @@ dependencies = [
     "uvicorn[standard]>=0.29.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Lightning-AI/litserve"
+"Bug Tracker" = "https://github.com/Lightning-AI/litserve/issues"
+Documentation = "https://lightning-ai.github.io/litserve/"
+"Source Code" = "https://github.com/Lightning-AI/litserve"
+Download = "https://github.com/Lightning-AI/litserve"
+
+[project.scripts]
+litserve = "litserve.__main__:main"
+lightning = "litserve.cli:main"
 
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-
 [tool.hatch.version]
 path = "src/litserve/__about__.py"
 pattern = "__version__ = \"(?P<version>.+)\""
 
+
 [tool.hatch.metadata]
 allow-direct-references = true
-
 
 [tool.check-manifest]
 ignore = [
@@ -35,7 +66,6 @@ ignore = [
     ".github",
     ".github/*"
 ]
-
 
 [tool.pytest.ini_options]
 norecursedirs = [
