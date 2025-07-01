@@ -2,7 +2,7 @@ httpx>=0.27.0
 coverage[toml] >=7.5.3
 pytest >=8.0
 pytest-cov
-mypy ==1.16.0
+mypy ==1.16.1
 pytest-asyncio
 asgi-lifespan
 python-multipart
