@@ -52,12 +52,12 @@ jobs:
       - name: Tests
         timeout-minutes: 15
         run: |
-          uv run pytest --cov=litserve src/ tests/ -v -s --durations=100
+          pytest --cov=litserve src/ tests/ -v -s --durations=100
 
       - name: Statistics
         run: |
-          uv run coverage report
-          uv run coverage xml
+          coverage report
+          coverage xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
