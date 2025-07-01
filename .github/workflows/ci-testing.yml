@@ -10,9 +10,6 @@ defaults:
   run:
     shell: bash
 
-env:
-  UV_SYSTEM_PYTHON: 1
-
 jobs:
   pytester:
     runs-on: ${{ matrix.os }}
@@ -32,15 +29,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Install uv and setup python
         uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
+      - run: uv pip install --python=${{ matrix.python-version }} pip
 
       - name: Set min. dependencies
         if: matrix.requires == 'oldest'
