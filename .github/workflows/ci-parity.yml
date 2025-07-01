@@ -26,7 +26,7 @@ jobs:
       - name: Install LitServe
         run: |
           pip --version
-          pip install . torchvision jsonargparse uvloop tenacity -U -q -r _requirements/test.txt -U -q
+          pip install '.[dev]' torchvision jsonargparse uvloop tenacity -U -q
           pip list
 
       - name: Parity test
