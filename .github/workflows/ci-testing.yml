@@ -10,6 +10,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  UV_SYSTEM_PYTHON: 1
+
 jobs:
   pytester:
     runs-on: ${{ matrix.os }}
