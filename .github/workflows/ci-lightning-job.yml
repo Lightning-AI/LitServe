@@ -1,0 +1,43 @@
+name: CI perf test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  perf-test:
+    runs-on: "ubuntu-24.04"
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run scripts in studio
+        env:
+          LIGHTNING_USER_ID: ${{ secrets.LIGHTNING_USER_ID }}
+          LIGHTNING_API_KEY: ${{ secrets.LIGHTNING_API_KEY }}
+        run: |
+          pip install lightning_sdk -U -q
+          python .github/workflows/run_as_job.py ${{ github.run_id }}
+
+      - name: Load report
+        if: always()
+        id: load-report
+        run: |
+          report=$(python .github/load-quickstart-report.py)
+          echo "REPORT<<EOF" >> $GITHUB_ENV
+          echo "$report" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
