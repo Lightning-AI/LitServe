@@ -29,28 +29,30 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install uv and setup python
+        uses: astral-sh/setup-uv@v6
         with:
+          activate-environment: true
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          enable-cache: true
+      - name: Install the project
+        run: uv sync --all-extras --dev
 
       - name: Set min. dependencies
         if: matrix.requires == 'oldest'
         run: |
-          pip install 'lightning-utilities[cli]'
-          python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
+          uv pip install 'lightning-utilities[cli]'
+          uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
 
       - name: Install package & dependencies
         run: |
-          pip --version
-          pip install -e '.[test]' -U -q --find-links $TORCH_URL
+          uv pip install -e '.[dev]' -U -q --find-links $TORCH_URL
           pip list
 
       - name: Tests
         timeout-minutes: 15
         run: |
-          python -m pytest --cov=litserve src/ tests/ -v -s --durations=100
+          pytest --cov=litserve src/ tests/ -v -s --durations=100
 
       - name: Statistics
         run: |
