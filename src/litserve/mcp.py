@@ -33,7 +33,10 @@ _is_mcp_installed = is_package_installed("fastmcp")
 
 if _is_mcp_installed:
     from fastapi import FastAPI
-    from mcp.server.fastmcp.server import _convert_to_content
+    try:
+        from mcp.server.fastmcp.server import _convert_to_content
+    except ImportError:
+        from mcp.server.fastmcp.utilities.func_metadata import _convert_to_content
     from mcp.server.lowlevel import Server as MCPServer
     from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
     from mcp.types import Tool as ToolType
