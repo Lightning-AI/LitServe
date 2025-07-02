@@ -33,6 +33,7 @@ _is_mcp_installed = is_package_installed("fastmcp")
 
 if _is_mcp_installed:
     from fastapi import FastAPI
+
     try:
         from mcp.server.fastmcp.server import _convert_to_content
     except ImportError:
