@@ -16,6 +16,17 @@ class TestEmbedAPI(LitAPI):
     def encode_response(self, output) -> dict:
         return {"embeddings": output}
 
+class TestOpenAPI(LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    async def predict(self, x) -> List[List[float]]:
+        n = len(x) if isinstance(x, list) else 1
+        yield np.random.rand(n, 768).tolist()
+
+    async  def encode_response(self, output) -> dict:
+        yield {"embeddings": output}
+
 
 class TestEmbedBatchedAPI(TestEmbedAPI):
     def predict(self, batch) -> List[List[List[float]]]:
