@@ -31,7 +31,6 @@ from litserve.test_examples.openai_embedding_spec_example import (
     TestEmbedAPIWithUsage,
     TestEmbedAPIWithYieldEncodeResponse,
     TestEmbedAPIWithYieldPredict,
-    TestOpenAPI,
 )
 from litserve.utils import wrap_litserve_start
 
