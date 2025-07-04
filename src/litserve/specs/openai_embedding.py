@@ -144,7 +144,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         print("OpenAI Embedding Spec is ready.")
 
-    def _check_lit_api(self, api: "LitAPI"):
+    def _check_lit_api(self, api):
         from litserve import LitAPI
 
         if inspect.isgeneratorfunction(api.predict):
