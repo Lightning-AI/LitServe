@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, List, Literal, Optional, Union
 from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
 from pydantic import BaseModel
+
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
@@ -130,20 +131,22 @@ class OpenAIEmbeddingSpec(LitSpec):
 
     def setup(self, server: "LitServer"):
         from litserve import LitAPI
+
         super().setup(server)
 
         lit_api = server.lit_api
 
         if isinstance(lit_api, LitAPI):
             self._check_lit_api(lit_api)
-        if isinstance(lit_api,list):
+        if isinstance(lit_api, list):
             for api in lit_api:
                 self._check_lit_api(api)
 
         print("OpenAI Embedding Spec is ready.")
 
-    def _check_lit_api(self,api: "LitAPI"):
+    def _check_lit_api(self, api: "LitAPI"):
         from litserve import LitAPI
+
         if inspect.isgeneratorfunction(api.predict):
             raise ValueError(
                 "You are using yield in your predict method, which is used for streaming.",
@@ -162,6 +165,7 @@ class OpenAIEmbeddingSpec(LitSpec):
                 "Please consider replacing yield with return in encode_response.\n",
                 EMBEDDING_API_EXAMPLE,
             )
+
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
         return request.input
 
