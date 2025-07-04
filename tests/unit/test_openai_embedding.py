@@ -22,7 +22,6 @@ from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
-from litserve.specs.openai import OpenAISpec
 from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
 from litserve.test_examples.openai_embedding_spec_example import (
     TestEmbedAPI,
@@ -54,7 +53,10 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_multi_endpoint(openai_embedding_request_data):
-    server = ls.LitServer([TestEmbedAPI(spec=OpenAIEmbeddingSpec(), api_path="/v2/embeddings"), TestEmbedAPI(spec=OpenAIEmbeddingSpec())])
+    server = ls.LitServer([
+        TestEmbedAPI(spec=OpenAIEmbeddingSpec(), api_path="/v2/embeddings"),
+        TestEmbedAPI(spec=OpenAIEmbeddingSpec()),
+    ])
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
