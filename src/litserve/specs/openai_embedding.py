@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING, Any, List, Literal, Optional, Union
 from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
 from pydantic import BaseModel
-
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
@@ -131,11 +130,21 @@ class OpenAIEmbeddingSpec(LitSpec):
 
     def setup(self, server: "LitServer"):
         from litserve import LitAPI
-
         super().setup(server)
 
         lit_api = server.lit_api
-        if inspect.isgeneratorfunction(lit_api.predict):
+
+        if isinstance(lit_api, LitAPI):
+            self._check_lit_api(lit_api)
+        if isinstance(lit_api,list):
+            for api in lit_api:
+                self._check_lit_api(api)
+
+        print("OpenAI Embedding Spec is ready.")
+
+    def _check_lit_api(self,api: "LitAPI"):
+        from litserve import LitAPI
+        if inspect.isgeneratorfunction(api.predict):
             raise ValueError(
                 "You are using yield in your predict method, which is used for streaming.",
                 "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
@@ -144,8 +153,8 @@ class OpenAIEmbeddingSpec(LitSpec):
                 EMBEDDING_API_EXAMPLE,
             )
 
-        is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
-        if not is_encode_response_original and inspect.isgeneratorfunction(lit_api.encode_response):
+        is_encode_response_original = api.encode_response.__code__ is LitAPI.encode_response.__code__
+        if not is_encode_response_original and inspect.isgeneratorfunction(api.encode_response):
             raise ValueError(
                 "You are using yield in your encode_response method, which is used for streaming.",
                 "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
@@ -153,9 +162,6 @@ class OpenAIEmbeddingSpec(LitSpec):
                 "Please consider replacing yield with return in encode_response.\n",
                 EMBEDDING_API_EXAMPLE,
             )
-
-        print("OpenAI Embedding Spec is ready.")
-
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
         return request.input
 
