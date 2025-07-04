@@ -146,7 +146,8 @@ class OpenAIEmbeddingSpec(LitSpec):
 
     def _check_lit_api(self, api):
         from litserve import LitAPI
-        if isinstance(api.spec,OpenAIEmbeddingSpec):
+
+        if isinstance(api.spec, OpenAIEmbeddingSpec):
             if inspect.isgeneratorfunction(api.predict):
                 raise ValueError(
                     "You are using yield in your predict method, which is used for streaming.",

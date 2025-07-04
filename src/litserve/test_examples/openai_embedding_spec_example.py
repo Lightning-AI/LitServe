@@ -16,6 +16,7 @@ class TestEmbedAPI(LitAPI):
     def encode_response(self, output) -> dict:
         return {"embeddings": output}
 
+
 class TestOpenAPI(LitAPI):
     def setup(self, device):
         self.model = None
@@ -24,7 +25,7 @@ class TestOpenAPI(LitAPI):
         n = len(x) if isinstance(x, list) else 1
         yield np.random.rand(n, 768).tolist()
 
-    async  def encode_response(self, output) -> dict:
+    async def encode_response(self, output) -> dict:
         yield {"embeddings": output}
 
 

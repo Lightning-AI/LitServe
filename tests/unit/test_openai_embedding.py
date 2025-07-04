@@ -26,12 +26,12 @@ from litserve.specs.openai import OpenAISpec
 from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
 from litserve.test_examples.openai_embedding_spec_example import (
     TestEmbedAPI,
-    TestOpenAPI,
     TestEmbedAPIWithMissingEmbeddings,
     TestEmbedAPIWithNonDictOutput,
     TestEmbedAPIWithUsage,
     TestEmbedAPIWithYieldEncodeResponse,
     TestEmbedAPIWithYieldPredict,
+    TestOpenAPI,
 )
 from litserve.utils import wrap_litserve_start
 
@@ -52,11 +52,12 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
             assert len(resp.json()["data"]) == 1, "Length of data should be 1"
             assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
 
+
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_multi_endpoint(openai_embedding_request_data):
     spec_openai = OpenAISpec()
     spec_embedding = OpenAIEmbeddingSpec()
-    server = ls.LitServer([TestOpenAPI(spec=spec_openai,enable_async=True),TestEmbedAPI(spec=spec_embedding)])
+    server = ls.LitServer([TestOpenAPI(spec=spec_openai, enable_async=True), TestEmbedAPI(spec=spec_embedding)])
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
