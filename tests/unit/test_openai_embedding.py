@@ -61,7 +61,7 @@ async def test_openai_embedding_spec_with_multi_endpoint(openai_embedding_reques
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+            resp = await ac.post("/v2/embeddings", json=openai_embedding_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["object"] == "list", "Object should be list"
             assert resp.json()["data"][0]["index"] == 0, "Index should be 0"

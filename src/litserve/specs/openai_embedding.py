@@ -138,7 +138,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         if isinstance(lit_api, LitAPI):
             self._check_lit_api(lit_api)
-        if isinstance(lit_api, list):
+        elif isinstance(lit_api, list):
             for api in lit_api:
                 self._check_lit_api(api)
 
