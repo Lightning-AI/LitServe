@@ -135,26 +135,37 @@ class OpenAIEmbeddingSpec(LitSpec):
         super().setup(server)
 
         lit_api = server.lit_api
-        if inspect.isgeneratorfunction(lit_api.predict):
-            raise ValueError(
-                "You are using yield in your predict method, which is used for streaming.",
-                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
-                "is not a sequential operation.",
-                "Please consider replacing yield with return in predict.\n",
-                EMBEDDING_API_EXAMPLE,
-            )
 
-        is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
-        if not is_encode_response_original and inspect.isgeneratorfunction(lit_api.encode_response):
-            raise ValueError(
-                "You are using yield in your encode_response method, which is used for streaming.",
-                "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
-                "is not a sequential operation.",
-                "Please consider replacing yield with return in encode_response.\n",
-                EMBEDDING_API_EXAMPLE,
-            )
+        if isinstance(lit_api, LitAPI):
+            self._check_lit_api(lit_api)
+        elif isinstance(lit_api, list):
+            for api in lit_api:
+                self._check_lit_api(api)
 
         print("OpenAI Embedding Spec is ready.")
+
+    def _check_lit_api(self, api):
+        from litserve import LitAPI
+
+        if isinstance(api.spec, OpenAIEmbeddingSpec):
+            if inspect.isgeneratorfunction(api.predict):
+                raise ValueError(
+                    "You are using yield in your predict method, which is used for streaming.",
+                    "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
+                    "is not a sequential operation.",
+                    "Please consider replacing yield with return in predict.\n",
+                    EMBEDDING_API_EXAMPLE,
+                )
+
+            is_encode_response_original = api.encode_response.__code__ is LitAPI.encode_response.__code__
+            if not is_encode_response_original and inspect.isgeneratorfunction(api.encode_response):
+                raise ValueError(
+                    "You are using yield in your encode_response method, which is used for streaming.",
+                    "OpenAIEmbeddingSpec doesn't support streaming because producing embeddings ",
+                    "is not a sequential operation.",
+                    "Please consider replacing yield with return in encode_response.\n",
+                    EMBEDDING_API_EXAMPLE,
+                )
 
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:
         return request.input
