@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/lightning-ai-litserve-badge.png)](https://mseep.ai/app/lightning-ai-litserve)
+
 <div align='center'>
 
 <h2>
