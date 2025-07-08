@@ -170,12 +170,12 @@ def test_batch_predict_string_warning():
 
     mock_input = torch.tensor([[1.0], [2.0]])
 
+    # Simulate the behavior in run_batched_loop
+    y = api.predict(mock_input)
     with pytest.warns(
         UserWarning,
         match="When batching is enabled, 'predict' must return a list to handle multiple inputs correctly.",
     ):
-        # Simulate the behavior in run_batched_loop
-        y = api.predict(mock_input)
         api.unbatch(y)
 
 
