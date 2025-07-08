@@ -107,20 +107,12 @@ async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_validation(openai_request_data):
-    server = ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=OpenAIEmbeddingSpec())
-    with pytest.raises(ValueError, match="You are using yield in your predict method"), wrap_litserve_start(
-        server
-    ) as server:
-        async with LifespanManager(server.app):
-            pass
+    with pytest.raises(ValueError, match="You are using yield in your predict method"):
+         ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=OpenAIEmbeddingSpec())
 
-    server = ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=OpenAIEmbeddingSpec())
-    with pytest.raises(ValueError, match="You are using yield in your encode_response method"), wrap_litserve_start(
-        server
-    ) as server:
-        async with LifespanManager(server.app):
-            pass
 
+    with pytest.raises(ValueError, match="You are using yield in your encode_response method"):
+        ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=OpenAIEmbeddingSpec())
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_request_data):
