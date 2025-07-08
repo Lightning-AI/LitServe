@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     import numpy as np
     import torch
 
-    from litserve import LitServer
+    from litserve import LitAPI, LitServer
 
 
 class EmbeddingRequest(BaseModel):
@@ -129,12 +129,9 @@ class OpenAIEmbeddingSpec(LitSpec):
         self.add_endpoint("/v1/embeddings", self.embeddings_endpoint, ["POST"])
         self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 
-    def setup(self, server: "LitServer"):
+    def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
-        super().setup(server)
-
-        lit_api = server.lit_api
         if inspect.isgeneratorfunction(lit_api.predict):
             raise ValueError(
                 "You are using yield in your predict method, which is used for streaming.",
@@ -154,6 +151,8 @@ class OpenAIEmbeddingSpec(LitSpec):
                 EMBEDDING_API_EXAMPLE,
             )
 
+    def setup(self, server: "LitServer"):
+        super().setup(server)
         print("OpenAI Embedding Spec is ready.")
 
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> List[str]:

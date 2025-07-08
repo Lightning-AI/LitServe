@@ -52,6 +52,23 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
 
 
 @pytest.mark.asyncio
+async def test_openai_embedding_spec_with_multi_endpoint(openai_embedding_request_data):
+    server = ls.LitServer([
+        TestEmbedAPI(spec=OpenAIEmbeddingSpec()),
+    ])
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            assert resp.json()["object"] == "list", "Object should be list"
+            assert resp.json()["data"][0]["index"] == 0, "Index should be 0"
+            assert len(resp.json()["data"]) == 1, "Length of data should be 1"
+            assert len(resp.json()["data"][0]["embedding"]) == 768, "Embedding length should be 768"
+
+
+@pytest.mark.asyncio
 async def test_openai_embedding_spec_with_multiple_inputs(openai_embedding_request_data_array):
     spec = OpenAIEmbeddingSpec()
     server = ls.LitServer(TestEmbedAPI(spec=spec))
@@ -90,19 +107,11 @@ async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_validation(openai_request_data):
-    server = ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=OpenAIEmbeddingSpec())
-    with pytest.raises(ValueError, match="You are using yield in your predict method"), wrap_litserve_start(
-        server
-    ) as server:
-        async with LifespanManager(server.app):
-            pass
+    with pytest.raises(ValueError, match="You are using yield in your predict method"):
+        ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=OpenAIEmbeddingSpec())
 
-    server = ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=OpenAIEmbeddingSpec())
-    with pytest.raises(ValueError, match="You are using yield in your encode_response method"), wrap_litserve_start(
-        server
-    ) as server:
-        async with LifespanManager(server.app):
-            pass
+    with pytest.raises(ValueError, match="You are using yield in your encode_response method"):
+        ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=OpenAIEmbeddingSpec())
 
 
 @pytest.mark.asyncio
