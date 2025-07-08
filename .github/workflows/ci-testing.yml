@@ -36,11 +36,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
-      - name: Set min. dependencies
-        if: matrix.requires == 'oldest'
-        run: |
-          uv pip install 'lightning-utilities[cli]'
-          uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
+      # @borda -  is this needed?
+      # - name: Set min. dependencies
+      #   if: matrix.requires == 'oldest'
+      #   run: |
+      #     uv pip install 'lightning-utilities[cli]'
+      #     uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
 
       - name: Install package & dependencies
         run: |

@@ -18,16 +18,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv and setup python
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.11"
+          activate-environment: true
+          python-version: "3.12"
+          enable-cache: true
 
       - name: Install LitServe
         run: |
-          pip --version
-          pip install '.[dev]' torchvision jsonargparse uvloop tenacity -U -q
-          pip list
+          uv pip --version
+          uv pip sync
+          uv pip install torchvision jsonargparse uvloop tenacity -U -q
+          uv pip list
 
       - name: Parity test
         run: export PYTHONPATH=$PWD && python tests/parity_fastapi/main.py
