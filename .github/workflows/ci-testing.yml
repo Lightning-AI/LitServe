@@ -35,8 +35,6 @@ jobs:
           activate-environment: true
           python-version: ${{ matrix.python-version }}
           enable-cache: true
-      - name: Install the project
-        run: uv sync --all-extras --dev
 
       - name: Set min. dependencies
         if: matrix.requires == 'oldest'
@@ -46,7 +44,7 @@ jobs:
 
       - name: Install package & dependencies
         run: |
-          uv pip install -e '.[dev]' -U -q --find-links $TORCH_URL
+          uv sync --all-extras --dev
           pip list
 
       - name: Tests
