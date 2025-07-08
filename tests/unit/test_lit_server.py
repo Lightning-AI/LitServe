@@ -317,9 +317,11 @@ def test_server_terminate():
     server.verify_worker_status = MagicMock()
     server._transport = MagicMock()
 
-    with patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager, \
-         patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start, \
-         patch("litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])) as mock_launch:
+    with patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager, patch(
+        "litserve.server.LitServer._start_server", side_effect=Exception("mocked error")
+    ) as mock_start, patch(
+        "litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])
+    ) as mock_launch:
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
 
