@@ -199,4 +199,8 @@ dev = [
     "requests>=2.32.4",
     "torch>2.0.0",
     "transformers>=4.53.0",
+    "uvloop>=0.21.0",
+    "tenacity>=9.1.2",
+    "jsonargparse",
+    "rich",
 ]

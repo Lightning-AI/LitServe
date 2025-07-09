@@ -27,7 +27,8 @@ jobs:
 
       - name: Install LitServe
         run: |
-          uv pip sync --all-extras --dev
+          uv sync --all-extras --dev
+          uv pip compile pyproject.toml -o requirements.txt
           uv pip install torchvision jsonargparse uvloop tenacity -U -q
           uv pip list
 
