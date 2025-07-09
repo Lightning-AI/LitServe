@@ -52,7 +52,7 @@ def run_script_with_timeout(file, timeout, extra_time, killall):
     sel = selectors.DefaultSelector()
     try:
         process = subprocess.Popen(
-            ["python", str(file)],
+            [sys.executable, str(file)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             bufsize=1,  # Line-buffered
