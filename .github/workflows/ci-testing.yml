@@ -49,7 +49,7 @@ jobs:
         run: |
           uv pip install -r requirements.txt -U -q
           uv sync --group dev
-          pip list
+          uv pip list
 
       - name: Tests
         timeout-minutes: 15
