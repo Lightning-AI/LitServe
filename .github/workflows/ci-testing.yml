@@ -44,7 +44,9 @@ jobs:
         run: |
           uv pip install 'lightning-utilities[cli]'
           uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
+          echo "======requirements.txt======"
           cat requirements.txt
+          echo "----------------------------"
 
       - name: Install package
         run: |
