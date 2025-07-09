@@ -105,8 +105,18 @@ def simple_litapi():
 
 
 @pytest.fixture
+def simple_litapi_cls():
+    return SimpleLitAPI
+
+
+@pytest.fixture
+def simple_stream_cls():
+    return SimpleStreamAPI
+
+
+@pytest.fixture
 def simple_stream_api():
-    return SimpleStreamAPI()
+    return SimpleStreamAPI(stream=True)
 
 
 @pytest.fixture

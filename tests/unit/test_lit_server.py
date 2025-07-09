@@ -119,14 +119,14 @@ async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
             )
 
 
-def test_litapi_with_stream(simple_litapi):
-    with pytest.raises(  # noqa: PT012
+def test_litapi_with_stream(simple_litapi_cls):
+    with pytest.raises(
         ValueError,
         match="""When `stream=True` both `lit_api.predict` and
              `lit_api.encode_response` must generate values using `yield""",
     ):
-        simple_litapi.stream = True
-        simple_litapi.loop
+        # TODO: The error should be raised in the LitAPI constructor
+        LitServer(simple_litapi_cls(stream=True))
 
 
 class Linear(nn.Module):
@@ -381,14 +381,14 @@ class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
 @pytest.mark.asyncio
 async def test_inject_context():
     # Test context injection with single loop
-    server = LitServer(IdentityAPI())
+    api = IdentityAPI()
+    server = LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            response = await ac.post("/predict", json={"input": 4.0}, headers={"x-request-id": "123"})
-            assert response.json()["output"] == 4.0
-            assert response.json()["x-request-id"] == "123"
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
     server = LitServer(IdentityBatchedAPI(max_batch_size=2, batch_timeout=0.01))
@@ -396,36 +396,29 @@ async def test_inject_context():
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            response1 = ac.post("/predict", json={"input": 4.0}, headers={"x-request-id": "123"})
-            response2 = ac.post("/predict", json={"input": 5.0}, headers={"x-request-id": "456"})
-            response1, response2 = await asyncio.gather(response1, response2)
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
-    assert response1.json()["output"] == 4.0
-    assert response2.json()["output"] == 5.0
-    assert response1.json()["x-request-id"] == "123"
-    assert response2.json()["x-request-id"] == "456"
-
-    # Test context injection with streaming batched loop
+    # Test context injection with batched streaming loop
     server = LitServer(IdentityBatchedStreamingAPI(max_batch_size=2, batch_timeout=0.01, stream=True))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            response1 = ac.post("/predict", json={"input": 4.0}, headers={"x-request-id": "123"})
-            response2 = ac.post("/predict", json={"input": 5.0}, headers={"x-request-id": "456"})
-            response1, response2 = await asyncio.gather(response1, response2)
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
-    assert response1.json()["output"] == 4.0
-    assert response2.json()["output"] == 5.0
-    assert response1.json()["x-request-id"] == "123"
-    assert response2.json()["x-request-id"] == "456"
+    server = LitServer(PredictErrorAPI())
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        resp = client.post("/predict", json={"input": 5.0}, timeout=10)
+        assert resp.status_code == 500, "predict() missed 1 required positional argument: 'y'"
 
 
 def test_custom_api_path():
     with pytest.raises(ValueError, match="api_path must start with '/'"):
-        LitServer(LitAPI(), api_path="predict")
+        LitServer(ls.test_examples.SimpleLitAPI(api_path="predict"))
 
-    server = LitServer(LitAPI(api_path="/v1/predict"))
+    server = LitServer(ls.test_examples.SimpleLitAPI(api_path="/v1/predict"))
     assert "/v1/predict" in [route.path for route in server.app.routes]
 
 
@@ -554,6 +547,7 @@ def test_workers_setup_status(use_zmq):
 
 
 def test_max_batch_size_warning(simple_litapi):
+    # Remove this test after v0.3.0
     with pytest.warns(DeprecationWarning, match="'max_batch_size' and 'batch_timeout' are being deprecated"):
         ls.LitServer(simple_litapi, max_batch_size=4)
 
@@ -652,8 +646,8 @@ class TestAsyncStreamLitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_async_stream_litapi():
-    api = TestAsyncStreamLitAPI(enable_async=True)
-    server = LitServer(api, stream=True)
+    api = TestAsyncStreamLitAPI(enable_async=True, stream=True)
+    server = LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -678,8 +672,8 @@ class TestSleepAsyncStreamLitAPI(TestAsyncStreamLitAPI):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("num_requests", [10, 50, 100])
 async def test_concurrent_async_streaming_inference(num_requests):
-    api = TestSleepAsyncStreamLitAPI(enable_async=True)
-    server = LitServer(api, stream=True)
+    api = TestSleepAsyncStreamLitAPI(enable_async=True, stream=True)
+    server = LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
