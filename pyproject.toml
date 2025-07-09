@@ -203,4 +203,5 @@ dev = [
     "tenacity>=9.1.2",
     "jsonargparse",
     "rich",
+    "torchvision>=0.22.1",
 ]
