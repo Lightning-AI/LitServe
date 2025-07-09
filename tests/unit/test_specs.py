@@ -413,19 +413,19 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 
 @pytest.mark.asyncio
 async def test_openai_spec_asyncapi_predict_validation():
-    with pytest.raises(ValueError, match="must be an async generator or async function when enable_async=True"):
+    with pytest.raises(ValueError, match="predict must be an async generator"):
         IncorrectAsyncAPI(enable_async=True, spec=OpenAISpec())
 
 
 @pytest.mark.asyncio
 def test_openai_spec_asyncapi_encode_response_validation():
-    with pytest.raises(UserWarning, match="should be an async function or async generator when enable_async=True"):
+    with pytest.raises(UserWarning, match="encode_response is neither a generator nor an async generator"):
         IncorrectEncodeAsyncAPI(enable_async=True, spec=OpenAISpec())
 
 
 @pytest.mark.asyncio
 def test_openai_asyncapi_enable_async_flag_validation():
-    with pytest.warns(UserWarning, match="should be an async function or async generator when enable_async=True"):
+    with pytest.warns(UserWarning, match="'enable_async' is not set in LitAPI."):
         IncorrectAsyncAPI(enable_async=False, spec=OpenAISpec())
 
 
