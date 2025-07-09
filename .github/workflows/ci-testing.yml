@@ -49,6 +49,7 @@ jobs:
       - name: Install package
         run: |
           uv pip install -r requirements.txt -U -q
+          uv pip list
           uv sync --group dev
           uv pip list
 
