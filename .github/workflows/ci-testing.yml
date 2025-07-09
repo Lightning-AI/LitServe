@@ -37,7 +37,11 @@ jobs:
           enable-cache: true
 
       - name: Set up dependencies
-        run: uv pip compile pyproject.toml -o requirements.txt
+        run: |
+          uv pip compile pyproject.toml -o requirements.txt
+          echo "======requirements.txt======"
+          cat requirements.txt
+          echo "----------------------------"
 
       - name: Set min. dependencies
         if: matrix.requires == 'oldest'
