@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
+
 import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
-from litserve.specs.openai import ChatMessage, OpenAISpec
+from litserve.specs.openai import ChatCompletionRequest, ChatMessage, OpenAISpec
 from litserve.test_examples.openai_spec_example import (
     OpenAIBatchingWithUsage,
     OpenAIWithUsage,
@@ -30,20 +32,55 @@ from litserve.test_examples.openai_spec_example import (
 from litserve.utils import wrap_litserve_start
 
 
+class TestOpenAISpecAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = None
+
+    def predict(self, x):
+        assert isinstance(x, ChatCompletionRequest), "decode_request returns a ChatCompletionRequest"
+        for e in ["This", "is", "a", "generated", "output"]:
+            yield e + " "
+
+
+class TestAsyncAPI(TestOpenAISpecAPI):
+    async def predict(self, x):
+        assert isinstance(x, ChatCompletionRequest), "decode_request returns a ChatCompletionRequest"
+        for e in ["This", "is", "a", "generated", "output"]:
+            yield e + " "
+
+
+@pytest.mark.parametrize(
+    "api", [TestOpenAISpecAPI(spec=OpenAISpec()), TestAsyncAPI(enable_async=True, spec=OpenAISpec())]
+)
 @pytest.mark.asyncio
-async def test_openai_spec(openai_request_data):
-    spec = OpenAISpec()
-    server = ls.LitServer(TestAPI(), spec=spec)
+async def test_openai_spec(openai_request_data, api):
+    server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
+            transport=ASGITransport(app=manager.app),
+            base_url="http://test",
         ) as ac:
+            openai_request_data["stream"] = True
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
+            messages = []
+            async for chunk in resp.aiter_lines():
+                if not chunk.startswith("data: "):
+                    continue
+                content = chunk[6:].strip()
+                if content == "[DONE]" or not content:
+                    break
+                try:
+                    chunk = json.loads(content)
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    content_piece = delta.get("content")
+                    if content_piece is not None:
+                        messages.append(content_piece)
+                except json.JSONDecodeError:
+                    continue  # Optionally log or handle bad JSON chunks
 
-            assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output", (
-                "LitAPI predict response should match with the generated output"
-            )
+            final_output = "".join(messages)
+            assert final_output == "This is a generated output ", f"final_output: {final_output}"
 
 
 # OpenAIWithUsage
@@ -252,6 +289,34 @@ async def test_openai_spec_metadata_required_fail(openai_request_data):
             assert "Missing required metadata" in resp.text
 
 
+class TestAPIWithReasoningEffort(TestAPI):
+    def encode_response(self, output, context):
+        yield ChatMessage(
+            role="assistant",
+            content=f"This is a generated output with reasoning effort: {context.get('reasoning_effort', None)}",
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reasoning_effort", ["low", "medium", "high", None, "random"])
+async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_data):
+    server = ls.LitServer(TestAPIWithReasoningEffort(), spec=OpenAISpec())
+    openai_request_data["reasoning_effort"] = reasoning_effort
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data)
+            if reasoning_effort == "random":
+                assert resp.status_code == 422  # as random is not a valid reasoning effort
+            else:
+                assert resp.status_code == 200
+                assert (
+                    resp.json()["choices"][0]["message"]["content"]
+                    == f"This is a generated output with reasoning effort: {reasoning_effort}"
+                )
+
+
 class IncorrectAPI1(ls.LitAPI):
     def setup(self, device):
         self.model = None
@@ -314,13 +379,13 @@ class WrongLitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_fail_http(openai_request_data):
-    server = ls.LitServer(WrongLitAPI(), spec=ls.OpenAISpec())
+    server = ls.LitServer(WrongLitAPI(spec=ls.OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
             res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
-            assert res.status_code == 501, "Server raises 501 error"
+            assert res.status_code == 501, f"Server raises 501 error: {res.content}"
             assert res.text == '{"detail":"test LitAPI.predict error"}'
 
 
@@ -342,9 +407,6 @@ class IncorrectDecodeAsyncAPI(IncorrectAsyncAPI):
     def decode_request(self, request):
         return request
 
-    def _validate_async_methods(self):
-        return None
-
 
 class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
     async def predict(self, x):
@@ -352,20 +414,14 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 
 
 @pytest.mark.asyncio
-def test_openai_spec_asyncapi_decode_request_validation():
-    with pytest.raises(ValueError, match="decode_request is not a coroutine"):
-        ls.LitServer(IncorrectDecodeAsyncAPI(enable_async=True), spec=OpenAISpec())
-
-
-@pytest.mark.asyncio
-def test_openai_spec_asyncapi_predict_validation():
-    with pytest.raises(ValueError, match="predict is not a generator"):
+async def test_openai_spec_asyncapi_predict_validation():
+    with pytest.raises(ValueError, match="predict must be an async generator"):
         ls.LitServer(IncorrectAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
 @pytest.mark.asyncio
 def test_openai_spec_asyncapi_encode_response_validation():
-    with pytest.raises(ValueError, match="encode_response is not a generator"):
+    with pytest.raises(ValueError, match="encode_response is neither a generator nor an async generator"):
         ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True), spec=OpenAISpec())
 
 
@@ -386,12 +442,6 @@ class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
         yield {"role": "assistant", "content": output}
 
 
-@pytest.mark.asyncio
-def test_openai_asyncapi_decode_not_implemented():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
-        ls.LitServer(DecodeNotImplementedAsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
-
-
 class AsyncOpenAILitAPI(ls.LitAPI):
     def setup(self, device):
         self.model = None
@@ -405,7 +455,7 @@ class AsyncOpenAILitAPI(ls.LitAPI):
             yield token
 
     async def encode_response(self, output_stream, context):
-        for output in output_stream:
+        async for output in output_stream:
             yield {"role": "assistant", "content": output}
 
 

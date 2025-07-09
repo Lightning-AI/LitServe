@@ -25,6 +25,20 @@ from litserve.server import LitServer
 from litserve.utils import wrap_litserve_start
 
 
+def pytest_collection_modifyitems(config, items):
+    """Auto-mark tests based on their file path."""
+    for item in items:
+        # Get the relative path of the test file
+        test_path = item.fspath.relto(config.rootdir)
+
+        if "tests/unit/" in str(test_path):
+            item.add_marker(pytest.mark.unit)
+        elif "tests/integration/" in str(test_path):
+            item.add_marker(pytest.mark.integration)
+        elif "tests/e2e/" in str(test_path):
+            item.add_marker(pytest.mark.e2e)
+
+
 class SimpleLitAPI(LitAPI):
     def setup(self, device):
         self.model = lambda x: x**2

@@ -23,15 +23,15 @@ from litserve.utils import configure_logging, set_trace, set_trace_if_debug
 configure_logging()
 
 __all__ = [
+    "Callback",
     "LitAPI",
     "LitServer",
-    "Request",
-    "Response",
+    "Logger",
     "OpenAISpec",
     "OpenAIEmbeddingSpec",
-    "test_examples",
-    "Callback",
-    "Logger",
+    "Request",
+    "Response",
     "set_trace",
     "set_trace_if_debug",
+    "test_examples",
 ]

@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import dataclasses
+import importlib.util
 import logging
 import os
 import pdb
@@ -29,6 +30,10 @@ if TYPE_CHECKING:
     from litserve.server import LitServer
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_LOG_FORMAT = (
+    "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+)
 
 
 class LitAPIStatus:
@@ -81,6 +86,13 @@ def wrap_litserve_start(server: "LitServer"):
     for lit_api in server.litapi_connector:
         server.inference_workers.extend(server.launch_inference_worker(lit_api))
     server._prepare_app_run(server.app)
+    if is_package_installed("mcp"):
+        from litserve.mcp import _LitMCPServerConnector
+
+        server.mcp_server = _LitMCPServerConnector()
+    else:
+        server.mcp_server = None
+
     try:
         yield server
     finally:
@@ -120,7 +132,7 @@ def _get_default_handler(stream, format):
 
 def configure_logging(
     level: Union[str, int] = logging.INFO,
-    format: str = "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(message)s",
+    format: str = _DEFAULT_LOG_FORMAT,
     stream: TextIO = sys.stdout,
     use_rich: bool = False,
 ):
@@ -215,3 +227,8 @@ def set_trace_if_debug(debug_env_var="LITSERVE_DEBUG", debug_env_var_value="1"):
     """Set a tracepoint in the code if the environment variable LITSERVE_DEBUG is set."""
     if os.environ.get(debug_env_var) == debug_env_var_value:
         set_trace()
+
+
+def is_package_installed(package_name: str) -> bool:
+    spec = importlib.util.find_spec(package_name)
+    return spec is not None

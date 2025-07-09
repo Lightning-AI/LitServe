@@ -142,15 +142,7 @@ def test_decode_request_with_openai_spec():
     api.pre_setup(spec=ls.OpenAISpec())
     request = ChatCompletionRequest(messages=[{"role": "system", "content": "Hello"}])
     decoded_request = api.decode_request(request)
-    assert decoded_request[0]["content"] == "Hello", "Decode request should return the input message"
-
-
-def test_decode_request_with_openai_spec_wrong_request():
-    api = ls.test_examples.TestAPI(max_batch_size=1)
-    api.request_timeout = 30
-    api.pre_setup(spec=ls.OpenAISpec())
-    with pytest.raises(AttributeError, match="object has no attribute 'messages'"):
-        api.decode_request({"input": "Hello"})
+    assert decoded_request.messages[0].content == "Hello", "Decode request should return the input message"
 
 
 def test_encode_response():
@@ -285,5 +277,7 @@ def test_log():
 
 
 def test_enable_async_not_set():
-    with pytest.raises(ValueError, match=r"LitAPI\(enable_async=True\) requires all methods to be coroutines\."):
+    with pytest.raises(
+        ValueError, match=r"predict must be an async generator or async function when enable_async=True"
+    ):
         ls.test_examples.SimpleLitAPI(enable_async=True)

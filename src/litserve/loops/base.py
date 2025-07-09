@@ -45,18 +45,46 @@ def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
-    sig = inspect.signature(func)
-    is_async_gen = inspect.isasyncgenfunction(func)
+async def _sync_fn_to_async_fn(func, *args, **kwargs):
+    if inspect.isgeneratorfunction(func):
 
-    if "context" in sig.parameters:
-        result = (
-            await func(*args, **kwargs, context=context) if not is_async_gen else func(*args, **kwargs, context=context)
-        )
-    else:
-        result = await func(*args, **kwargs) if not is_async_gen else func(*args, **kwargs)
+        async def async_fn(*args, **kwargs):
+            for item in func(*args, **kwargs):
+                yield item
+            return
+
+        return async_fn(*args, **kwargs)
+
+    return await asyncio.to_thread(func, *args, **kwargs)
+
+
+async def _handle_async_function(func, *args, **kwargs):
+    # Call the function based on its type
+    if inspect.isasyncgenfunction(func):
+        # Async generator - return directly (don't await)
+        return func(*args, **kwargs)
+    if asyncio.iscoroutinefunction(func):
+        # Async function - await the result
+        return await func(*args, **kwargs)
+
+    # Sync function - convert to async function, then await if result is awaitable
+    result = await _sync_fn_to_async_fn(func, *args, **kwargs)
+
+    # Check if the result is awaitable (coroutine)
+    if asyncio.iscoroutine(result):
+        return await result
 
     return result
+
+
+async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
+    sig = inspect.signature(func)
+
+    # Determine if we need to inject context
+    if "context" in sig.parameters:
+        kwargs["context"] = context
+
+    return await _handle_async_function(func, *args, **kwargs)
 
 
 def collate_requests(

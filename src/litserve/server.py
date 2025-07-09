@@ -19,6 +19,7 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import pickle
 import secrets
 import sys
 import threading
@@ -29,7 +30,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union
 
 import uvicorn
 import uvicorn.server
@@ -49,7 +50,19 @@ from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.transport.factory import TransportConfig, create_transport_from_config
-from litserve.utils import LitAPIStatus, LoopResponseType, WorkerSetupStatus, call_after_stream, configure_logging
+from litserve.utils import (
+    LitAPIStatus,
+    LoopResponseType,
+    WorkerSetupStatus,
+    call_after_stream,
+    configure_logging,
+    is_package_installed,
+)
+
+_MCP_AVAILABLE = is_package_installed("mcp")
+
+if TYPE_CHECKING:
+    from litserve.mcp import ToolEndpointType
 
 mp.allow_connection_pickling()
 
@@ -241,6 +254,13 @@ class _LitAPIConnector:
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
 
+    def get_mcp_tools(self) -> List["ToolEndpointType"]:
+        mcp_tools = []
+        for lit_api in self.lit_apis:
+            if lit_api.mcp:
+                mcp_tools.append(lit_api.mcp.as_tool())
+        return mcp_tools
+
 
 class BaseRequestHandler(ABC):
     def __init__(self, lit_api: LitAPI, server: "LitServer"):
@@ -281,6 +301,7 @@ class BaseRequestHandler(ABC):
 class RegularRequestHandler(BaseRequestHandler):
     async def handle_request(self, request, request_type) -> Response:
         try:
+            logger.debug(f"Handling request: {request}")
             # Prepare request
             payload = await self._prepare_request(request, request_type)
 
@@ -297,7 +318,7 @@ class RegularRequestHandler(BaseRequestHandler):
             response, status = self.server.response_buffer.pop(uid)
 
             if status == LitAPIStatus.ERROR:
-                await self._handle_error_response(response)
+                self._handle_error_response(response)
 
             # Trigger callback
             self.server._callback_runner.trigger_event(EventTypes.ON_RESPONSE.value, litserver=self.server)
@@ -305,16 +326,27 @@ class RegularRequestHandler(BaseRequestHandler):
             return response
 
         except HTTPException as e:
-            raise e
+            raise e from None
 
         except Exception as e:
-            logger.exception(f"Error handling request: {e}")
-            raise HTTPException(status_code=500, detail="Internal server error")
+            logger.error(f"Unhandled exception: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Internal server error") from e
 
-    async def _handle_error_response(self, response):
-        logger.error("Error in request: %s", response)
+    @staticmethod
+    def _handle_error_response(response):
+        """Raise HTTPException as is and rest as 500 after logging the error."""
+        try:
+            if isinstance(response, bytes):
+                response = pickle.loads(response)
+                raise HTTPException(status_code=response.status_code, detail=response.detail)
+        except Exception as e:
+            logger.debug(f"couldn't unpickle error response {e}")
+
         if isinstance(response, HTTPException):
             raise response
+
+        if isinstance(response, Exception):
+            logger.error(f"Error while handling request: {response}")
 
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -349,11 +381,250 @@ class StreamingRequestHandler(BaseRequestHandler):
 
 
 class LitServer:
+    """Initialize a LitServer for high-performance AI model serving.
+
+    LitServer transforms AI models into production-ready APIs with automatic scaling,
+    batching, streaming, and multi-GPU support.
+
+    Quick Start:
+        ```python
+        import litserve as ls
+
+        # Define inference pipeline
+        class MyAPI(ls.LitAPI):
+            def setup(self, device):
+                self.model = load_model()  # model loading logic
+
+            def predict(self, x):
+                return self.model(x)
+
+        # Create and run server
+        server = ls.LitServer(MyAPI())
+        server.run(port=8000)
+        ```
+
+    Args:
+        lit_api:
+            The core component - one or more LitAPI instances defining model logic.
+
+            - Single API: `MyAPI()` for serving one model
+            - Multiple APIs: `[API1(), API2()]` for multi-model serving
+
+            Each LitAPI must implement:
+            - `setup(device)`: Initialize the model
+            - `predict(x)`: Run inference
+            - Optional: `decode_request()`, `encode_response()` for custom I/O
+
+    Hardware Configuration:
+        accelerator:
+            Hardware type for inference. Defaults to "auto".
+
+            - "auto": Automatically detects best available (CUDA > MPS > CPU)
+            - "cpu": Force CPU usage
+            - "cuda": Use NVIDIA GPUs
+            - "mps": Use Apple Metal Performance Shaders
+
+        devices:
+            Number of devices to use. Defaults to "auto".
+
+            - "auto": Use all available devices
+            - int: Use specific number (e.g., 2 for 2 GPUs)
+
+        workers_per_device:
+            Worker processes per device for parallel inference. Defaults to 1.
+
+            - Higher values = better throughput but more memory usage
+            - Good starting point: 1-4 depending on model size
+            - For CPU, set to the number of cores available on the machine (e.g., 8 for 8-core CPU)
+            - Monitor GPU memory when increasing
+
+    Performance & Scaling:
+        timeout:
+            Request timeout in seconds. Defaults to 30.
+
+            - Set to False or -1 to disable timeouts
+            - Increase for slow models (e.g., 300 for large LLMs)
+            - Decrease for fast models (e.g., 5 for lightweight models)
+
+        fast_queue:
+            Enable ZeroMQ for high-throughput scenarios (>100 RPS). Defaults to False.
+
+            - Use when serving hundreds of requests per second
+            - Not supported on Windows
+
+        track_requests:
+            Track active requests across all API servers for monitoring and load management. Defaults to False.
+
+            When enabled, tracks the total number of active requests in the queue across all API servers
+            and makes this count available via callbacks using the `on_request` hook. Essential for
+            monitoring concurrent request load and implementing custom load management logic.
+
+            - Recommended for production deployments
+            - Access count via callbacks or `server.active_requests` property
+            - Useful for monitoring and handling concurrent requests effectively
+
+    API Configuration:
+        healthcheck_path:
+            Health check endpoint for load balancers. Defaults to "/health".
+
+            - Returns 200 when all workers are ready
+            - Critical for Kubernetes/Docker deployments
+
+        info_path:
+            Server information endpoint. Defaults to "/info".
+
+            - Shows model metadata, device info, server config
+            - Useful for debugging and monitoring
+
+        shutdown_path:
+            Graceful shutdown endpoint. Defaults to "/shutdown".
+
+        enable_shutdown_api:
+            Enable remote shutdown capability. Defaults to False.
+
+            - Requires authentication token (set LIT_SHUTDOWN_API_KEY env var)
+            - Useful for automated deployment pipelines
+
+    Content & Middleware:
+        max_payload_size:
+            Maximum request size. Defaults to "100MB".
+
+            - String format: "10MB", "1GB"
+            - Integer format: bytes (1048576 for 1MB)
+            - Increase for large images/videos
+
+        middlewares:
+            HTTP middleware for cross-cutting concerns. Defaults to None.
+
+            Example:
+            ```python
+            from starlette.middleware.cors import CORSMiddleware
+
+            server = LitServer(
+                api,
+                middlewares=[
+                    (CORSMiddleware, {"allow_origins": ["*"]}),
+                    # Add more middleware as needed
+                ]
+            )
+            ```
+
+        model_metadata:
+            Metadata about the model displayed at info endpoint. Defaults to None.
+
+            Example:
+            ```python
+            metadata = {
+                "model_name": "bert-base-uncased",
+                "version": "1.0.0",
+                "description": "Text classification model"
+            }
+            ```
+
+    Monitoring & Debugging:
+        callbacks:
+            Event handlers for server lifecycle. Defaults to None.
+
+            - Built-in callbacks for logging, metrics, custom logic
+            - Triggers on request start/end, server start/stop
+
+        loggers:
+            Custom loggers for metrics and events. Defaults to None.
+
+            - Integrate with monitoring stack
+            - Track performance metrics, error rates
+
+    Advanced Configuration:
+        max_batch_size, batch_timeout, spec, stream, api_path, loop:
+            **Deprecated**: Configure these in LitAPI implementation instead.
+
+            Migration example:
+            ```python
+            # Old way (deprecated)
+            server = LitServer(api, max_batch_size=8, stream=True)
+
+            # New way (recommended)
+            api = MyAPI(max_batch_size=8, stream=True)
+            server = LitServer(api)
+            ```
+
+    Examples:
+        Basic Usage:
+        ```python
+        import litserve as ls
+
+        class SimpleAPI(ls.LitAPI):
+            def setup(self, device):
+                self.model = lambda x: x * 2  # model here
+
+            def predict(self, x):
+                return self.model(x)
+
+        server = ls.LitServer(SimpleAPI())
+        server.run()
+        ```
+
+        Production Setup:
+        ```python
+        server = ls.LitServer(
+            MyAPI(max_batch_size=8),
+            accelerator="cuda",
+            devices=2,
+            workers_per_device=4,
+            fast_queue=True,
+            track_requests=True,
+            max_payload_size="50MB",
+            timeout=60
+        )
+        server.run(port=8000, num_api_servers=4)
+        ```
+
+        Multi-Model Serving:
+        ```python
+        # Serve multiple models on different endpoints
+        text_api = TextClassifierAPI(api_path="/classify")
+        image_api = ImageClassifierAPI(api_path="/vision")
+
+        server = ls.LitServer([text_api, image_api])
+        server.run()
+        ```
+
+        Streaming Response:
+        ```python
+        class StreamingAPI(ls.LitAPI):
+            def setup(self, device):
+                self.model = load_llm()
+
+            def predict(self, prompt):
+                for token in self.model.generate(prompt):
+                    yield {"token": token}
+
+        server = ls.LitServer(StreamingAPI(stream=True))
+        ```
+
+    Deployment:
+        Self-hosted:
+        ```bash
+        python server.py  # Run locally
+        ```
+
+        Lightning AI Cloud:
+        ```bash
+        lightning deploy server.py --cloud  # One-click deploy
+        ```
+
+    See Also:
+        - LitAPI: Base class for defining model logic
+        - LitSpec: API specifications (OpenAI compatibility)
+        - Documentation: https://lightning.ai/docs/litserve
+
+    """
+
     def __init__(
         self,
         lit_api: Union[LitAPI, List[LitAPI]],
-        accelerator: str = "auto",
-        devices: Union[str, int] = "auto",
+        accelerator: Literal["cpu", "cuda", "mps", "auto"] = "auto",
+        devices: Union[int, Literal["auto"]] = "auto",
         workers_per_device: int = 1,
         timeout: Union[float, bool] = 30,
         healthcheck_path: str = "/health",
@@ -368,82 +639,13 @@ class LitServer:
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         fast_queue: bool = False,
+        # All the following arguments are deprecated and will be removed in v0.3.0
         max_batch_size: Optional[int] = None,
         batch_timeout: float = 0.0,
         stream: bool = False,
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
     ):
-        """Initialize a LitServer instance for high-performance model inference.
-
-        Args:
-            lit_api (Union[LitAPI, List[LitAPI]]):
-                API instance(s) defining model inference logic. Single instance or list for multi-model serving.
-
-            accelerator (str, optional):
-                Hardware type: 'cpu', 'cuda', 'mps', or 'auto' (detects best available). Defaults to 'auto'.
-
-            devices (Union[int, str], optional):
-                Number of devices to use, or 'auto' for all available. Defaults to 'auto'.
-
-            workers_per_device (int, optional):
-                Worker processes per device. Higher values improve throughput but use more memory. Defaults to 1.
-
-            timeout (Union[float, bool], optional):
-                Request timeout in seconds, or False to disable. Defaults to 30.
-
-            healthcheck_path (str, optional):
-                Health check endpoint path for load balancers. Defaults to "/health".
-
-            info_path (str, optional):
-                Server info endpoint path showing metadata and configuration. Defaults to "/info".
-
-            shutdown_path (str, optional):
-                Server shutdown endpoint path that terminates and cleans up all worker and server processes.
-                Defaults to "/shutdown".
-
-            enable_shutdown_api (bool, optional):
-                Enable the shutdown endpoint. If True, the server will listen for shutdown requests
-                at the specified path. Defaults to False.
-
-            model_metadata (dict, optional):
-                Model metadata displayed at info endpoint (e.g., {"version": "1.0"}). Defaults to None.
-
-            max_payload_size (Union[int, str], optional):
-                Maximum request size as bytes or string ("10MB"). Defaults to "100MB".
-
-            track_requests (bool, optional):
-                Enable request tracking for monitoring. Recommended for production. Defaults to False.
-
-            callbacks (List[Callback], optional):
-                Callback instances for lifecycle events (logging, metrics). Defaults to None.
-
-            middlewares (List[Middleware], optional):
-                HTTP middleware for auth, CORS, rate limiting, etc. Defaults to None.
-
-            loggers (List[Logger], optional):
-                Custom loggers for server activity. Defaults to standard logging.
-
-            fast_queue (bool, optional):
-                Enable ZeroMQ for high-throughput (>100 RPS). Requires ZeroMQ installation. Defaults to False.
-
-            max_batch_size, batch_timeout, stream, spec, api_path, loop:
-                **Deprecated**: Configure these in your LitAPI implementation instead.
-
-        Example:
-            >>> # Basic
-            >>> server = LitServer(MyLitAPI())
-
-            >>> # Production
-            >>> server = LitServer(
-            ...     lit_api=MyLitAPI(max_batch_size=4),
-            ...     accelerator="cuda",
-            ...     devices=2,
-            ...     fast_queue=True,
-            ...     track_requests=True
-            ... )
-
-        """
         if max_batch_size is not None:
             warnings.warn(
                 "'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer` "
@@ -565,6 +767,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = False
+        self.mcp_server = None
 
         accelerator = self._connector.accelerator
         devices = self._connector.devices
@@ -609,7 +812,7 @@ class LitServer:
                     self.workers_setup_status,
                     self._callback_runner,
                 ),
-                name=f"lit-inference-{endpoint}_{worker_id}",
+                name="inference-worker",
             )
             process.start()
             process_list.append(process)
@@ -639,7 +842,11 @@ class LitServer:
         )
 
         try:
-            yield
+            if _MCP_AVAILABLE:
+                async with self.mcp_server.lifespan(app):
+                    yield
+            else:
+                yield
         finally:
             self._callback_runner.trigger_event(EventTypes.ON_SERVER_END.value, litserver=self)
 
@@ -899,49 +1106,169 @@ class LitServer:
         pretty_logs: bool = False,
         **kwargs,
     ):
-        """Run the LitServe server to handle API requests and distribute them to inference workers.
+        """Start the LitServer to serve AI model requests with production-ready performance.
+
+        This method launches the complete serving infrastructure: initializes worker processes,
+        starts the HTTP server, and begins handling requests. The server runs until manually
+        stopped (Ctrl+C) or programmatically shut down.
+
+        Quick Start:
+            ```python
+            # Basic usage - starts server on localhost:8000
+            server.run()
+
+            # Production - multiple servers and custom port
+            server.run(port=8080, num_api_servers=4)
+            ```
+
+        Server Lifecycle:
+            1. **Initialize**: Sets up worker processes and communication queues
+            2. **Health Check**: Verifies all workers are ready to serve requests
+            3. **Start HTTP Server**: Begins accepting requests on specified host/port
+            4. **Serve Requests**: Distributes requests to workers and returns responses
+            5. **Graceful Shutdown**: Properly terminates workers when stopped
 
         Args:
-            host (str, optional):
-                Host address to bind to. "0.0.0.0" for all IPs, "127.0.0.1" for localhost only. Defaults to "0.0.0.0".
+            host:
+                Network interface to bind the server to. Defaults to "0.0.0.0".
 
-            port (Union[str, int], optional):
-                Port number to bind to. Must be available. Defaults to 8000.
+                - "0.0.0.0": Accept connections from any IP (public access)
+                - "127.0.0.1": Only accept local connections (localhost only)
+                - "::": IPv6 equivalent of "0.0.0.0"
 
-            num_api_servers (Optional[int], optional):
-                Number of uvicorn server instances for parallel API handling. Higher values improve
-                throughput but use more resources. Defaults to None (single instance).
+                For development, use "127.0.0.1" for security. For production/Docker, use "0.0.0.0".
 
-            log_level (str, optional):
-                Logging level: "critical", "error", "warning", "info", "debug", "trace".
-                Use "debug" for development. Defaults to "info".
+            port:
+                Port number to listen on. Defaults to 8000.
 
-            generate_client_file (bool, optional):
-                Auto-generate Python client file with typed methods for API interaction. Defaults to True.
+                - Must be between 1024-65535 (privileged ports require admin)
+                - Ensure the port is available and not blocked by firewalls
+                - Common choices: 8000, 8080, 3000, 5000
 
-            api_server_worker_type (Literal["process", "thread"], optional):
-                Worker type. "process" for better isolation/CPU usage, "thread" for less memory. Defaults to "process".
+        Performance Configuration:
+            num_api_servers:
+                Number of parallel HTTP server processes. Defaults to None (auto-detect).
 
-            pretty_logs (bool, optional):
-                Enhanced log formatting with colors using rich library. Good for development. Defaults to False.
+                - None: Uses same count as inference workers (recommended)
+                - Higher values improve HTTP throughput but use more memory
+                - Good starting point: 2-8 depending on expected load
+                - Each server handles HTTP requests independently
 
+            api_server_worker_type:
+                Process architecture for HTTP servers. Defaults to "process".
+
+                - "process": Better isolation, CPU utilization, and fault tolerance
+                - "thread": Lower memory usage but shared memory space
+                - Windows automatically uses "thread" (process forking not supported)
+
+        Development & Debugging:
+            log_level:
+                Logging verbosity level. Defaults to "info".
+
+                - "critical": Only severe errors
+                - "error": Error conditions
+                - "warning": Warning messages (good for production)
+                - "info": General information (default)
+                - "debug": Detailed debugging info (development)
+                - "trace": Very verbose output (troubleshooting)
+
+            pretty_logs:
+                Enable enhanced log formatting with colors and rich formatting. Defaults to False.
+
+                - Requires: `pip install rich`
+                - Great for development and local debugging
+                - May not display properly in some production log aggregators
+
+            generate_client_file:
+                Auto-generate a Python client file for easy API interaction. Defaults to True.
+
+                - Creates `client.py` in current directory with typed methods
+                - Useful for testing and integration
+                - Safe to disable in production environments
+
+        Advanced Configuration:
             **kwargs:
-                Additional uvicorn server options (ssl_keyfile, ssl_certfile, etc.). See uvicorn docs.
+                Additional uvicorn server configuration options.
 
-        Example:
-        >>> server.run()  # Basic
+                Common SSL options:
+                ```python
+                server.run(
+                    ssl_keyfile="path/to/key.pem",
+                    ssl_certfile="path/to/cert.pem"
+                )
+                ```
 
-        >>> server.run(  # Production
-        ...     port=8080,
-        ...     num_api_servers=4,
-        ...     log_level="warning"
-        ... )
+                Other uvicorn options: ssl_ca_certs, ssl_ciphers, ssl_version,
+                workers, backlog, etc. See uvicorn documentation for full list.
 
-        >>> server.run(  # Development
-        ...     log_level="debug",
-        ...     pretty_logs=True,
-        ...     generate_client_file=True
-        ... )
+        Examples:
+            Basic Development:
+            ```python
+            # Simple local development
+            server.run()
+            # Access at: http://localhost:8000
+            # API docs at: http://localhost:8000/docs
+            ```
+
+            Production Configuration:
+            ```python
+            # High-performance production setup
+            server.run(
+                host="0.0.0.0",
+                port=8000,
+                num_api_servers=8,
+                log_level="warning",
+                pretty_logs=False,
+                generate_client_file=False
+            )
+            ```
+
+            Development with Debug:
+            ```python
+            # Development with detailed logging
+            server.run(
+                host="127.0.0.1",
+                port=8000,
+                log_level="debug",
+                pretty_logs=True,
+                num_api_servers=1
+            )
+            ```
+
+            Multi-API Server:
+            ```python
+            # Balance load across multiple HTTP servers
+            server.run(
+                port=8000,
+                num_api_servers=4,  # 4 parallel HTTP servers
+                api_server_worker_type="process"
+            )
+            ```
+
+        Server Endpoints:
+            Once running, the server provides several built-in endpoints:
+
+            - **Main API**: `POST /predict` (or custom path from LitAPI)
+            - **Health Check**: `GET /health` - Returns 200 when ready
+            - **Server Info**: `GET /info` - Shows configuration and metadata
+            - **API Documentation**: `GET /docs` - Interactive Swagger UI
+            - **OpenAPI Schema**: `GET /openapi.json` - API specification
+
+        Stopping the Server:
+            - **Ctrl+C**: Graceful shutdown (recommended)
+            - **SIGTERM**: Graceful shutdown in Docker/Kubernetes
+            - **Shutdown API**: POST to `/shutdown` (if enabled)
+
+        Common Issues:
+            - **Port in use**: Choose different port or stop conflicting process
+            - **Permission denied**: Use port > 1024 or run with appropriate permissions
+            - **Workers not ready**: Check model loading in LitAPI.setup() method
+            - **Memory issues**: Reduce num_api_servers or workers_per_device
+
+        Notes:
+            - Server blocks execution until stopped (use threads for non-blocking)
+            - Logs show startup progress and any configuration issues
+            - Swagger UI provides interactive API testing interface
 
         """
         if generate_client_file:
@@ -1019,6 +1346,11 @@ class LitServer:
                 if lit_api.spec:
                     lit_api.spec.response_queue_id = response_queue_id
 
+            if _MCP_AVAILABLE:
+                from litserve.mcp import _LitMCPServerConnector
+
+                self.mcp_server = _LitMCPServerConnector()
+                self.mcp_server.connect_mcp_server(self.litapi_connector.get_mcp_tools(), self.app)
             app: FastAPI = copy.copy(self.app)
 
             self._prepare_app_run(app)
@@ -1043,9 +1375,9 @@ class LitServer:
             server = uvicorn.Server(config=uvicorn_config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
-                w = ctx.Process(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
+                w = ctx.Process(target=server.run, args=(sockets,), name=f"LitServer-{response_queue_id}")
             elif uvicorn_worker_type == "thread":
-                w = threading.Thread(target=server.run, args=(sockets,), name=f"lit-uvicorn-{response_queue_id}")
+                w = threading.Thread(target=server.run, args=(sockets,), name=f"LitServer-{response_queue_id}")
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()

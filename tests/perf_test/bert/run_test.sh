@@ -2,14 +2,14 @@
 
 # Function to clean up server process
 cleanup() {
-    pkill -f "python tests/perf_test/bert/server.py"
+    pkill -f "uv run tests/perf_test/bert/server.py"
 }
 
 # Trap script exit to run cleanup
 trap cleanup EXIT
 
 # Start the server in the background and capture its PID
-python tests/perf_test/bert/server.py &
+uv run tests/perf_test/bert/server.py &
 SERVER_PID=$!
 
 echo "Server started with PID $SERVER_PID"
@@ -17,7 +17,7 @@ echo "Server started with PID $SERVER_PID"
 # Run your benchmark script
 echo "Preparing to run benchmark.py..."
 
-export PYTHONPATH=$PWD && python tests/perf_test/bert/benchmark.py
+export PYTHONPATH=$PWD && uv run tests/perf_test/bert/benchmark.py
 
 # Check if benchmark.py exited successfully
 if [ $? -ne 0 ]; then

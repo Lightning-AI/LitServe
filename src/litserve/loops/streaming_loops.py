@@ -155,21 +155,17 @@ class StreamingLoop(DefaultLoop):
 
             # When using async, predict should return an async generator
             # and encode_response should handle async generators
-            async for item in y_gen:
-                # For each item from predict, pass to encode_response
-                # The _async_inject_context already handles async generators correctly
-                enc_result = await _async_inject_context(
-                    context,
-                    lit_api.encode_response,
-                    [item],  # Wrap in list since encode_response expects an iterable
-                )
+            # The _async_inject_context already handles async generators correctly
+            enc_result = await _async_inject_context(
+                context,
+                lit_api.encode_response,
+                y_gen,
+            )
 
-                # encode_response should also return an async generator
-                async for y_enc in enc_result:
-                    y_enc = lit_api.format_encoded_response(y_enc)
-                    self.put_response(
-                        transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
-                    )
+            # encode_response should also return an async generator
+            async for y_enc in enc_result:
+                y_enc = lit_api.format_encoded_response(y_enc)
+                self.put_response(transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING)
 
             self.put_response(
                 transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
@@ -200,6 +196,10 @@ class StreamingLoop(DefaultLoop):
         transport: MessageTransport,
         callback_runner: CallbackRunner,
     ):
+        if lit_api.spec:
+            # wrap the default implementation of the spec in an async spec wrapper
+            lit_api.spec = lit_api.spec.as_async()
+
         async def process_requests():
             event_loop = asyncio.get_running_loop()
             pending_tasks = set()
@@ -243,7 +243,7 @@ class StreamingLoop(DefaultLoop):
                 pending_tasks.add(task)
                 task.add_done_callback(pending_tasks.discard)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
 
         try:
             loop.run_until_complete(process_requests())

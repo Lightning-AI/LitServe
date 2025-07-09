@@ -26,7 +26,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from litserve.specs.base import LitSpec
+from litserve.specs.base import LitSpec, _AsyncSpecWrapper
 from litserve.utils import LitAPIStatus, azip
 
 if typing.TYPE_CHECKING:
@@ -176,6 +176,7 @@ class ChatCompletionRequest(BaseModel):
     tools: Optional[List[Tool]] = None
     tool_choice: Optional[ToolChoice] = ToolChoice.auto
     response_format: Optional[ResponseFormat] = None
+    reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
     metadata: Optional[Dict[str, str]] = None
 
 
@@ -263,13 +264,14 @@ class ExampleAPI(ls.LitAPI):
 ```
 """
 
-ASYNC_LITAPI_VALIDATION_MSG = """LitAPI.decode_request, LitAPI.predict, and LitAPI.encode_response must all be async
-coroutines (use 'async def') while using the OpenAISpec with async enabled in LitAPI.
+ASYNC_LITAPI_VALIDATION_MSG = """Error: {}
 
-Additionally, LitAPI.predict and LitAPI.encode_response must be async generators (use 'yield' or 'yield from' inside
- an 'async def' function).
+`enable_async` is set but LitAPI method is not async. To use async with OpenAISpec, you need to make the following changes:
 
-Error: {}
+- LitAPI.decode_request can be a regular function or an async function.
+- LitAPI.predict must be an async generator (use 'yield' or 'yield from' inside an 'async def' function).
+- LitAPI.encode_response can be a regular function or an async generator.
+
 
 Please follow the examples below for guidance on how to use the spec in async mode:
 
@@ -322,7 +324,27 @@ class ExampleAPI(ls.LitAPI):
         async for out in output:
             yield ChatMessage(role="assistant", content=out)
 ```
-"""
+"""  # noqa: E501
+
+
+def _openai_format_error(error: Exception):
+    if isinstance(error, HTTPException):
+        return "data: " + json.dumps({
+            "error": {
+                "message": error.detail,
+                "type": "internal",
+                "param": None,
+                "code": "internal_error",
+            }
+        })
+    return "data: " + json.dumps({
+        "error": {
+            "message": "Internal server error",
+            "type": "internal",
+            "param": None,
+            "code": "internal_error",
+        }
+    })
 
 
 class OpenAISpec(LitSpec):
@@ -345,14 +367,23 @@ class OpenAISpec(LitSpec):
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
 
         if lit_api.enable_async:
+            # warning for decode_request and encode_response
             if not asyncio.iscoroutinefunction(lit_api.decode_request):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("decode_request is not a coroutine"))
+                logger.info("decode_request is not a coroutine function. LitServe will asyncify it.")
+            if not inspect.isasyncgenfunction(lit_api.encode_response):
+                logger.info("encode_response is not an async generator. LitServe will asyncify it.")
 
             if not inspect.isasyncgenfunction(lit_api.predict):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict is not a generator"))
+                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("predict must be an async generator"))
 
-            if not inspect.isasyncgenfunction(lit_api.encode_response):
-                raise ValueError(ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is not a generator"))
+            if (
+                not is_encode_response_original
+                and not inspect.isgeneratorfunction(lit_api.encode_response)
+                and not inspect.isasyncgenfunction(lit_api.encode_response)
+            ):
+                raise ValueError(
+                    ASYNC_LITAPI_VALIDATION_MSG.format("encode_response is neither a generator nor an async generator")
+                )
 
         else:
             for method in ["decode_request", "predict", "encode_response"]:
@@ -374,6 +405,9 @@ class OpenAISpec(LitSpec):
         super().setup(server)
         print("OpenAI spec setup complete")
 
+    def as_async(self) -> "_AsyncOpenAISpecWrapper":
+        return _AsyncOpenAISpecWrapper(self)
+
     def populate_context(self, context, request):
         data = request.dict()
         data.pop("messages")
@@ -381,9 +415,8 @@ class OpenAISpec(LitSpec):
 
     def decode_request(
         self, request: ChatCompletionRequest, context_kwargs: Optional[dict] = None
-    ) -> List[Dict[str, str]]:
-        # returns [{"role": "system", "content": "..."}, ...]
-        return [el.model_dump(by_alias=True, exclude_none=True) for el in request.messages]
+    ) -> ChatCompletionRequest:
+        return request
 
     def batch(self, inputs):
         return list(inputs)
@@ -473,79 +506,96 @@ class OpenAISpec(LitSpec):
         return await response_task
 
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
-        model = request.model
-        usage_info = None
-        async for streaming_response in azip(*pipe_responses):
-            choices = []
-            usage_infos = []
-            # iterate over n choices
-            for i, (response, status) in enumerate(streaming_response):
-                if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
-                    raise response
-                elif status == LitAPIStatus.ERROR:
-                    logger.error("Error in streaming response: %s", response)
-                    raise HTTPException(status_code=500)
-                encoded_response = json.loads(response)
-                logger.debug(encoded_response)
-                chat_msg = ChoiceDelta(**encoded_response)
-                usage_infos.append(UsageInfo(**encoded_response))
-                choice = ChatCompletionStreamingChoice(
-                    index=i, delta=chat_msg, system_fingerprint="", finish_reason=None
+        try:
+            model = request.model
+            usage_info = None
+            async for streaming_response in azip(*pipe_responses):
+                choices = []
+                usage_infos = []
+                # iterate over n choices
+                for i, (response, status) in enumerate(streaming_response):
+                    if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+                        raise response
+                    elif status == LitAPIStatus.ERROR:
+                        logger.error("Error in streaming response: %s", response)
+                        raise HTTPException(status_code=500)
+                    encoded_response = json.loads(response)
+                    logger.debug(encoded_response)
+                    chat_msg = ChoiceDelta(**encoded_response)
+                    usage_infos.append(UsageInfo(**encoded_response))
+                    choice = ChatCompletionStreamingChoice(
+                        index=i, delta=chat_msg, system_fingerprint="", finish_reason=None
+                    )
+
+                    choices.append(choice)
+
+                # Only use the last item from encode_response
+                usage_info = sum(usage_infos)
+                chunk = ChatCompletionChunk(model=model, choices=choices, usage=None)
+                logger.debug(chunk)
+                yield f"data: {chunk.model_dump_json(by_alias=True)}\n\n"
+
+            choices = [
+                ChatCompletionStreamingChoice(
+                    index=i,
+                    delta=ChoiceDelta(),
+                    finish_reason="stop",
                 )
-
-                choices.append(choice)
-
-            # Only use the last item from encode_response
-            usage_info = sum(usage_infos)
-            chunk = ChatCompletionChunk(model=model, choices=choices, usage=None)
-            logger.debug(chunk)
-            yield f"data: {chunk.model_dump_json(by_alias=True)}\n\n"
-
-        choices = [
-            ChatCompletionStreamingChoice(
-                index=i,
-                delta=ChoiceDelta(),
-                finish_reason="stop",
+                for i in range(request.n)
+            ]
+            last_chunk = ChatCompletionChunk(
+                model=model,
+                choices=choices,
+                usage=usage_info,
             )
-            for i in range(request.n)
-        ]
-        last_chunk = ChatCompletionChunk(
-            model=model,
-            choices=choices,
-            usage=usage_info,
-        )
-        yield f"data: {last_chunk.model_dump_json(by_alias=True)}\n\n"
-        yield "data: [DONE]\n\n"
+            yield f"data: {last_chunk.model_dump_json(by_alias=True)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error("Error in streaming response: %s", e, exc_info=True)
+            yield _openai_format_error(e)
+            return
 
     async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
-        model = request.model
-        usage_infos = []
-        choices = []
-        # iterate over n choices
-        for i, streaming_response in enumerate(generator_list):
-            msgs = []
-            tool_calls = None
-            usage = None
-            async for response, status in streaming_response:
-                if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
-                    raise response
-                if status == LitAPIStatus.ERROR:
-                    logger.error("Error in OpenAI non-streaming response: %s", response)
-                    raise HTTPException(status_code=500)
+        try:
+            model = request.model
+            usage_infos = []
+            choices = []
+            # iterate over n choices
+            for i, streaming_response in enumerate(generator_list):
+                msgs = []
+                tool_calls = None
+                usage = None
+                async for response, status in streaming_response:
+                    if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+                        raise response
+                    if status == LitAPIStatus.ERROR:
+                        logger.error("Error in OpenAI non-streaming response: %s", response)
+                        raise HTTPException(status_code=500)
 
-                # data from LitAPI.encode_response
-                encoded_response = json.loads(response)
-                logger.debug(encoded_response)
-                chat_msg = ChatMessage(**encoded_response)
-                usage = UsageInfo(**encoded_response)
-                usage_infos.append(usage)  # Aggregate usage info across all choices
-                msgs.append(chat_msg.content)
-                if chat_msg.tool_calls:
-                    tool_calls = chat_msg.tool_calls
+                    # data from LitAPI.encode_response
+                    encoded_response = json.loads(response)
+                    logger.debug(encoded_response)
+                    chat_msg = ChatMessage(**encoded_response)
+                    usage = UsageInfo(**encoded_response)
+                    usage_infos.append(usage)  # Aggregate usage info across all choices
+                    msgs.append(chat_msg.content)
+                    if chat_msg.tool_calls:
+                        tool_calls = chat_msg.tool_calls
 
-            content = "".join(msg for msg in msgs if msg is not None)
-            msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
-            choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
-            choices.append(choice)
+                content = "".join(msg for msg in msgs if msg is not None)
+                msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
+                choice = ChatCompletionResponseChoice(index=i, message=msg, finish_reason="stop")
+                choices.append(choice)
 
-        return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
+            return ChatCompletionResponse(model=model, choices=choices, usage=sum(usage_infos))
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error("Error in non-streaming response: %s", e, exc_info=True)
+            raise HTTPException(status_code=500)
+
+
+class _AsyncOpenAISpecWrapper(_AsyncSpecWrapper):
+    async def encode_response(self, output_generator: AsyncGenerator, context_kwargs: Optional[dict] = None):
+        async for output in output_generator:
+            yield self._spec._encode_response(output)

@@ -25,9 +25,108 @@ from litserve.specs.base import LitSpec
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
+    from litserve.mcp import MCP
 
 
 class LitAPI(ABC):
+    """Define inference logic for the model.
+
+    LitAPI is the core abstraction for serving AI models with LitServe. It provides a clean
+    interface for model loading, request processing, and response generation with automatic
+    optimizations like batching, streaming, and async processing.
+
+    Core Workflow:
+        1. **setup()**: Load and initialize the model once per worker
+        2. **decode_request()**: Convert HTTP request to model input format
+        3. **predict()**: Run model inference on the input
+        4. **encode_response()**: Convert model output to HTTP response format
+
+    Quick Start:
+        ```python
+        import litserve as ls
+
+        class MyAPI(ls.LitAPI):
+            def setup(self, device):
+                self.model = lambda x: x**2
+
+            def predict(self, x):
+                return self.model(x["input"])
+
+        server = ls.LitServer(MyAPI())
+        server.run()
+        ```
+
+    Required Methods:
+        setup(device): Initialize the model and resources
+        predict(x): Core inference logic
+
+    Optional Methods:
+        decode_request(request): Transform HTTP requests to model input
+        encode_response(output): Transform model outputs to HTTP responses
+        batch(inputs)/unbatch(outputs): Custom batching logic
+
+    Configuration:
+        max_batch_size: Batch multiple requests for better GPU utilization. Defaults to 1.
+        batch_timeout: Wait time for batch to fill (seconds). Defaults to 0.0.
+        stream: Enable streaming responses for real-time output. Defaults to False.
+        api_path: URL endpoint path. Defaults to "/predict".
+        enable_async: Enable async/await for non-blocking operations. Defaults to False.
+        spec: API specification (e.g., OpenAISpec for OpenAI compatibility). Defaults to None.
+        mcp: Model Context Protocol integration for AI assistants. Defaults to None.
+
+    Examples:
+        Batched GPU Inference:
+        ```python
+        class BatchedAPI(ls.LitAPI):
+            def setup(self, device):
+                self.model = load_model().to(device)
+
+            def predict(self, batch):
+                return self.model(batch)
+
+        api = BatchedAPI(max_batch_size=8, batch_timeout=0.1)
+        ```
+
+        Streaming LLM:
+        ```python
+        class StreamingLLM(ls.LitAPI):
+            def setup(self, device):
+                self.model = load_llm()
+
+            def predict(self, prompt):
+                for token in self.model.generate_stream(prompt):
+                    yield token
+
+        api = StreamingLLM(stream=True)
+        ```
+
+        OpenAI-Compatible:
+        ```python
+        from litserve.specs import OpenAISpec
+
+        class ChatAPI(ls.LitAPI):
+            def setup(self, device):
+                self.model = load_chat_model()
+
+            def predict(self, messages):
+                return self.model.chat(messages)
+
+        api = ChatAPI(spec=OpenAISpec())
+        ```
+
+    Performance Tips:
+        - Use batching for GPU models to maximize utilization
+        - Enable streaming for operations taking >1 second
+        - Use async for I/O-bound operations (databases, external APIs)
+        - Load models in setup(), not __init__
+        - Monitor GPU memory usage with larger batch sizes
+
+    See Also:
+        - LitServer: Server class for hosting APIs
+        - LitSpec: API specifications for standard interfaces
+
+    """
+
     _stream: bool = False
     _default_unbatch: Optional[Callable] = None
     _spec: Optional[LitSpec] = None
@@ -43,56 +142,10 @@ class LitAPI(ABC):
         stream: bool = False,
         loop: Optional[Union[str, "LitLoop"]] = "auto",
         spec: Optional[LitSpec] = None,
+        mcp: Optional["MCP"] = None,
         enable_async: bool = False,
     ):
-        """Initialize a LitAPI instance that defines the model's inference behavior.
-
-        Args:
-            max_batch_size (int, optional):
-                Maximum requests to batch together for inference. Higher values improve throughput
-                for models that benefit from batching but use more memory. Defaults to 1.
-
-            batch_timeout (float, optional):
-                Maximum seconds to wait for a batch to fill before processing incomplete batches.
-                Lower values reduce latency, higher values improve batching efficiency. Defaults to 0.0.
-
-            api_path (str, optional):
-                URL endpoint path for predictions (e.g., "/predict", "/v1/chat"). Defaults to "/predict".
-
-            stream (bool, optional):
-                Enable streaming responses for real-time output (useful for LLMs, long-running tasks).
-                Requires implementing encode_response() for streaming. Defaults to False.
-
-            loop (Union[str, LitLoop], optional):
-                Inference loop strategy. "auto" selects optimal loop based on batching/streaming settings,
-                or provide custom LitLoop instance for advanced control. Defaults to "auto".
-
-            spec (LitSpec, optional):
-                API specification defining input/output schemas and behavior. Use OpenAISpec for
-                OpenAI-compatible APIs or custom LitSpec implementations. Defaults to None.
-
-            enable_async (bool, optional):
-                Enable async/await support for non-blocking operations in predict() method.
-                Useful for I/O-bound inference or external API calls. Defaults to False.
-
-        Example:
-            >>> # Simple API
-            >>> api = LitAPI()
-
-            >>> # Batched inference
-            >>> api = LitAPI(max_batch_size=8, batch_timeout=0.1)
-
-            >>> # OpenAI-compatible API
-            >>> api = LitAPI(spec=OpenAISpec())
-
-            >>> # Async processing
-            >>> api = LitAPI(enable_async=True)
-
-        Note:
-            You must implement setup(), predict(), and optionally decode_request()/encode_response()
-            methods to define your model's behavior.
-
-        """
+        """Initialize LitAPI with configuration options."""
 
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
@@ -133,33 +186,59 @@ class LitAPI(ABC):
         self.batch_timeout = batch_timeout
         self.enable_async = enable_async
         self._validate_async_methods()
+        self.mcp = mcp
+        if mcp:
+            mcp._connect(self)
 
     def _validate_async_methods(self):
         """Validate that async methods are properly implemented when enable_async is True."""
-        if self.enable_async:
-            # check if LitAPI methods are coroutines or async generators
-            for method in ["decode_request", "predict", "encode_response"]:
-                method_obj = getattr(self, method)
-                if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
-                    raise ValueError("""LitAPI(enable_async=True) requires all methods to be coroutines.
+        if not self.enable_async:
+            return
 
-Please either set enable_async=False or implement the following methods as coroutines:
-Example:
-    class MyLitAPI(LitAPI):
-        async def decode_request(self, request, **kwargs):
-            return request
-        async def predict(self, x, **kwargs):
-            return x
-        async def encode_response(self, output, **kwargs):
-            return output
+        # Define validation rules for each method
+        validation_rules = {
+            "decode_request": {
+                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
+                "error_type": "warning",
+                "message": "should be an async function or async generator when enable_async=True",
+            },
+            "encode_response": {
+                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
+                "error_type": "warning",
+                "message": "should be an async function or async generator when enable_async=True",
+            },
+            "predict": {
+                "required_types": [inspect.isasyncgenfunction, asyncio.iscoroutinefunction],
+                "error_type": "error",
+                "message": "must be an async generator or async function when enable_async=True",
+            },
+        }
 
-Streaming example:
-    class MyStreamingAPI(LitAPI):
-        async def predict(self, x, **kwargs):
-            for i in range(10):
-                await asyncio.sleep(0.1)  # simulate async work
-                yield f"Token {i}: {x}"
-""")
+        errors = []
+        warnings_list = []
+
+        for method_name, rules in validation_rules.items():
+            method_obj = getattr(self, method_name)
+
+            # Check if method satisfies any of the required types
+            is_valid = any(check_func(method_obj) for check_func in rules["required_types"])
+
+            if not is_valid:
+                message = f"{method_name} {rules['message']}"
+
+                if rules["error_type"] == "error":
+                    errors.append(message)
+                else:
+                    warnings_list.append(message)
+
+        # Emit warnings
+        for warning_msg in warnings_list:
+            warnings.warn(f"{warning_msg}. LitServe will asyncify the method.", UserWarning)
+
+        # Raise errors if any
+        if errors:
+            error_msg = "Async validation failed:\n" + "\n".join(f"- {err}" for err in errors)
+            raise ValueError(error_msg)
 
     @abstractmethod
     def setup(self, device):

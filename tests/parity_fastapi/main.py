@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import time
 from functools import wraps
 
@@ -28,7 +29,7 @@ def run_python_script(filename):
         @wraps(test_fn)
         def wrapper(*args, **kwargs):
             process = subprocess.Popen(
-                ["python", filename],
+                [sys.executable, filename],
             )
             print("Waiting for server to start...")
             time.sleep(10)
