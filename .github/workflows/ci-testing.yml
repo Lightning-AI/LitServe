@@ -39,24 +39,20 @@ jobs:
       - name: Set up dependencies
         run: |
           uv pip compile pyproject.toml -o requirements.txt
-          echo "======requirements.txt======"
           cat requirements.txt
-          echo "----------------------------"
 
-      - name: Set min. dependencies
-        if: matrix.requires == 'oldest'
-        run: |
-          uv pip install 'lightning-utilities[cli]'
-          uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
-          echo "======requirements.txt======"
-          cat requirements.txt
-          echo "----------------------------"
+      # TODO: FIX THIS TO SUPPORT PYPROJECT.TOML
+      # - name: Set min. dependencies
+      #   if: matrix.requires == 'oldest'
+      #   run: |
+      #     uv pip install 'lightning-utilities[cli]'
+      #     uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
+      #     cat requirements.txt
 
       - name: Install package
         run: |
-          uv pip install -r requirements.txt -U -q
           uv pip list
-          uv sync --group dev
+          uv sync --all-extras --dev
           uv pip list
 
       - name: Tests
