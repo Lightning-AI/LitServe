@@ -107,11 +107,12 @@ async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_validation(openai_request_data):
+    # FIXME:  The error should be raised in the LitAPI constructor
     with pytest.raises(ValueError, match="You are using yield in your predict method"):
-        TestEmbedAPIWithYieldPredict(spec=OpenAIEmbeddingSpec())
+        ls.LitServer(TestEmbedAPIWithYieldPredict(spec=OpenAIEmbeddingSpec()))
 
     with pytest.raises(ValueError, match="You are using yield in your encode_response method"):
-        TestEmbedAPIWithYieldEncodeResponse(spec=OpenAIEmbeddingSpec())
+        ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(spec=OpenAIEmbeddingSpec()))
 
 
 @pytest.mark.asyncio

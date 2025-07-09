@@ -86,18 +86,15 @@ async def test_openai_spec(openai_request_data, api):
 # OpenAIWithUsage
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("api", "batch_size"),
+    ("api_cls", "batch_size"),
     [
-        (OpenAIWithUsage(), 1),
-        (OpenAIWithUsageEncodeResponse(), 1),
-        (OpenAIBatchingWithUsage(), 2),
+        (OpenAIWithUsage, 1),
+        (OpenAIWithUsageEncodeResponse, 1),
+        (OpenAIBatchingWithUsage, 2),
     ],
 )
-async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
-    api.spec = ls.OpenAISpec()
-    api.max_batch_size = batch_size
-    api.batch_timeout = 0.01
-    server = ls.LitServer(api)
+async def test_openai_token_usage(api_cls, batch_size, openai_request_data, openai_response_data):
+    server = ls.LitServer(api_cls(spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -134,16 +131,13 @@ class OpenAIWithUsagePerToken(ls.LitAPI):
 # OpenAIWithUsagePerToken
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("api", "batch_size"),
+    ("api_cls", "batch_size"),
     [
-        (OpenAIWithUsagePerToken(), 1),
+        (OpenAIWithUsagePerToken, 1),
     ],
 )
-async def test_openai_per_token_usage(api, batch_size, openai_request_data, openai_response_data):
-    api.spec = ls.OpenAISpec()
-    api.max_batch_size = batch_size
-    api.batch_timeout = 0.01
-    server = ls.LitServer(api)
+async def test_openai_per_token_usage(api_cls, batch_size, openai_request_data):
+    server = ls.LitServer(api_cls(spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -218,8 +212,7 @@ async def test_override_encode(openai_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_tools(openai_request_data_with_tools):
-    spec = OpenAISpec()
-    server = ls.LitServer(TestAPIWithToolCalls(spec=spec))
+    server = ls.LitServer(TestAPIWithToolCalls(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -241,8 +234,7 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_response_format(openai_request_data_with_response_format):
-    spec = OpenAISpec()
-    server = ls.LitServer(TestAPIWithStructuredOutput(spec=spec))
+    server = ls.LitServer(TestAPIWithStructuredOutput(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -257,53 +249,57 @@ async def test_openai_spec_with_response_format(openai_request_data_with_respons
 
 class MetadataRequiredAPI(ls.LitAPI):
     def setup(self, device):
-        self.model = None
+        self.device = device
 
     def decode_request(self, request):
-        if "metadata" not in request:
-            raise HTTPException(status_code=400, detail="Metadata is required")
         return request
 
     def predict(self, request):
-        for e in ["This", "is", "a", "generated", "output"]:
-            yield e + " "
+        metadata = request.metadata
+        if not metadata or "user_id" not in metadata:
+            raise HTTPException(status_code=500, detail="Missing required metadata")
+        yield "ok"
 
 
 @pytest.mark.asyncio
 async def test_openai_spec_metadata(openai_request_data_with_metadata):
-    server = ls.LitServer(MetadataRequiredAPI(), spec=OpenAISpec())
+    server = ls.LitServer(MetadataRequiredAPI(spec=OpenAISpec()))
+
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_metadata, timeout=10)
-            assert resp.status_code == 200, "Status code should be 200"
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_metadata)
+            assert resp.status_code == 200
+            assert resp.json()["choices"][0]["message"]["content"] == "ok"
 
 
 @pytest.mark.asyncio
 async def test_openai_spec_metadata_required_fail(openai_request_data):
     server = ls.LitServer(MetadataRequiredAPI(spec=OpenAISpec()))
+
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
-            assert resp.status_code == 400, "Status code should be 400"
-            assert resp.json()["detail"] == "Metadata is required"
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data)
+            assert resp.status_code == 500
+            assert "Missing required metadata" in resp.text
 
 
 class TestAPIWithReasoningEffort(TestAPI):
     def encode_response(self, output, context):
-        context["reasoning_effort"] = 0.5
-        yield from super().encode_response(output, context=context)
+        yield ChatMessage(
+            role="assistant",
+            content=f"This is a generated output with reasoning effort: {context.get('reasoning_effort', None)}",
+        )
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reasoning_effort", ["low", "medium", "high", None, "random"])
 async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_data):
-    spec = OpenAISpec()
-    spec.reasoning_effort = reasoning_effort
-    server = ls.LitServer(TestAPIWithReasoningEffort(spec=spec))
+    server = ls.LitServer(TestAPIWithReasoningEffort(spec=OpenAISpec()))
+    openai_request_data["reasoning_effort"] = reasoning_effort
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -337,10 +333,11 @@ class IncorrectAPI2(IncorrectAPI1):
 
 @pytest.mark.asyncio
 async def test_openai_spec_validation(openai_request_data):
-    with pytest.raises(ValueError, match="Your LitAPI is missing a predict method"):
-        IncorrectAPI1(spec=OpenAISpec())
-    with pytest.raises(ValueError, match="`encode_response` is not a generator"):
-        IncorrectAPI2(spec=OpenAISpec())
+    with pytest.raises(ValueError, match="predict is not a generator"):
+        ls.LitServer(IncorrectAPI1(spec=OpenAISpec()))
+
+    with pytest.raises(ValueError, match="encode_response is not a generator"):
+        ls.LitServer(IncorrectAPI2(spec=OpenAISpec()))
 
 
 class PrePopulatedAPI(ls.LitAPI):
@@ -356,12 +353,8 @@ class PrePopulatedAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_oai_prepopulated_context(openai_request_data):
-    spec = OpenAISpec()
-    api = PrePopulatedAPI(spec=spec)
-    server = ls.LitServer(api)
-
-    # test without streaming
-    openai_request_data["stream"] = False
+    openai_request_data["max_completion_tokens"] = 3
+    server = ls.LitServer(PrePopulatedAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -383,8 +376,14 @@ class WrongLitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_fail_http(openai_request_data):
-    with pytest.raises(HTTPException):
-        WrongLitAPI(spec=ls.OpenAISpec())
+    server = ls.LitServer(WrongLitAPI(spec=OpenAISpec()))
+    with wrap_litserve_start(server) as server:
+        async with LifespanManager(server.app) as manager, AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as ac:
+            res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+            assert res.status_code == 501, f"Server raises 501 error: {res.content}"
+            assert res.text == '{"detail":"test LitAPI.predict error"}'
 
 
 class IncorrectAsyncAPI(ls.LitAPI):
@@ -414,19 +413,19 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 @pytest.mark.asyncio
 async def test_openai_spec_asyncapi_predict_validation():
     with pytest.raises(ValueError, match="predict must be an async generator"):
-        IncorrectAsyncAPI(enable_async=True, spec=OpenAISpec())
+        ls.LitServer(IncorrectAsyncAPI(enable_async=True, spec=OpenAISpec()))
 
 
 @pytest.mark.asyncio
 def test_openai_spec_asyncapi_encode_response_validation():
-    with pytest.raises(UserWarning, match="encode_response is neither a generator nor an async generator"):
-        IncorrectEncodeAsyncAPI(enable_async=True, spec=OpenAISpec())
+    with pytest.raises(ValueError, match="encode_response is neither a generator nor an async generator"):
+        ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True, spec=OpenAISpec()))
 
 
 @pytest.mark.asyncio
 def test_openai_asyncapi_enable_async_flag_validation():
-    with pytest.warns(UserWarning, match="'enable_async' is not set in LitAPI."):
-        IncorrectAsyncAPI(enable_async=False, spec=OpenAISpec())
+    with pytest.raises(ValueError, match="'enable_async' is not set in LitAPI."):
+        ls.LitServer(IncorrectAsyncAPI(enable_async=False, spec=OpenAISpec()))
 
 
 class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
