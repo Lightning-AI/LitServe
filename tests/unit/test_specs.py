@@ -417,7 +417,7 @@ async def test_openai_spec_asyncapi_predict_validation():
 
 
 @pytest.mark.asyncio
-def test_openai_spec_asyncapi_encode_response_validation():
+async def test_openai_spec_asyncapi_encode_response_validation():
     with pytest.raises(ValueError, match="encode_response is neither a generator nor an async generator"):
         ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True, spec=OpenAISpec()))
 
