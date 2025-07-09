@@ -36,16 +36,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
-      # @borda -  is this needed?
-      # - name: Set min. dependencies
-      #   if: matrix.requires == 'oldest'
-      #   run: |
-      #     uv pip install 'lightning-utilities[cli]'
-      #     uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
+      - name: Set min. dependencies
+        if: matrix.requires == 'oldest'
+        run: |
+          uv pip compile pyproject.toml -o requirements.txt
+          uv pip install 'lightning-utilities[cli]'
+          uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
 
       - name: Install package & dependencies
         run: |
-          uv sync --all-extras --dev
+          uv pip install -r requirements.txt -U -q
+          uv sync --group dev
           pip list
 
       - name: Tests
