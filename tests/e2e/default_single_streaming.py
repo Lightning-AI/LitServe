@@ -18,6 +18,6 @@ class SimpleStreamingAPI(LitAPI):
 
 
 if __name__ == "__main__":
-    api = SimpleStreamingAPI()
-    server = LitServer(api, stream=True)
+    api = SimpleStreamingAPI(stream=True)
+    server = LitServer(api)
     server.run(port=8000)

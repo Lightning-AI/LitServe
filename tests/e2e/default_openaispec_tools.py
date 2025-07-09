@@ -20,5 +20,6 @@ class TestAPIWithToolCalls(TestAPI):
 
 
 if __name__ == "__main__":
-    server = ls.LitServer(TestAPIWithToolCalls(), spec=OpenAISpec())
+    api = TestAPIWithToolCalls(spec=OpenAISpec())
+    server = ls.LitServer(api)
     server.run()
