@@ -21,7 +21,7 @@ jobs:
         include:
           - { os: "macos-latest", python-version: "3.12" }
           - { os: "windows-latest", python-version: "3.11" }
-          - { os: "ubuntu-22.04", python-version: "3.9", requires: "oldest" }
+          #- { os: "ubuntu-22.04", python-version: "3.9", requires: "oldest" } # fixme
 
     timeout-minutes: 35
     env:
@@ -29,28 +29,36 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install uv and setup python
+        uses: astral-sh/setup-uv@v6
         with:
+          activate-environment: true
           python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          enable-cache: true
 
-      - name: Set min. dependencies
-        if: matrix.requires == 'oldest'
+      - name: Set up dependencies
         run: |
-          pip install 'lightning-utilities[cli]'
-          python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt", "_requirements/test.txt"]'
+          uv pip compile pyproject.toml -o requirements.txt
+          cat requirements.txt
 
-      - name: Install package & dependencies
+      # TODO: FIX THIS TO SUPPORT PYPROJECT.TOML
+      # - name: Set min. dependencies
+      #   if: matrix.requires == 'oldest'
+      #   run: |
+      #     uv pip install 'lightning-utilities[cli]'
+      #     uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
+      #     cat requirements.txt
+
+      - name: Install package
         run: |
-          pip --version
-          pip install -e '.[test]' -U -q --find-links $TORCH_URL
-          pip list
+          uv pip list
+          uv sync --all-extras --dev
+          uv pip list
 
       - name: Tests
         timeout-minutes: 15
         run: |
-          python -m pytest --cov=litserve src/ tests/ -v -s --durations=100
+          pytest --cov=litserve src/ tests/ -v -s --durations=100
 
       - name: Statistics
         run: |

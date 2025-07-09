@@ -14,6 +14,7 @@
 import json
 import os
 import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
@@ -31,7 +32,7 @@ def e2e_from_file(filename):
         @wraps(test_fn)
         def wrapper(*args, **kwargs):
             process = subprocess.Popen(
-                ["python", filename],
+                [sys.executable, filename],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
