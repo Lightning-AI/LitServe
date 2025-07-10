@@ -476,11 +476,11 @@ class LitServer:
             - Shows model metadata, device info, server config
             - Useful for debugging and monitoring
 
-        openapi_url:
-            OpenAPI specification endpoint provided by FastAPI. Defaults to "/openapi.json".
+        disable_openapi_url:
+            If True, disables the OpenAPI schema endpoint ("/openapi.json").
 
-            - Provides a machine-readable description of the API
-            - To disable it, set this value to an empty string: ""
+            - Useful for production environments where exposing API schemas is not desired.
+            - Defaults to False (the OpenAPI schema is enabled).
 
         shutdown_path:
             Graceful shutdown endpoint. Defaults to "/shutdown".
@@ -645,7 +645,7 @@ class LitServer:
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         fast_queue: bool = False,
-        openapi_url: str = "/openapi.json",
+        disable_openapi_url: bool = False,
         # All the following arguments are deprecated and will be removed in v0.3.0
         max_batch_size: Optional[int] = None,
         batch_timeout: float = 0.0,
@@ -716,12 +716,6 @@ class LitServer:
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
 
-        if openapi_url != "" and not openapi_url.startswith("/"):
-            raise ValueError(
-                "openapi_url must start with '/'. Please provide a valid api path like '/openapi.json' or '' if you "
-                "want to deactivate it"
-            )
-
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
@@ -755,7 +749,7 @@ class LitServer:
         self.track_requests = track_requests
         self.timeout = timeout
         self.litapi_connector.set_request_timeout(timeout)
-        self.app = FastAPI(lifespan=self.lifespan, openapi_url=openapi_url)
+        self.app = FastAPI(lifespan=self.lifespan, openapi_url="" if disable_openapi_url else "/openapi.json")
         self.app.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
