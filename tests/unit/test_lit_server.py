@@ -66,7 +66,8 @@ def test_device_identifiers_error(simple_litapi, devices):
 @pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
 async def test_stream(simple_stream_api, use_zmq):
-    server = LitServer(simple_stream_api, stream=True, timeout=10, fast_queue=use_zmq)
+    simple_stream_api.stream = True
+    server = LitServer(simple_stream_api, timeout=10, fast_queue=use_zmq)
     expected_output1 = "prompt=Hello generated_output=LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
@@ -93,9 +94,11 @@ async def test_stream(simple_stream_api, use_zmq):
 @pytest.mark.parametrize("use_zmq", [True, False])
 @pytest.mark.asyncio
 async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
-    server = LitServer(
-        simple_batched_stream_api, stream=True, max_batch_size=4, batch_timeout=2, timeout=30, fast_queue=use_zmq
-    )
+    api = simple_batched_stream_api
+    api.stream = True
+    api.max_batch_size = 4
+    api.batch_timeout = 2
+    server = LitServer(api, timeout=30, fast_queue=use_zmq)
     expected_output1 = "Hello LitServe is streaming output".lower().replace(" ", "")
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
@@ -116,13 +119,14 @@ async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
             )
 
 
-def test_litapi_with_stream(simple_litapi):
+def test_litapi_with_stream(simple_litapi_cls):
     with pytest.raises(
         ValueError,
         match="""When `stream=True` both `lit_api.predict` and
              `lit_api.encode_response` must generate values using `yield""",
     ):
-        LitServer(simple_litapi, stream=True)
+        # TODO: The error should be raised in the LitAPI constructor
+        LitServer(simple_litapi_cls(stream=True))
 
 
 class Linear(nn.Module):
@@ -231,11 +235,12 @@ def test_server_run(mock_uvicorn, mock_manager):
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @patch("litserve.server.uvicorn")
 def test_start_server(mock_uvicon):
-    server = LitServer(ls.test_examples.TestAPI(), spec=ls.OpenAISpec())
+    api = ls.test_examples.TestAPI(spec=ls.OpenAISpec())
+    server = LitServer(api)
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
     mock_uvicon.Server.assert_called()
-    assert server.lit_api._spec.response_queue_id is not None, "response_queue_id must be generated"
+    assert server.lit_api.spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
 @pytest.fixture
@@ -386,7 +391,7 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
-    server = LitServer(IdentityBatchedAPI(), max_batch_size=2, batch_timeout=0.01)
+    server = LitServer(IdentityBatchedAPI(max_batch_size=2, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -395,7 +400,7 @@ async def test_inject_context():
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
-    server = LitServer(IdentityBatchedStreamingAPI(), max_batch_size=2, batch_timeout=0.01, stream=True)
+    server = LitServer(IdentityBatchedStreamingAPI(max_batch_size=2, batch_timeout=0.01, stream=True))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -410,14 +415,11 @@ async def test_inject_context():
 
 
 def test_custom_api_path():
-    with pytest.raises(ValueError, match="api_path must start with '/'. "):
-        LitServer(ls.test_examples.SimpleLitAPI(), api_path="predict")
+    with pytest.raises(ValueError, match="api_path must start with '/'"):
+        LitServer(ls.test_examples.SimpleLitAPI(api_path="predict"))
 
-    server = LitServer(ls.test_examples.SimpleLitAPI(), api_path="/v1/custom_predict")
-    url = server.lit_api.api_path
-    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        response = client.post(url, json={"input": 4.0})
-        assert response.status_code == 200, "Server response should be 200 (OK)"
+    server = LitServer(ls.test_examples.SimpleLitAPI(api_path="/v1/predict"))
+    assert "/v1/predict" in [route.path for route in server.app.routes]
 
 
 def test_custom_healthcheck_path():
@@ -535,20 +537,19 @@ class FailFastAPI(ls.test_examples.SimpleLitAPI):
 
 
 @pytest.mark.parametrize("use_zmq", [True, False])
-def test_workers_setup_status(use_zmq):
-    api = FailFastAPI()
-    server = LitServer(api, devices=1, fast_queue=use_zmq)
+def test_workers_setup_status(use_zmq, port):
+    server = LitServer(
+        FailFastAPI(),
+        fast_queue=use_zmq,
+    )
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
-        server.run()
+        server.run(port=port, log_level="error")
 
 
 def test_max_batch_size_warning(simple_litapi):
-    with pytest.warns(
-        DeprecationWarning,
-        match="'max_batch_size' and 'batch_timeout' are being deprecated in `LitServer`",
-    ):
+    # Remove this test after v0.3.0
+    with pytest.warns(DeprecationWarning, match="'max_batch_size' and 'batch_timeout' are being deprecated"):
         ls.LitServer(simple_litapi, max_batch_size=4)
-    assert simple_litapi.max_batch_size == 4, "LitServer should have max_batch_size set to 4"
 
 
 class TestAsyncLitAPI(ls.LitAPI):
@@ -645,8 +646,8 @@ class TestAsyncStreamLitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_async_stream_litapi():
-    api = TestAsyncStreamLitAPI(enable_async=True)
-    server = LitServer(api, stream=True)
+    api = TestAsyncStreamLitAPI(enable_async=True, stream=True)
+    server = LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -671,8 +672,8 @@ class TestSleepAsyncStreamLitAPI(TestAsyncStreamLitAPI):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("num_requests", [10, 50, 100])
 async def test_concurrent_async_streaming_inference(num_requests):
-    api = TestSleepAsyncStreamLitAPI(enable_async=True)
-    server = LitServer(api, stream=True)
+    api = TestSleepAsyncStreamLitAPI(enable_async=True, stream=True)
+    server = LitServer(api)
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"

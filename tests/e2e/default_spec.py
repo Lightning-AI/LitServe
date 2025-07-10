@@ -16,5 +16,6 @@ from litserve.specs.openai import OpenAISpec
 from litserve.test_examples.openai_spec_example import TestAPI
 
 if __name__ == "__main__":
-    server = ls.LitServer(TestAPI(), spec=OpenAISpec())
+    api = TestAPI(spec=OpenAISpec())
+    server = ls.LitServer(api)
     server.run(port=8000)

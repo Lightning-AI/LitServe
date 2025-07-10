@@ -108,16 +108,17 @@ async def test_openai_embedding_spec_with_usage(openai_embedding_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_validation(openai_request_data):
+    # FIXME:  The error should be raised in the LitAPI constructor
     with pytest.raises(ValueError, match="You are using yield in your predict method"):
-        ls.LitServer(TestEmbedAPIWithYieldPredict(), spec=OpenAIEmbeddingSpec())
+        ls.LitServer(TestEmbedAPIWithYieldPredict(spec=OpenAIEmbeddingSpec()))
 
     with pytest.raises(ValueError, match="You are using yield in your encode_response method"):
-        ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(), spec=OpenAIEmbeddingSpec())
+        ls.LitServer(TestEmbedAPIWithYieldEncodeResponse(spec=OpenAIEmbeddingSpec()))
 
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_request_data):
-    server = ls.LitServer(TestEmbedAPIWithNonDictOutput(), spec=ls.OpenAIEmbeddingSpec())
+    server = ls.LitServer(TestEmbedAPIWithNonDictOutput(spec=ls.OpenAIEmbeddingSpec()))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -129,7 +130,7 @@ async def test_openai_embedding_spec_with_non_dict_output(openai_embedding_reque
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_request_data):
-    server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(), spec=OpenAIEmbeddingSpec())
+    server = ls.LitServer(TestEmbedAPIWithMissingEmbeddings(spec=OpenAIEmbeddingSpec()))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -147,7 +148,8 @@ class TestOpenAIWithBatching(TestEmbedAPI):
 
 @pytest.mark.asyncio
 async def test_openai_embedding_spec_with_batching(openai_embedding_request_data):
-    server = ls.LitServer(TestOpenAIWithBatching(max_batch_size=10, batch_timeout=4), spec=ls.OpenAIEmbeddingSpec())
+    api = TestOpenAIWithBatching(max_batch_size=10, batch_timeout=4, spec=ls.OpenAIEmbeddingSpec())
+    server = ls.LitServer(api)
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -176,7 +178,8 @@ async def test_openai_embedding_spec_with_batching(openai_embedding_request_data
 
 @pytest.mark.asyncio
 async def test_batching_with_client_side_batching(openai_embedding_request_data_array):
-    server = ls.LitServer(TestOpenAIWithBatching(max_batch_size=2, batch_timeout=10), spec=ls.OpenAIEmbeddingSpec())
+    api = TestOpenAIWithBatching(max_batch_size=2, batch_timeout=10, spec=ls.OpenAIEmbeddingSpec())
+    server = ls.LitServer(api)
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(

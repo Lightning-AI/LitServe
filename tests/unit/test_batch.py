@@ -145,21 +145,21 @@ def test_max_batch_size_warning():
         UserWarning,
         match=warning,
     ):
-        LitServer(SimpleBatchLitAPI(), accelerator="cpu", devices=1, timeout=2)
+        SimpleBatchLitAPI()
 
     # Test no warnings are raised when max_batch_size is set and max_batch_size is not set
     with pytest.raises(pytest.fail.Exception), pytest.warns(
         UserWarning,
         match=warning,
     ):
-        LitServer(SimpleBatchLitAPI(max_batch_size=2), accelerator="cpu", devices=1, timeout=2)
+        SimpleBatchLitAPI(max_batch_size=2)
 
     # Test no warning is set when LitAPI doesn't implement batch and unbatch
     with pytest.raises(pytest.fail.Exception), pytest.warns(
         UserWarning,
         match=warning,
     ):
-        LitServer(SimpleTorchAPI(), accelerator="cpu", devices=1, timeout=2)
+        SimpleTorchAPI()
 
 
 def test_batch_predict_string_warning():

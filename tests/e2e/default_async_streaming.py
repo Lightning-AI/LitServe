@@ -31,6 +31,6 @@ class AsyncAPI(ls.LitAPI):
 
 
 if __name__ == "__main__":
-    api = AsyncAPI(enable_async=True)
-    server = ls.LitServer(api, stream=True)
+    api = AsyncAPI(enable_async=True, stream=True)
+    server = ls.LitServer(api)
     server.run(port=8000)

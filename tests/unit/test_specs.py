@@ -86,15 +86,15 @@ async def test_openai_spec(openai_request_data, api):
 # OpenAIWithUsage
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("api", "batch_size"),
+    ("api_cls", "batch_size"),
     [
-        (OpenAIWithUsage(), 1),
-        (OpenAIWithUsageEncodeResponse(), 1),
-        (OpenAIBatchingWithUsage(), 2),
+        (OpenAIWithUsage, 1),
+        (OpenAIWithUsageEncodeResponse, 1),
+        (OpenAIBatchingWithUsage, 2),
     ],
 )
-async def test_openai_token_usage(api, batch_size, openai_request_data, openai_response_data):
-    server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
+async def test_openai_token_usage(api_cls, batch_size, openai_request_data, openai_response_data):
+    server = ls.LitServer(api_cls(spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -131,13 +131,13 @@ class OpenAIWithUsagePerToken(ls.LitAPI):
 # OpenAIWithUsagePerToken
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("api", "batch_size"),
+    ("api_cls", "batch_size"),
     [
-        (OpenAIWithUsagePerToken(), 1),
+        (OpenAIWithUsagePerToken, 1),
     ],
 )
-async def test_openai_per_token_usage(api, batch_size, openai_request_data, openai_response_data):
-    server = ls.LitServer(api, spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01)
+async def test_openai_per_token_usage(api_cls, batch_size, openai_request_data):
+    server = ls.LitServer(api_cls(spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -158,7 +158,7 @@ async def test_openai_per_token_usage(api, batch_size, openai_request_data, open
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_image(openai_request_data_with_image):
-    server = ls.LitServer(TestAPI(), spec=OpenAISpec())
+    server = ls.LitServer(TestAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -173,7 +173,7 @@ async def test_openai_spec_with_image(openai_request_data_with_image):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_audio(openai_request_data_with_audio_wav, openai_request_data_with_audio_flac):
-    server = ls.LitServer(TestAPI(), spec=OpenAISpec())
+    server = ls.LitServer(TestAPI(spec=OpenAISpec()))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -197,7 +197,7 @@ async def test_openai_spec_with_audio(openai_request_data_with_audio_wav, openai
 
 @pytest.mark.asyncio
 async def test_override_encode(openai_request_data):
-    server = ls.LitServer(TestAPIWithCustomEncode(), spec=OpenAISpec())
+    server = ls.LitServer(TestAPIWithCustomEncode(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -212,8 +212,7 @@ async def test_override_encode(openai_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_tools(openai_request_data_with_tools):
-    spec = OpenAISpec()
-    server = ls.LitServer(TestAPIWithToolCalls(), spec=spec)
+    server = ls.LitServer(TestAPIWithToolCalls(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -235,8 +234,7 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_response_format(openai_request_data_with_response_format):
-    spec = OpenAISpec()
-    server = ls.LitServer(TestAPIWithStructuredOutput(), spec=spec)
+    server = ls.LitServer(TestAPIWithStructuredOutput(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -265,7 +263,7 @@ class MetadataRequiredAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_openai_spec_metadata(openai_request_data_with_metadata):
-    server = ls.LitServer(MetadataRequiredAPI(), spec=OpenAISpec())
+    server = ls.LitServer(MetadataRequiredAPI(spec=OpenAISpec()))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -278,7 +276,7 @@ async def test_openai_spec_metadata(openai_request_data_with_metadata):
 
 @pytest.mark.asyncio
 async def test_openai_spec_metadata_required_fail(openai_request_data):
-    server = ls.LitServer(MetadataRequiredAPI(), spec=OpenAISpec())
+    server = ls.LitServer(MetadataRequiredAPI(spec=OpenAISpec()))
 
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -300,7 +298,7 @@ class TestAPIWithReasoningEffort(TestAPI):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reasoning_effort", ["low", "medium", "high", None, "random"])
 async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_data):
-    server = ls.LitServer(TestAPIWithReasoningEffort(), spec=OpenAISpec())
+    server = ls.LitServer(TestAPIWithReasoningEffort(spec=OpenAISpec()))
     openai_request_data["reasoning_effort"] = reasoning_effort
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
@@ -336,10 +334,10 @@ class IncorrectAPI2(IncorrectAPI1):
 @pytest.mark.asyncio
 async def test_openai_spec_validation(openai_request_data):
     with pytest.raises(ValueError, match="predict is not a generator"):
-        ls.LitServer(IncorrectAPI1(), spec=OpenAISpec())
+        ls.LitServer(IncorrectAPI1(spec=OpenAISpec()))
 
     with pytest.raises(ValueError, match="encode_response is not a generator"):
-        ls.LitServer(IncorrectAPI2(), spec=OpenAISpec())
+        ls.LitServer(IncorrectAPI2(spec=OpenAISpec()))
 
 
 class PrePopulatedAPI(ls.LitAPI):
@@ -356,8 +354,7 @@ class PrePopulatedAPI(ls.LitAPI):
 @pytest.mark.asyncio
 async def test_oai_prepopulated_context(openai_request_data):
     openai_request_data["max_completion_tokens"] = 3
-    spec = OpenAISpec()
-    server = ls.LitServer(PrePopulatedAPI(), spec=spec)
+    server = ls.LitServer(PrePopulatedAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -379,7 +376,7 @@ class WrongLitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_fail_http(openai_request_data):
-    server = ls.LitServer(WrongLitAPI(spec=ls.OpenAISpec()))
+    server = ls.LitServer(WrongLitAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
@@ -416,19 +413,19 @@ class IncorrectEncodeAsyncAPI(IncorrectAsyncAPI):
 @pytest.mark.asyncio
 async def test_openai_spec_asyncapi_predict_validation():
     with pytest.raises(ValueError, match="predict must be an async generator"):
-        ls.LitServer(IncorrectAsyncAPI(enable_async=True), spec=OpenAISpec())
+        ls.LitServer(IncorrectAsyncAPI(enable_async=True, spec=OpenAISpec()))
 
 
 @pytest.mark.asyncio
-def test_openai_spec_asyncapi_encode_response_validation():
+async def test_openai_spec_asyncapi_encode_response_validation():
     with pytest.raises(ValueError, match="encode_response is neither a generator nor an async generator"):
-        ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True), spec=OpenAISpec())
+        ls.LitServer(IncorrectEncodeAsyncAPI(enable_async=True, spec=OpenAISpec()))
 
 
 @pytest.mark.asyncio
 def test_openai_asyncapi_enable_async_flag_validation():
     with pytest.raises(ValueError, match="'enable_async' is not set in LitAPI."):
-        ls.LitServer(IncorrectAsyncAPI(enable_async=False), spec=OpenAISpec())
+        ls.LitServer(IncorrectAsyncAPI(enable_async=False, spec=OpenAISpec()))
 
 
 class DecodeNotImplementedAsyncOpenAILitAPI(ls.LitAPI):
@@ -461,7 +458,7 @@ class AsyncOpenAILitAPI(ls.LitAPI):
 
 @pytest.mark.asyncio
 async def test_openai_spec_with_async_litapi(openai_request_data):
-    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True), spec=OpenAISpec())
+    server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"

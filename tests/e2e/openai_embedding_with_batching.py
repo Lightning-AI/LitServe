@@ -15,6 +15,6 @@ class EmbeddingsAPI(ls.LitAPI):
 
 
 if __name__ == "__main__":
-    api = EmbeddingsAPI(max_batch_size=10, batch_timeout=2)
-    server = ls.LitServer(api, spec=ls.OpenAIEmbeddingSpec())
+    api = EmbeddingsAPI(max_batch_size=10, batch_timeout=2, spec=ls.OpenAIEmbeddingSpec())
+    server = ls.LitServer(api)
     server.run(port=8000)
