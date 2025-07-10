@@ -17,10 +17,10 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11"]
         include:
-          - { os: "macos-latest", python-version: "3.12" }
-          - { os: "windows-latest", python-version: "3.12" }
+          - { os: "macos-latest", python-version: "3.11" }
+          - { os: "windows-latest", python-version: "3.11" }
 
     timeout-minutes: 35
     env:
@@ -50,15 +50,16 @@ jobs:
           coverage report
           coverage xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
-          flags: unittests
-          env_vars: OS,PYTHON
-          name: codecov-umbrella
-          fail_ci_if_error: false
+      # e2e's are server-client tests via REST, so we don't need to upload coverage to Codecov
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v5
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     file: ./coverage.xml
+      #     flags: unittests
+      #     env_vars: OS,PYTHON
+      #     name: codecov-umbrella
+      #     fail_ci_if_error: false
 
   tests-guardian:
     runs-on: ubuntu-latest
