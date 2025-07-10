@@ -11,20 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-__version__ = "0.2.14a0"
-__author__ = "Lightning-AI et al."
-__author_email__ = "community@lightning.ai"
-__license__ = "Apache-2.0"
-__copyright__ = f"Copyright (c) 2024, {__author__}."
-__homepage__ = "https://github.com/Lightning-AI/litserve"
-__docs__ = "Lightweight AI server."
-
-__all__ = [
-    "__author__",
-    "__author_email__",
-    "__copyright__",
-    "__docs__",
-    "__homepage__",
-    "__license__",
-    "__version__",
-]
+_DEFAULT_LIT_API_PATH = "/predict"

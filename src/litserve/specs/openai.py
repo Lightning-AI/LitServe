@@ -26,6 +26,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec, _AsyncSpecWrapper
 from litserve.utils import LitAPIStatus, azip
 
@@ -352,10 +353,7 @@ class OpenAISpec(LitSpec):
         self,
     ):
         super().__init__()
-        # register the endpoint
         self.api_path = "/v1/chat/completions"  # default api path
-        self.add_endpoint("/v1/chat/completions", self.chat_completion, ["POST"])
-        self.add_endpoint("/v1/chat/completions", self.options_chat_completions, ["OPTIONS"])
 
     @property
     def stream(self):
@@ -364,6 +362,15 @@ class OpenAISpec(LitSpec):
     def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
+        # Override the spec's api_path only if provided
+        if lit_api._api_path and lit_api._api_path != _DEFAULT_LIT_API_PATH:
+            self.api_path = lit_api._api_path
+
+        # register the endpoint
+        self.add_endpoint(self.api_path, self.chat_completion, ["POST"])
+        self.add_endpoint(self.api_path, self.options_chat_completions, ["OPTIONS"])
+
+        # validate LitAPI methods
         is_encode_response_original = lit_api.encode_response.__code__ is LitAPI.encode_response.__code__
 
         if lit_api.enable_async:

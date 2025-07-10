@@ -52,15 +52,16 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
 
 
 @pytest.mark.asyncio
-async def test_openai_embedding_spec_with_multi_endpoint(openai_embedding_request_data):
+@pytest.mark.parametrize("api_path", ["/v1/embeddings", "/v2/embeddings"])
+async def test_openai_embedding_spec_with_custom_api_path(openai_embedding_request_data, api_path):
     server = ls.LitServer([
-        TestEmbedAPI(spec=OpenAIEmbeddingSpec()),
+        TestEmbedAPI(spec=OpenAIEmbeddingSpec(), api_path=api_path),
     ])
     with wrap_litserve_start(server) as server:
         async with LifespanManager(server.app) as manager, AsyncClient(
             transport=ASGITransport(app=manager.app), base_url="http://test"
         ) as ac:
-            resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
+            resp = await ac.post(api_path, json=openai_embedding_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["object"] == "list", "Object should be list"
             assert resp.json()["data"][0]["index"] == 0, "Index should be 0"

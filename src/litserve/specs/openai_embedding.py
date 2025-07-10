@@ -23,6 +23,7 @@ from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
 from pydantic import BaseModel
 
+from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus
 
@@ -124,14 +125,20 @@ if __name__ == "__main__":
 class OpenAIEmbeddingSpec(LitSpec):
     def __init__(self):
         super().__init__()
-        # register the endpoint
         self.api_path = "/v1/embeddings"  # default api path
-        self.add_endpoint("/v1/embeddings", self.embeddings_endpoint, ["POST"])
-        self.add_endpoint("/v1/embeddings", self.options_embeddings, ["GET"])
 
     def pre_setup(self, lit_api: "LitAPI"):
         from litserve import LitAPI
 
+        # Override the spec's api_path only if provided
+        if lit_api._api_path and lit_api._api_path != _DEFAULT_LIT_API_PATH:
+            self.api_path = lit_api._api_path
+
+        # register the endpoint
+        self.add_endpoint(self.api_path, self.embeddings_endpoint, ["POST"])
+        self.add_endpoint(self.api_path, self.options_embeddings, ["GET"])
+
+        # validate LitAPI methods
         if inspect.isgeneratorfunction(lit_api.predict):
             raise ValueError(
                 "You are using yield in your predict method, which is used for streaming.",
