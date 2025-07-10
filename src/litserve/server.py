@@ -476,6 +476,12 @@ class LitServer:
             - Shows model metadata, device info, server config
             - Useful for debugging and monitoring
 
+        disable_openapi_url:
+            If True, disables the OpenAPI schema endpoint ("/openapi.json").
+
+            - Useful for production environments where exposing API schemas is not desired.
+            - Defaults to False (the OpenAPI schema is enabled).
+
         shutdown_path:
             Graceful shutdown endpoint. Defaults to "/shutdown".
 
@@ -639,6 +645,7 @@ class LitServer:
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
         loggers: Optional[Union[Logger, List[Logger]]] = None,
         fast_queue: bool = False,
+        disable_openapi_url: bool = False,
         # All the following arguments are deprecated and will be removed in v0.3.0
         max_batch_size: Optional[int] = None,
         batch_timeout: float = 0.0,
@@ -742,7 +749,7 @@ class LitServer:
         self.track_requests = track_requests
         self.timeout = timeout
         self.litapi_connector.set_request_timeout(timeout)
-        self.app = FastAPI(lifespan=self.lifespan)
+        self.app = FastAPI(lifespan=self.lifespan, openapi_url="" if disable_openapi_url else "/openapi.json")
         self.app.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
