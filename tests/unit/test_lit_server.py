@@ -537,13 +537,13 @@ class FailFastAPI(ls.test_examples.SimpleLitAPI):
 
 
 @pytest.mark.parametrize("use_zmq", [True, False])
-def test_workers_setup_status(use_zmq):
+def test_workers_setup_status(use_zmq, port):
     server = LitServer(
         FailFastAPI(),
         fast_queue=use_zmq,
     )
     with pytest.raises(RuntimeError, match="One or more workers failed to start. Shutting down LitServe"):
-        server.run(port=8001, log_level="error")
+        server.run(port=port, log_level="error")
 
 
 def test_max_batch_size_warning(simple_litapi):

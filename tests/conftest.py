@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import base64
+import random
 import time
 from typing import Generator
 
@@ -392,3 +393,8 @@ def mock_manager():
             pass
 
     return MockManager()
+
+
+@pytest.fixture
+def port():
+    return random.randint(10000, 65535)
