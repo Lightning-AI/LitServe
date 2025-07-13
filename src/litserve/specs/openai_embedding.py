@@ -17,6 +17,7 @@ import logging
 import sys
 import time
 import uuid
+import warnings
 from typing import TYPE_CHECKING, Any, List, Literal, Optional, Union
 
 from fastapi import HTTPException, Request, Response, status
@@ -131,13 +132,13 @@ class OpenAIEmbeddingSpec(LitSpec):
         from litserve import LitAPI
 
         # Override the spec's api_path only if provided
-        if lit_api._api_path and lit_api._api_path != _DEFAULT_LIT_API_PATH:
+        if lit_api._api_path and lit_api._api_path not in (_DEFAULT_LIT_API_PATH, self.api_path):
             self.api_path = lit_api._api_path
-            logger.warning(
-                f"You are using a custom API path: {self.api_path} with OpenAI Embedding Spec\n"
-                f"Note: The OpenAI SDK only works with the default path '/v1/embeddings'.\n"
+            warnings.warn(
+                f"You are using a custom API path: '{self.api_path}' with OpenAI Embedding Spec. "
+                f"The OpenAI SDK only works with the default path '/v1/embeddings'. "
                 f"To use this custom path, please send HTTP requests directly to "
-                f"'http://your-server:port{self.api_path}' or use a client library that supports custom endpoints.\n"
+                f"'http://your-server:port{self.api_path}' or use a client library that supports custom endpoints. "
                 f"If you want to use the OpenAI SDK, keep the default path '/v1/embeddings'."
             )
 
