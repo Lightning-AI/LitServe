@@ -486,6 +486,5 @@ async def test_openai_spec_with_custom_api_path(api_path, openai_request_data):
 
 @pytest.mark.asyncio
 async def test_openai_spec_custom_api_path_warning():
-    """Test that a warning is logged when using a custom API path with OpenAISpec."""
     with pytest.warns(UserWarning, match="You are using a custom API path: "):
         ls.LitServer(TestAPI(spec=OpenAISpec(), api_path="/v2/chat/completions"))

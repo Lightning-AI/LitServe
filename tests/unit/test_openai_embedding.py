@@ -70,6 +70,12 @@ async def test_openai_embedding_spec_with_custom_api_path(openai_embedding_reque
 
 
 @pytest.mark.asyncio
+async def test_openai_embedding_spec_custom_api_path_warning():
+    with pytest.warns(UserWarning, match="You are using a custom API path: "):
+        ls.LitServer(TestEmbedAPI(spec=OpenAIEmbeddingSpec(), api_path="/v2/embeddings"))
+
+
+@pytest.mark.asyncio
 async def test_openai_embedding_spec_with_multiple_inputs(openai_embedding_request_data_array):
     spec = OpenAIEmbeddingSpec()
     server = ls.LitServer(TestEmbedAPI(spec=spec))
