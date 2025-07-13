@@ -366,10 +366,10 @@ class OpenAISpec(LitSpec):
         if lit_api._api_path and lit_api._api_path != _DEFAULT_LIT_API_PATH:
             self.api_path = lit_api._api_path
             logger.warning(
-                f"You are using a custom API path: {self.api_path} with OpenAI Spec\n"
-                f"Note: The OpenAI SDK only works with the default path '/v1/chat/completions'.\n"
+                f"You are using a custom API path: '{self.api_path}' with OpenAI Spec. "
+                f"The OpenAI SDK only works with the default path '/v1/chat/completions'. "
                 f"To use this custom path, please send HTTP requests directly to "
-                f"'http://your-server:port{self.api_path}' or use a client library that supports custom endpoints.\n"
+                f"'http://your-server:port{self.api_path}' or use a client library that supports custom endpoints. "
                 f"If you want to use the OpenAI SDK, keep the default path '/v1/chat/completions'."
             )
 
