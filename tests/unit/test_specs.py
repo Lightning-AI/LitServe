@@ -482,3 +482,9 @@ async def test_openai_spec_with_custom_api_path(api_path, openai_request_data):
             resp = await ac.post(api_path, json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output"
+
+
+@pytest.mark.asyncio
+async def test_openai_spec_custom_api_path_warning():
+    with pytest.warns(UserWarning, match="Custom API path detected"):
+        ls.LitServer(TestAPI(spec=OpenAISpec(), api_path="/v2/chat/completions"))

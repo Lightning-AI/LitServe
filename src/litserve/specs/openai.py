@@ -18,6 +18,7 @@ import logging
 import time
 import typing
 import uuid
+import warnings
 from collections import deque
 from enum import Enum
 from typing import Annotated, AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
@@ -363,8 +364,14 @@ class OpenAISpec(LitSpec):
         from litserve import LitAPI
 
         # Override the spec's api_path only if provided
-        if lit_api._api_path and lit_api._api_path != _DEFAULT_LIT_API_PATH:
+        if lit_api._api_path and lit_api._api_path not in (_DEFAULT_LIT_API_PATH, self.api_path):
             self.api_path = lit_api._api_path
+            warnings.warn(
+                f"Custom API path detected: '{self.api_path}'. "
+                "The OpenAI SDK only supports the default path '/v1/chat/completions'. "
+                f"To use '{self.api_path}', send HTTP requests directly or use a client that supports custom endpoints."
+                " For SDK compatibility, use the default path."
+            )
 
         # register the endpoint
         self.add_endpoint(self.api_path, self.chat_completion, ["POST"])
