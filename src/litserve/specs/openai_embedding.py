@@ -137,7 +137,7 @@ class OpenAIEmbeddingSpec(LitSpec):
             warnings.warn(
                 f"Custom API path detected: '{self.api_path}'. "
                 "The OpenAI SDK only supports the default path '/v1/embeddings'. "
-                f"To use '{self.api_path}', send HTTP requests directly or use a client that supports custom endpoints. "
+                f"To use '{self.api_path}', send HTTP requests directly or use a client that supports custom endpoints."
                 "For SDK compatibility, use the default path."
             )
 
