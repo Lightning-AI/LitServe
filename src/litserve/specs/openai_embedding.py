@@ -141,7 +141,6 @@ class OpenAIEmbeddingSpec(LitSpec):
                 "For SDK compatibility, use the default path."
             )
 
-
         # register the endpoint
         self.add_endpoint(self.api_path, self.embeddings_endpoint, ["POST"])
         self.add_endpoint(self.api_path, self.options_embeddings, ["GET"])
