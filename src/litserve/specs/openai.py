@@ -370,7 +370,7 @@ class OpenAISpec(LitSpec):
                 f"Custom API path detected: '{self.api_path}'. "
                 "The OpenAI SDK only supports the default path '/v1/chat/completions'. "
                 f"To use '{self.api_path}', send HTTP requests directly or use a client that supports custom endpoints."
-                "For SDK compatibility, use the default path."
+                " For SDK compatibility, use the default path."
             )
 
         # register the endpoint
