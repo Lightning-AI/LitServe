@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import time
 
 import numpy as np
 import pytest
@@ -281,3 +282,37 @@ def test_enable_async_not_set():
         ValueError, match=r"predict must be an async generator or async function when enable_async=True"
     ):
         ls.test_examples.SimpleLitAPI(enable_async=True)
+
+
+class HeavyInitAPI(ls.LitAPI):
+    def __init__(self):
+        super().__init__()
+        time.sleep(2)
+
+
+class HeavyInitAPIWithSetup(HeavyInitAPI):
+    def setup(self, device):
+        pass
+
+
+class HeavySetupAPI(ls.LitAPI):
+    def setup(self, device):
+        time.sleep(2)
+
+
+def test_heavy_init_api_no_setup():
+    with pytest.warns(RuntimeWarning):
+        HeavyInitAPI()
+
+
+def test_heavy_init_api_with_setup(recwarn):
+    HeavyInitAPIWithSetup()
+
+    assert len(recwarn) == 0
+
+
+def test_heavy_setup_api(recwarn):
+    api = HeavySetupAPI()
+    api.setup("")
+
+    assert len(recwarn) == 0

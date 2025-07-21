@@ -15,20 +15,21 @@ import asyncio
 import inspect
 import json
 import warnings
-from abc import ABC, abstractmethod
+from abc import ABC
 from queue import Queue
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from pydantic import BaseModel
 
 from litserve.specs.base import LitSpec
+from litserve.timed_init_meta import TimedInitMeta
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
     from litserve.mcp import MCP
 
 
-class LitAPI(ABC):
+class LitAPI(ABC, metaclass=TimedInitMeta):
     """Define inference logic for the model.
 
     LitAPI is the core abstraction for serving AI models with LitServe. It provides a clean
@@ -240,7 +241,6 @@ class LitAPI(ABC):
             error_msg = "Async validation failed:\n" + "\n".join(f"- {err}" for err in errors)
             raise ValueError(error_msg)
 
-    @abstractmethod
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
         pass
