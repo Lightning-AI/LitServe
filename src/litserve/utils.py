@@ -19,7 +19,10 @@ import os
 import pdb
 import pickle
 import sys
+import time
 import uuid
+import warnings
+from abc import ABCMeta
 from contextlib import contextmanager
 from enum import Enum
 from typing import TYPE_CHECKING, Any, AsyncIterator, TextIO, Union
@@ -34,6 +37,10 @@ logger = logging.getLogger(__name__)
 _DEFAULT_LOG_FORMAT = (
     "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 )
+# Threshold for detecting heavy initialization tasks.
+# A value of 1 second was chosen based on empirical observations
+# of typical initialization times in this project.
+_INIT_THRESHOLD = 1
 
 
 class LitAPIStatus:
@@ -232,3 +239,43 @@ def set_trace_if_debug(debug_env_var="LITSERVE_DEBUG", debug_env_var_value="1"):
 def is_package_installed(package_name: str) -> bool:
     spec = importlib.util.find_spec(package_name)
     return spec is not None
+
+
+class _TimedInitMeta(ABCMeta):
+    def __new__(mcls, name, bases, namespace, **kwargs):
+        cls = super().__new__(mcls, name, bases, namespace, **kwargs)
+        cls._has_custom_setup = False
+
+        for base in bases:
+            if hasattr(base, "setup"):
+                base_setup = base.setup
+
+                if "setup" in namespace and namespace["setup"] is not base_setup:
+                    cls._has_custom_setup = True
+                    break
+        else:
+            if "setup" in namespace:
+                cls._has_custom_setup = True
+
+        return cls
+
+    def __call__(cls, *args, **kwargs):
+        start_time = time.perf_counter()
+        instance = super().__call__(*args, **kwargs)
+        elapsed = time.perf_counter() - start_time
+
+        if elapsed >= _INIT_THRESHOLD and not cls._has_custom_setup:
+            warnings.warn(
+                (
+                    f"{cls.__name__}.__init__ took {elapsed:.2f} seconds to execute. This suggests that you're "
+                    "loading a model or doing other heavy processing inside the constructor.\n\n"
+                    "To improve startup performance and avoid unnecessary work across processes, move any one-time "
+                    f"heavy initialization into the `{cls.__name__}.setup` method.\n\n"
+                    "The `LitAPI.setup` method is designed for deferred, process-specific loading — ideal for models "
+                    "and large resources."
+                ),
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+        return instance
