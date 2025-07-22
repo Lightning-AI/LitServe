@@ -301,7 +301,9 @@ class HeavySetupAPI(ls.LitAPI):
 
 
 def test_heavy_init_api_no_setup():
-    with pytest.warns(RuntimeWarning):
+    with pytest.warns(
+        RuntimeWarning, match="LitAPI.setup method helps in loading the model only on the required processes"
+    ):
         HeavyInitAPI()
 
 
