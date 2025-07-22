@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 _DEFAULT_LOG_FORMAT = (
     "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 )
-# Threshold for detecting heavy initialization tasks. 
-# A value of 1 second was chosen based on empirical observations 
+# Threshold for detecting heavy initialization tasks.
+# A value of 1 second was chosen based on empirical observations
 # of typical initialization times in this project.
 _INIT_THRESHOLD = 1
 
