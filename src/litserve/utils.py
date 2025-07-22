@@ -266,12 +266,14 @@ class _TimedInitMeta(ABCMeta):
 
         if elapsed >= _INIT_THRESHOLD and not cls._has_custom_setup:
             warnings.warn(
-                f"""
-                LitAPI.setup method helps in loading the model only on the required processes.
-                {cls.__name__}.__init__ took {elapsed:.2f} seconds to execute, so it looks like
-                you are performing model loading or some heavy processing in __init__. Please move heavy one-time
-                loading code into {cls.__name__}.setup method.
-                """,
+                (
+                    f"{cls.__name__}.__init__ took {elapsed:.2f} seconds to execute. This suggests that you're "
+                    "loading a model or doing other heavy processing inside the constructor.\n\n"
+                    "To improve startup performance and avoid unnecessary work across processes, move any one-time "
+                    f"heavy initialization into the `{cls.__name__}.setup` method.\n\n"
+                    "The `LitAPI.setup` method is designed for deferred, process-specific loading — ideal for models "
+                    "and large resources."
+                ),
                 RuntimeWarning,
                 stacklevel=2,
             )
