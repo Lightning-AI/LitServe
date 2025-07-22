@@ -22,14 +22,14 @@ from typing import TYPE_CHECKING, Callable, Optional, Union
 from pydantic import BaseModel
 
 from litserve.specs.base import LitSpec
-from litserve.timed_init_meta import TimedInitMeta
+from litserve.utils import _TimedInitMeta
 
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
     from litserve.mcp import MCP
 
 
-class LitAPI(ABC, metaclass=TimedInitMeta):
+class LitAPI(ABC, metaclass=_TimedInitMeta):
     """Define inference logic for the model.
 
     LitAPI is the core abstraction for serving AI models with LitServe. It provides a clean
