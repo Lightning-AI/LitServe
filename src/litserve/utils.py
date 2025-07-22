@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 _DEFAULT_LOG_FORMAT = (
     "%(asctime)s - %(processName)s[%(process)d] - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
 )
+# Threshold for detecting heavy initialization tasks. 
+# A value of 1 second was chosen based on empirical observations 
+# of typical initialization times in this project.
 _INIT_THRESHOLD = 1
 
 
@@ -265,8 +268,8 @@ class _TimedInitMeta(ABCMeta):
             warnings.warn(
                 f"""
                 LitAPI.setup method helps in loading the model only on the required processes.
-                {cls.__name__}.__init__ took {elapsed:.2f} seconds to execute, so it looks like that
-                you perform model loading or some heavy processing in __init__. Please move heavy one-time
+                {cls.__name__}.__init__ took {elapsed:.2f} seconds to execute, so it looks like
+                you are performing model loading or some heavy processing in __init__. Please move heavy one-time
                 loading code into {cls.__name__}.setup method.
                 """,
                 RuntimeWarning,
