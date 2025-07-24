@@ -67,33 +67,6 @@ ignore = [
     ".github/*"
 ]
 
-[tool.pytest.ini_options]
-norecursedirs = [
-    ".git",
-    ".github",
-    "dist",
-    "build",
-    "docs",
-]
-addopts = [
-    "--strict-markers",
-    "--doctest-modules",
-    "--color=yes",
-    "--disable-pytest-warnings",
-]
-filterwarnings = [
-    "error::FutureWarning",
-]
-xfail_strict = true
-junit_duration_report = "call"
-python_files = "test_*.py"
-testpaths = ["tests"]
-markers = [
-    "unit: unit tests",
-    "integration: integration tests",
-    "e2e: end-to-end tests",
-]
-
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
