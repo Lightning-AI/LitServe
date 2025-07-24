@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main, "release/*"]
   schedule:
-    - cron: "0 0 * * *"  # every day at midnight UTC
+    - cron: "0 0 * * *" # every day at midnight UTC
 
 defaults:
   run:
