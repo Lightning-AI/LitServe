@@ -37,6 +37,9 @@ MultiPartParser.max_file_size = sys.maxsize
 # renamed in PR: https://github.com/encode/starlette/pull/2780
 MultiPartParser.spool_max_size = sys.maxsize
 
+_DEFAULT_STOP_LOOP_MESSAGE = "Received sentinel value, stopping loop"
+_SENTINEL_VALUE = (None, None, None, None)
+
 
 def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
@@ -88,7 +91,7 @@ async def _async_inject_context(context: Union[List[dict], dict], func, *args, *
 
 
 class _StopLoopError(Exception):
-    def __init__(self, message: str = "Received sentinel value, stopping loop"):
+    def __init__(self, message: str = _DEFAULT_STOP_LOOP_MESSAGE):
         self.message = message
         super().__init__(self.message)
 
@@ -107,7 +110,7 @@ def collate_requests(
         while len(payloads) < lit_api.max_batch_size:
             try:
                 request_data = request_queue.get_nowait()
-                if request_data == (None, None, None, None):
+                if request_data == _SENTINEL_VALUE:
                     raise _StopLoopError()
                 response_queue_id, uid, timestamp, x_enc = request_data
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
@@ -125,7 +128,7 @@ def collate_requests(
 
         try:
             request_data = request_queue.get(timeout=min(remaining_time, 0.001))
-            if request_data == (None, None, None, None):
+            if request_data == _SENTINEL_VALUE:
                 raise _StopLoopError()
             response_queue_id, uid, timestamp, x_enc = request_data
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:

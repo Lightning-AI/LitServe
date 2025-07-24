@@ -21,7 +21,7 @@ from fastapi import HTTPException
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.loops.base import DefaultLoop, _async_inject_context, _inject_context, _StopLoopError
+from litserve.loops.base import _SENTINEL_VALUE, DefaultLoop, _async_inject_context, _inject_context, _StopLoopError
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.utils import LitAPIStatus, LoopResponseType, PickleableHTTPException
@@ -42,7 +42,7 @@ class SingleLoop(DefaultLoop):
         while True:
             try:
                 request_data = request_queue.get(timeout=1.0)
-                if request_data == (None, None, None, None):
+                if request_data == _SENTINEL_VALUE:
                     logger.debug("Received sentinel value, stopping loop")
                     return
                 response_queue_id, uid, timestamp, x_enc = request_data
@@ -216,7 +216,7 @@ class SingleLoop(DefaultLoop):
             while True:
                 try:
                     request_data = await event_loop.run_in_executor(None, request_queue.get, 1.0)
-                    if request_data == (None, None, None, None):
+                    if request_data == _SENTINEL_VALUE:
                         logger.debug("Received sentinel value, stopping loop")
                         return
                     response_queue_id, uid, timestamp, x_enc = request_data
