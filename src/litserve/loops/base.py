@@ -88,7 +88,9 @@ async def _async_inject_context(context: Union[List[dict], dict], func, *args, *
 
 
 class _StopLoopError(Exception):
-    pass
+    def __init__(self, message: str = "Received sentinel value, stopping loop"):
+        self.message = message
+        super().__init__(self.message)
 
 
 def collate_requests(

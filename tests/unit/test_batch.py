@@ -26,7 +26,7 @@ from httpx import ASGITransport, AsyncClient
 import litserve as ls
 from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
-from litserve.loops.base import collate_requests
+from litserve.loops.base import _StopLoopError, collate_requests
 from litserve.loops.simple_loops import BatchedLoop
 from litserve.utils import wrap_litserve_start
 
@@ -233,6 +233,15 @@ def test_collate_requests(batch_timeout, batch_size):
     payloads, timed_out_uids = collate_requests(api, request_queue)
     assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
+
+
+def test_collate_requests_sentinel():
+    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0)
+    api.request_timeout = 5
+    request_queue = Queue()
+    request_queue.put((None, None, None, None))
+    with pytest.raises(_StopLoopError, match="Received sentinel value, stopping loop"):
+        collate_requests(api, request_queue)
 
 
 class BatchSizeMismatchAPI(SimpleBatchLitAPI):
