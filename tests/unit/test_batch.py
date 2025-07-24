@@ -14,7 +14,7 @@
 import asyncio
 import time
 from queue import Queue
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -28,7 +28,8 @@ from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
 from litserve.loops.base import _StopLoopError, collate_requests
 from litserve.loops.simple_loops import BatchedLoop
-from litserve.utils import wrap_litserve_start
+from litserve.transport.base import MessageTransport
+from litserve.utils import LoopResponseType, wrap_litserve_start
 
 NOOP_CB_RUNNER = CallbackRunner()
 
@@ -184,11 +185,23 @@ class FakeResponseQueue:
         raise StopIteration("exit loop")
 
 
+class FakeTransport(MessageTransport):
+    def __init__(self):
+        self.responses = []
+
+    async def areceive(self, **kwargs) -> dict:
+        raise NotImplementedError("This is a fake transport")
+
+    def send(self, response, consumer_id: int):
+        self.responses.append(response)
+
+
 def test_batched_loop():
     requests_queue = Queue()
     response_queue_id = 0
     requests_queue.put((response_queue_id, "uuid-1234", time.monotonic(), {"input": 4.0}))
     requests_queue.put((response_queue_id, "uuid-1235", time.monotonic(), {"input": 5.0}))
+    requests_queue.put((None, None, None, None))
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 2
@@ -201,13 +214,17 @@ def test_batched_loop():
     lit_api_mock.encode_response = MagicMock(side_effect=lambda x: {"output": x})
 
     loop = BatchedLoop()
-    with patch("pickle.dumps", side_effect=StopIteration("exit loop")), pytest.raises(StopIteration, match="exit loop"):
-        loop.run_batched_loop(
-            lit_api_mock,
-            requests_queue,
-            [FakeResponseQueue()],
-            callback_runner=NOOP_CB_RUNNER,
-        )
+    transport = FakeTransport()
+    loop.run_batched_loop(
+        lit_api_mock,
+        requests_queue,
+        transport=transport,
+        callback_runner=NOOP_CB_RUNNER,
+    )
+
+    assert len(transport.responses) == 2, "response queue should have 2 responses"
+    assert transport.responses[0] == ("uuid-1234", ({"output": 16.0}, "OK", LoopResponseType.REGULAR))
+    assert transport.responses[1] == ("uuid-1235", ({"output": 25.0}, "OK", LoopResponseType.REGULAR))
 
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.batch.assert_called_once_with([4.0, 5.0])
