@@ -33,7 +33,13 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.loops import BatchedStreamingLoop, LitLoop, Output, StreamingLoop, inference_worker
-from litserve.loops.base import DefaultLoop, _async_inject_context, _handle_async_function, _sync_fn_to_async_fn
+from litserve.loops.base import (
+    _SENTINEL_VALUE,
+    DefaultLoop,
+    _async_inject_context,
+    _handle_async_function,
+    _sync_fn_to_async_fn,
+)
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
     notify_timed_out_requests,
@@ -82,7 +88,7 @@ class TestQueue(Queue):
             raise Empty  # Simulate queue being empty after sentinel
         item = super().get(timeout=timeout)
         # Sentinel: (None, None, None, None)
-        if item == (None, None, None, None):
+        if item == _SENTINEL_VALUE:
             self._sentinel_seen = True
             raise KeyboardInterrupt  # Triggers loop exit in your code
         return item
@@ -107,7 +113,7 @@ def async_loop_args():
     requests_queue = TestQueue()
     requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 1}))
     requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}))
-    requests_queue.put((None, None, None, None))
+    requests_queue.put(_SENTINEL_VALUE)
 
     lit_api = AsyncTestLitAPI()
     return lit_api, requests_queue
@@ -263,7 +269,7 @@ async def test_streaming_loop_process_streaming_request(mock_transport):
 def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
     requests_queue = TestQueue()
     requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
-    requests_queue.put((None, None, None, None))  # Sentinel to stop the loop
+    requests_queue.put(_SENTINEL_VALUE)  # Sentinel to stop the loop
 
     lit_api = AsyncTestStreamLitAPI()
     loop = StreamingLoop()
@@ -412,7 +418,7 @@ async def test_run_single_loop(mock_transport):
     time.sleep(1)
 
     # Stop the loop by putting a sentinel value in the queue
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
     response = await transport.areceive(consumer_id=0)
@@ -445,7 +451,7 @@ async def test_run_single_loop_timeout():
     assert response.status_code == 504
     assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
 
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
 
@@ -481,7 +487,7 @@ async def test_run_batched_loop():
         actual = await transport.areceive(0, timeout=10)
         assert actual == expected, f"Expected {expected}, got {actual}"
 
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
 
@@ -524,7 +530,7 @@ async def test_run_batched_loop_timeout(mock_transport):
     _, (response2, _, _) = await transport.areceive(consumer_id=0, timeout=10)
     assert response2 == {"output": 25.0}
 
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
 
@@ -548,7 +554,7 @@ async def test_run_streaming_loop(mock_transport):
     time.sleep(1)
 
     # Stop the loop by putting a sentinel value in the queue
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
     for i in range(3):
@@ -579,7 +585,7 @@ async def test_run_streaming_loop_timeout(mock_transport):
     time.sleep(1)
 
     # Stop the loop by putting a sentinel value in the queue
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
     assert "Request UUID-001 was waiting in the queue for too long" in stream.getvalue()
@@ -617,7 +623,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     time.sleep(1)
 
     # Stop the loop by putting a sentinel value in the queue
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     loop_thread.join()
 
     response = response_queues[0].get(timeout=5)[1]
