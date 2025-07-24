@@ -2,7 +2,6 @@ import concurrent.futures
 import random
 import time
 
-import gpustat
 import psutil
 import requests
 from requests.adapters import HTTPAdapter
@@ -53,6 +52,8 @@ def send_request():
 
 def benchmark(num_requests=1000, concurrency_level=50, print_metrics=True):
     """Benchmark the ML server."""
+    import gpustat
+
     global executor, session
 
     # Update session if concurrency level changes
