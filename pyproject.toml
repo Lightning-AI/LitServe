@@ -67,26 +67,6 @@ ignore = [
     ".github/*"
 ]
 
-[tool.pytest.ini_options]
-norecursedirs = [
-    ".git",
-    ".github",
-    "dist",
-    "build",
-    "docs",
-]
-addopts = [
-    "--strict-markers",
-    "--doctest-modules",
-    "--color=yes",
-    "--disable-pytest-warnings",
-]
-filterwarnings = [
-    "error::FutureWarning",
-]
-xfail_strict = true
-junit_duration_report = "call"
-
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
