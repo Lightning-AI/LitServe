@@ -86,6 +86,13 @@ filterwarnings = [
 ]
 xfail_strict = true
 junit_duration_report = "call"
+python_files = "test_*.py"
+testpaths = ["tests"]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+    "e2e: end-to-end tests",
+]
 
 [tool.coverage.report]
 exclude_lines = [
