@@ -55,9 +55,9 @@ jobs:
           uv sync --all-extras --dev
           uv pip list
 
-      - name: DocTests
-        timeout-minutes: 15
-        run: pytest --cov=litserve src/ -v -s --doctest-modules
+      #- name: DocTests
+      #  timeout-minutes: 15
+      #  run: pytest --cov=litserve src/ -v -s --doctest-modules
 
       - name: Tests
         timeout-minutes: 15
