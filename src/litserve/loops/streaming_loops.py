@@ -41,7 +41,11 @@ class StreamingLoop(DefaultLoop):
         lit_spec = lit_api.spec
         while True:
             try:
-                response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
+                request_data = request_queue.get(timeout=1.0)
+                if request_data == (None, None, None, None):
+                    logger.debug("Received sentinel value, stopping loop")
+                    return
+                response_queue_id, uid, timestamp, x_enc = request_data
                 logger.debug("uid=%s", uid)
             except (Empty, ValueError):
                 continue

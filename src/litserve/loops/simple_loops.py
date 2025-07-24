@@ -21,7 +21,7 @@ from fastapi import HTTPException
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.loops.base import DefaultLoop, _async_inject_context, _inject_context, collate_requests
+from litserve.loops.base import DefaultLoop, _async_inject_context, _inject_context, _StopLoopError
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
 from litserve.utils import LitAPIStatus, LoopResponseType, PickleableHTTPException
@@ -41,7 +41,11 @@ class SingleLoop(DefaultLoop):
         lit_spec = lit_spec or lit_api.spec
         while True:
             try:
-                response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=1.0)
+                request_data = request_queue.get(timeout=1.0)
+                if request_data == (None, None, None, None):
+                    logger.debug("Received sentinel value, stopping loop")
+                    return
+                response_queue_id, uid, timestamp, x_enc = request_data
             except (Empty, ValueError):
                 continue
             except KeyboardInterrupt:  # pragma: no cover
@@ -211,9 +215,11 @@ class SingleLoop(DefaultLoop):
             pending_tasks = set()
             while True:
                 try:
-                    response_queue_id, uid, timestamp, x_enc = await event_loop.run_in_executor(
-                        None, request_queue.get, 1.0
-                    )
+                    request_data = await event_loop.run_in_executor(None, request_queue.get, 1.0)
+                    if request_data == (None, None, None, None):
+                        logger.debug("Received sentinel value, stopping loop")
+                        return
+                    response_queue_id, uid, timestamp, x_enc = request_data
                 except (Empty, ValueError):
                     continue
                 except KeyboardInterrupt:
@@ -291,10 +297,14 @@ class BatchedLoop(DefaultLoop):
     ):
         lit_spec = lit_api.spec
         while True:
-            batches, timed_out_uids = collate_requests(
-                lit_api,
-                request_queue,
-            )
+            try:
+                batches, timed_out_uids = self.get_batch_requests(
+                    lit_api,
+                    request_queue,
+                )
+            except _StopLoopError:
+                logger.debug("Received sentinel value, stopping loop")
+                return
 
             for response_queue_id, uid in timed_out_uids:
                 logger.error(
