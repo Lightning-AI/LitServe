@@ -26,7 +26,7 @@ from httpx import ASGITransport, AsyncClient
 import litserve as ls
 from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
-from litserve.loops.base import _StopLoopError, collate_requests
+from litserve.loops.base import _SENTINEL_VALUE, _StopLoopError, collate_requests
 from litserve.loops.simple_loops import BatchedLoop
 from litserve.transport.base import MessageTransport
 from litserve.utils import LoopResponseType, wrap_litserve_start
@@ -201,7 +201,7 @@ def test_batched_loop():
     response_queue_id = 0
     requests_queue.put((response_queue_id, "uuid-1234", time.monotonic(), {"input": 4.0}))
     requests_queue.put((response_queue_id, "uuid-1235", time.monotonic(), {"input": 5.0}))
-    requests_queue.put((None, None, None, None))
+    requests_queue.put(_SENTINEL_VALUE)
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 2
@@ -256,7 +256,7 @@ def test_collate_requests_sentinel():
     api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0)
     api.request_timeout = 5
     request_queue = Queue()
-    request_queue.put((None, None, None, None))
+    request_queue.put(_SENTINEL_VALUE)
     with pytest.raises(_StopLoopError, match="Received sentinel value, stopping loop"):
         collate_requests(api, request_queue)
 
