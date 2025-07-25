@@ -37,6 +37,9 @@ MultiPartParser.max_file_size = sys.maxsize
 # renamed in PR: https://github.com/encode/starlette/pull/2780
 MultiPartParser.spool_max_size = sys.maxsize
 
+_DEFAULT_STOP_LOOP_MESSAGE = "Received sentinel value, stopping loop"
+_SENTINEL_VALUE = (None, None, None, None)
+
 
 def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
@@ -87,6 +90,12 @@ async def _async_inject_context(context: Union[List[dict], dict], func, *args, *
     return await _handle_async_function(func, *args, **kwargs)
 
 
+class _StopLoopError(Exception):
+    def __init__(self, message: str = _DEFAULT_STOP_LOOP_MESSAGE):
+        self.message = message
+        super().__init__(self.message)
+
+
 def collate_requests(
     lit_api: LitAPI,
     request_queue: Queue,
@@ -100,7 +109,10 @@ def collate_requests(
     if lit_api.batch_timeout == 0:
         while len(payloads) < lit_api.max_batch_size:
             try:
-                response_queue_id, uid, timestamp, x_enc = request_queue.get_nowait()
+                request_data = request_queue.get_nowait()
+                if request_data == _SENTINEL_VALUE:
+                    raise _StopLoopError()
+                response_queue_id, uid, timestamp, x_enc = request_data
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                     timed_out_uids.append((response_queue_id, uid))
                 else:
@@ -115,7 +127,10 @@ def collate_requests(
             break
 
         try:
-            response_queue_id, uid, timestamp, x_enc = request_queue.get(timeout=min(remaining_time, 0.001))
+            request_data = request_queue.get(timeout=min(remaining_time, 0.001))
+            if request_data == _SENTINEL_VALUE:
+                raise _StopLoopError()
+            response_queue_id, uid, timestamp, x_enc = request_data
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                 timed_out_uids.append((response_queue_id, uid))
             else:
@@ -264,7 +279,7 @@ class LitLoop(_BaseLoop):
         self,
         lit_api: LitAPI,
         request_queue: Queue,
-    ):
+    ) -> Tuple[List, List]:
         batches, timed_out_uids = collate_requests(
             lit_api,
             request_queue,

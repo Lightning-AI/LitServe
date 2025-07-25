@@ -5,6 +5,8 @@ on:
     branches: [main, "release/*"]
   pull_request:
     branches: [main, "release/*"]
+  schedule:
+    - cron: "0 0 * * *" # every day at midnight UTC
 
 defaults:
   run:
@@ -57,8 +59,7 @@ jobs:
 
       - name: Tests
         timeout-minutes: 15
-        run: |
-          pytest --cov=litserve src/ tests/ -v -s --durations=100
+        run: pytest --cov=litserve tests/ -v -s --durations=100
 
       - name: Statistics
         run: |
