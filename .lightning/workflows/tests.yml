@@ -1,8 +1,8 @@
 trigger:
   push:
-    branches: ["master"]
+    branches: ["main"]
   pull_request:
-    branches: ["master"]
+    branches: ["main"]
 
 timeout: "25" # minutes
 machine: "L4_X_2"
