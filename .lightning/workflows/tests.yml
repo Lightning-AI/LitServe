@@ -43,7 +43,7 @@ run: |
   uv pip list
   # Sanity check
   python -c "import torch ; mgpu = torch.cuda.device_count() ; assert mgpu >= 2, f'found GPUs: {mgpu}'"
-  
+
   # Show caches
   uv pip install -q py-tree
   uv run py-tree /var/tmp/torch
