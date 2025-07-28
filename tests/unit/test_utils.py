@@ -11,12 +11,12 @@ import pytest
 from fastapi import HTTPException
 
 from litserve.utils import (
+    add_ssl_context_from_env,
     call_after_stream,
     configure_logging,
     dump_exception,
     generate_random_zmq_address,
     is_package_installed,
-    add_ssl_context_from_env,
     set_trace_if_debug,
 )
 
