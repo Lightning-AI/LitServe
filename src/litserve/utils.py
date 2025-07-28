@@ -319,16 +319,16 @@ def load_ssl_context_from_env() -> Dict[str, Any]:
         cert_pem = base64.b64decode(cert_pem_b64).decode("utf-8")
         cert_key = base64.b64decode(cert_key_b64).decode("utf-8")
 
-        # Write to temporary files that are not deleted on close
-        with tempfile.NamedTemporaryFile(
-            mode="w+", delete=False, encoding="utf-8"
-        ) as cert_file, tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8") as key_file:
+        # Write to temporary files
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file, tempfile.NamedTemporaryFile(
+            mode="w+", delete=False
+        ) as key_file:
             cert_file.write(cert_pem)
             cert_file.flush()
             key_file.write(cert_key)
             key_file.flush()
 
-            # Return a dictionary with Path objects to the created files
+            # Return with the corrected key for the certificate file
             return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name)}
 
     # Return an empty dictionary if env vars are not set
