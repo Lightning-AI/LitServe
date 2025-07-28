@@ -54,6 +54,7 @@ from litserve.utils import (
     LitAPIStatus,
     LoopResponseType,
     WorkerSetupStatus,
+    add_ssl_context_from_env,
     call_after_stream,
     configure_logging,
     is_package_installed,
@@ -1294,8 +1295,16 @@ class LitServer:
         if host not in ["0.0.0.0", "127.0.0.1", "::"]:
             raise ValueError(host_msg)
 
+        kwargs = add_ssl_context_from_env(kwargs)
+
         configure_logging(log_level, use_rich=pretty_logs)
-        config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
+        config = uvicorn.Config(
+            app=self.app,
+            host=host,
+            port=port,
+            log_level=log_level,
+            **kwargs,
+        )
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:

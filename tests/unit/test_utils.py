@@ -1,7 +1,9 @@
+import base64
 import logging
 import os
 import pickle
 import sys
+from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -9,6 +11,7 @@ import pytest
 from fastapi import HTTPException
 
 from litserve.utils import (
+    add_ssl_context_from_env,
     call_after_stream,
     configure_logging,
     dump_exception,
@@ -91,3 +94,47 @@ def test_set_trace_if_debug_not_set(mock_forked_pdb):
 def test_is_package_installed():
     assert is_package_installed("pytest")
     assert not is_package_installed("nonexistent_package")
+
+
+def test_add_ssl_context_from_env_with_env_vars():
+    """Tests that the SSL context is loaded correctly when environment variables are set."""
+    dummy_cert = "dummy certificate"
+    dummy_key = "dummy key"
+
+    b64_cert = base64.b64encode(dummy_cert.encode("utf-8")).decode("utf-8")
+    b64_key = base64.b64encode(dummy_key.encode("utf-8")).decode("utf-8")
+
+    with mock.patch.dict(os.environ, {"LIGHTNING_CERT_PEM": b64_cert, "LIGHTNING_KEY_FILE": b64_key}):
+        ssl_context = add_ssl_context_from_env({})
+
+        assert ssl_context
+
+        assert "ssl_certfile" in ssl_context
+        assert "ssl_keyfile" in ssl_context
+        assert isinstance(ssl_context["ssl_certfile"], Path)
+        assert isinstance(ssl_context["ssl_keyfile"], Path)
+
+        with open(ssl_context["ssl_certfile"]) as f:
+            assert f.read() == dummy_cert
+        with open(ssl_context["ssl_keyfile"]) as f:
+            assert f.read() == dummy_key
+
+        os.remove(ssl_context["ssl_certfile"])
+        os.remove(ssl_context["ssl_keyfile"])
+
+
+def test_add_ssl_context_from_env_without_env_vars():
+    """Tests that an empty dictionary is returned when environment variables are not set."""
+    with mock.patch.dict(os.environ, {}, clear=True):
+        ssl_context = add_ssl_context_from_env({})
+        assert ssl_context == {}
+
+
+def test_add_ssl_context_from_env_with_one_env_var_missing():
+    """Tests that an empty dictionary is returned when one of the environment variables is missing."""
+    dummy_cert = "dummy certificate"
+    b64_cert = base64.b64encode(dummy_cert.encode("utf-8")).decode("utf-8")
+
+    with mock.patch.dict(os.environ, {"LIGHTNING_CERT_PEM": b64_cert}, clear=True):
+        ssl_context = add_ssl_context_from_env({})
+        assert ssl_context == {}
