@@ -57,6 +57,7 @@ from litserve.utils import (
     call_after_stream,
     configure_logging,
     is_package_installed,
+    _load_ssl_context,
 )
 
 _MCP_AVAILABLE = is_package_installed("mcp")
@@ -1295,7 +1296,14 @@ class LitServer:
             raise ValueError(host_msg)
 
         configure_logging(log_level, use_rich=pretty_logs)
-        config = uvicorn.Config(app=self.app, host=host, port=port, log_level=log_level, **kwargs)
+        config = uvicorn.Config(
+            app=self.app, 
+            host=host, 
+            port=port, 
+            log_level=log_level, 
+            **_load_ssl_context(), 
+            **kwargs,
+        )
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:

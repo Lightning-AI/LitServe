@@ -25,7 +25,10 @@ import warnings
 from abc import ABCMeta
 from contextlib import contextmanager
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, TextIO, Union
+from typing import TYPE_CHECKING, Any, AsyncIterator, TextIO, Union, Dict
+import tempfile
+from pathlib import Path
+import base64
 
 from fastapi import HTTPException
 
@@ -279,3 +282,28 @@ class _TimedInitMeta(ABCMeta):
             )
 
         return instance
+
+
+def _load_ssl_context() -> Dict[str, Any]:
+    cert_pem_b64 = os.getenv("LIGHTNING_CERT_PEM", "")
+    cert_key_b64 = os.getenv("LIGHTNING_KEY_FILE", "")
+
+    if cert_pem_b64 and cert_key_b64:
+        # Decode the base64 strings to get the actual PEM content
+        cert_pem = base64.b64decode(cert_pem_b64).decode('utf-8')
+        cert_key = base64.b64decode(cert_key_b64).decode('utf-8')
+
+        # Write to temporary files
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False) as cert_file, \
+                tempfile.NamedTemporaryFile(mode='w+', delete=False) as key_file:
+
+            cert_file.write(cert_pem)
+            cert_file.flush()
+            key_file.write(cert_key)
+            key_file.flush()
+
+            # Return with the corrected key for the certificate file
+            return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name)}
+
+    # No valid SSL context could be created
+    return {}
