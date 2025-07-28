@@ -284,7 +284,7 @@ class _TimedInitMeta(ABCMeta):
         return instance
 
 
-def load_ssl_context_from_env() -> Dict[str, Any]:
+def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Loads SSL context from base64-encoded environment variables.
 
     This function checks for the presence of `LIGHTNING_CERT_PEM` and
@@ -311,6 +311,9 @@ def load_ssl_context_from_env() -> Dict[str, Any]:
 
     """
 
+    if "ssl_keyfile" in kwargs and "ssl_certfile" in kwargs:
+        return kwargs
+
     cert_pem_b64 = os.getenv("LIGHTNING_CERT_PEM", "")
     cert_key_b64 = os.getenv("LIGHTNING_KEY_FILE", "")
 
@@ -329,7 +332,7 @@ def load_ssl_context_from_env() -> Dict[str, Any]:
             key_file.flush()
 
             # Return a dictionary with Path objects to the created files
-            return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name)}
+            return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
 
     # Return an empty dictionary if env vars are not set
-    return {}
+    return kwargs
