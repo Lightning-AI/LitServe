@@ -333,5 +333,7 @@ def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         key_file.write(cert_key)
         key_file.flush()
 
+        logger.info("Loading TLS Certificates \n")
+
         # Return a dictionary with Path objects to the created files
         return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
