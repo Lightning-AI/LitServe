@@ -317,22 +317,21 @@ def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     cert_pem_b64 = os.getenv("LIGHTNING_CERT_PEM", "")
     cert_key_b64 = os.getenv("LIGHTNING_KEY_FILE", "")
 
-    if cert_pem_b64 and cert_key_b64:
-        # Decode the base64 strings to get the actual PEM content
-        cert_pem = base64.b64decode(cert_pem_b64).decode("utf-8")
-        cert_key = base64.b64decode(cert_key_b64).decode("utf-8")
+    if cert_pem_b64 == "" or cert_key_b64 == "":
+        return kwargs
 
-        # Write to temporary files
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file, tempfile.NamedTemporaryFile(
-            mode="w+", delete=False
-        ) as key_file:
-            cert_file.write(cert_pem)
-            cert_file.flush()
-            key_file.write(cert_key)
-            key_file.flush()
+    # Decode the base64 strings to get the actual PEM content
+    cert_pem = base64.b64decode(cert_pem_b64).decode("utf-8")
+    cert_key = base64.b64decode(cert_key_b64).decode("utf-8")
 
-            # Return a dictionary with Path objects to the created files
-            return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
+    # Write to temporary files
+    with tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file, tempfile.NamedTemporaryFile(
+        mode="w+", delete=False
+    ) as key_file:
+        cert_file.write(cert_pem)
+        cert_file.flush()
+        key_file.write(cert_key)
+        key_file.flush()
 
-    # Return an empty dictionary if env vars are not set
-    return kwargs
+        # Return a dictionary with Path objects to the created files
+        return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
