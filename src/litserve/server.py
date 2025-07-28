@@ -54,10 +54,10 @@ from litserve.utils import (
     LitAPIStatus,
     LoopResponseType,
     WorkerSetupStatus,
-    _load_ssl_context,
     call_after_stream,
     configure_logging,
     is_package_installed,
+    load_ssl_context_from_env,
 )
 
 _MCP_AVAILABLE = is_package_installed("mcp")
@@ -1301,7 +1301,7 @@ class LitServer:
             host=host,
             port=port,
             log_level=log_level,
-            **_load_ssl_context(),
+            **load_ssl_context_from_env(),
             **kwargs,
         )
         sockets = [config.bind_socket()]

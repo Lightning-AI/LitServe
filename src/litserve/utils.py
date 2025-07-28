@@ -284,7 +284,33 @@ class _TimedInitMeta(ABCMeta):
         return instance
 
 
-def _load_ssl_context() -> Dict[str, Any]:
+def load_ssl_context_from_env() -> Dict[str, Any]:
+    """Loads SSL context from base64-encoded environment variables.
+
+    This function checks for the presence of `LIGHTNING_CERT_PEM` and
+    `LIGHTNING_KEY_FILE` environment variables. It expects these variables
+    to contain the SSL certificate and private key, respectively, as
+    base64-encoded PEM strings.
+
+    If both variables are found, it decodes them and writes the content to
+    secure, temporary files. The paths to these files are returned in a
+    dictionary suitable for direct use as keyword arguments in libraries
+    that require SSL file paths (like `uvicorn` or `requests`).
+
+    Note:
+        The temporary files are not automatically deleted (`delete=False`).
+        The calling application is responsible for cleaning up these files
+        after the SSL context is no longer needed to prevent leaving
+        sensitive data on disk.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing `ssl_certfile` and `ssl_keyfile`
+        keys with `pathlib.Path` objects pointing to the temporary files.
+        If either of the required environment variables is missing, it
+        returns an empty dictionary.
+
+    """
+
     cert_pem_b64 = os.getenv("LIGHTNING_CERT_PEM", "")
     cert_key_b64 = os.getenv("LIGHTNING_KEY_FILE", "")
 
@@ -293,17 +319,17 @@ def _load_ssl_context() -> Dict[str, Any]:
         cert_pem = base64.b64decode(cert_pem_b64).decode("utf-8")
         cert_key = base64.b64decode(cert_key_b64).decode("utf-8")
 
-        # Write to temporary files
-        with tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file, tempfile.NamedTemporaryFile(
-            mode="w+", delete=False
-        ) as key_file:
+        # Write to temporary files that are not deleted on close
+        with tempfile.NamedTemporaryFile(
+            mode="w+", delete=False, encoding="utf-8"
+        ) as cert_file, tempfile.NamedTemporaryFile(mode="w+", delete=False, encoding="utf-8") as key_file:
             cert_file.write(cert_pem)
             cert_file.flush()
             key_file.write(cert_key)
             key_file.flush()
 
-            # Return with the corrected key for the certificate file
+            # Return a dictionary with Path objects to the created files
             return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name)}
 
-    # No valid SSL context could be created
+    # Return an empty dictionary if env vars are not set
     return {}

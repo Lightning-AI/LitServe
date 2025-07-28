@@ -11,12 +11,12 @@ import pytest
 from fastapi import HTTPException
 
 from litserve.utils import (
-    _load_ssl_context,
     call_after_stream,
     configure_logging,
     dump_exception,
     generate_random_zmq_address,
     is_package_installed,
+    load_ssl_context_from_env,
     set_trace_if_debug,
 )
 
@@ -96,7 +96,7 @@ def test_is_package_installed():
     assert not is_package_installed("nonexistent_package")
 
 
-def test_load_ssl_context_with_env_vars():
+def testload_ssl_context_from_env_with_env_vars():
     """Tests that the SSL context is loaded correctly when environment variables are set."""
     dummy_cert = "dummy certificate"
     dummy_key = "dummy key"
@@ -105,7 +105,7 @@ def test_load_ssl_context_with_env_vars():
     b64_key = base64.b64encode(dummy_key.encode("utf-8")).decode("utf-8")
 
     with mock.patch.dict(os.environ, {"LIGHTNING_CERT_PEM": b64_cert, "LIGHTNING_KEY_FILE": b64_key}):
-        ssl_context = _load_ssl_context()
+        ssl_context = load_ssl_context_from_env()
 
         assert ssl_context
 
@@ -123,18 +123,18 @@ def test_load_ssl_context_with_env_vars():
         os.remove(ssl_context["ssl_keyfile"])
 
 
-def test_load_ssl_context_without_env_vars():
+def testload_ssl_context_from_env_without_env_vars():
     """Tests that an empty dictionary is returned when environment variables are not set."""
     with mock.patch.dict(os.environ, {}, clear=True):
-        ssl_context = _load_ssl_context()
+        ssl_context = load_ssl_context_from_env()
         assert ssl_context == {}
 
 
-def test_load_ssl_context_with_one_env_var_missing():
+def testload_ssl_context_from_env_with_one_env_var_missing():
     """Tests that an empty dictionary is returned when one of the environment variables is missing."""
     dummy_cert = "dummy certificate"
     b64_cert = base64.b64encode(dummy_cert.encode("utf-8")).decode("utf-8")
 
     with mock.patch.dict(os.environ, {"LIGHTNING_CERT_PEM": b64_cert}, clear=True):
-        ssl_context = _load_ssl_context()
+        ssl_context = load_ssl_context_from_env()
         assert ssl_context == {}
