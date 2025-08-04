@@ -28,6 +28,7 @@ run: |
   uv pip list
   set -ex
 
+  # Define
   image_tmp="${image##*cuda}" # Remove everything up to and including "cuda"
   CUDA_VERSION="${image_tmp%%-*}" # Extract the CUDA version up to the first hyphen
   echo "Using CUDA version: ${CUDA_VERSION}"
