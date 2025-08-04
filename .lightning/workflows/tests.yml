@@ -27,6 +27,7 @@ run: |
   uv --version
   uv cache dir
   uv pip list
+  # from now on, fail is fail
   set -ex
 
   # Define
