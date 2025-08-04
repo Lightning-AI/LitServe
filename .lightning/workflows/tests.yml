@@ -15,7 +15,7 @@ parametrize:
 env:
   TOKENIZERS_PARALLELISM: "false"
   MKL_SERVICE_FORCE_INTEL: 1
-  TEST_DIRS: "unittests"
+  #TEST_DIRS: "unittests"
   FREEZE_REQUIREMENTS: 1
   SKIP_SLOW_DOCTEST: 1
 
