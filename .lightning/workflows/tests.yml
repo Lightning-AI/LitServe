@@ -50,7 +50,7 @@ run: |
 
   uv run coverage run --source litserve -m pytest src tests -v
 
-
+  # Coverage reporting
   uv run coverage report
   uv run coverage xml
   #  uv run codecov --token=$(CODECOV_TOKEN) --name="GPU-coverage" \
@@ -61,6 +61,6 @@ run: |
   uv pip install torch torchvision -U -q --find-links=${TORCH_URL}
   export PYTHONPATH=$PWD && uv run tests/parity_fastapi/main.py
 
-  # Run GPU perf test
+  # Run GPU perf tests
   uv pip install gpustat wget -U -q
   bash tests/perf_test/bert/run_test.sh
