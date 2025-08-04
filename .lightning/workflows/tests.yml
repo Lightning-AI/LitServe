@@ -40,6 +40,7 @@ run: |
 
   uv sync --all-extras --dev
 
+  # Lens
   uv pip list
   # Sanity check
   python -c "import torch ; mgpu = torch.cuda.device_count() ; assert mgpu >= 2, f'found GPUs: {mgpu}'"
