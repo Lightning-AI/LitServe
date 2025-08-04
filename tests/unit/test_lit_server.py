@@ -122,8 +122,8 @@ async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
 def test_litapi_with_stream(simple_litapi_cls):
     with pytest.raises(
         ValueError,
-        match="""When `stream=True` both `lit_api.predict` and
-             `lit_api.encode_response` must generate values using `yield""",
+        match="""When `stream=True` both `lit_api.predict` and `lit_api.encode_response` must generate values using
+              `yield.""",
     ):
         # TODO: The error should be raised in the LitAPI constructor
         LitServer(simple_litapi_cls(stream=True))

@@ -52,8 +52,8 @@ logger = logging.getLogger(__name__)
 
 
 def extract_input_schema(func) -> Dict[str, Any]:
-    """Extract JSON schema for function input parameters from a Python function. Supports regular type annotations,
-    Pydantic Fields, and Pydantic BaseModel classes.
+    """Extract JSON schema for function input parameters from a Python function. Pydantic Fields, and Pydantic BaseModel
+    classes. Supports regular type annotations,
 
     Args:
         func: Python function to analyze
@@ -557,19 +557,15 @@ class _LitMCPServerConnector:
             app: LitServer's FastAPI app to mount the MCP server to.
 
         """
-
         if len(mcp_tools) == 0:
             return
 
         for tool in mcp_tools:
             self.add_tool(tool)
-
         logger.warning(
             "MCP support is in beta and APIs are subject to change. Please report any issues to https://github.com/Lightning-AI/litserve/issues"
         )
-
         self._mount_with_fastapi(app)
-
         logger.info(
             "================================================"
             "\n🎉 Enabled MCP server ⚡\n"
@@ -583,6 +579,6 @@ class _LitMCPServerConnector:
       "args": [ "mcp-remote", "https://8000-YOUR_HOST_NAME.cloudspaces.litng.ai/mcp/"] # replace url with your server url + /mcp/
     }
   }
-}\n"""  # noqa: E501
+}\n"""
             "================================================\n"
         )

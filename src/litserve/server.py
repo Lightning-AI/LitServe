@@ -964,7 +964,6 @@ class LitServer:
 
     def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
         """Register endpoint routes for the FastAPI app."""
-
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
 
         # Create handlers

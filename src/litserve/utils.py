@@ -310,7 +310,6 @@ def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         returns an empty dictionary.
 
     """
-
     if "ssl_keyfile" in kwargs and "ssl_certfile" in kwargs:
         return kwargs
 

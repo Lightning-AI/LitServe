@@ -52,8 +52,8 @@ class Output:
 
 class ContinuousBatchingLoop(LitLoop):
     def __init__(self, max_sequence_length: int = 2048):
-        """Runs continuous batching loop. This loop handles adding new requests, processing them in batches, and
-        managing the state of active sequences.
+        """Runs continuous batching loop. managing the state of active sequences. This loop handles adding new requests,
+        processing them in batches, and.
 
         The loop requires the following methods to be implemented in the LitAPI:
           - setup: sets up the model on the device
@@ -79,28 +79,34 @@ class ContinuousBatchingLoop(LitLoop):
             )
 
         if not hasattr(lit_api, "step") and not hasattr(lit_api, "predict"):
-            raise ValueError("""Using the default step method with Continuous batching loop requires the lit_api to
-have a `predict` method which accepts decoded request inputs and a list of generated_sequence.
-Please implement the has_finished method in the lit_api.
+            raise ValueError(
+                """Using the default step method with Continuous batching loop requires the lit_api to have
+                             a `predict` method which accepts decoded request inputs and a list of generated_sequence.
+                             Please implement the has_finished method in the lit_api.
 
-    class ExampleAPI(LitAPI):
-        ...
-        def predict(self, inputs, generated_sequence):
-            # implement predict logic
-            # return list of new tokens
-            ...
-        """)
+                             class ExampleAPI(LitAPI):
+                                 ...
+                                 def predict(self, inputs, generated_sequence):
+                                     # implement predict logic
+                                     # return list of new tokens
+                                     ...
+
+                             """
+            )
 
         if not hasattr(lit_api, "step") and not hasattr(lit_api, "has_finished"):
-            raise ValueError("""Using the default step method with Continuous batching loop
-requires the lit_api to have a has_finished method. Please implement the has_finished method in the lit_api.
+            raise ValueError(
+                """Using the default step method with Continuous batching loop requires the lit_api to have
+                             a has_finished method. Please implement the has_finished method in the lit_api.
 
-    class ExampleAPI(LitAPI):
-        ...
-        def has_finished(self, uid: str, token: str, max_sequence_length: int) -> bool:
-            # implement has_finished logic
-            return False
-        """)
+                             class ExampleAPI(LitAPI):
+                                 ...
+                                 def has_finished(self, uid: str, token: str, max_sequence_length: int) -> bool:
+                                     # implement has_finished logic
+                                     return False
+
+                             """
+            )
 
     def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""

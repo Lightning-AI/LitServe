@@ -31,8 +31,8 @@ class Logger(ABC):
         self._config = {}
 
     def mount(self, path: str, app: ASGIApp) -> None:
-        """Mount an ASGI app endpoint to LitServer. Use this method when you want to add an additional endpoint to the
-        server such as /metrics endpoint for prometheus metrics.
+        """Mount an ASGI app endpoint to LitServer. server such as /metrics endpoint for prometheus metrics. Use this
+        method when you want to add an additional endpoint to the.
 
         Args:
             path (str): The path to mount the app to.
