@@ -34,8 +34,7 @@ run: |
   image_tmp="${image##*cuda}" # Remove everything up to and including "cuda"
   CUDA_VERSION="${image_tmp%%-*}" # Extract the CUDA version up to the first hyphen
   echo "Using CUDA version: ${CUDA_VERSION}"
-  CUDA_VERSION_M_M="${CUDA_VERSION%.*}" # Get major.minor by removing the last dot and everything after
-  CUDA_VERSION_MM="${CUDA_VERSION_M_M//'.'/''}"
+  CUDA_VERSION_MM="${CUDA_VERSION//'.'/''}"
   TORCH_VER="${image##*torch}" # Extract the torch version from the image name
   echo "Using Torch version: ${TORCH_VER}"
   TORCH_URL="https://download.pytorch.org/whl/cu${CUDA_VERSION_MM}/torch_stable.html"
