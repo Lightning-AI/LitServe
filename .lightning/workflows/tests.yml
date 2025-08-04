@@ -52,6 +52,7 @@ run: |
   uv pip install -q py-tree
   uv run py-tree /var/tmp/torch
 
+  # Testing
   uv run coverage run --source litserve -m pytest src tests -v
 
   # Coverage reporting
