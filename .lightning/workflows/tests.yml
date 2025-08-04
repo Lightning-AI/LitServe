@@ -7,10 +7,10 @@ trigger:
 timeout: "25" # minutes
 machine: "L4_X_2"
 image: "pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime"
-parametrize:
-  matrix: {}
-  include: []
-  exclude: []
+#parametrize:
+#  matrix: {}
+#  include: []
+#  exclude: []
 
 env:
   TOKENIZERS_PARALLELISM: "false"
