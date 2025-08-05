@@ -1,0 +1,70 @@
+trigger:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+timeout: "25" # minutes
+machine: "L4_X_2"
+image: "pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime"
+#parametrize:
+#  matrix: {}
+#  include: []
+#  exclude: []
+
+env:
+  TOKENIZERS_PARALLELISM: "false"
+  MKL_SERVICE_FORCE_INTEL: 1
+  #TEST_DIRS: "unittests"
+  FREEZE_REQUIREMENTS: 1
+  SKIP_SLOW_DOCTEST: 1
+
+run: |
+  # Basic Info
+  whereis nvidia
+  nvidia-smi
+  pip install uv
+  uv --version
+  uv cache dir
+  uv pip list
+  # from now on, fail is fail
+  set -ex
+
+  # Define extra vars
+  image_tmp="${image##*cuda}" # Remove everything up to and including "cuda"
+  CUDA_VERSION="${image_tmp%%-*}" # Extract the CUDA version up to the first hyphen
+  echo "Using CUDA version: ${CUDA_VERSION}"
+  CUDA_VERSION_MM="${CUDA_VERSION//'.'/''}"
+  TORCH_VER="${image##*torch}" # Extract the torch version from the image name
+  echo "Using Torch version: ${TORCH_VER}"
+  TORCH_URL="https://download.pytorch.org/whl/cu${CUDA_VERSION_MM}/torch_stable.html"
+  echo ${TORCH_URL}
+
+  uv sync --all-extras --dev
+
+  # Lens
+  uv pip list
+  # Sanity check
+  python -c "import torch ; mgpu = torch.cuda.device_count() ; assert mgpu >= 2, f'found GPUs: {mgpu}'"
+
+  # Show caches
+  uv pip install -q py-tree
+  uv run py-tree /var/tmp/torch
+
+  # Testing
+  uv run coverage run --source litserve -m pytest src tests -v
+
+  # Coverage reporting
+  uv run coverage report
+  uv run coverage xml
+  #  uv run codecov --token=$(CODECOV_TOKEN) --name="GPU-coverage" \
+  #    --commit=$(Build.SourceVersion) --flags=gpu,unittest --env=linux,azure
+  ls -l
+
+  # Run FastAPI parity tests
+  uv pip install torch torchvision -U -q --find-links=${TORCH_URL}
+  export PYTHONPATH=$PWD && uv run tests/parity_fastapi/main.py
+
+  # Run GPU perf tests
+  uv pip install gpustat wget -U -q
+  bash tests/perf_test/bert/run_test.sh
