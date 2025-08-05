@@ -20,7 +20,7 @@ env:
   SKIP_SLOW_DOCTEST: 1
 
 run: |
-  # Info
+  # Basic Info
   whereis nvidia
   nvidia-smi
   pip install uv
