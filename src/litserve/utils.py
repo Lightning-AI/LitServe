@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import base64
 import dataclasses
 import importlib.util
 import logging
@@ -19,13 +20,15 @@ import os
 import pdb
 import pickle
 import sys
+import tempfile
 import time
 import uuid
 import warnings
 from abc import ABCMeta
 from contextlib import contextmanager
 from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, TextIO, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, TextIO, Union
 
 from fastapi import HTTPException
 
@@ -279,3 +282,58 @@ class _TimedInitMeta(ABCMeta):
             )
 
         return instance
+
+
+def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Loads SSL context from base64-encoded environment variables.
+
+    This function checks for the presence of `LIGHTNING_CERT_PEM` and
+    `LIGHTNING_KEY_FILE` environment variables. It expects these variables
+    to contain the SSL certificate and private key, respectively, as
+    base64-encoded PEM strings.
+
+    If both variables are found, it decodes them and writes the content to
+    secure, temporary files. The paths to these files are returned in a
+    dictionary suitable for direct use as keyword arguments in libraries
+    that require SSL file paths (like `uvicorn` or `requests`).
+
+    Note:
+        The temporary files are not automatically deleted (`delete=False`).
+        The calling application is responsible for cleaning up these files
+        after the SSL context is no longer needed to prevent leaving
+        sensitive data on disk.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing `ssl_certfile` and `ssl_keyfile`
+        keys with `pathlib.Path` objects pointing to the temporary files.
+        If either of the required environment variables is missing, it
+        returns an empty dictionary.
+
+    """
+
+    if "ssl_keyfile" in kwargs and "ssl_certfile" in kwargs:
+        return kwargs
+
+    cert_pem_b64 = os.getenv("LIGHTNING_CERT_PEM", "")
+    cert_key_b64 = os.getenv("LIGHTNING_KEY_FILE", "")
+
+    if cert_pem_b64 == "" or cert_key_b64 == "":
+        return kwargs
+
+    # Decode the base64 strings to get the actual PEM content
+    cert_pem = base64.b64decode(cert_pem_b64).decode("utf-8")
+    cert_key = base64.b64decode(cert_key_b64).decode("utf-8")
+
+    # Write to temporary files
+    with tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file, tempfile.NamedTemporaryFile(
+        mode="w+", delete=False
+    ) as key_file:
+        cert_file.write(cert_pem)
+        cert_file.flush()
+        key_file.write(cert_key)
+        key_file.flush()
+
+        logger.info("Loading TLS Certificates \n")
+
+        # Return a dictionary with Path objects to the created files
+        return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
