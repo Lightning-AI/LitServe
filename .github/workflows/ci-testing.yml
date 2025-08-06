@@ -23,7 +23,7 @@ jobs:
         include:
           - { os: "macos-latest", python-version: "3.12" }
           - { os: "windows-latest", python-version: "3.11" }
-          #- { os: "ubuntu-22.04", python-version: "3.9", requires: "oldest" } # fixme
+          - { os: "ubuntu-22.04", python-version: "3.9", requires: "oldest" }
 
     timeout-minutes: 35
     env:
@@ -43,13 +43,11 @@ jobs:
           uv pip compile pyproject.toml -o requirements.txt
           cat requirements.txt
 
-      # TODO: FIX THIS TO SUPPORT PYPROJECT.TOML
-      # - name: Set min. dependencies
-      #   if: matrix.requires == 'oldest'
-      #   run: |
-      #     uv pip install 'lightning-utilities[cli]'
-      #     uv run python -m lightning_utilities.cli requirements set-oldest --req_files='["requirements.txt"]'
-      #     cat requirements.txt
+      - name: Set min. dependencies
+        if: matrix.requires == 'oldest'
+        run: |
+          uv pip install 'lightning-utilities[cli]>=0.15.1'
+          uv run python -m lightning_utilities.cli requirements set-oldest --req_files=pyproject.toml
 
       - name: Install package
         run: |
