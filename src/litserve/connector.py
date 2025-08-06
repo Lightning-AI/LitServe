@@ -16,11 +16,11 @@ import platform
 import subprocess
 import sys
 from functools import lru_cache
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 
 class _Connector:
-    def __init__(self, accelerator: str = "auto", devices: Union[List[int], int, str] = "auto"):
+    def __init__(self, accelerator: str = "auto", devices: Union[list[int], int, str] = "auto"):
         accelerator = self._sanitize_accelerator(accelerator)
         if accelerator in ("cpu", "cuda", "mps"):
             self._accelerator = accelerator

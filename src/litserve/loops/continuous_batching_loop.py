@@ -15,7 +15,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from queue import Queue
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from fastapi import HTTPException
 
@@ -30,15 +30,17 @@ logger = logging.getLogger(__name__)
 
 
 def notify_timed_out_requests(
-    response_queues: List[Queue],
-    timed_out_uids: List[Tuple[int, str]],
+    response_queues: list[Queue],
+    timed_out_uids: list[tuple[int, str]],
 ):
     for response_queue_id, uid in timed_out_uids:
         logger.error(f"Request {uid} was waiting in the queue for too long and has been timed out.")
-        response_queues[response_queue_id].put((
-            uid,
-            (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR, LoopResponseType.STREAMING),
-        ))
+        response_queues[response_queue_id].put(
+            (
+                uid,
+                (HTTPException(504, "Request timed out"), LitAPIStatus.ERROR, LoopResponseType.STREAMING),
+            )
+        )
 
 
 @dataclass
@@ -67,9 +69,9 @@ class ContinuousBatchingLoop(LitLoop):
 
         """
         super().__init__()
-        self.active_sequences: Dict[str, Dict] = {}  # uid -> {input, current_length, generated_sequence}
+        self.active_sequences: dict[str, dict] = {}  # uid -> {input, current_length, generated_sequence}
         self.max_sequence_length = max_sequence_length
-        self.response_queue_ids: Dict[str, int] = {}  # uid -> response_queue_id
+        self.response_queue_ids: dict[str, int] = {}  # uid -> response_queue_id
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         """Check if the lit_api has the necessary methods and if streaming is enabled."""
@@ -119,14 +121,14 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
     async def prefill(
         self,
-        pending_requests: List[Tuple[str, Any]],
+        pending_requests: list[tuple[str, Any]],
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: List[Queue] = None,
+        response_queues: list[Queue] = None,
         max_batch_size: Optional[int] = None,
         batch_timeout: Optional[float] = None,
-    ) -> List[Tuple[str, Any]]:
+    ) -> list[tuple[str, Any]]:
         """Fill available capacity with pending and new requests."""
         # First process existing pending requests
         while pending_requests and self.has_capacity(lit_api):
@@ -154,7 +156,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: List[Queue],
+        response_queues: list[Queue],
     ):
         logger.info("Running prefill in background")
         try:
@@ -176,8 +178,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             logger.info("Exiting run_in_background in continuous_batching_loop")
 
     async def step(
-        self, prev_outputs: Optional[List[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
-    ) -> List[Output]:
+        self, prev_outputs: Optional[list[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
+    ) -> list[Output]:
         return await asyncio.to_thread(lit_api.step, prev_outputs)
 
     async def run(
@@ -187,7 +189,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
     ):
         """Main loop that processes batches of requests."""
@@ -243,8 +245,8 @@ class DefaultContinuousBatchingLoop(ContinuousBatchingLoop):
         self.active_sequences[uid] = {"input": decoded_request, "current_length": 0, "generated_sequence": []}
 
     async def step(
-        self, prev_outputs: Optional[List[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
-    ) -> List[Output]:
+        self, prev_outputs: Optional[list[Output]], lit_api: LitAPI, lit_spec: Optional[LitSpec]
+    ) -> list[Output]:
         """Process one token generation step for all active sequences."""
         if not self.active_sequences:
             return []
@@ -255,9 +257,9 @@ class DefaultContinuousBatchingLoop(ContinuousBatchingLoop):
 
         try:
             # Assume lit_api.predict handles batched token generation
-            new_tokens: List[Any] = lit_api.predict(inputs, generated)
+            new_tokens: list[Any] = lit_api.predict(inputs, generated)
 
-            responses: List[Output] = []
+            responses: list[Output] = []
 
             # Process each sequence's new token
             for uid, token in zip(self.active_sequences.keys(), new_tokens):
