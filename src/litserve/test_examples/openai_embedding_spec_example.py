@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 
 from litserve.api import LitAPI
@@ -9,7 +7,7 @@ class TestEmbedAPI(LitAPI):
     def setup(self, device):
         self.model = None
 
-    def predict(self, x) -> List[List[float]]:
+    def predict(self, x) -> list[list[float]]:
         n = len(x) if isinstance(x, list) else 1
         return np.random.rand(n, 768).tolist()
 
@@ -18,7 +16,7 @@ class TestEmbedAPI(LitAPI):
 
 
 class TestEmbedBatchedAPI(TestEmbedAPI):
-    def predict(self, batch) -> List[List[List[float]]]:
+    def predict(self, batch) -> list[list[list[float]]]:
         return [np.random.rand(len(x), 768).tolist() for x in batch]
 
 

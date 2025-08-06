@@ -55,9 +55,11 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
 @pytest.mark.asyncio
 @pytest.mark.parametrize("api_path", ["/v1/embeddings", "/v2/embeddings"])
 async def test_openai_embedding_spec_with_custom_api_path(openai_embedding_request_data, api_path):
-    server = ls.LitServer([
-        TestEmbedAPI(spec=OpenAIEmbeddingSpec(), api_path=api_path),
-    ])
+    server = ls.LitServer(
+        [
+            TestEmbedAPI(spec=OpenAIEmbeddingSpec(), api_path=api_path),
+        ]
+    )
     with wrap_litserve_start(server) as server:
         async with (
             LifespanManager(server.app) as manager,

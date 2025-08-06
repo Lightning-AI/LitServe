@@ -29,7 +29,7 @@ from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, TextIO, Union
+from typing import TYPE_CHECKING, Any, TextIO, Union
 
 from fastapi import HTTPException
 
@@ -285,7 +285,7 @@ class _TimedInitMeta(ABCMeta):
         return instance
 
 
-def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def add_ssl_context_from_env(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Loads SSL context from base64-encoded environment variables.
 
     This function checks for the presence of `LIGHTNING_CERT_PEM` and
@@ -305,7 +305,7 @@ def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         sensitive data on disk.
 
     Returns:
-        Dict[str, Any]: A dictionary containing `ssl_certfile` and `ssl_keyfile`
+        dict[str, Any]: A dictionary containing `ssl_certfile` and `ssl_keyfile`
         keys with `pathlib.Path` objects pointing to the temporary files.
         If either of the required environment variables is missing, it
         returns an empty dictionary.

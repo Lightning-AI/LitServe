@@ -31,7 +31,7 @@ from collections import deque
 from collections.abc import Iterable, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
@@ -94,7 +94,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 async def _mixed_response_to_buffer(
     transport: MessageTransport,
-    response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    response_buffer: dict[str, Union[tuple[deque, asyncio.Event], asyncio.Event]],
     consumer_id: int = 0,
 ):
     """Handle both regular and streaming responses.
@@ -127,7 +127,7 @@ async def _mixed_response_to_buffer(
 
 async def response_queue_to_buffer(
     transport: MessageTransport,
-    response_buffer: Dict[str, Union[Tuple[deque, asyncio.Event], asyncio.Event]],
+    response_buffer: dict[str, Union[tuple[deque, asyncio.Event], asyncio.Event]],
     consumer_id: int,
     litapi_connector: "_LitAPIConnector",
 ):
@@ -201,7 +201,7 @@ class _LitAPIConnector:
     before use.
 
     Attributes:
-        lit_apis (List[LitAPI]): A list of `LitAPI` instances managed by this connector.
+        lit_apis (list[LitAPI]): A list of `LitAPI` instances managed by this connector.
 
     Methods:
         pre_setup(): Calls the `pre_setup` method on all managed `LitAPI` instances.
@@ -256,7 +256,7 @@ class _LitAPIConnector:
         for lit_api in self.lit_apis:
             lit_api.set_logger_queue(queue)
 
-    def get_mcp_tools(self) -> List["ToolEndpointType"]:
+    def get_mcp_tools(self) -> list["ToolEndpointType"]:
         mcp_tools = []
         for lit_api in self.lit_apis:
             if lit_api.mcp:
@@ -278,7 +278,7 @@ class BaseRequestHandler(ABC):
             return await request.json()
         return request
 
-    async def _submit_request(self, payload: dict) -> Tuple[str, asyncio.Event]:
+    async def _submit_request(self, payload: dict) -> tuple[str, asyncio.Event]:
         """Submit request to worker queue."""
         request_queue = self.server._get_request_queue(self.lit_api.api_path)
         response_queue_id = self.server.app.response_queue_id
@@ -630,7 +630,7 @@ class LitServer:
 
     def __init__(
         self,
-        lit_api: Union[LitAPI, List[LitAPI]],
+        lit_api: Union[LitAPI, list[LitAPI]],
         accelerator: Literal["cpu", "cuda", "mps", "auto"] = "auto",
         devices: Union[int, Literal["auto"]] = "auto",
         workers_per_device: int = 1,
@@ -643,9 +643,9 @@ class LitServer:
         spec: Optional[LitSpec] = None,
         max_payload_size=None,
         track_requests: bool = False,
-        callbacks: Optional[Union[List[Callback], Callback]] = None,
+        callbacks: Optional[Union[list[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
-        loggers: Optional[Union[Logger, List[Logger]]] = None,
+        loggers: Optional[Union[Logger, list[Logger]]] = None,
         fast_queue: bool = False,
         disable_openapi_url: bool = False,
         # All the following arguments are deprecated and will be removed in v0.3.0
@@ -759,7 +759,7 @@ class LitServer:
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
-        self.active_counters: List[mp.Value] = []
+        self.active_counters: list[mp.Value] = []
         self.middlewares = middlewares
         self._logger_connector = _LoggerConnector(self, loggers)
         self.logger_queue = None
@@ -1051,7 +1051,7 @@ class LitServer:
     def _perform_graceful_shutdown(
         self,
         manager: mp.Manager,
-        uvicorn_workers: List[Union[mp.Process, threading.Thread]],
+        uvicorn_workers: list[Union[mp.Process, threading.Thread]],
         shutdown_reason: str = "normal",
     ):
         """Encapsulates the graceful shutdown logic."""
@@ -1419,7 +1419,7 @@ class LitServer:
     def _start_worker_monitoring(
         self,
         manager: mp.Manager,
-        uvicorn_workers: List[Union[mp.Process, threading.Thread]],
+        uvicorn_workers: list[Union[mp.Process, threading.Thread]],
     ):
         def monitor():
             while not self._shutdown_event.is_set():

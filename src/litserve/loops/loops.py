@@ -13,7 +13,6 @@
 # limitations under the License.
 import logging
 from queue import Queue
-from typing import Dict
 
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
@@ -64,7 +63,7 @@ def inference_worker(
     worker_id: int,
     request_queue: Queue,
     transport: MessageTransport,
-    workers_setup_status: Dict[int, str],
+    workers_setup_status: dict[int, str],
     callback_runner: CallbackRunner,
 ):
     lit_spec = lit_api.spec

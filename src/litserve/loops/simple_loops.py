@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from queue import Empty, Queue
-from typing import Dict, Optional
+from typing import Optional
 
 from fastapi import HTTPException
 
@@ -275,7 +275,7 @@ class SingleLoop(DefaultLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
         lit_spec: Optional[LitSpec] = None,
         stream: bool = False,
@@ -401,7 +401,7 @@ class BatchedLoop(DefaultLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
         lit_spec: Optional[LitSpec] = None,
         stream: bool = False,

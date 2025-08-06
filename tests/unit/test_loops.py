@@ -21,7 +21,7 @@ import threading
 import time
 from collections.abc import AsyncGenerator
 from queue import Empty, Queue
-from typing import Dict, List, Optional
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -639,7 +639,7 @@ class TestLoop(LitLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
     ):
         try:
@@ -662,7 +662,7 @@ class TestLoop(LitLoop):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
     ):
         item = request_queue.get()
@@ -844,7 +844,7 @@ class ContinuousBatchingAPI(ls.LitAPI):
     def has_active_requests(self) -> bool:
         return bool(self.model)
 
-    def step(self, prev_outputs: Optional[List[Output]]) -> List[Output]:
+    def step(self, prev_outputs: Optional[list[Output]]) -> list[Output]:
         outputs = []
         for k in self.model:
             v = self.model[k]

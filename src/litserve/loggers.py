@@ -16,7 +16,7 @@ import logging
 import multiprocessing as mp
 import pickle
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from starlette.types import ASGIApp
 
@@ -93,7 +93,7 @@ class _LoggerConnector:
 
     """
 
-    def __init__(self, lit_server: "LitServer", loggers: Optional[Union[List[Logger], Logger]] = None):
+    def __init__(self, lit_server: "LitServer", loggers: Optional[Union[list[Logger], Logger]] = None):
         self._loggers = []
         self._lit_server = lit_server
         if loggers is None:
@@ -126,7 +126,7 @@ class _LoggerConnector:
             return False
 
     @staticmethod
-    def _process_logger_queue(logger_proxies: List[_LoggerProxy], queue):
+    def _process_logger_queue(logger_proxies: list[_LoggerProxy], queue):
         loggers = [proxy if isinstance(proxy, Logger) else proxy.create_logger() for proxy in logger_proxies]
         while True:
             key, value = queue.get()
