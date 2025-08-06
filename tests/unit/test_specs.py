@@ -56,10 +56,13 @@ class TestAsyncAPI(TestOpenAISpecAPI):
 async def test_openai_spec(openai_request_data, api):
     server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app),
-            base_url="http://test",
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(
+                transport=ASGITransport(app=manager.app),
+                base_url="http://test",
+            ) as ac,
+        ):
             openai_request_data["stream"] = True
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
@@ -96,9 +99,10 @@ async def test_openai_spec(openai_request_data, api):
 async def test_openai_token_usage(api_cls, batch_size, openai_request_data, openai_response_data):
     server = ls.LitServer(api_cls(spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             result = resp.json()
@@ -139,9 +143,10 @@ class OpenAIWithUsagePerToken(ls.LitAPI):
 async def test_openai_per_token_usage(api_cls, batch_size, openai_request_data):
     server = ls.LitServer(api_cls(spec=ls.OpenAISpec(), max_batch_size=batch_size, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             result = resp.json()
@@ -160,9 +165,10 @@ async def test_openai_per_token_usage(api_cls, batch_size, openai_request_data):
 async def test_openai_spec_with_image(openai_request_data_with_image):
     server = ls.LitServer(TestAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_image, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -176,9 +182,10 @@ async def test_openai_spec_with_audio(openai_request_data_with_audio_wav, openai
     server = ls.LitServer(TestAPI(spec=OpenAISpec()))
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_audio_wav, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -199,9 +206,10 @@ async def test_openai_spec_with_audio(openai_request_data_with_audio_wav, openai
 async def test_override_encode(openai_request_data):
     server = ls.LitServer(TestAPIWithCustomEncode(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -214,9 +222,10 @@ async def test_override_encode(openai_request_data):
 async def test_openai_spec_with_tools(openai_request_data_with_tools):
     server = ls.LitServer(TestAPIWithToolCalls(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_tools, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["choices"][0]["message"]["content"] == "", (
@@ -236,9 +245,10 @@ async def test_openai_spec_with_tools(openai_request_data_with_tools):
 async def test_openai_spec_with_response_format(openai_request_data_with_response_format):
     server = ls.LitServer(TestAPIWithStructuredOutput(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_response_format, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert (
@@ -266,9 +276,10 @@ async def test_openai_spec_metadata(openai_request_data_with_metadata):
     server = ls.LitServer(MetadataRequiredAPI(spec=OpenAISpec()))
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data_with_metadata)
             assert resp.status_code == 200
             assert resp.json()["choices"][0]["message"]["content"] == "ok"
@@ -279,9 +290,10 @@ async def test_openai_spec_metadata_required_fail(openai_request_data):
     server = ls.LitServer(MetadataRequiredAPI(spec=OpenAISpec()))
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data)
             assert resp.status_code == 500
             assert "Missing required metadata" in resp.text
@@ -301,9 +313,10 @@ async def test_openai_spec_reasoning_effort(reasoning_effort, openai_request_dat
     server = ls.LitServer(TestAPIWithReasoningEffort(spec=OpenAISpec()))
     openai_request_data["reasoning_effort"] = reasoning_effort
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data)
             if reasoning_effort == "random":
                 assert resp.status_code == 422  # as random is not a valid reasoning effort
@@ -356,9 +369,10 @@ async def test_oai_prepopulated_context(openai_request_data):
     openai_request_data["max_completion_tokens"] = 3
     server = ls.LitServer(PrePopulatedAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.json()["choices"][0]["message"]["content"] == "This is a", (
                 "OpenAISpec must return only 3 tokens as specified using `max_completion_tokens` parameter"
@@ -378,9 +392,10 @@ class WrongLitAPI(ls.LitAPI):
 async def test_fail_http(openai_request_data):
     server = ls.LitServer(WrongLitAPI(spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             res = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert res.status_code == 501, f"Server raises 501 error: {res.content}"
             assert res.text == '{"detail":"test LitAPI.predict error"}'
@@ -460,9 +475,10 @@ class AsyncOpenAILitAPI(ls.LitAPI):
 async def test_openai_spec_with_async_litapi(openai_request_data):
     server = ls.LitServer(AsyncOpenAILitAPI(enable_async=True, spec=OpenAISpec()))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
 
@@ -476,9 +492,10 @@ async def test_openai_spec_with_async_litapi(openai_request_data):
 async def test_openai_spec_with_custom_api_path(api_path, openai_request_data):
     server = ls.LitServer(TestAPI(spec=OpenAISpec(), api_path=api_path))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post(api_path, json=openai_request_data, timeout=10)
             assert resp.status_code == 200, "Status code should be 200"
             assert resp.json()["choices"][0]["message"]["content"] == "This is a generated output"

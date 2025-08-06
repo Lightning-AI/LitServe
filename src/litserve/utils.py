@@ -25,10 +25,11 @@ import time
 import uuid
 import warnings
 from abc import ABCMeta
+from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, TextIO, Union
+from typing import TYPE_CHECKING, Any, Dict, TextIO, Union
 
 from fastapi import HTTPException
 
@@ -325,9 +326,10 @@ def add_ssl_context_from_env(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     cert_key = base64.b64decode(cert_key_b64).decode("utf-8")
 
     # Write to temporary files
-    with tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file, tempfile.NamedTemporaryFile(
-        mode="w+", delete=False
-    ) as key_file:
+    with (
+        tempfile.NamedTemporaryFile(mode="w+", delete=False) as cert_file,
+        tempfile.NamedTemporaryFile(mode="w+", delete=False) as key_file,
+    ):
         cert_file.write(cert_pem)
         cert_file.flush()
         key_file.write(cert_key)

@@ -31,9 +31,10 @@ async def test_multiple_endpoints():
     server = ls.LitServer([api1, api2])
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/api1", json={"input": 2.0}, timeout=10)
             assert resp.status_code == 200, "Server response should be 200 (OK)"
             assert resp.json()["output"] == 4.0, "output from Identity server must be same as input"

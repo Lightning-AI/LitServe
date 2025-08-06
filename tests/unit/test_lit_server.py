@@ -72,9 +72,10 @@ async def test_stream(simple_stream_api, use_zmq):
     expected_output2 = "prompt=World generated_output=LitServe is streaming output".lower().replace(" ", "")
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             # TODO: remove this sleep when we have a better way to check if the server is ready
             # TODO: main process can only consume when response_queue_to_buffer is ready
             await asyncio.sleep(4)
@@ -103,9 +104,10 @@ async def test_batched_stream_server(simple_batched_stream_api, use_zmq):
     expected_output2 = "World LitServe is streaming output".lower().replace(" ", "")
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp1 = ac.post("/predict", json={"prompt": "Hello"}, timeout=10)
             resp2 = ac.post("/predict", json={"prompt": "World"}, timeout=10)
             resp1, resp2 = await asyncio.gather(resp1, resp2)
@@ -322,11 +324,11 @@ def test_server_terminate():
     server.verify_worker_status = MagicMock()
     server._transport = MagicMock()
 
-    with patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager, patch(
-        "litserve.server.LitServer._start_server", side_effect=Exception("mocked error")
-    ) as mock_start, patch(
-        "litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])
-    ) as mock_launch:
+    with (
+        patch("litserve.server.LitServer._init_manager", return_value=MagicMock()) as mock_init_manager,
+        patch("litserve.server.LitServer._start_server", side_effect=Exception("mocked error")) as mock_start,
+        patch("litserve.server.LitServer.launch_inference_worker", return_value=([MagicMock()])) as mock_launch,
+    ):
         with pytest.raises(Exception, match="mocked error"):
             server.run(port=8001)
 
@@ -384,27 +386,30 @@ async def test_inject_context():
     api = IdentityAPI()
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched loop
     server = LitServer(IdentityBatchedAPI(max_batch_size=2, batch_timeout=0.01))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
     # Test context injection with batched streaming loop
     server = LitServer(IdentityBatchedStreamingAPI(max_batch_size=2, batch_timeout=0.01, stream=True))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
     assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
@@ -571,9 +576,10 @@ async def test_async_litapi():
     api = TestAsyncLitAPI(enable_async=True)
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 200, "Server response should be 200 (OK)"
             assert resp.json()["output"] == 25.0, "output from Identity server must be same as input"
@@ -593,9 +599,10 @@ async def test_concurrent_async_inference(num_requests):
     api = TestSleepAsyncLitAPI(enable_async=True)
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             sleep(2)  # Sleep a bit to ensure the server is ready
 
             tasks = [ac.post("/predict", json={"input": 5.0}, timeout=10) for _ in range(num_requests)]
@@ -620,9 +627,10 @@ class TestHTTPExceptionAsyncLitAPI(TestAsyncLitAPI):
 async def test_error_propagation_in_async_litapi():
     server = LitServer(TestHTTPExceptionAsyncLitAPI(enable_async=True))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
             assert resp.status_code == 501, "Server raises 501 error"
             assert resp.json() == {"detail": "decode request is bad"}, "decode request is bad"
@@ -649,9 +657,10 @@ async def test_async_stream_litapi():
     api = TestAsyncStreamLitAPI(enable_async=True, stream=True)
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             resp = await ac.post("/predict", json={"input": 4.0}, timeout=10)
             assert resp.status_code == 200, "Server response should be 200 (OK)"
             chunks = []
@@ -675,9 +684,10 @@ async def test_concurrent_async_streaming_inference(num_requests):
     api = TestSleepAsyncStreamLitAPI(enable_async=True, stream=True)
     server = LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             sleep(2)  # Sleep a bit to ensure the server is ready
 
             # Prepare concurrent streaming requests using the parameterized num_requests

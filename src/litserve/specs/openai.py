@@ -20,8 +20,9 @@ import typing
 import uuid
 import warnings
 from collections import deque
+from collections.abc import AsyncGenerator, Iterator
 from enum import Enum
-from typing import Annotated, AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse

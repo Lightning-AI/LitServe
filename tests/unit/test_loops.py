@@ -19,8 +19,9 @@ import json
 import re
 import threading
 import time
+from collections.abc import AsyncGenerator
 from queue import Empty, Queue
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -707,9 +708,10 @@ async def test_loop_with_server_async(fast_queue):
     server = ls.LitServer(lit_api, loop=loop, fast_queue=fast_queue)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response = await ac.post("/predict", json={"input": 4.0}, timeout=5)
             assert response.json() == {"output": 1600.0}
 

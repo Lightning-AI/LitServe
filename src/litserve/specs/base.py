@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import abstractmethod
-from typing import TYPE_CHECKING, AsyncGenerator, Callable, Generator, List, Optional, Union
+from collections.abc import AsyncGenerator, Generator
+from typing import TYPE_CHECKING, Callable, List, Optional, Union
 
 if TYPE_CHECKING:
     from litserve import LitAPI, LitServer
