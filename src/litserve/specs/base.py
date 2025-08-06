@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import abstractmethod
-from typing import TYPE_CHECKING, AsyncGenerator, Callable, Generator, List, Optional, Union
+from collections.abc import AsyncGenerator, Generator
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 if TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -43,7 +44,7 @@ class LitSpec:
         self.request_queue = server._get_request_queue(self.api_path)
         self.data_streamer = server.data_streamer
 
-    def add_endpoint(self, path: str, endpoint: Callable, methods: List[str]):
+    def add_endpoint(self, path: str, endpoint: Callable, methods: list[str]):
         """Register an endpoint in the spec."""
         self._endpoints.append((path, endpoint, methods))
 

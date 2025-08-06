@@ -427,11 +427,14 @@ async def test_mcp_server():
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
-    async with streamablehttp_client("http://localhost:8000/mcp/") as (
-        read_stream,
-        write_stream,
-        _,
-    ), ClientSession(read_stream, write_stream) as session:
+    async with (
+        streamablehttp_client("http://localhost:8000/mcp/") as (
+            read_stream,
+            write_stream,
+            _,
+        ),
+        ClientSession(read_stream, write_stream) as session,
+    ):
         await session.initialize()
         result = await session.list_tools()
         assert len(result.tools) == 1, f"Expected 1 tool. Result: {result}"

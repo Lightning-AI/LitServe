@@ -17,7 +17,6 @@ import selectors
 import subprocess
 import sys
 import time
-from typing import List
 
 import pytest
 from tqdm import tqdm
@@ -25,7 +24,7 @@ from tqdm import tqdm
 uvicorn_msg = "Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)"
 
 
-def extract_code_blocks(lines: List[str]) -> List[str]:
+def extract_code_blocks(lines: list[str]) -> list[str]:
     language = "python"
     regex = re.compile(
         r"(?P<start>^```(?P<block_language>(\w|-)+)\n)(?P<code>.*?\n)(?P<end>```)",
@@ -35,7 +34,7 @@ def extract_code_blocks(lines: List[str]) -> List[str]:
     return [block for block_language, block in blocks if block_language == language]
 
 
-def get_code_blocks(file: str) -> List[str]:
+def get_code_blocks(file: str) -> list[str]:
     with open(file) as f:
         lines = list(f)
         return extract_code_blocks(lines)

@@ -16,9 +16,10 @@ from litserve.utils import wrap_litserve_start
 
 async def run_simple_request(server, num_requests=1):
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             responses = [ac.post("/predict", json={"input": 4.0}) for _ in range(num_requests)]
             responses = await asyncio.gather(*responses)
             for response in responses:

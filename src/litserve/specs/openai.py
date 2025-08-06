@@ -20,8 +20,9 @@ import typing
 import uuid
 import warnings
 from collections import deque
+from collections.abc import AsyncGenerator, Iterator
 from enum import Enum
-from typing import Annotated, AsyncGenerator, Dict, Iterator, List, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
@@ -92,7 +93,7 @@ class AudioContent(BaseModel):
 class Function(BaseModel):
     name: str
     description: str
-    parameters: Dict[str, object]
+    parameters: dict[str, object]
 
 
 class ToolChoice(str, Enum):
@@ -129,7 +130,7 @@ class ResponseFormatJSONObject(BaseModel):
 class JSONSchema(BaseModel):
     name: str
     description: Optional[str] = None
-    schema_: Optional[Dict[str, object]] = Field(None, alias="schema")
+    schema_: Optional[dict[str, object]] = Field(None, alias="schema")
     strict: Optional[bool] = False
 
 
@@ -145,9 +146,9 @@ ResponseFormat = Annotated[
 
 class ChatMessage(BaseModel):
     role: str
-    content: Optional[Union[str, List[Union[TextContent, ImageContent, AudioContent]]]] = None
+    content: Optional[Union[str, list[Union[TextContent, ImageContent, AudioContent]]]] = None
     name: Optional[str] = None
-    tool_calls: Optional[List[ToolCall]] = None
+    tool_calls: Optional[list[ToolCall]] = None
     tool_call_id: Optional[str] = None
 
 
@@ -164,22 +165,22 @@ class ChoiceDelta(ChatMessage):
 
 class ChatCompletionRequest(BaseModel):
     model: Optional[str] = ""
-    messages: List[ChatMessage]
+    messages: list[ChatMessage]
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 1.0
     n: Optional[int] = 1
     max_tokens: Optional[int] = None  # Kept for backward compatibility
     max_completion_tokens: Optional[int] = None
-    stop: Optional[Union[str, List[str]]] = None
+    stop: Optional[Union[str, list[str]]] = None
     stream: Optional[bool] = False
     presence_penalty: Optional[float] = 0.0
     frequency_penalty: Optional[float] = 0.0
     user: Optional[str] = None
-    tools: Optional[List[Tool]] = None
+    tools: Optional[list[Tool]] = None
     tool_choice: Optional[ToolChoice] = ToolChoice.auto
     response_format: Optional[ResponseFormat] = None
     reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
-    metadata: Optional[Dict[str, str]] = None
+    metadata: Optional[dict[str, str]] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
@@ -193,7 +194,7 @@ class ChatCompletionResponse(BaseModel):
     object: str = "chat.completion"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str
-    choices: List[ChatCompletionResponseChoice]
+    choices: list[ChatCompletionResponseChoice]
     usage: UsageInfo
 
 
@@ -210,7 +211,7 @@ class ChatCompletionChunk(BaseModel):
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str
     system_fingerprint: Optional[str] = None
-    choices: List[ChatCompletionStreamingChoice]
+    choices: list[ChatCompletionStreamingChoice]
     usage: Optional[UsageInfo]
 
 
@@ -331,22 +332,26 @@ class ExampleAPI(ls.LitAPI):
 
 def _openai_format_error(error: Exception):
     if isinstance(error, HTTPException):
-        return "data: " + json.dumps({
+        return "data: " + json.dumps(
+            {
+                "error": {
+                    "message": error.detail,
+                    "type": "internal",
+                    "param": None,
+                    "code": "internal_error",
+                }
+            }
+        )
+    return "data: " + json.dumps(
+        {
             "error": {
-                "message": error.detail,
+                "message": "Internal server error",
                 "type": "internal",
                 "param": None,
                 "code": "internal_error",
             }
-        })
-    return "data: " + json.dumps({
-        "error": {
-            "message": "Internal server error",
-            "type": "internal",
-            "param": None,
-            "code": "internal_error",
         }
-    })
+    )
 
 
 class OpenAISpec(LitSpec):
@@ -438,7 +443,7 @@ class OpenAISpec(LitSpec):
     def unbatch(self, output):
         yield output
 
-    def extract_usage_info(self, output: Dict) -> Dict:
+    def extract_usage_info(self, output: dict) -> dict:
         prompt_tokens: int = output.pop("prompt_tokens", 0)
         completion_tokens: int = output.pop("completion_tokens", 0)
         total_tokens: int = output.pop("total_tokens", 0)
@@ -451,7 +456,7 @@ class OpenAISpec(LitSpec):
     def validate_chat_message(self, obj):
         return isinstance(obj, dict) and "role" in obj and "content" in obj
 
-    def _encode_response(self, output: Union[Dict[str, str], List[Dict[str, str]]]) -> Dict:
+    def _encode_response(self, output: Union[dict[str, str], list[dict[str, str]]]) -> dict:
         logger.debug(output)
         if output is None:
             message = {"role": "assistant", "content": None}
@@ -475,13 +480,13 @@ class OpenAISpec(LitSpec):
         return {**message, **usage_info}
 
     def encode_response(
-        self, output_generator: Union[Dict[str, str], List[Dict[str, str]]], context_kwargs: Optional[dict] = None
+        self, output_generator: Union[dict[str, str], list[dict[str, str]]], context_kwargs: Optional[dict] = None
     ) -> Iterator[Union[ChatMessage, ChatMessageWithUsage]]:
         for output in output_generator:
             logger.debug(output)
             yield self._encode_response(output)
 
-    async def get_from_queues(self, uids) -> List[AsyncGenerator]:
+    async def get_from_queues(self, uids) -> list[AsyncGenerator]:
         choice_pipes = []
         for uid, q, event in zip(uids, self.queues, self.events):
             data = self.data_streamer(q, event, send_status=True)
@@ -519,7 +524,7 @@ class OpenAISpec(LitSpec):
         response_task = asyncio.create_task(self.non_streaming_completion(request, responses))
         return await response_task
 
-    async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: List):
+    async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: list):
         try:
             model = request.model
             usage_info = None
@@ -569,7 +574,7 @@ class OpenAISpec(LitSpec):
             yield _openai_format_error(e)
             return
 
-    async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: List[AsyncGenerator]):
+    async def non_streaming_completion(self, request: ChatCompletionRequest, generator_list: list[AsyncGenerator]):
         try:
             model = request.model
             usage_infos = []

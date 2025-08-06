@@ -93,9 +93,10 @@ async def test_batched():
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
@@ -111,9 +112,10 @@ async def test_unbatched():
     api.pre_setup(spec=None)
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)
@@ -149,16 +151,22 @@ def test_max_batch_size_warning():
         SimpleBatchLitAPI()
 
     # Test no warnings are raised when max_batch_size is set and max_batch_size is not set
-    with pytest.raises(pytest.fail.Exception), pytest.warns(
-        UserWarning,
-        match=warning,
+    with (
+        pytest.raises(pytest.fail.Exception),
+        pytest.warns(
+            UserWarning,
+            match=warning,
+        ),
     ):
         SimpleBatchLitAPI(max_batch_size=2)
 
     # Test no warning is set when LitAPI doesn't implement batch and unbatch
-    with pytest.raises(pytest.fail.Exception), pytest.warns(
-        UserWarning,
-        match=warning,
+    with (
+        pytest.raises(pytest.fail.Exception),
+        pytest.warns(
+            UserWarning,
+            match=warning,
+        ),
     ):
         SimpleTorchAPI()
 
@@ -278,9 +286,10 @@ async def test_batch_size_mismatch():
     server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
 
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response1 = ac.post("/predict", json={"input": 4.0})
             response2 = ac.post("/predict", json={"input": 5.0})
             response1, response2 = await asyncio.gather(response1, response2)

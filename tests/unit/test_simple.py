@@ -248,9 +248,10 @@ async def test_timeout(use_zmq):
     api = SlowLitAPI()  # takes 2 seconds for each prediction
     server = LitServer(api, accelerator="cpu", devices=1, timeout=2, fast_queue=use_zmq)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
             await asyncio.sleep(0.0001)
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
@@ -277,9 +278,10 @@ async def test_batch_timeout_with_concurrent_requests(use_zmq):
         fast_queue=use_zmq,
     )
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
             await asyncio.sleep(0.0001)
