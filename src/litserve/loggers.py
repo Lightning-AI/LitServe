@@ -129,15 +129,27 @@ class _LoggerConnector:
     def _process_logger_queue(logger_proxies: List[_LoggerProxy], queue):
         loggers = [proxy if isinstance(proxy, Logger) else proxy.create_logger() for proxy in logger_proxies]
         while True:
-            key, value = queue.get()
-            for logger in loggers:
-                try:
-                    logger.process(key, value)
-                except Exception as e:
-                    module_logger.error(
-                        f"{logger.__class__.__name__} ran into an error while processing log for entry "
-                        f"with key {key} and value {value}: {e}"
-                    )
+            try:
+                key, value = queue.get()
+                for logger in loggers:
+                    try:
+                        logger.process(key, value)
+                    except Exception as e:
+                        module_logger.error(
+                            f"{logger.__class__.__name__} ran into an error while processing log for entry "
+                            f"with key {key} and value {value}: {e}"
+                        )
+            except (EOFError, OSError, BrokenPipeError):
+                # Queue was closed, exit gracefully
+                module_logger.debug("Logger queue closed, terminating logger process")
+                break
+            except KeyboardInterrupt:
+                # Handle graceful shutdown
+                module_logger.debug("Logger process interrupted, terminating")
+                break
+            except Exception as e:
+                module_logger.error(f"Unexpected error in logger process: {e}")
+                break
 
     @functools.cache  # Run once per LitServer instance
     def run(self, lit_server: "LitServer"):

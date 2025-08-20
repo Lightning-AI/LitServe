@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import atexit
 import json
 import sys
 import time
@@ -31,6 +32,27 @@ from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import LitServer
 from litserve.utils import wrap_litserve_start
+
+# Add cleanup tracking
+_active_processes = []
+
+
+def cleanup_processes():
+    """Cleanup function to terminate any remaining processes."""
+    for process in _active_processes:
+        try:
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=2)
+                if process.is_alive():
+                    process.kill()
+        except Exception:
+            pass
+    _active_processes.clear()
+
+
+# Register cleanup on exit
+atexit.register(cleanup_processes)
 
 
 def test_index(sync_testclient):
