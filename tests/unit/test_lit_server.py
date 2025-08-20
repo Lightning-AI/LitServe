@@ -16,6 +16,7 @@ import atexit
 import json
 import sys
 import time
+from contextlib import suppress
 from time import sleep
 from unittest.mock import MagicMock, patch
 
@@ -40,14 +41,13 @@ _active_processes = []
 def cleanup_processes():
     """Cleanup function to terminate any remaining processes."""
     for process in _active_processes:
-        try:
+        with suppress(Exception):
+            if not process.is_alive():
+                continue
+            process.terminate()
+            process.join(timeout=2)
             if process.is_alive():
-                process.terminate()
-                process.join(timeout=2)
-                if process.is_alive():
-                    process.kill()
-        except Exception:
-            pass
+                process.kill()
     _active_processes.clear()
 
 
