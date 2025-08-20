@@ -21,7 +21,7 @@ import sys
 import time
 from abc import ABC
 from queue import Empty, Queue
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from starlette.formparsers import MultiPartParser
 
@@ -41,7 +41,7 @@ _DEFAULT_STOP_LOOP_MESSAGE = "Received sentinel value, stopping loop"
 _SENTINEL_VALUE = (None, None, None, None)
 
 
-def _inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
+def _inject_context(context: Union[list[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
     if "context" in sig.parameters:
         return func(*args, **kwargs, context=context)
@@ -80,7 +80,7 @@ async def _handle_async_function(func, *args, **kwargs):
     return result
 
 
-async def _async_inject_context(context: Union[List[dict], dict], func, *args, **kwargs):
+async def _async_inject_context(context: Union[list[dict], dict], func, *args, **kwargs):
     sig = inspect.signature(func)
 
     # Determine if we need to inject context
@@ -99,7 +99,7 @@ class _StopLoopError(Exception):
 def collate_requests(
     lit_api: LitAPI,
     request_queue: Queue,
-) -> Tuple[List, List]:
+) -> tuple[list, list]:
     payloads = []
     timed_out_uids = []
     entered_at = time.monotonic()
@@ -170,9 +170,9 @@ class _BaseLoop(ABC):
             device: str,
             worker_id: int,
             request_queue: Queue,
-            response_queues: List[Queue],
+            response_queues: list[Queue],
             stream: bool,
-            workers_setup_status: Dict[int, str],
+            workers_setup_status: dict[int, str],
             callback_runner: CallbackRunner,
         ):
             item = request_queue.get()
@@ -198,7 +198,7 @@ class _BaseLoop(ABC):
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: List[Queue],
+        response_queues: list[Queue],
     ):
         pass
 
@@ -209,7 +209,7 @@ class _BaseLoop(ABC):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
     ):
         lit_spec = lit_api.spec
@@ -255,7 +255,7 @@ class _BaseLoop(ABC):
         worker_id: int,
         request_queue: Queue,
         transport: MessageTransport,
-        workers_setup_status: Dict[int, str],
+        workers_setup_status: dict[int, str],
         callback_runner: CallbackRunner,
     ):
         raise NotImplementedError
@@ -279,7 +279,7 @@ class LitLoop(_BaseLoop):
         self,
         lit_api: LitAPI,
         request_queue: Queue,
-    ) -> Tuple[List, List]:
+    ) -> tuple[list, list]:
         batches, timed_out_uids = collate_requests(
             lit_api,
             request_queue,
@@ -330,10 +330,13 @@ class DefaultLoop(LitLoop):
             return
 
         original = lit_api.unbatch.__code__ is LitAPI.unbatch.__code__
-        if not lit_api.stream and any([
-            inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response) or inspect.isasyncgenfunction(lit_api.encode_response),
-        ]):
+        if not lit_api.stream and any(
+            [
+                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response)
+                or inspect.isasyncgenfunction(lit_api.encode_response),
+            ]
+        ):
             raise ValueError(
                 """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` must not be
                 generator or async generator functions.
@@ -366,16 +369,18 @@ class DefaultLoop(LitLoop):
         if (
             lit_api.stream
             and lit_api.max_batch_size > 1
-            and not all([
-                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
-                inspect.isgeneratorfunction(lit_api.encode_response)
-                or inspect.isasyncgenfunction(lit_api.encode_response),
-                (
-                    original
-                    or inspect.isgeneratorfunction(lit_api.unbatch)
-                    or inspect.isasyncgenfunction(lit_api.unbatch)
-                ),
-            ])
+            and not all(
+                [
+                    inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+                    inspect.isgeneratorfunction(lit_api.encode_response)
+                    or inspect.isasyncgenfunction(lit_api.encode_response),
+                    (
+                        original
+                        or inspect.isgeneratorfunction(lit_api.unbatch)
+                        or inspect.isasyncgenfunction(lit_api.unbatch)
+                    ),
+                ]
+            )
         ):
             raise ValueError(
                 """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
@@ -407,10 +412,13 @@ class DefaultLoop(LitLoop):
              """
             )
 
-        if lit_api.stream and not all([
-            inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
-            inspect.isgeneratorfunction(lit_api.encode_response) or inspect.isasyncgenfunction(lit_api.encode_response),
-        ]):
+        if lit_api.stream and not all(
+            [
+                inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
+                inspect.isgeneratorfunction(lit_api.encode_response)
+                or inspect.isasyncgenfunction(lit_api.encode_response),
+            ]
+        ):
             raise ValueError(
                 """When `stream=True` both `lit_api.predict` and
              `lit_api.encode_response` must generate values using `yield` (can be regular or async generators).

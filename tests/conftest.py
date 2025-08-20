@@ -14,7 +14,7 @@
 import base64
 import random
 import time
-from typing import Generator
+from collections.abc import Generator
 
 import psutil
 import pytest

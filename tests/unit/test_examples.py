@@ -19,9 +19,10 @@ async def test_simple_pytorch_api():
     api = ls.test_examples.SimpleTorchAPI()
     server = ls.LitServer(api, accelerator="cpu")
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response = await ac.post("/predict", json={"input": 4.0})
             assert response.json() == {"output": 9.0}
 
@@ -31,9 +32,10 @@ async def test_simple_batched_api():
     api = ls.test_examples.SimpleBatchedAPI(max_batch_size=4, batch_timeout=0.1)
     server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response = await ac.post("/predict", json={"input": 4.0})
             assert response.json() == {"output": 16.0}
 
@@ -43,9 +45,10 @@ async def test_simple_api():
     api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(api)
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response = await ac.post("/predict", json={"input": 4.0})
             assert response.json() == {"output": 16.0}
 

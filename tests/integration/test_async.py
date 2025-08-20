@@ -32,8 +32,9 @@ class MinimalAsyncAPI(ls.LitAPI):
 async def test_async_api():
     server = ls.LitServer(MinimalAsyncAPI(enable_async=True))
     with wrap_litserve_start(server) as server:
-        async with LifespanManager(server.app) as manager, AsyncClient(
-            transport=ASGITransport(app=manager.app), base_url="http://test"
-        ) as ac:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
             response = await ac.post("/predict", json={"input": 2})
             assert response.json() == {"output": 4}

@@ -1,7 +1,7 @@
 import logging
 from abc import ABC
 from enum import Enum
-from typing import List, Union
+from typing import Union
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +62,12 @@ class Callback(ABC):
 
 
 class CallbackRunner:
-    def __init__(self, callbacks: Union[Callback, List[Callback]] = None):
+    def __init__(self, callbacks: Union[Callback, list[Callback]] = None):
         self._callbacks = []
         if callbacks:
             self._add_callbacks(callbacks)
 
-    def _add_callbacks(self, callbacks: Union[Callback, List[Callback]]):
+    def _add_callbacks(self, callbacks: Union[Callback, list[Callback]]):
         if not isinstance(callbacks, list):
             callbacks = [callbacks]
         for callback in callbacks:

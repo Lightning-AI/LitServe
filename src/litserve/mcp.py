@@ -18,7 +18,7 @@ import json
 import logging
 import weakref
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Optional, Union, get_args, get_origin
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def extract_input_schema(func) -> Dict[str, Any]:
+def extract_input_schema(func) -> dict[str, Any]:
     """Extract JSON schema for function input parameters from a Python function. Supports regular type annotations,
     Pydantic Fields, and Pydantic BaseModel classes.
 
@@ -212,7 +212,7 @@ def _python_type_to_json_schema(python_type) -> Union[str, dict]:
     if python_type in type_mapping:
         return type_mapping[python_type]
 
-    # Handle typing module types (List, Dict, Optional, etc.)
+    # Handle typing module types (list, Dict, Optional, etc.)
     origin = get_origin(python_type)
     if origin is not None:
         # Handle Optional types (Union[T, None])
@@ -247,12 +247,14 @@ def _param_name_to_title(param_name: str) -> str:
 
 async def _call_handler(handler, **kwargs):
     sig = inspect.signature(handler)
-    bound = sig.bind_partial(**{
-        k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
-        for k, v in kwargs.items()
-        for name, p in sig.parameters.items()
-        if k == name
-    })
+    bound = sig.bind_partial(
+        **{
+            k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
+            for k, v in kwargs.items()
+            for name, p in sig.parameters.items()
+            if k == name
+        }
+    )
     return _convert_to_content(await handler(*bound.args, **bound.kwargs))
 
 
@@ -328,7 +330,7 @@ class MCP:
         - Basic types: `str`, `int`, `float`, `bool`, `list`, `dict`
         - Optional types: `Optional[str]`, `Union[str, None]`
         - Pydantic models: Full schema extraction with validation
-        - Complex types: `List[str]`, `Dict[str, Any]`
+        - Complex types: `list[str]`, `dict[str, Any]`
 
     Notes:
         - MCP integration is optional and doesn't affect non-MCP clients
@@ -346,7 +348,7 @@ class MCP:
     def __init__(
         self,
         description: Optional[str] = None,
-        input_schema: Optional[Dict[str, Any]] = None,
+        input_schema: Optional[dict[str, Any]] = None,
         name: Optional[str] = None,
     ):
         """
@@ -451,10 +453,12 @@ class _MCPRequestHandler:
             await send(error_message)
 
             body = json.dumps({"error": str(e)}).encode("utf-8")
-            await send({
-                "type": "http.response.body",
-                "body": body,
-            })
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": body,
+                }
+            )
 
     # https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/server/fastmcp/server.py
     def streamable_http_app(self) -> Starlette:
@@ -471,7 +475,7 @@ class _MCPRequestHandler:
         handle_streamable_http = self.handle_streamable_http
 
         # Create routes
-        routes: List[Mount] = [Mount("/mcp/", app=handle_streamable_http)]
+        routes: list[Mount] = [Mount("/mcp/", app=handle_streamable_http)]
         return Starlette(
             routes=routes,
         )
@@ -494,7 +498,7 @@ class _LitMCPServerConnector:
         self.tool_endpoint_connections[tool.name] = tool.endpoint
         self.tools.append(tool)
 
-    def list_tools(self) -> List[ToolEndpointType]:
+    def list_tools(self) -> list[ToolEndpointType]:
         return self.tools
 
     @asynccontextmanager
@@ -549,7 +553,7 @@ class _LitMCPServerConnector:
         starlette_app = self.request_handler.streamable_http_app()
         app.mount("/", starlette_app, name="mcp")
 
-    def connect_mcp_server(self, mcp_tools: List[ToolType], app: FastAPI):
+    def connect_mcp_server(self, mcp_tools: list[ToolType], app: FastAPI):
         """LitServer calls this method to connect MCP server to the FastAPI app.
 
         Args:

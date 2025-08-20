@@ -1,6 +1,6 @@
 import inspect
 import sys
-from typing import Dict, List, Optional
+from typing import Optional
 from unittest.mock import patch
 
 import pytest
@@ -152,11 +152,11 @@ def test_mcp_schema_with_default_values():
 
 def test_python_type_to_json_schema_complex():
     # Test generic types
-    assert _python_type_to_json_schema(List[str]) == "array"
-    assert _python_type_to_json_schema(Dict[str, int]) == "object"
+    assert _python_type_to_json_schema(list[str]) == "array"
+    assert _python_type_to_json_schema(dict[str, int]) == "object"
 
     # Test nested optional types
-    assert _python_type_to_json_schema(Optional[List[str]]) == {"type": "array", "nullable": True}
+    assert _python_type_to_json_schema(Optional[list[str]]) == {"type": "array", "nullable": True}
 
 
 class ModelWithConstraints(BaseModel):
