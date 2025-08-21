@@ -48,6 +48,10 @@ class SingleLoop(DefaultLoop):
                 response_queue_id, uid, timestamp, x_enc = request_data
             except (Empty, ValueError):
                 continue
+            except EOFError:
+                # Manager/connection closed: treat as shutdown
+                logger.debug("Request queue closed (EOF). Exiting worker loop.")
+                break
             except KeyboardInterrupt:  # pragma: no cover
                 self.kill()
                 return
