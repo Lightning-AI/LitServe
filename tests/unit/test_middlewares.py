@@ -84,4 +84,4 @@ def test_middleware_multiple_initialization():
     api4 = ls.test_examples.SimpleLitAPI(api_path="/api4")
 
     server = ls.LitServer([api1, api2, api3, api4])
-    assert len(server.app.user_middleware) == 1, "Default/User middleware should be initialized only once"
+    assert len(server.app.user_middleware) == 1, "Each middleware should be initialized only once for `n` LitAPIs"
