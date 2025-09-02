@@ -75,3 +75,13 @@ def test_middlewares_inputs():
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+
+
+def test_middleware_multiple_initialization():
+    api1 = ls.test_examples.SimpleLitAPI(api_path="/api1")
+    api2 = ls.test_examples.SimpleLitAPI(api_path="/api2")
+    api3 = ls.test_examples.SimpleLitAPI(api_path="/api3")
+    api4 = ls.test_examples.SimpleLitAPI(api_path="/api4")
+
+    server = ls.LitServer([api1, api2, api3, api4])
+    assert len(server.app.user_middleware) == 1, "Each middleware should be initialized only once for `n` LitAPIs"
