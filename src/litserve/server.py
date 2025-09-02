@@ -752,6 +752,7 @@ class LitServer:
         self.timeout = timeout
         self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan, openapi_url="" if disable_openapi_url else "/openapi.json")
+
         self.app.response_queue_id = None
         self.response_buffer = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
@@ -791,6 +792,8 @@ class LitServer:
         self.inference_workers_config = self.devices * self.workers_per_device
         self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
+        # register middleware
+        self._register_middleware()
 
     def launch_inference_worker(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
@@ -947,6 +950,7 @@ class LitServer:
 
     def register_endpoints(self):
         self._register_internal_endpoints()
+
         for lit_api in self.litapi_connector:
             decode_request_signature = inspect.signature(lit_api.decode_request)
             encode_response_signature = inspect.signature(lit_api.encode_response)
@@ -986,9 +990,6 @@ class LitServer:
 
         # Handle specs
         self._register_spec_endpoints(lit_api)
-
-        # Register middleware
-        self._register_middleware()
 
     def _register_spec_endpoints(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
