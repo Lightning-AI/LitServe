@@ -29,8 +29,8 @@ repos:
         additional_dependencies: [tomli]
         #args: ["--write-changes"]
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
+  - repo: https://github.com/JoC0de/pre-commit-prettier
+    rev: b3e25fa39aa676c36bc18eb9eae6f26d9bb63f39 # v3.6.2 using SHA as tags are not persistent
     hooks:
       - id: prettier
         files: \.(json|yml|yaml|toml)
