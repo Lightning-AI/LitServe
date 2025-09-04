@@ -58,6 +58,7 @@ class Broker:
     def _run(self):
         """Main broker loop."""
         context = zmq.Context()
+        frontend, backend = None, None
         try:
             frontend = context.socket(zmq.XPUB)
             frontend.bind(self.frontend_address)
@@ -69,8 +70,10 @@ class Broker:
         except zmq.ZMQError as e:
             logger.error(f"Broker error: {e}")
         finally:
-            frontend.close(linger=0)
-            backend.close(linger=0)
+            if frontend:
+                frontend.close(linger=0)
+            if backend:
+                backend.close(linger=0)
             context.term()
 
     def stop(self):
