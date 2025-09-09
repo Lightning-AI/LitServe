@@ -361,7 +361,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     def has_capacity(self) -> bool:
         raise NotImplementedError("has_capacity is not implemented")
 
-    def health(self) -> bool | Awaitable[bool]:
+    def health(self) -> Union[bool, Awaitable[bool]]:
         """Check the additional health status of the API.
 
         This method is used in the /health endpoint of the server to determine the health status.
