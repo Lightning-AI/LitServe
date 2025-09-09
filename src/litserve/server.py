@@ -915,7 +915,14 @@ class LitServer:
             if not workers_ready:
                 workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
 
-            lit_api_health_status = all(lit_api.health() for lit_api in self.litapi_connector)
+            lit_api_health_status = True
+            for lit_api in self.litapi_connector:
+                result = lit_api.health()
+                if inspect.isawaitable(result):
+                    result = await result
+                if not result:
+                    lit_api_health_status = False
+                    break
             if workers_ready and lit_api_health_status:
                 return Response(content="ok", status_code=200)
 

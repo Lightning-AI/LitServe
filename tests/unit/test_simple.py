@@ -149,6 +149,34 @@ def test_workers_health_with_custom_health_method(use_zmq):
         assert response.text == "ok"
 
 
+class AsyncHealthLitAPI(SimpleLitAPI):
+    async def health(self) -> bool:
+        await asyncio.sleep(0.1)
+        return True
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_workers_health_with_async_health_method(use_zmq):
+    server = LitServer(
+        AsyncHealthLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # wait for workers to be ready
+        for _ in range(10):
+            response = client.get("/health")
+            if response.status_code == 200:
+                break
+            time.sleep(0.5)
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
         for i in range(100):

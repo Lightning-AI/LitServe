@@ -16,6 +16,7 @@ import inspect
 import json
 import warnings
 from abc import ABC
+from collections.abc import Awaitable
 from queue import Queue
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
@@ -360,14 +361,17 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     def has_capacity(self) -> bool:
         raise NotImplementedError("has_capacity is not implemented")
 
-    def health(self) -> bool:
+    def health(self) -> bool | Awaitable[bool]:
         """Check the additional health status of the API.
 
         This method is used in the /health endpoint of the server to determine the health status.
         Users can extend this method to include additional health checks specific to their application.
 
+        The default implementation is synchronous but users may optionally implement an
+        ``async`` version which will be awaited by :class:`~litserve.server.LitServer`.
+
         Returns:
-            bool: True if the API is healthy, False otherwise.
+            bool: ``True`` if the API is healthy, ``False`` otherwise.
 
         """
         return True
