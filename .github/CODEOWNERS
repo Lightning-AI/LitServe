@@ -2,12 +2,12 @@
 
 # These owners will be the default owners for everything in the repo. Unless a later match takes precedence,
 # @global-owner1 and @global-owner2 will be requested for review when someone opens a pull request.
-* @lantiga @aniketmaurya @ethanwharris @borda @justusschock @tchaton @andyland @k223kim @KaelanDt
+* @lantiga @aniketmaurya @ethanwharris @borda @justusschock @tchaton @andyland @k223kim @KaelanDt @dmitsf @Abdul-0x4A
 
 # CI/CD and configs
-/.github/       @borda
-*.yaml          @borda
-*.yml           @borda
+/.github/       @borda @andyland @dmitsf @Abdul-0x4A
+*.yaml          @borda @andyland @dmitsf @Abdul-0x4A
+*.yml           @borda @andyland @dmitsf @Abdul-0x4A
 
 # devel requirements
 /_requirements/ @borda @lantiga
