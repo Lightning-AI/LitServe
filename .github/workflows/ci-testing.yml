@@ -74,6 +74,9 @@ jobs:
           name: codecov-umbrella
           fail_ci_if_error: false
 
+      - name: Minimize uv cache
+        run: uv cache prune --ci
+
   tests-guardian:
     runs-on: ubuntu-latest
     needs: pytester
