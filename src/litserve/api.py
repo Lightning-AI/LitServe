@@ -279,6 +279,15 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                 "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
                 UserWarning,
             )
+        elif isinstance(output, dict):
+            warnings.warn(
+                "The 'predict' method returned a dict instead of a list of predictions. "
+                "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
+                "For example, return [{'class_A': 0.2, 'class_B': 0.8}, {'class_A': 0.5, 'class_B': 0.5}] "
+                "instead of {'class_A': [0.2, 0.5], 'class_B': [0.8, 0.5]}. "
+                "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
+                UserWarning,
+            )
         return list(output)
 
     def _unbatch_stream(self, output_stream):
