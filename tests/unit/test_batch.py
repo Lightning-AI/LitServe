@@ -322,3 +322,27 @@ def test_batch_predict_dict_warning():
         # So outputs would be ["class_A", "class_B"] which has the same length as num_inputs
         # This is the edge case we're warning about
         assert outputs == ["class_A", "class_B"]
+
+
+def test_batch_predict_set_warning():
+    """Test that a warning is raised when predict returns a set instead of a list."""
+    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
+    api.request_timeout = 30
+    api.pre_setup(spec=None)
+    
+    # Mock predict to return a set
+    # This simulates the edge case: set with 2 elements when batch size is 2
+    api.predict = MagicMock(return_value={1, 2})
+
+    mock_input = torch.tensor([[1.0], [2.0]])
+
+    # Simulate the behavior in run_batched_loop
+    y = api.predict(mock_input)
+    with pytest.warns(
+        UserWarning,
+        match="The 'predict' method returned a set instead of a list of predictions.",
+    ):
+        outputs = api.unbatch(y)
+        # When list() is called on a set, the order is arbitrary
+        # This could lead to incorrect results
+        assert len(outputs) == 2
