@@ -275,3 +275,29 @@ def test_mcp_litserve_connector():
     connector.connect_mcp_server([tool], app)
     mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
     assert isinstance(mcp_mount.app, Starlette)
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_handler_with_request_param():
+    """Test that _call_handler properly handles the 'request' parameter for endpoint_handler."""
+    from litserve.mcp import _call_handler
+
+    # Mock the _convert_to_content function since we don't have the actual MCP package
+    import litserve.mcp as mcp_module
+    original_convert = getattr(mcp_module, "_convert_to_content", None)
+    mcp_module._convert_to_content = lambda x: x
+
+    try:
+        # Simulate endpoint_handler signature that expects a 'request' parameter
+        async def endpoint_handler(request: MCPTestModel):
+            return {"result": f"name={request.name}, age={request.age}"}
+
+        # Test with arguments wrapped in 'request' key (the fix)
+        arguments = {"name": "John", "age": 30}
+        result = await _call_handler(endpoint_handler, request=arguments)
+
+        assert result == {"result": "name=John, age=30"}
+    finally:
+        # Restore original function if it existed
+        if original_convert:
+            mcp_module._convert_to_content = original_convert
