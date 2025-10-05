@@ -55,7 +55,13 @@
 &nbsp; 
 
 # Looking for GPUs and an inference platform?
-Over 340,000 developers use [Lightning Cloud](https://lightning.ai/?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) - purpose-built for LitServe, PyTorch and PyTorch Lightning. Get GPUs from $0.19, frontier-grade training/inference [clusters](https://lightning.ai/clusters?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme), vibe training/inference [workspaces](https://lightning.ai/studios?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme), [notebooks](https://lightning.ai/notebooks?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) with AI assistance and [inference](https://lightning.ai/deploy?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) for your custom models.
+Over 340,000 developers use [Lightning Cloud](https://lightning.ai/?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme) - purpose-built for PyTorch and PyTorch Lightning. 
+- [GPUs](https://lightning.ai/pricing?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme) from $0.19.   
+- [Clusters](https://lightning.ai/clusters?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): frontier-grade training/inference clusters.   
+- [AI Studio (vibe train)](https://lightning.ai/studios?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): workspaces where AI helps you debug, tune and vibe train.
+- [AI Studio (vibe deploy)](https://lightning.ai/studios?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): workspaces where AI helps you optimize, and deploy models.     
+- [Notebooks](https://lightning.ai/notebooks?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): Persistent GPU workspaces where AI helps you code and analyze.
+- [Inference](https://lightning.ai/deploy?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): Deploy models as inference APIs.   
 
 # Why LitServe?
 LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multi-model orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
