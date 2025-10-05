@@ -1,7 +1,9 @@
 <div align='center'>
 
 <h2>
-  The easiest way to deploy agents, MCP servers, RAG, pipelines, any model. 
+  The framework to build your own inference engine with expert control.   
+  <br/>
+  Build inference APIs, agents, MCP servers, RAG, and pipelines.
   <br/>
   No MLOps. No YAML.
 </h2>    
@@ -11,19 +13,13 @@
 &nbsp; 
 </div>
 
-Most serving engines serve one model with rigid abstractions. LitServe lets you serve any model (vision, audio, text) and build full AI systems - agents, chatbots, MCP servers, RAG, pipelines - with full control, batching, multi-GPU, streaming, custom logic, multi-model support, and zero YAML. 
-
-Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
-
-&nbsp;
-
 <div align='center'>
   
 <pre>
-✅ Build full AI systems   ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
-✅ Custom logic + control  ✅ Any PyTorch model          ✅ Self-host or managed        
-✅ Multi-GPU autoscaling   ✅ Batching + streaming       ✅ BYO model or vLLM           
-✅ No MLOps glue code      ✅ Easy setup in Python       ✅ Serverless support          
+✅ Build your own inference engine ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
+✅ Custom logic + control          ✅ Any PyTorch model          ✅ Self-host or managed        
+✅ Multi-GPU autoscaling           ✅ Batching + streaming       ✅ BYO model or vLLM           
+✅ No MLOps glue code              ✅ Easy setup in Python       ✅ Serverless support          
 
 </pre>
 
@@ -44,19 +40,29 @@ Self host or deploy in one-click to [Lightning AI](https://lightning.ai/).
     <a target="_blank" href="#features" style="margin: 0 10px;">Features</a> •
     <a target="_blank" href="#performance" style="margin: 0 10px;">Performance</a> •
     <a target="_blank" href="#host-anywhere" style="margin: 0 10px;">Hosting</a> •
-    <a target="_blank" href="https://lightning.ai/docs/litserve" style="margin: 0 10px;">Docs</a>
+    <a target="_blank" href="https://lightning.ai/docs/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme" style="margin: 0 10px;">Docs</a>
   </div>
 </div>
 
 &nbsp;
 
 <div align="center">
-<a target="_blank" href="https://lightning.ai/docs/litserve/home/get-started">
+<a target="_blank" href="https://lightning.ai/docs/litserve/home/get-started?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">
   <img src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/get-started-badge.svg" height="36px" alt="Get started"/>
 </a>
 </div>
 
 &nbsp; 
+
+# Looking for GPUs and an inference platform?
+Over 340,000 developers use [Lightning Cloud](https://lightning.ai/?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) - purpose-built for LitServe, PyTorch and PyTorch Lightning. Get GPUs from $0.19, frontier-grade training/inference [clusters](https://lightning.ai/clusters?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme), vibe training/inference [workspaces](https://lightning.ai/studios?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme), [notebooks](https://lightning.ai/notebooks?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) with AI assistance and [inference](https://lightning.ai/deploy?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) for your custom models.
+
+# Why LitServe?
+LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multi-model orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
+
+Self host LitServe or deploy in one-click to [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
+
+&nbsp;
 
 # Quick start
 
@@ -149,12 +155,12 @@ curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -
 A few key benefits:
 
 - **Deploy any pipeline or model**: Agents, pipelines, RAG, chatbots, image models, video, speech, text, etc...
-- **No MLOps glue:** LitAPI lets you build full AI systems (multi-model, agent, RAG) in one place ([more](https://lightning.ai/docs/litserve/api-reference/litapi)).   
-- **Instant setup:** Connect models, DBs, and data in a few lines with `setup()` ([more](https://lightning.ai/docs/litserve/api-reference/litapi#setup)).    
-- **Optimized:** autoscaling, GPU support, and fast inference included ([more](https://lightning.ai/docs/litserve/api-reference/litserver)).    
-- **Deploy anywhere:** self-host or one-click deploy with Lightning ([more](https://lightning.ai/docs/litserve/features/deploy-on-cloud)).
+- **No MLOps glue:** LitAPI lets you build full AI systems (multi-model, agent, RAG) in one place ([more](https://lightning.ai/docs/litserve/api-reference/litapi?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).   
+- **Instant setup:** Connect models, DBs, and data in a few lines with `setup()` ([more](https://lightning.ai/docs/litserve/api-reference/litapi?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme#setup)).    
+- **Optimized:** autoscaling, GPU support, and fast inference included ([more](https://lightning.ai/docs/litserve/api-reference/litserver?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).    
+- **Deploy anywhere:** self-host or one-click deploy with Lightning ([more](https://lightning.ai/docs/litserve/features/deploy-on-cloud?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).
 - **FastAPI for AI:** Built on FastAPI but optimized for AI - 2× faster with AI-specific multi-worker handling ([more]((#performance))).   
-- **Expert-friendly:** Use vLLM, or build your own with full control over batching, caching, and logic ([more](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api)).    
+- **Expert-friendly:** Use vLLM, or build your own with full control over batching, caching, and logic ([more](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).    
 
 > ⚠️ Not a vLLM or Ollama alternative out of the box. LitServe gives you lower-level flexibility to build what they do (and more) if you need it.
 
@@ -165,26 +171,26 @@ Here are examples of inference pipelines for common model types and use cases.
   
 <pre>
 <strong>Toy model:</strong>      <a target="_blank" href="#define-a-server">Hello world</a>
-<strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-llama-3-2-vision-with-litserve">Llama 3.2</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use">Agent with tool use</a>
-<strong>RAG:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api">vLLM RAG (Llama 3.2)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-1-rag-api">RAG API (LlamaIndex)</a>
-<strong>NLP:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly">Hugging face</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model">BERT</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-text-embedding-api-with-litserve">Text embedding API</a>
-<strong>Multimodal:</strong>     <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve">OpenAI Clip</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm">MiniCPM</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve">Phi-3.5 Vision Instruct</a>, <a target="_blank" href="https://lightning.ai/bhimrajyadav/studios/deploy-and-chat-with-qwen2-vl-using-litserve">Qwen2-VL</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-pixtral">Pixtral</a>
-<strong>Audio:</strong>          <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model">Whisper</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft">AudioCraft</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api">StableAudio</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-noise-cancellation-api-with-deepfilternet">Noise cancellation (DeepFilterNet)</a>
-<strong>Vision:</strong>         <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2">Stable diffusion 2</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-auraflow">AuraFlow</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-flux">Flux</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-super-resolution-image-api-with-aura-sr">Image Super Resolution (Aura SR)</a>,
-                <a target="_blank" href="https://lightning.ai/bhimrajyadav/studios/deploy-background-removal-api-with-litserve">Background Removal</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-controlled-image-generation-api-controlnet">Control Stable Diffusion (ControlNet)</a>
-<strong>Speech:</strong>         <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model">Text-speech (XTTS V2)</a>, <a target="_blank" href="https://lightning.ai/bhimrajyadav/studios/deploy-a-speech-generation-api-using-parler-tts-powered-by-litserve">Parler-TTS</a>
-<strong>Classical ML:</strong>   <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve">Random forest</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve">XGBoost</a>
-<strong>Miscellaneous:</strong>  <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-media-conversion-api-with-ffmpeg">Media conversion API (ffmpeg)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-both-pytorch-and-tensorflow-in-a-single-api">PyTorch + TensorFlow in one API</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server">LLM proxy server</a>
+<strong>LLMs:</strong>           <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-llama-3-2-vision-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Llama 3.2</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">LLM Proxy server</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-ai-agent-with-tool-use?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Agent with tool use</a>
+<strong>RAG:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">vLLM RAG (Llama 3.2)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-1-rag-api?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">RAG API (LlamaIndex)</a>
+<strong>NLP:</strong>            <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-any-hugging-face-model-instantly?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Hugging face</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-hugging-face-bert-model?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">BERT</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-text-embedding-api-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Text embedding API</a>
+<strong>Multimodal:</strong>     <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-clip-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">OpenAI Clip</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-minicpm?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">MiniCPM</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-phi3-5-vision-api-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Phi-3.5 Vision Instruct</a>, <a target="_blank" href="https://lightning.ai/bhimrajyadav/studios/deploy-and-chat-with-qwen2-vl-using-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Qwen2-VL</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-multi-modal-llm-with-pixtral?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Pixtral</a>
+<strong>Audio:</strong>          <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-open-ai-s-whisper-model?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Whisper</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-music-generation-api-with-meta-s-audio-craft?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">AudioCraft</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-audio-generation-api?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">StableAudio</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-noise-cancellation-api-with-deepfilternet?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Noise cancellation (DeepFilterNet)</a>
+<strong>Vision:</strong>         <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-private-api-for-stable-diffusion-2?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Stable diffusion 2</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-auraflow?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">AuraFlow</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-image-generation-api-with-flux?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Flux</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-super-resolution-image-api-with-aura-sr?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Image Super Resolution (Aura SR)</a>,
+                <a target="_blank" href="https://lightning.ai/bhimrajyadav/studios/deploy-background-removal-api-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Background Removal</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-controlled-image-generation-api-controlnet?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Control Stable Diffusion (ControlNet)</a>
+<strong>Speech:</strong>         <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-a-voice-clone-api-coqui-xtts-v2-model?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Text-speech (XTTS V2)</a>, <a target="_blank" href="https://lightning.ai/bhimrajyadav/studios/deploy-a-speech-generation-api-using-parler-tts-powered-by-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Parler-TTS</a>
+<strong>Classical ML:</strong>   <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-random-forest-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Random forest</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-xgboost-with-litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">XGBoost</a>
+<strong>Miscellaneous:</strong>  <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-an-media-conversion-api-with-ffmpeg?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">Media conversion API (ffmpeg)</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/deploy-both-pytorch-and-tensorflow-in-a-single-api?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">PyTorch + TensorFlow in one API</a>, <a target="_blank" href="https://lightning.ai/lightning-ai/studios/openai-fault-tolerant-proxy-server?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme">LLM proxy server</a>
 </pre>
 </pre>
 
-[Browse 100+ community-built templates](https://lightning.ai/studios?section=serving)
+[Browse 100+ community-built templates](https://lightning.ai/studios?section=serving&utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)
 
 &nbsp;
 
 # Host anywhere
 
-Self-host with full control, or deploy with [Lightning AI](https://lightning.ai/) in seconds with autoscaling, security, and 99.995% uptime.  
+Self-host with full control, or deploy with [Lightning AI](https://lightning.ai/?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) in seconds with autoscaling, security, and 99.995% uptime.  
 **Free tier included. No setup required. Run on your cloud**   
 
 ```bash
@@ -199,27 +205,27 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 
 <div align='center'>
 
-| [Feature](https://lightning.ai/docs/litserve/features)               | Self Managed                      | [Fully Managed on Lightning](https://lightning.ai/deploy)         |
+| [Feature](https://lightning.ai/docs/litserve/features?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)               | Self Managed                      | [Fully Managed on Lightning](https://lightning.ai/deploy?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)         |
 |----------------------------------------------------------------------|-----------------------------------|------------------------------------|
 | Docker-first deployment          | ✅ DIY                             | ✅ One-click deploy                |
-| Cost                             | ✅ Free (DIY)                      | ✅ Generous [free tier](https://lightning.ai/pricing) with pay as you go                |
+| Cost                             | ✅ Free (DIY)                      | ✅ Generous [free tier](https://lightning.ai/pricing?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) with pay as you go                |
 | Full control                     | ✅                                 | ✅                                 |
 | Use any engine (vLLM, etc.)      | ✅                                 | ✅ vLLM, Ollama, LitServe, etc.    |
 | Own VPC                          | ✅ (manual setup)                  | ✅ Connect your own VPC            |
 | [(2x)+ faster than plain FastAPI](#performance)                                               | ✅       | ✅                                 |
-| [Bring your own model](https://lightning.ai/docs/litserve/features/full-control)              | ✅       | ✅                                 |
-| [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home)                 | ✅       | ✅                                 |
-| [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference)                  | ✅       | ✅                                 |
-| [Batching](https://lightning.ai/docs/litserve/features/batching)                              | ✅       | ✅                                 |
-| [Streaming](https://lightning.ai/docs/litserve/features/streaming)                            | ✅       | ✅                                 |
-| [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling)                 | ✅       | ✅                                 |
-| [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples)         | ✅       | ✅                                 |
-| [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control) | ✅       | ✅                                 |
+| [Bring your own model](https://lightning.ai/docs/litserve/features/full-control?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)              | ✅       | ✅                                 |
+| [Build compound systems (1+ models)](https://lightning.ai/docs/litserve/home?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                 | ✅       | ✅                                 |
+| [GPU autoscaling](https://lightning.ai/docs/litserve/features/gpu-inference?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                  | ✅       | ✅                                 |
+| [Batching](https://lightning.ai/docs/litserve/features/batching?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                              | ✅       | ✅                                 |
+| [Streaming](https://lightning.ai/docs/litserve/features/streaming?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                            | ✅       | ✅                                 |
+| [Worker autoscaling](https://lightning.ai/docs/litserve/features/autoscaling?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                 | ✅       | ✅                                 |
+| [Serve all models: (LLMs, vision, etc.)](https://lightning.ai/docs/litserve/examples?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)         | ✅       | ✅                                 |
+| [Supports PyTorch, JAX, TF, etc...](https://lightning.ai/docs/litserve/features/full-control?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) | ✅       | ✅                                 |
 | [OpenAPI compliant](https://www.openapis.org/)                                                | ✅       | ✅                                 |
-| [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec)             | ✅       | ✅                                 |
-| [MCP server support](https://lightning.ai/docs/litserve/features/mcp)                         | ✅       | ✅                                 |
-| [Asynchronous](https://lightning.ai/docs/litserve/features/async-concurrency)                 | ✅       | ✅                                 |
-| [Authentication](https://lightning.ai/docs/litserve/features/authentication)                  | ❌ DIY   | ✅ Token, password, custom         |
+| [Open AI compatibility](https://lightning.ai/docs/litserve/features/open-ai-spec?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)             | ✅       | ✅                                 |
+| [MCP server support](https://lightning.ai/docs/litserve/features/mcp?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                         | ✅       | ✅                                 |
+| [Asynchronous](https://lightning.ai/docs/litserve/features/async-concurrency?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                 | ✅       | ✅                                 |
+| [Authentication](https://lightning.ai/docs/litserve/features/authentication?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                  | ❌ DIY   | ✅ Token, password, custom         |
 | GPUs                             | ❌ DIY                             | ✅ 8+ GPU types, H100s from $1.75  |
 | Load balancing                   | ❌                                 | ✅ Built-in                        |
 | Scale to zero (serverless)       | ❌                                 | ✅ No machine runs when idle       |
@@ -234,7 +240,7 @@ https://github.com/user-attachments/assets/ff83dab9-0c9f-4453-8dcb-fb9526726344
 | 24/7 enterprise support          | ❌                                 | ✅ Dedicated support               |
 | Cost controls & audit logs       | ❌                                 | ✅ Budgets, breakdowns, logs       |
 | Debug on GPUs                    | ❌                                 | ✅ Studio integration              |
-| [20+ features](https://lightning.ai/docs/litserve/features)                    | -                                 | -                                  |
+| [20+ features](https://lightning.ai/docs/litserve/features?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)                    | -                                 | -                                  |
 
 </div>
 
@@ -245,7 +251,7 @@ LitServe is designed for AI workloads. Specialized multi-worker handling deliver
 
 Additional features like batching and GPU autoscaling can drive performance well beyond 2x, scaling efficiently to handle more simultaneous requests than FastAPI and TorchServe.
     
-Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks) (higher is better).  
+Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/benchmarks?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) (higher is better).  
 
 <div align="center">
   <img alt="LitServe" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_charts_v6.png" width="1000px" style="max-width: 100%;">
@@ -253,13 +259,13 @@ Reproduce the full benchmarks [here](https://lightning.ai/docs/litserve/home/ben
 
 These results are for image and text classification ML tasks. The performance relationships hold for other ML tasks (embedding, LLM serving, audio, segmentation, object detection, summarization etc...).   
     
-***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/vLLM), integrate [vLLM with LitServe](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api), use [LitGPT](https://github.com/Lightning-AI/litgpt?tab=readme-ov-file#deploy-an-llm), or build your custom vLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
+***💡 Note on LLM serving:*** For high-performance LLM serving (like Ollama/vLLM), integrate [vLLM with LitServe](https://lightning.ai/lightning-ai/studios/deploy-a-private-llama-3-2-rag-api?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme), use [LitGPT](https://github.com/Lightning-AI/litgpt?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme#deploy-an-llm), or build your custom vLLM-like server with LitServe. Optimizations like kv-caching, which can be done with LitServe, are needed to maximize LLM performance.
 
 &nbsp;
 
 
 # Community
-LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community) - Let's make the world's most advanced AI inference engine.
+LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) - Let's make the world's most advanced AI inference engine.
 
 💬 [Get help on Discord](https://discord.com/invite/XncpTy7DSt)    
 📋 [License: Apache 2.0](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)    
