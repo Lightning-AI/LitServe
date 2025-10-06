@@ -336,17 +336,34 @@ class BatchedStreamingLoop(DefaultLoop):
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
                 # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
+                # Track which items in the batch have finished
+                finished_items = set()
+                
                 for y_batch in y_enc_iter:
-                    for response_queue_id, y_enc, uid in zip(response_queue_ids, y_batch, uids):
-                        y_enc = lit_api.format_encoded_response(y_enc)
+                    for idx, (response_queue_id, y_enc, uid) in enumerate(zip(response_queue_ids, y_batch, uids)):
+                        # Skip items that have already finished
+                        if idx in finished_items:
+                            continue
+                        
+                        # Check if this item has finished (None indicates EOS/end of sequence)
+                        if y_enc is None:
+                            finished_items.add(idx)
+                            # Send finish signal for this specific item
+                            self.put_response(
+                                transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
+                            )
+                        else:
+                            y_enc = lit_api.format_encoded_response(y_enc)
+                            self.put_response(
+                                transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
+                            )
+                
+                # Send finish signal for any items that haven't finished yet
+                for idx, (response_queue_id, uid) in enumerate(zip(response_queue_ids, uids)):
+                    if idx not in finished_items:
                         self.put_response(
-                            transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.STREAMING
+                            transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
                         )
-
-                for response_queue_id, uid in zip(response_queue_ids, uids):
-                    self.put_response(
-                        transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
-                    )
             except KeyboardInterrupt:  # pragma: no cover
                 self.kill()
                 return
