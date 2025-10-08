@@ -280,10 +280,10 @@ def test_mcp_litserve_connector():
 @pytest.mark.asyncio
 async def test_mcp_call_handler_with_request_param():
     """Test that _call_handler properly handles the 'request' parameter for endpoint_handler."""
-    from litserve.mcp import _call_handler
-
     # Mock the _convert_to_content function since we don't have the actual MCP package
     import litserve.mcp as mcp_module
+    from litserve.mcp import _call_handler
+
     original_convert = getattr(mcp_module, "_convert_to_content", None)
     mcp_module._convert_to_content = lambda x: x
 
