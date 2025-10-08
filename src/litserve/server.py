@@ -1358,10 +1358,14 @@ class LitServer:
             self._perform_graceful_shutdown(manager, uvicorn_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
-        # Add middleware to count active requests
-        active_counter = mp.Value("i", 0, lock=True)
-        self.active_counters.append(active_counter)
-        app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+        if self.track_requests:
+            # create new reference to middleware list
+            app.user_middleware = list(app.user_middleware)
+
+            # Add middleware to count active requests
+            active_counter = mp.Value("i", 0, lock=True)
+            self.active_counters.append(active_counter)
+            app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         workers = []
