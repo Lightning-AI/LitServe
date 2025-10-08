@@ -28,6 +28,7 @@ from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
 from litserve.loops.base import _SENTINEL_VALUE, _StopLoopError, collate_requests
 from litserve.loops.simple_loops import BatchedLoop
+from litserve.test_examples import SimpleBatchedAPI
 from litserve.transport.base import MessageTransport
 from litserve.utils import LoopResponseType, wrap_litserve_start
 
@@ -301,10 +302,10 @@ async def test_batch_size_mismatch():
 
 def test_batch_predict_dict_warning():
     """Test that a warning is raised when predict returns a dict instead of a list."""
-    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
+    api = SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
     api.request_timeout = 30
     api.pre_setup(spec=None)
-    
+
     # Mock predict to return a dict with lists as values
     # This simulates the edge case: dict with 2 keys when batch size is 2
     api.predict = MagicMock(return_value={"class_A": [0.2, 0.3], "class_B": [0.8, 0.7]})
@@ -318,18 +319,18 @@ def test_batch_predict_dict_warning():
         match="The 'predict' method returned a dict instead of a list of predictions.",
     ):
         outputs = api.unbatch(y)
-        # When list() is called on a dict, it returns the keys
-        # So outputs would be ["class_A", "class_B"] which has the same length as num_inputs
-        # This is the edge case we're warning about
-        assert outputs == ["class_A", "class_B"]
+    # When list() is called on a dict, it returns the keys
+    # So outputs would be ["class_A", "class_B"] which has the same length as num_inputs
+    # This is the edge case we're warning about
+    assert outputs == ["class_A", "class_B"]
 
 
 def test_batch_predict_set_warning():
     """Test that a warning is raised when predict returns a set instead of a list."""
-    api = ls.test_examples.SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
+    api = SimpleBatchedAPI(max_batch_size=2, batch_timeout=0.1)
     api.request_timeout = 30
     api.pre_setup(spec=None)
-    
+
     # Mock predict to return a set
     # This simulates the edge case: set with 2 elements when batch size is 2
     api.predict = MagicMock(return_value={1, 2})
@@ -343,6 +344,6 @@ def test_batch_predict_set_warning():
         match="The 'predict' method returned a set instead of a list of predictions.",
     ):
         outputs = api.unbatch(y)
-        # When list() is called on a set, the order is arbitrary
-        # This could lead to incorrect results
-        assert len(outputs) == 2
+    # When list() is called on a set, the order is arbitrary
+    # This could lead to incorrect results
+    assert len(outputs) == 2
