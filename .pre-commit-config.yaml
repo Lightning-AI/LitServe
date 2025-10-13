@@ -30,7 +30,7 @@ repos:
         #args: ["--write-changes"]
 
   - repo: https://github.com/JoC0de/pre-commit-prettier
-    rev: v3.6.2 # v3.6.2 using SHA as tags are not persistent
+    rev: v3.6.2
     hooks:
       - id: prettier
         files: \.(json|yml|yaml|toml)
