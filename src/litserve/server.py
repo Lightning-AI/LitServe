@@ -752,6 +752,7 @@ class LitServer:
         self.timeout = timeout
         self.litapi_connector.set_request_timeout(timeout)
         self.app = FastAPI(lifespan=self.lifespan, openapi_url="" if disable_openapi_url else "/openapi.json")
+        self._disable_openapi_url = disable_openapi_url
 
         self.app.response_queue_id = None
         self.response_buffer = {}
@@ -1345,7 +1346,8 @@ class LitServer:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
-            print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+            if not self._disable_openapi_url:
+                print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
 
             self._start_worker_monitoring(manager, uvicorn_workers)
 
