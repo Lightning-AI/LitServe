@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
+
 import pytest
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -19,6 +21,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp
 
 import litserve as ls
+from litserve.middlewares import RequestCountMiddleware
 from litserve.utils import wrap_litserve_start
 
 
@@ -85,3 +88,28 @@ def test_middleware_multiple_initialization():
 
     server = ls.LitServer([api1, api2, api3, api4])
     assert len(server.app.user_middleware) == 1, "Each middleware should be initialized only once for `n` LitAPIs"
+
+
+def test_track_requests_middleware_isolation():
+    """Test that _prepare_app_run doesn't modify the original app's middleware list."""
+
+    lit_api = ls.test_examples.SimpleLitAPI()
+    server = ls.LitServer(lit_api, track_requests=True)
+
+    # Store original middleware state
+    original_middleware = server.app.user_middleware.copy()
+
+    # Create app copies (simulating multiple API servers)
+    app_copies = [copy.copy(server.app) for _ in range(3)]
+
+    # Call _prepare_app_run on each copy
+    for app_copy in app_copies:
+        server._prepare_app_run(app_copy)
+
+    # Verify each copy has RequestCountMiddleware added
+    for app_copy in app_copies:
+        assert len(app_copy.user_middleware) == len(original_middleware) + 1
+        # Check that RequestCountMiddleware is added
+        assert any(mw.cls is RequestCountMiddleware for mw in app_copy.user_middleware), (
+            "RequestCountMiddleware not found in middleware list"
+        )
