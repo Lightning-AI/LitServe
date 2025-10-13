@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import contextlib
 import json
 import sys
 import time
@@ -336,6 +337,26 @@ def test_server_terminate():
         mock_launch.assert_called()
         mock_start.assert_called()
         server._transport.close.assert_called()
+
+
+@pytest.mark.parametrize(("disable_openapi_url", "should_print"), [(False, True), (True, False)])
+@patch("builtins.print")
+@patch("litserve.server.uvicorn")
+def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manager, disable_openapi_url, should_print):
+    """Test that the Swagger UI message is only printed when disable_openapi_url=False."""
+    server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url)
+    server.verify_worker_status = MagicMock()
+
+    with (
+        patch("litserve.server.mp.Manager", return_value=mock_manager),
+        contextlib.suppress(Exception),
+    ):
+        server.run(port=8000)
+
+    if should_print:
+        mock_print.assert_called_with("Swagger UI is available at http://0.0.0.0:8000/docs")
+    else:
+        mock_print.assert_not_called()
 
 
 class IdentityAPI(ls.test_examples.SimpleLitAPI):
