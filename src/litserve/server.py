@@ -1359,7 +1359,7 @@ class LitServer:
 
     def _prepare_app_run(self, app: FastAPI):
         if self.track_requests:
-            # create new reference to middleware list
+            # create a copy of the middleware list
             app.user_middleware = list(app.user_middleware)
 
             # Add middleware to count active requests
