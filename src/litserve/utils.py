@@ -94,16 +94,16 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
             lit_api.spec.response_queue_id = 0
 
     server.manager = server._init_manager(1)
-    
+
     server.inference_workers = []
     for lit_api in server.litapi_connector:
         server.inference_workers.extend(server.launch_inference_workers(lit_api))
-    
+
     server._prepare_app_run(server.app)
-    
+
     if worker_monitor:
         server._start_worker_monitoring(server.manager, {})
-    
+
     if is_package_installed("mcp"):
         from litserve.mcp import _LitMCPServerConnector
 

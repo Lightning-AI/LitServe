@@ -21,6 +21,7 @@ import multiprocessing as mp
 import os
 import pickle
 import secrets
+import socket
 import sys
 import threading
 import time
@@ -31,8 +32,8 @@ from collections import deque
 from collections.abc import Iterable, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union, Dict
-import socket
+from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, Union
+
 import uvicorn
 import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -154,7 +155,7 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, (*response, response_type,  worker_id) = result
+                uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
                     response_buffer[uid] = (response_buffer[uid][0], worker_id)
@@ -180,7 +181,7 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, (*response, response_type,  worker_id) = result
+                uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
                     response_buffer[uid] = (response_buffer[uid][0], worker_id)
@@ -405,9 +406,7 @@ class StreamingRequestHandler(BaseRequestHandler):
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
-
 class _Server(uvicorn.server.Server):
-
     def run(self, worker_id: int, sockets: Union[list[socket.socket], None] = None) -> None:
         os.environ["LITSERVE_WORKER_ID"] = str(worker_id)
         return super().run(sockets)
@@ -685,7 +684,7 @@ class LitServer:
         stream: bool = False,
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
-        restart_workers: bool = False
+        restart_workers: bool = False,
     ):
         if max_batch_size is not None:
             warnings.warn(
@@ -810,7 +809,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = restart_workers or False
-        self.monitor_internal = 5   
+        self.monitor_internal = 5
         self.mcp_server = None
 
         accelerator = self._connector.accelerator
@@ -898,7 +897,7 @@ class LitServer:
             ),
             name="inference-worker",
         )
-        
+
         print("0.2")
 
         process.start()
@@ -1491,9 +1490,13 @@ class LitServer:
             server = _Server(config=uvicorn_config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
-                w = ctx.Process(target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}")
+                w = ctx.Process(
+                    target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}"
+                )
             elif uvicorn_worker_type == "thread":
-                w = threading.Thread(target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}")
+                w = threading.Thread(
+                    target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}"
+                )
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
@@ -1544,9 +1547,9 @@ class LitServer:
                             event, resp_worker_id = resp
                             if int(resp_worker_id) == worker_id:
                                 event.set()
-                            
+
                             self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
-                        
+
                         print(f"Worker {worker_id} is dead. Restarting it...")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_inference_worker(lit_api, worker_id)
@@ -1556,7 +1559,7 @@ class LitServer:
 
             except Exception as e:
                 print(e)
-            
+
             print("Closing monitor")
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
