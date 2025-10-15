@@ -805,6 +805,8 @@ class LitServer:
         self.monitor_internal = 5
         self.mcp_server = None
 
+        self._monitor_workers = True
+
         accelerator = self._connector.accelerator
         devices = self._connector.devices
         if accelerator == "cpu":
@@ -1409,7 +1411,8 @@ class LitServer:
             if not self._disable_openapi_url:
                 print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
 
-            self._start_worker_monitoring(manager, uvicorn_workers)
+            if self._monitor_workers:
+                self._start_worker_monitoring(manager, uvicorn_workers)
 
             self._shutdown_event.wait()
 

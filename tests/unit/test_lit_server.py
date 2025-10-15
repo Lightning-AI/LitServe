@@ -345,13 +345,14 @@ def test_server_terminate():
 @patch("litserve.server.uvicorn")
 def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manager, disable_openapi_url, should_print):
     """Test that the Swagger UI message is only printed when disable_openapi_url=False."""
-    server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url)
+    server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url, restart_workers=False)
     server.verify_worker_status = MagicMock()
 
     with (
         patch("litserve.server.mp.Manager", return_value=mock_manager),
         contextlib.suppress(Exception),
     ):
+        server._monitor_workers = False
         server.run(port=8000)
 
     if should_print:
