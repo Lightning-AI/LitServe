@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from queue import Queue
 import os
+from queue import Queue
+
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import LitLoop, _BaseLoop

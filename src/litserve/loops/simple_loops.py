@@ -18,6 +18,7 @@ from queue import Empty, Queue
 from typing import Optional
 
 from fastapi import HTTPException
+
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import _SENTINEL_VALUE, DefaultLoop, _async_inject_context, _inject_context, _StopLoopError

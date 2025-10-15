@@ -14,11 +14,11 @@
 import asyncio
 import contextlib
 import json
+import os
 import sys
 import time
 from time import sleep
 from unittest.mock import MagicMock, patch
-import os 
 
 import pytest
 import torch
@@ -743,9 +743,8 @@ class FailingLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-        worker_id = os.environ.get("LITSERVE_WORKER_ID", "0")
         if x == 0:
-            os._exit(1) # This will terminate the worker process
+            os._exit(1)  # This will terminate the worker process
         return 1
 
     def encode_response(self, output):
@@ -755,7 +754,13 @@ class FailingLitAPI(LitAPI):
 @pytest.mark.asyncio
 async def test_worker_restart_and_server_shutdown():
     api = FailingLitAPI()
-    server = LitServer(api, accelerator="cpu", devices=1, workers_per_device=2, restart_workers=True,)
+    server = LitServer(
+        api,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=2,
+        restart_workers=True,
+    )
     server.monitor_internal = 0.5
 
     with wrap_litserve_start(server, worker_monitor=True) as server:
