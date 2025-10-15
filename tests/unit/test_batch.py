@@ -266,7 +266,7 @@ def test_collate_requests_sentinel():
     request_queue = Queue()
     request_queue.put(_SENTINEL_VALUE)
     with pytest.raises(_StopLoopError, match="Received sentinel value, stopping loop"):
-        collate_requests(api, request_queue)
+        collate_requests(MagicMock(), api, request_queue, MagicMock())
 
 
 class BatchSizeMismatchAPI(SimpleBatchLitAPI):
