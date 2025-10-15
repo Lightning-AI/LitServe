@@ -114,6 +114,7 @@ def collate_requests(
                 request_data = request_queue.get_nowait()
                 if request_data == _SENTINEL_VALUE:
                     raise _StopLoopError()
+
                 response_queue_id, uid, timestamp, x_enc = request_data
 
                 loop.put_response(
@@ -122,7 +123,7 @@ def collate_requests(
                     uid=uid,
                     response_data=(),
                     status=LitAPIStatus.START,
-                    response_type=LoopResponseType.STREAMING,
+                    response_type=LoopResponseType.STREAMING if lit_api.stream else LoopResponseType.REGULAR,
                 )
 
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
@@ -142,6 +143,7 @@ def collate_requests(
             request_data = request_queue.get(timeout=min(remaining_time, 0.001))
             if request_data == _SENTINEL_VALUE:
                 raise _StopLoopError()
+
             response_queue_id, uid, timestamp, x_enc = request_data
 
             loop.put_response(
@@ -150,7 +152,7 @@ def collate_requests(
                 uid=uid,
                 response_data=(),
                 status=LitAPIStatus.START,
-                response_type=LoopResponseType.STREAMING,
+                response_type=LoopResponseType.STREAMING if lit_api.stream else LoopResponseType.REGULAR,
             )
 
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
