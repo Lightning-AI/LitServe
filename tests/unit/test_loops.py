@@ -155,7 +155,7 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     expected_output = request[3]["input"] ** 2
     assert response == (
         request[1],
-        ({"output": expected_output}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, None),
+        ({"output": expected_output}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY),
     )
 
 
@@ -173,13 +173,13 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
         loop._run_single_loop_with_async(lit_api_mock, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
-    assert response == ("uuid-123", ((), "START", ls.utils.LoopResponseType.REGULAR, None))
+    assert response == ("uuid-123", ((), "START", ls.utils.LoopResponseType.REGULAR, ANY))
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
-    assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, None))
+    assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY))
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
-    assert response == ("uuid-234", ((), "START", ls.utils.LoopResponseType.REGULAR, None))
+    assert response == ("uuid-234", ((), "START", ls.utils.LoopResponseType.REGULAR, ANY))
     response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
-    assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, None))
+    assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY))
 
 
 class FakeStreamSender(DummyMessageTransport):
@@ -270,7 +270,7 @@ async def test_streaming_loop_process_streaming_request(mock_transport):
         response = await mock_transport.areceive(consumer_id=request[0])
         assert response == (
             request[1],
-            (i, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, None),
+            (i, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, ANY),
         )
 
 
@@ -294,12 +294,12 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
         if i == 0:
             assert response == (
                 "uuid-123",
-                (((), "START", ls.utils.LoopResponseType.STREAMING, None)),
+                (((), "START", ls.utils.LoopResponseType.STREAMING, ANY)),
             )
         else:
             assert response == (
                 "uuid-123",
-                (i - 1, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, None),
+                (i - 1, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, ANY),
             )
 
 
@@ -702,7 +702,7 @@ class TestLoop(LitLoop):
         response = lit_api.predict(x)
         response_enc = lit_api.encode_response(response)
         transport.send(
-            (uid, (response_enc, LitAPIStatus.OK, LoopResponseType.REGULAR, None)), consumer_id=response_queue_id
+            (uid, (response_enc, LitAPIStatus.OK, LoopResponseType.REGULAR, ANY)), consumer_id=response_queue_id
         )
         raise StopIteration("exit loop")
 
