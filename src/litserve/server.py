@@ -820,7 +820,7 @@ class LitServer:
         # register middleware
         self._register_middleware()
 
-    def launch_inference_workers(self, lit_api: LitAPI):
+    def launch_inference_worker(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
@@ -855,7 +855,7 @@ class LitServer:
             process_list.append(process)
         return process_list
 
-    def launch_inference_worker(self, lit_api: LitAPI, worker_id: int):
+    def launch_single_inference_worker(self, lit_api: LitAPI, worker_id: int):
         specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
@@ -1393,7 +1393,7 @@ class LitServer:
         self._logger_connector.run(self)
         self.inference_workers = []
         for lit_api in self.litapi_connector:
-            _inference_workers = self.launch_inference_workers(lit_api)
+            _inference_workers = self.launch_inference_worker(lit_api)
             self.inference_workers.extend(_inference_workers)
 
         self.verify_worker_status()
@@ -1535,7 +1535,7 @@ class LitServer:
 
                         print(f"Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
-                        self.inference_workers[idx] = self.launch_inference_worker(lit_api, worker_id)
+                        self.inference_workers[idx] = self.launch_single_inference_worker(lit_api, worker_id)
                         print(f"Worker {worker_id} has been started.")
 
                     time.sleep(self.monitor_internal)
