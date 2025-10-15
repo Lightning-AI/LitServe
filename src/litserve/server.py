@@ -1476,7 +1476,7 @@ class LitServer:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
             workers.append(w)
-        return dict(workers)
+        return dict(enumerate(workers))
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
