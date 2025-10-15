@@ -159,7 +159,7 @@ async def response_queue_to_buffer(
                     response_buffer[uid] = (response_buffer[uid][0], response_buffer[uid][1], worker_id)
                     continue
 
-                stream_response_buffer, event = response_buffer[uid]
+                stream_response_buffer, event, _ = response_buffer[uid]
                 stream_response_buffer.append(response)
                 event.set()
             except asyncio.CancelledError:
@@ -182,7 +182,7 @@ async def response_queue_to_buffer(
                     response_buffer[uid] = (response_buffer[uid][0], response_buffer[uid][1], worker_id)
                     continue
 
-                event = response_buffer.pop(uid)
+                event, _, _ = response_buffer.pop(uid)
                 response_buffer[uid] = response
                 event.set()
             except asyncio.CancelledError:
