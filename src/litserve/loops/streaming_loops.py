@@ -231,7 +231,7 @@ class StreamingLoop(DefaultLoop):
                         uid=uid,
                         response_data=(),
                         status=LitAPIStatus.START,
-                        response_type=LoopResponseType.REGULAR,
+                        response_type=LoopResponseType.STREAMING,
                     )
                     logger.debug("uid=%s", uid)
                 except (Empty, ValueError):
