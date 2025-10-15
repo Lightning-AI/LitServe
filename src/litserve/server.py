@@ -112,7 +112,7 @@ async def _mixed_response_to_buffer(
             uid, (*response, response_type, worker_id) = result
 
             if response[1] == LitAPIStatus.START:
-                response_buffer[uid] = (response_buffer[uid][0], worker_id)
+                response_buffer[uid] = (response_buffer[uid][0], response_buffer[uid][1], worker_id)
                 continue
 
             if response_type == LoopResponseType.STREAMING:
@@ -156,7 +156,7 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    response_buffer[uid] = (response_buffer[uid][0], worker_id)
+                    response_buffer[uid] = (response_buffer[uid][0], response_buffer[uid][1], worker_id)
                     continue
 
                 stream_response_buffer, event = response_buffer[uid]
@@ -179,7 +179,7 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    response_buffer[uid] = (response_buffer[uid][0], worker_id)
+                    response_buffer[uid] = (response_buffer[uid][0], response_buffer[uid][1], worker_id)
                     continue
 
                 event = response_buffer.pop(uid)
@@ -381,7 +381,7 @@ class StreamingRequestHandler(BaseRequestHandler):
             # Set up streaming response
             event = asyncio.Event()
             response_queue = deque()
-            self.server.response_buffer[uid] = (response_queue, event)
+            self.server.response_buffer[uid] = (response_queue, event, None)
 
             # Create streaming response
             response_generator = call_after_stream(
@@ -1519,9 +1519,15 @@ class LitServer:
                         worker_id = idx % len(self.inference_workers_config)
 
                         for uid, resp in self.response_buffer.items():
-                            event, resp_worker_id = resp
-                            if int(resp_worker_id) == worker_id:
-                                event.set()
+                            if len(resp) == 3:
+                                response_queue, event, resp_worker_id = resp
+                                response_queue.append((None, LitAPIStatus.ERROR))
+                                if int(resp_worker_id) == worker_id:
+                                    event.set()
+                            else:
+                                event, resp_worker_id = resp
+                                if int(resp_worker_id) == worker_id:
+                                    event.set()
 
                             self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
 

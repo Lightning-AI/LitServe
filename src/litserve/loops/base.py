@@ -198,7 +198,7 @@ class _BaseLoop(ABC):
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: list[Queue],
+        transport: MessageTransport,
     ):
         pass
 

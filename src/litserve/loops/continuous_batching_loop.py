@@ -125,7 +125,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: list[Queue] = None,
+        transport: MessageTransport,
         max_batch_size: Optional[int] = None,
         batch_timeout: Optional[float] = None,
     ) -> list[tuple[str, Any]]:
@@ -140,13 +140,27 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             request = await asyncio.to_thread(self.get_request, request_queue, timeout=1, block=True)
             if request is None:
                 break
+
+            response_queue_id, uid, _, input = request
+
+            print("PUTTING RESPONSE BEFORE")
+
+            self.put_response(
+                transport=transport,
+                response_queue_id=response_queue_id,
+                uid=uid,
+                response_data=(),
+                status=LitAPIStatus.START,
+                response_type=LoopResponseType.STREAMING,
+            )
+
+            print("PUTTING RESPONSE AFTER")
+
             if self.has_capacity(lit_api):
-                response_queue_id, uid, _, input = request
                 logger.debug(f"New request: {uid}, {input}")
                 self.response_queue_ids[uid] = response_queue_id
                 self.add_request(uid, input, lit_api, lit_spec)
             else:
-                response_queue_id, uid, _, input = request
                 pending_requests.append((response_queue_id, uid, input))
                 break
         return pending_requests
@@ -156,7 +170,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: list[Queue],
+        transport: MessageTransport,
     ):
         logger.info("Running prefill in background")
         try:
@@ -167,7 +181,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     lit_api,
                     lit_spec,
                     request_queue,
-                    response_queues,
+                    transport,
                     max_batch_size=lit_api.max_batch_size,
                     batch_timeout=lit_api.batch_timeout,
                 )

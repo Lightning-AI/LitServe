@@ -46,6 +46,20 @@ class StreamingLoop(DefaultLoop):
                     logger.debug("Received sentinel value, stopping loop")
                     return
                 response_queue_id, uid, timestamp, x_enc = request_data
+
+                print("PUTTING RESPONSE BEFORE")
+
+                self.put_response(
+                    transport=transport,
+                    response_queue_id=response_queue_id,
+                    uid=uid,
+                    response_data=(),
+                    status=LitAPIStatus.START,
+                    response_type=LoopResponseType.STREAMING,
+                )
+
+                print("PUTTING RESPONSE AFTER")
+
                 logger.debug("uid=%s", uid)
             except (Empty, ValueError):
                 continue

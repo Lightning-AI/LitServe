@@ -770,3 +770,46 @@ async def test_worker_restart_and_server_shutdown():
         ):
             resp = await ac.post("/predict", json={"input": 0}, timeout=2)
             assert resp.status_code == 500
+
+
+class FailingLitAPIStreaming(LitAPI):
+    def setup(self, device):
+        worker_id = os.environ.get("LITSERVE_WORKER_ID", "0")
+        print(f"Worker {worker_id} setup successfully on {device}")
+
+    def decode_request(self, request):
+        yield request["input"]
+
+    def predict(self, x):
+        for value in x:
+            print("HERE", value)
+            if value == 0:
+                print("EXITING WORKER")
+                os._exit(1)  # This will terminate the worker process
+            yield value
+
+    def encode_response(self, output):
+        for value in output:
+            yield {"output": float(value)}
+
+
+@pytest.mark.asyncio
+async def test_worker_restart_and_server_shutdown_streaming():
+    api = FailingLitAPIStreaming()
+    server = LitServer(
+        api,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=2,
+        restart_workers=True,
+        stream=True,
+    )
+    server.monitor_internal = 0.5
+
+    with wrap_litserve_start(server, worker_monitor=True) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 0}, timeout=2)
+            assert resp.status_code == 200
