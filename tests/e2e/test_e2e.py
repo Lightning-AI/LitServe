@@ -43,18 +43,18 @@ def e2e_from_file(filename):
                 # Print logs in real-time
                 for line in process.stdout:
                     print(line, end="")
+                    if "Application startup complete." in line:
+                        break
 
                 # Give your test function a chance to run
                 test_fn(*args, **kwargs)
             except Exception:
                 raise
             finally:
-                # Clean up the process tree
-                if process.poll() is None:  # if still running
-                    parent = psutil.Process(process.pid)
-                    for child in parent.children(recursive=True):
-                        child.kill()
-                    process.kill()
+                parent = psutil.Process(process.pid)
+                for child in parent.children(recursive=True):
+                    child.kill()
+                process.kill()
 
         return wrapper
 
