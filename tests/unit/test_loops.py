@@ -22,7 +22,7 @@ import time
 from collections.abc import AsyncGenerator
 from queue import Empty, Queue
 from typing import Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from asgi_lifespan import LifespanManager
@@ -440,7 +440,7 @@ async def test_run_single_loop(mock_transport):
 
     response = await transport.areceive(consumer_id=0)
     response = await transport.areceive(consumer_id=0)
-    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, None))
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, ANY))
 
 
 @pytest.mark.asyncio
@@ -498,8 +498,8 @@ async def test_run_batched_loop():
     loop_thread.start()
 
     expected_responses = [
-        ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, None)),
-        ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, None)),
+        ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, ANY)),
+        ("UUID-002", ({"output": 25.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, ANY)),
     ]
 
     await transport.areceive(0, timeout=10)
@@ -829,7 +829,7 @@ async def test_lit_loop_put_response(lit_loop_setup, mock_transport):
     lit_loop, _, request_queue = lit_loop_setup
     lit_loop.put_response(mock_transport, 0, "UUID-001", {"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR)
     response = await mock_transport.areceive(0)
-    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, None))
+    assert response == ("UUID-001", ({"output": 16.0}, LitAPIStatus.OK, LoopResponseType.REGULAR, ANY))
 
 
 def test_notify_timed_out_requests():

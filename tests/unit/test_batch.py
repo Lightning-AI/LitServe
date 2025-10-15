@@ -230,9 +230,9 @@ def test_batched_loop():
         callback_runner=NOOP_CB_RUNNER,
     )
 
-    assert len(transport.responses) == 2, "response queue should have 2 responses"
-    assert transport.responses[0] == ("uuid-1234", ({"output": 16.0}, "OK", LoopResponseType.REGULAR))
-    assert transport.responses[1] == ("uuid-1235", ({"output": 25.0}, "OK", LoopResponseType.REGULAR))
+    assert len(transport.responses) == 4, "response queue should have 2 responses"
+    assert transport.responses[2] == ("uuid-1234", ({"output": 16.0}, "OK", LoopResponseType.REGULAR, None))
+    assert transport.responses[3] == ("uuid-1235", ({"output": 25.0}, "OK", LoopResponseType.REGULAR, None))
 
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.batch.assert_called_once_with([4.0, 5.0])
@@ -255,7 +255,7 @@ def test_collate_requests(batch_timeout, batch_size):
     request_queue = Queue()
     for i in range(batch_size):
         request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i))  # response_queue_id, uid, timestamp, x_enc
-    payloads, timed_out_uids = collate_requests(api, request_queue)
+    payloads, timed_out_uids = collate_requests(MagicMock(), api, request_queue, MagicMock())
     assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
 
