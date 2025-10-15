@@ -156,6 +156,7 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
+                    print(response_buffer)
                     response_buffer[uid] = (*response_buffer[uid][:-1], worker_id)
                     continue
 

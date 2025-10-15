@@ -507,7 +507,7 @@ class OpenAISpec(LitSpec):
             request_el.n = 1
             q = deque()
             event = asyncio.Event()
-            self.response_buffer[uid] = (q, event)
+            self.response_buffer[uid] = (q, event, None)
             self.request_queue.put((response_queue_id, uid, time.monotonic(), request_el))
             self.queues.append(q)
             self.events.append(event)
