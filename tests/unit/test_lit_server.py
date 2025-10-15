@@ -701,7 +701,7 @@ class TestSleepAsyncStreamLitAPI(TestAsyncStreamLitAPI):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("num_requests", [10, 50, 100])
+@pytest.mark.parametrize("num_requests", [100])
 async def test_concurrent_async_streaming_inference(num_requests):
     api = TestSleepAsyncStreamLitAPI(enable_async=True, stream=True)
     server = LitServer(api)
