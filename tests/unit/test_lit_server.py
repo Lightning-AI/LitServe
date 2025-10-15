@@ -756,10 +756,7 @@ class FailingLitAPI(LitAPI):
 async def test_worker_restart_and_server_shutdown():
     api = FailingLitAPI()
     server = LitServer(api, accelerator="cpu", devices=1, workers_per_device=2, restart_workers=True,)
-    server.monitor_internal = 1
-
-
-    i = 0
+    server.monitor_internal = 0.5
 
     with wrap_litserve_start(server, worker_monitor=True) as server:
         async with (
@@ -767,3 +764,4 @@ async def test_worker_restart_and_server_shutdown():
             AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
         ):
             resp = await ac.post("/predict", json={"input": 0}, timeout=2)
+            assert resp.status_code == 500

@@ -114,8 +114,6 @@ async def _mixed_response_to_buffer(
                 response_buffer[uid] = (response_buffer[uid][0], worker_id)
                 continue
 
-            print("RECEIVED", uid, response, response_type, worker_id)
-
             if response_type == LoopResponseType.STREAMING:
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
@@ -160,9 +158,6 @@ async def response_queue_to_buffer(
                     response_buffer[uid] = (response_buffer[uid][0], worker_id)
                     continue
 
-                breakpoint()
-                print("RECEIVED 2", uid, response, response_type, worker_id)
-
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
                 event.set()
@@ -184,10 +179,7 @@ async def response_queue_to_buffer(
 
                 if response[1] == LitAPIStatus.START:
                     response_buffer[uid] = (response_buffer[uid][0], worker_id)
-                    print("TOTOTO", response_buffer)
                     continue
-
-                print("RECEIVED 2", uid, response, response_type, worker_id)
 
                 event = response_buffer.pop(uid)
                 response_buffer[uid] = response
@@ -873,16 +865,12 @@ class LitServer:
             del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
             spec.setup(server_copy)
 
-        print("0.1")
-
         device = self.inference_workers_config[worker_id]
         endpoint = lit_api.api_path.split("/")[-1]
         if len(device) == 1:
             device = device[0]
 
         self.workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.STARTING
-
-        print("0.2")
 
         ctx = mp.get_context("spawn")
         process = ctx.Process(
@@ -899,11 +887,7 @@ class LitServer:
             name="inference-worker",
         )
         
-        print("0.2")
-
         process.start()
-
-        print("0.3")
         return process
 
     @asynccontextmanager
@@ -1408,17 +1392,12 @@ class LitServer:
 
         manager = self._init_manager(num_api_servers)
         self._logger_connector.run(self)
-        print("0000")
         self.inference_workers = []
         for lit_api in self.litapi_connector:
             _inference_workers = self.launch_inference_workers(lit_api)
             self.inference_workers.extend(_inference_workers)
 
-        print("CCC")
-
         self.verify_worker_status()
-
-        print("AAA")
 
         shutdown_reason = "normal"
         uvicorn_workers = {}
@@ -1427,12 +1406,8 @@ class LitServer:
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
 
-            print("BBB")
-
             if not self._disable_openapi_url:
                 print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
-
-            breakpoint()
 
             self._start_worker_monitoring(manager, uvicorn_workers)
 
@@ -1547,10 +1522,10 @@ class LitServer:
                             
                             self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
                         
-                        print(f"Worker {worker_id} is dead. Restarting it...")
+                        print(f"Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_inference_worker(lit_api, worker_id)
-                        print(f"Worker {worker_id} has been restarted...")
+                        print(f"Worker {worker_id} has been started.")
 
                     time.sleep(self.monitor_internal)
 
