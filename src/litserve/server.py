@@ -1524,12 +1524,13 @@ class LitServer:
                                 response_queue.append((None, LitAPIStatus.ERROR))
                                 if int(resp_worker_id) == worker_id:
                                     event.set()
-                            else:
+                                self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
+
+                            elif len(resp) == 2:
                                 event, resp_worker_id = resp
                                 if int(resp_worker_id) == worker_id:
                                     event.set()
-
-                            self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
+                                self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
 
                         print(f"Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
