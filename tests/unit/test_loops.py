@@ -803,7 +803,7 @@ def lit_loop_setup():
 def test_lit_loop_get_batch_requests(lit_loop_setup):
     lit_loop, lit_api, request_queue = lit_loop_setup
     lit_api.max_batch_size = 2
-    lit_api.batch_timeout = 0.001
+    lit_api.batch_timeout = 0.1
     request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
     request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
     batches, timed_out_uids = lit_loop.get_batch_requests(lit_api, request_queue, MagicMock())
