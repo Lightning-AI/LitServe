@@ -309,6 +309,7 @@ class BatchedLoop(DefaultLoop):
                 batches, timed_out_uids = self.get_batch_requests(
                     lit_api,
                     request_queue,
+                    transport,
                 )
             except _StopLoopError:
                 logger.debug("Received sentinel value, stopping loop")

@@ -97,8 +97,10 @@ class _StopLoopError(Exception):
 
 
 def collate_requests(
+    loop: "LitLoop",
     lit_api: LitAPI,
     request_queue: Queue,
+    transport: MessageTransport,
 ) -> tuple[list, list]:
     payloads = []
     timed_out_uids = []
@@ -113,6 +115,16 @@ def collate_requests(
                 if request_data == _SENTINEL_VALUE:
                     raise _StopLoopError()
                 response_queue_id, uid, timestamp, x_enc = request_data
+
+                loop.put_response(
+                    transport=transport,
+                    response_queue_id=response_queue_id,
+                    uid=uid,
+                    response_data=(),
+                    status=LitAPIStatus.START,
+                    response_type=LoopResponseType.STREAMING,
+                )
+
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                     timed_out_uids.append((response_queue_id, uid))
                 else:
@@ -131,6 +143,16 @@ def collate_requests(
             if request_data == _SENTINEL_VALUE:
                 raise _StopLoopError()
             response_queue_id, uid, timestamp, x_enc = request_data
+
+            loop.put_response(
+                transport=transport,
+                response_queue_id=response_queue_id,
+                uid=uid,
+                response_data=(),
+                status=LitAPIStatus.START,
+                response_type=LoopResponseType.STREAMING,
+            )
+
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                 timed_out_uids.append((response_queue_id, uid))
             else:
@@ -280,10 +302,13 @@ class LitLoop(_BaseLoop):
         self,
         lit_api: LitAPI,
         request_queue: Queue,
+        transport: MessageTransport,
     ) -> tuple[list, list]:
         batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
+            loop=self,
+            lit_api=lit_api,
+            request_queue=request_queue,
+            transport=transport,
         )
         return batches, timed_out_uids
 

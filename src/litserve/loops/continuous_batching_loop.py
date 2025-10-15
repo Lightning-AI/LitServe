@@ -143,8 +143,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
             response_queue_id, uid, _, input = request
 
-            print("PUTTING RESPONSE BEFORE")
-
             self.put_response(
                 transport=transport,
                 response_queue_id=response_queue_id,
@@ -153,8 +151,6 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 status=LitAPIStatus.START,
                 response_type=LoopResponseType.STREAMING,
             )
-
-            print("PUTTING RESPONSE AFTER")
 
             if self.has_capacity(lit_api):
                 logger.debug(f"New request: {uid}, {input}")

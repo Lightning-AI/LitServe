@@ -259,7 +259,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
         event = asyncio.Event()
-        self.response_buffer[uid] = event
+        self.response_buffer[uid] = (event, None)
 
         self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
         await event.wait()

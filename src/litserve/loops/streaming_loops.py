@@ -47,8 +47,6 @@ class StreamingLoop(DefaultLoop):
                     return
                 response_queue_id, uid, timestamp, x_enc = request_data
 
-                print("PUTTING RESPONSE BEFORE")
-
                 self.put_response(
                     transport=transport,
                     response_queue_id=response_queue_id,
@@ -57,8 +55,6 @@ class StreamingLoop(DefaultLoop):
                     status=LitAPIStatus.START,
                     response_type=LoopResponseType.STREAMING,
                 )
-
-                print("PUTTING RESPONSE AFTER")
 
                 logger.debug("uid=%s", uid)
             except (Empty, ValueError):
@@ -298,8 +294,10 @@ class BatchedStreamingLoop(DefaultLoop):
         lit_spec = lit_api.spec
         while True:
             batches, timed_out_uids = collate_requests(
-                lit_api,
-                request_queue,
+                loop=self,
+                lit_api=lit_api,
+                request_queue=request_queue,
+                transport=transport,
             )
             for response_queue_id, uid in timed_out_uids:
                 logger.error(
