@@ -237,13 +237,13 @@ def test_server_run(mock_uvicorn, mock_manager):
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
-@patch("litserve.server.uvicorn")
-def test_start_server(mock_uvicon):
+@patch("litserve.server._Server")
+def test_start_server(mock_server):
     api = ls.test_examples.TestAPI(spec=ls.OpenAISpec())
     server = LitServer(api)
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
-    mock_uvicon.Server.assert_called()
+    mock_server.assert_called()
     assert server.lit_api.spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
