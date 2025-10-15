@@ -156,7 +156,6 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    print(response_buffer)
                     response_buffer[uid] = (*response_buffer[uid][:-1], worker_id)
                     continue
 
@@ -1523,7 +1522,6 @@ class LitServer:
                         worker_id = idx % len(self.inference_workers_config)
 
                         for uid, resp in self.response_buffer.items():
-                            print(resp)
                             if len(resp) == 3:
                                 response_queue, event, resp_worker_id = resp
                                 response_queue.append((None, LitAPIStatus.ERROR))
