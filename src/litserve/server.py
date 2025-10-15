@@ -885,6 +885,11 @@ class LitServer:
             ),
             name="inference-worker",
         )
+<<<<<<< HEAD
+=======
+
+        print("0.2")
+>>>>>>> 617584629cc8b3767df1b6f4b9351913fb81dded
 
         process.start()
         return process
@@ -1525,7 +1530,11 @@ class LitServer:
 
                             self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
 
+<<<<<<< HEAD
                         print(f"Worker {worker_id} is dead. Restarting it")
+=======
+                        print(f"Worker {worker_id} is dead. Restarting it...")
+>>>>>>> 617584629cc8b3767df1b6f4b9351913fb81dded
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_inference_worker(lit_api, worker_id)
                         print(f"Worker {worker_id} has been started.")
