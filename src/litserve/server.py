@@ -31,8 +31,8 @@ from collections import deque
 from collections.abc import Iterable, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
-
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union, Dict
+import socket
 import uvicorn
 import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
@@ -108,7 +108,14 @@ async def _mixed_response_to_buffer(
             if result is None:
                 continue
 
-            uid, (*response, response_type) = result
+            uid, (*response, response_type, worker_id) = result
+
+            if response[1] == LitAPIStatus.START:
+                response_buffer[uid] = (response_buffer[uid][0], worker_id)
+                continue
+
+            print("RECEIVED", uid, response, response_type, worker_id)
+
             if response_type == LoopResponseType.STREAMING:
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
@@ -147,7 +154,15 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, (*response, _) = result
+                uid, (*response, response_type,  worker_id) = result
+
+                if response[1] == LitAPIStatus.START:
+                    response_buffer[uid] = (response_buffer[uid][0], worker_id)
+                    continue
+
+                breakpoint()
+                print("RECEIVED 2", uid, response, response_type, worker_id)
+
                 stream_response_buffer, event = response_buffer[uid]
                 stream_response_buffer.append(response)
                 event.set()
@@ -165,7 +180,15 @@ async def response_queue_to_buffer(
                 if result is None:
                     continue
 
-                uid, (*response, _) = result
+                uid, (*response, response_type,  worker_id) = result
+
+                if response[1] == LitAPIStatus.START:
+                    response_buffer[uid] = (response_buffer[uid][0], worker_id)
+                    print("TOTOTO", response_buffer)
+                    continue
+
+                print("RECEIVED 2", uid, response, response_type, worker_id)
+
                 event = response_buffer.pop(uid)
                 response_buffer[uid] = response
                 event.set()
@@ -312,7 +335,7 @@ class RegularRequestHandler(BaseRequestHandler):
 
             # Wait for response
             event = asyncio.Event()
-            self.server.response_buffer[uid] = event
+            self.server.response_buffer[uid] = (event, None)
 
             await event.wait()
 
@@ -380,6 +403,14 @@ class StreamingRequestHandler(BaseRequestHandler):
         except Exception as e:
             logger.exception(f"Error handling streaming request: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
+
+
+
+class _Server(uvicorn.server.Server):
+
+    def run(self, worker_id: int, sockets: Union[list[socket.socket], None] = None) -> None:
+        os.environ["LITSERVE_WORKER_ID"] = str(worker_id)
+        return super().run(sockets)
 
 
 class LitServer:
@@ -654,6 +685,7 @@ class LitServer:
         stream: bool = False,
         api_path: Optional[str] = None,
         loop: Optional[Union[str, LitLoop]] = None,
+        restart_workers: bool = False
     ):
         if max_batch_size is not None:
             warnings.warn(
@@ -777,7 +809,8 @@ class LitServer:
         self.litapi_request_queues = {}
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
-        self.restart_workers = False
+        self.restart_workers = restart_workers or False
+        self.monitor_internal = 5   
         self.mcp_server = None
 
         accelerator = self._connector.accelerator
@@ -796,7 +829,7 @@ class LitServer:
         # register middleware
         self._register_middleware()
 
-    def launch_inference_worker(self, lit_api: LitAPI):
+    def launch_inference_workers(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             # Objects of Server class are referenced (not copied)
@@ -831,6 +864,48 @@ class LitServer:
             process_list.append(process)
         return process_list
 
+    def launch_inference_worker(self, lit_api: LitAPI, worker_id: int):
+        specs = [lit_api.spec] if lit_api.spec else []
+        for spec in specs:
+            # Objects of Server class are referenced (not copied)
+            logging.debug(f"shallow copy for Server is created for for spec {spec}")
+            server_copy = copy.copy(self)
+            del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
+            spec.setup(server_copy)
+
+        print("0.1")
+
+        device = self.inference_workers_config[worker_id]
+        endpoint = lit_api.api_path.split("/")[-1]
+        if len(device) == 1:
+            device = device[0]
+
+        self.workers_setup_status[f"{endpoint}_{worker_id}"] = WorkerSetupStatus.STARTING
+
+        print("0.2")
+
+        ctx = mp.get_context("spawn")
+        process = ctx.Process(
+            target=inference_worker,
+            args=(
+                lit_api,
+                device,
+                worker_id,
+                self._get_request_queue(lit_api.api_path),
+                self._transport,
+                self.workers_setup_status,
+                self._callback_runner,
+            ),
+            name="inference-worker",
+        )
+        
+        print("0.2")
+
+        process.start()
+
+        print("0.3")
+        return process
+
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         loop = asyncio.get_running_loop()
@@ -838,7 +913,7 @@ class LitServer:
         if not hasattr(self, "_transport") or not self._transport:
             raise RuntimeError(
                 "Response queues have not been initialized. "
-                "Please make sure to call the 'launch_inference_worker' method of "
+                "Please make sure to call the 'launch_inference_workers' method of "
                 "the LitServer class to initialize the response queues."
             )
 
@@ -1060,7 +1135,7 @@ class LitServer:
     def _perform_graceful_shutdown(
         self,
         manager: mp.Manager,
-        uvicorn_workers: list[Union[mp.Process, threading.Thread]],
+        uvicorn_workers: Dict[str, Union[mp.Process, threading.Thread]],
         shutdown_reason: str = "normal",
     ):
         """Encapsulates the graceful shutdown logic."""
@@ -1074,8 +1149,8 @@ class LitServer:
             self._transport.close(send_sentinel=True)
 
         # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
-        if uvicorn_workers:
-            for i, uw in enumerate(uvicorn_workers):
+        if len(uvicorn_workers) > 0:
+            for i, uw in uvicorn_workers.items():
                 uvicorn_pid = uw.ident if isinstance(uw, threading.Thread) else uw.pid
                 uvicorn_name = uw.name
 
@@ -1333,21 +1408,31 @@ class LitServer:
 
         manager = self._init_manager(num_api_servers)
         self._logger_connector.run(self)
+        print("0000")
         self.inference_workers = []
         for lit_api in self.litapi_connector:
-            _inference_workers = self.launch_inference_worker(lit_api)
+            _inference_workers = self.launch_inference_workers(lit_api)
             self.inference_workers.extend(_inference_workers)
+
+        print("CCC")
 
         self.verify_worker_status()
 
+        print("AAA")
+
         shutdown_reason = "normal"
-        uvicorn_workers = []
+        uvicorn_workers = {}
         try:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
             )
+
+            print("BBB")
+
             if not self._disable_openapi_url:
                 print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+
+            breakpoint()
 
             self._start_worker_monitoring(manager, uvicorn_workers)
 
@@ -1403,17 +1488,17 @@ class LitServer:
                 # https://github.com/encode/uvicorn/pull/802
                 uvicorn_config.workers = num_uvicorn_servers
 
-            server = uvicorn.Server(config=uvicorn_config)
+            server = _Server(config=uvicorn_config)
             if uvicorn_worker_type == "process":
                 ctx = mp.get_context("fork")
-                w = ctx.Process(target=server.run, args=(sockets,), name=f"LitServer-{response_queue_id}")
+                w = ctx.Process(target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}")
             elif uvicorn_worker_type == "thread":
-                w = threading.Thread(target=server.run, args=(sockets,), name=f"LitServer-{response_queue_id}")
+                w = threading.Thread(target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}")
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
             workers.append(w)
-        return workers
+        return {i: w for i, w in enumerate(workers)}
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
@@ -1433,21 +1518,46 @@ class LitServer:
     def _start_worker_monitoring(
         self,
         manager: mp.Manager,
-        uvicorn_workers: list[Union[mp.Process, threading.Thread]],
+        uvicorn_workers: Dict[str, Union[mp.Process, threading.Thread]],
     ):
         def monitor():
-            while not self._shutdown_event.is_set():
-                for proc in self.inference_workers:
-                    if proc.is_alive():
-                        continue
+            try:
+                while not self._shutdown_event.is_set():
+                    broken_workers = {}
 
-                    if not self.restart_workers:
-                        logger.error(f"⚠️ Worker {proc.name} died; shutting down")
-                        self._perform_graceful_shutdown(manager, uvicorn_workers, f"⚠️ Worker {proc.name} died)")
-                        return
+                    for i, proc in enumerate(self.inference_workers):
+                        if proc.is_alive():
+                            continue
 
-                    # TODO: Handle restarting failed workers
-                time.sleep(5)
+                        if not self.restart_workers:
+                            logger.error(f"⚠️ Worker {proc.name} died; shutting down")
+                            self._perform_graceful_shutdown(manager, uvicorn_workers, f"⚠️ Worker {proc.name} died)")
+                            return
+
+                        broken_workers[i] = proc
+
+                    for idx, proc in broken_workers.items():
+                        lit_api_id = idx // len(self.inference_workers_config)
+                        worker_id = idx % len(self.inference_workers_config)
+
+                        for uid, resp in self.response_buffer.items():
+                            event, resp_worker_id = resp
+                            if int(resp_worker_id) == worker_id:
+                                event.set()
+                            
+                            self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
+                        
+                        print(f"Worker {worker_id} is dead. Restarting it...")
+                        lit_api = self.litapi_connector.lit_apis[lit_api_id]
+                        self.inference_workers[idx] = self.launch_inference_worker(lit_api, worker_id)
+                        print(f"Worker {worker_id} has been restarted...")
+
+                    time.sleep(self.monitor_internal)
+
+            except Exception as e:
+                print(e)
+            
+            print("Closing monitor")
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()

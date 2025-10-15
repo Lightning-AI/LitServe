@@ -18,7 +18,6 @@ from queue import Empty, Queue
 from typing import Optional
 
 from fastapi import HTTPException
-
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import _SENTINEL_VALUE, DefaultLoop, _async_inject_context, _inject_context, _StopLoopError
@@ -46,6 +45,14 @@ class SingleLoop(DefaultLoop):
                     logger.debug("Received sentinel value, stopping loop")
                     return
                 response_queue_id, uid, timestamp, x_enc = request_data
+                self.put_response(
+                    transport=transport,
+                    response_queue_id=response_queue_id,
+                    uid=uid,
+                    response_data=(),
+                    status=LitAPIStatus.START,
+                    response_type=LoopResponseType.REGULAR,
+                )
             except (Empty, ValueError):
                 continue
             except KeyboardInterrupt:  # pragma: no cover

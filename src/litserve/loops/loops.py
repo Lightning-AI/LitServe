@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from queue import Queue
-
+import os
 from litserve import LitAPI
 from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops.base import LitLoop, _BaseLoop
@@ -66,6 +66,8 @@ def inference_worker(
     workers_setup_status: dict[int, str],
     callback_runner: CallbackRunner,
 ):
+    os.environ["LITSERVE_WORKER_ID"] = str(worker_id)
+
     lit_spec = lit_api.spec
     loop: LitLoop = lit_api.loop
     stream = lit_api.stream

@@ -18,6 +18,7 @@ import sys
 import time
 from time import sleep
 from unittest.mock import MagicMock, patch
+import os 
 
 import pytest
 import torch
@@ -731,3 +732,38 @@ async def test_concurrent_async_streaming_inference(num_requests):
             assert elapsed < 4 + 4, (
                 f"Expected all requests to finish in just over 4s, plus some overhead, but took {elapsed:.2f}s."
             )
+
+
+class FailingLitAPI(LitAPI):
+    def setup(self, device):
+        worker_id = os.environ.get("LITSERVE_WORKER_ID", "0")
+        print(f"Worker {worker_id} setup successfully on {device}")
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        worker_id = os.environ.get("LITSERVE_WORKER_ID", "0")
+        if x == 0:
+            os._exit(1) # This will terminate the worker process
+        return 1
+
+    def encode_response(self, output):
+        return {"output": float(output)}
+
+
+@pytest.mark.asyncio
+async def test_worker_restart_and_server_shutdown():
+    api = FailingLitAPI()
+    server = LitServer(api, accelerator="cpu", devices=1, workers_per_device=2, restart_workers=True,)
+    server.monitor_internal = 1
+
+
+    i = 0
+
+    with wrap_litserve_start(server, worker_monitor=True) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 0}, timeout=2)

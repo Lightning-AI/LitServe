@@ -265,6 +265,7 @@ class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
         self._server_pid = os.getpid()
+        self._worker_id = None
 
     def kill(self):
         try:
@@ -305,7 +306,10 @@ class LitLoop(_BaseLoop):
         status: LitAPIStatus,
         response_type: LoopResponseType,
     ) -> None:
-        transport.send((uid, (response_data, status, response_type)), consumer_id=response_queue_id)
+        if self._worker_id is None:
+            self._worker_id = os.environ.get("LITSERVE_WORKER_ID", None)
+
+        transport.send((uid, (response_data, status, response_type, self._worker_id)), consumer_id=response_queue_id)
 
     def put_error_response(
         self,
