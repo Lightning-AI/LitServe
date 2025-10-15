@@ -97,7 +97,7 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
 
     server.inference_workers = []
     for lit_api in server.litapi_connector:
-        server.inference_workers.extend(server.launch_inference_workers(lit_api))
+        server.inference_workers.extend(server.launch_inference_worker(lit_api))
 
     server._prepare_app_run(server.app)
 
