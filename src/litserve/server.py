@@ -32,7 +32,7 @@ from collections import deque
 from collections.abc import Iterable, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Dict, Literal, Optional, Union
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
@@ -885,11 +885,6 @@ class LitServer:
             ),
             name="inference-worker",
         )
-<<<<<<< HEAD
-=======
-
-        print("0.2")
->>>>>>> 617584629cc8b3767df1b6f4b9351913fb81dded
 
         process.start()
         return process
@@ -1123,7 +1118,7 @@ class LitServer:
     def _perform_graceful_shutdown(
         self,
         manager: mp.Manager,
-        uvicorn_workers: Dict[str, Union[mp.Process, threading.Thread]],
+        uvicorn_workers: dict[str, Union[mp.Process, threading.Thread]],
         shutdown_reason: str = "normal",
     ):
         """Encapsulates the graceful shutdown logic."""
@@ -1481,7 +1476,7 @@ class LitServer:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
             workers.append(w)
-        return {i: w for i, w in enumerate(workers)}
+        return dict(workers)
 
     def setup_auth(self):
         if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
@@ -1501,7 +1496,7 @@ class LitServer:
     def _start_worker_monitoring(
         self,
         manager: mp.Manager,
-        uvicorn_workers: Dict[str, Union[mp.Process, threading.Thread]],
+        uvicorn_workers: dict[str, Union[mp.Process, threading.Thread]],
     ):
         def monitor():
             try:
@@ -1530,11 +1525,7 @@ class LitServer:
 
                             self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
 
-<<<<<<< HEAD
                         print(f"Worker {worker_id} is dead. Restarting it")
-=======
-                        print(f"Worker {worker_id} is dead. Restarting it...")
->>>>>>> 617584629cc8b3767df1b6f4b9351913fb81dded
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_inference_worker(lit_api, worker_id)
                         print(f"Worker {worker_id} has been started.")
