@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 
 from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec, _AsyncSpecWrapper
-from litserve.utils import LitAPIStatus, azip
+from litserve.utils import LitAPIStatus, ResponseBufferItem, azip
 
 if typing.TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -507,7 +507,7 @@ class OpenAISpec(LitSpec):
             request_el.n = 1
             q = deque()
             event = asyncio.Event()
-            self.response_buffer[uid] = (q, event, None)
+            self.response_buffer[uid] = ResponseBufferItem(response_queue=q, event=event)
             self.request_queue.put((response_queue_id, uid, time.monotonic(), request_el))
             self.queues.append(q)
             self.events.append(event)
