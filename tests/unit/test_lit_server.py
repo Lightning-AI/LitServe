@@ -773,7 +773,7 @@ async def test_worker_restart_and_server_shutdown():
             resp = await ac.post("/predict", json={"input": 0}, timeout=2)
             assert resp.status_code == 500
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
 
             tasks = []
             for _ in range(50):
