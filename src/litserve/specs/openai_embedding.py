@@ -264,11 +264,13 @@ class OpenAIEmbeddingSpec(LitSpec):
         self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
         await event.wait()
 
-        response, status = self.response_buffer.pop(uid)
+        response_buffer_item = self.response_buffer.pop(uid)
+        response, status = response_buffer_item.response
 
         if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
             logger.error("Error in embedding request: %s", response)
             raise response
+
         if status == LitAPIStatus.ERROR:
             logger.error("Error in embedding request: %s", response)
             raise HTTPException(status_code=status_code.HTTP_500_INTERNAL_SERVER_ERROR)
