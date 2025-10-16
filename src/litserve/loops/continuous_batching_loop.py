@@ -54,7 +54,7 @@ class Output:
 
 
 class ContinuousBatchingLoop(LitLoop):
-    def __init__(self, max_sequence_length: int = 2048, no_pending_requests: bool = False, sleep_delay: float = 0.01):
+    def __init__(self, max_sequence_length: int = 2048, no_pending_requests: bool = False, sleep_delay: float = 0.001):
         """Runs continuous batching loop. This loop handles adding new requests, processing them in batches, and
         managing the state of active sequences.
 
