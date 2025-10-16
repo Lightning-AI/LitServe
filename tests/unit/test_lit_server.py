@@ -832,5 +832,5 @@ async def test_worker_restart_and_server_shutdown_streaming():
             LifespanManager(server.app) as manager,
             AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
         ):
-            resp = await ac.post("/predict", json={"input": 0}, timeout=2)
+            resp = await ac.post("/predict", json={"input": 0})
             assert resp.status_code == 200

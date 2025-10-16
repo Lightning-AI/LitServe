@@ -1523,10 +1523,10 @@ class LitServer:
                             if resp.worker_id is None or resp.worker_id != worker_id:
                                 continue
 
+                            resp.response = (None, LitAPIStatus.ERROR)
+
                             if resp.response_queue is not None:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
-                            else:
-                                resp.response = (None, LitAPIStatus.ERROR)
 
                             resp.event.set()
 
