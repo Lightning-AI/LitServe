@@ -812,6 +812,7 @@ def test_get_default_loop_enable_async():
 @pytest.fixture
 def lit_loop_setup():
     lit_loop = LitLoop()
+    lit_loop._restart_workers = True
     lit_api = MagicMock(request_timeout=0.1)
     request_queue = Queue()
     return lit_loop, lit_api, request_queue
