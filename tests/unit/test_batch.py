@@ -231,7 +231,7 @@ def test_batched_loop():
         callback_runner=NOOP_CB_RUNNER,
     )
 
-    assert len(transport.responses) == 4, "response queue should have 2 responses"
+    assert len(transport.responses) == 4, "response queue should have 4 responses"
     assert transport.responses[2] == ("uuid-1234", ({"output": 16.0}, "OK", LoopResponseType.REGULAR, ANY))
     assert transport.responses[3] == ("uuid-1235", ({"output": 25.0}, "OK", LoopResponseType.REGULAR, ANY))
 
