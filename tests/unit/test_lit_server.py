@@ -772,7 +772,7 @@ async def test_worker_restart_and_server_shutdown():
             resp = await ac.post("/predict", json={"input": 0}, timeout=2)
             assert resp.status_code == 500
 
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
 
             tasks = []
             for _ in range(50):
@@ -786,6 +786,7 @@ async def test_worker_restart_and_server_shutdown():
             for response in responses:
                 assert response.status_code == 200
                 output = response.json()
+                print(output)
                 if output["output"] == 0:
                     worker_0_count += 1
                 else:

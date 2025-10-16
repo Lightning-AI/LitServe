@@ -282,6 +282,7 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
 
     lit_api = AsyncTestStreamLitAPI()
     loop = StreamingLoop()
+    loop._restart_workers = True
 
     # Patch kill to do nothing in test
     monkeypatch.setattr(loop, "kill", lambda: None)
