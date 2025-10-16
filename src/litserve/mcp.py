@@ -545,7 +545,9 @@ class _LitMCPServerConnector:
                 else:
                     raise ValueError(f"Endpoint {endpoint_path} not found")
                 logger.debug(f"call tool called, returning: {handler}")
-                return await _call_handler(handler, **arguments)
+                # Wrap arguments in 'request' key to match endpoint_handler signature
+                # endpoint_handler expects: async def endpoint_handler(request: request_type)
+                return await _call_handler(handler, request=arguments)
             except Exception as e:
                 logger.error(f"Error calling tool {name}: {e}")
                 raise e
