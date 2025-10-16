@@ -430,6 +430,7 @@ async def test_run_single_loop(mock_transport):
 
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = SingleLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_single_loop, args=(lit_api, request_queue, transport, NOOP_CB_RUNNER)
     )
