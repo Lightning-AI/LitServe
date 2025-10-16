@@ -262,6 +262,8 @@ class _BaseLoop(ABC):
                     if schedule_task.done():
                         self.on_schedule_task_done(schedule_task)
 
+                    await asyncio.sleep(0)
+
             event_loop.run_until_complete(_wrapper())
         else:
             while True:

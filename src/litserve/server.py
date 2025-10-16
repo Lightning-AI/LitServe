@@ -1532,6 +1532,10 @@ class LitServer:
                             if resp.worker_id is None or resp.worker_id != worker_id:
                                 continue
 
+                            # Check whether the event has already been set
+                            if resp.event.is_set():
+                                continue
+
                             resp.response = (None, LitAPIStatus.ERROR)
 
                             if resp.response_queue is not None:
