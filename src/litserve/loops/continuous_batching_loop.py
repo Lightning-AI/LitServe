@@ -144,7 +144,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
             response_queue_id, uid, timestamp, input = request
 
-            logger.debug(f"[worker {self._worker_id}] uid:{uid}, duration:{time.monotonic() - timestamp}")
+            logger.info(f"[worker {self._worker_id}] uid:{uid}, duration:{time.monotonic() - timestamp}")
 
             self.put_response(
                 transport=transport,
