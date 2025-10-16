@@ -891,6 +891,7 @@ class LitServer:
                 self._transport,
                 self.workers_setup_status,
                 self._callback_runner,
+                self.restart_workers,
             ),
             name="inference-worker",
         )
