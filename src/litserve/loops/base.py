@@ -259,7 +259,7 @@ class _BaseLoop(ABC):
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
 
-                    if schedule_task.done():
+                    if schedule_task.done() and not lit_api.has_active_requests():
                         self.on_schedule_task_done(schedule_task)
 
                     await asyncio.sleep(0)
