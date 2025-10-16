@@ -52,7 +52,7 @@ run: |
   uv run py-tree /var/tmp/torch
 
   # Testing
-  uv run coverage run --source litserve -m pytest src tests -v
+  uv run coverage run --source litserve -m pytest src tests -v --capture=no
 
   # Coverage reporting
   uv run coverage report

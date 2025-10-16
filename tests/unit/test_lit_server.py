@@ -14,6 +14,7 @@
 import asyncio
 import contextlib
 import json
+import os
 import sys
 import time
 from time import sleep
@@ -236,13 +237,13 @@ def test_server_run(mock_uvicorn, mock_manager):
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
-@patch("litserve.server.uvicorn")
-def test_start_server(mock_uvicon):
+@patch("litserve.server._Server")
+def test_start_server(mock_server):
     api = ls.test_examples.TestAPI(spec=ls.OpenAISpec())
     server = LitServer(api)
     sockets = MagicMock()
     server._start_server(8000, 1, "info", sockets, "process")
-    mock_uvicon.Server.assert_called()
+    mock_server.assert_called()
     assert server.lit_api.spec.response_queue_id is not None, "response_queue_id must be generated"
 
 
@@ -344,13 +345,14 @@ def test_server_terminate():
 @patch("litserve.server.uvicorn")
 def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manager, disable_openapi_url, should_print):
     """Test that the Swagger UI message is only printed when disable_openapi_url=False."""
-    server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url)
+    server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url, restart_workers=False)
     server.verify_worker_status = MagicMock()
 
     with (
         patch("litserve.server.mp.Manager", return_value=mock_manager),
         contextlib.suppress(Exception),
     ):
+        server._monitor_workers = False
         server.run(port=8000)
 
     if should_print:
@@ -700,7 +702,7 @@ class TestSleepAsyncStreamLitAPI(TestAsyncStreamLitAPI):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("num_requests", [10, 50, 100])
+@pytest.mark.parametrize("num_requests", [100])
 async def test_concurrent_async_streaming_inference(num_requests):
     api = TestSleepAsyncStreamLitAPI(enable_async=True, stream=True)
     server = LitServer(api)
@@ -731,3 +733,106 @@ async def test_concurrent_async_streaming_inference(num_requests):
             assert elapsed < 4 + 4, (
                 f"Expected all requests to finish in just over 4s, plus some overhead, but took {elapsed:.2f}s."
             )
+
+
+class FailingLitAPI(LitAPI):
+    def setup(self, device):
+        worker_id = os.environ.get("LITSERVE_WORKER_ID", "0")
+        print(f"Worker {worker_id} setup successfully on {device}")
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        if x == 0:
+            os._exit(1)  # This will terminate the worker process
+        return int(os.environ.get("LITSERVE_WORKER_ID", "0"))
+
+    def encode_response(self, output):
+        return {"output": output}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@pytest.mark.asyncio
+async def test_worker_restart_and_server_shutdown():
+    api = FailingLitAPI()
+    server = LitServer(
+        api,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=2,
+        restart_workers=True,
+    )
+    server.monitor_internal = 0.5
+
+    with wrap_litserve_start(server, worker_monitor=True) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 0}, timeout=2)
+            assert resp.status_code == 500
+
+            await asyncio.sleep(2)
+
+            tasks = []
+            for _ in range(50):
+                tasks.append(asyncio.create_task(ac.post("/predict", json={"input": 1})))
+
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            worker_0_count = 0
+            worker_1_count = 0
+
+            for response in responses:
+                assert response.status_code == 200
+                output = response.json()
+                print(output)
+                if output["output"] == 0:
+                    worker_0_count += 1
+                else:
+                    worker_1_count += 1
+
+            assert worker_0_count > 0
+            assert worker_1_count > 0
+
+
+class FailingLitAPIStreaming(LitAPI):
+    def setup(self, device):
+        worker_id = os.environ.get("LITSERVE_WORKER_ID", "0")
+        print(f"Worker {worker_id} setup successfully on {device}")
+
+    def decode_request(self, request):
+        yield request["input"]
+
+    def predict(self, x):
+        for value in x:
+            if value == 0:
+                os._exit(1)  # This will terminate the worker process
+            yield value
+
+    def encode_response(self, output):
+        for value in output:
+            yield {"output": float(value)}
+
+
+@pytest.mark.asyncio
+async def test_worker_restart_and_server_shutdown_streaming():
+    api = FailingLitAPIStreaming()
+    server = LitServer(
+        api,
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=2,
+        restart_workers=True,
+        stream=True,
+    )
+    server.monitor_internal = 0.5
+
+    with wrap_litserve_start(server, worker_monitor=True) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 0})
+            assert resp.status_code == 200

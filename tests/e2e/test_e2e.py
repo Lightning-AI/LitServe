@@ -15,7 +15,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 
@@ -33,13 +32,21 @@ def e2e_from_file(filename):
         def wrapper(*args, **kwargs):
             process = subprocess.Popen(
                 [sys.executable, filename],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # Merge stdout and stderr
                 stdin=subprocess.DEVNULL,
+                text=True,  # so we get strings instead of bytes
+                bufsize=1,  # line-buffered
             )
-            time.sleep(5)
 
             try:
+                # Print logs in real-time
+                for line in process.stdout:
+                    print(line, end="")
+                    if "Application startup complete." in line:
+                        break
+
+                # Give your test function a chance to run
                 test_fn(*args, **kwargs)
             except Exception:
                 raise

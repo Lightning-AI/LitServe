@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, ResponseBufferItem
 
 logger = logging.getLogger(__name__)
 
@@ -259,16 +259,18 @@ class OpenAIEmbeddingSpec(LitSpec):
         logger.debug("Received embedding request: %s", request)
         uid = uuid.uuid4()
         event = asyncio.Event()
-        self.response_buffer[uid] = event
+        self.response_buffer[uid] = ResponseBufferItem(event=event)
 
         self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
         await event.wait()
 
-        response, status = self.response_buffer.pop(uid)
+        response_buffer_item = self.response_buffer.pop(uid)
+        response, status = response_buffer_item.response
 
         if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
             logger.error("Error in embedding request: %s", response)
             raise response
+
         if status == LitAPIStatus.ERROR:
             logger.error("Error in embedding request: %s", response)
             raise HTTPException(status_code=status_code.HTTP_500_INTERNAL_SERVER_ERROR)

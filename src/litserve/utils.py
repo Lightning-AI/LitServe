@@ -25,11 +25,12 @@ import time
 import uuid
 import warnings
 from abc import ABCMeta
+from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, Union
+from typing import TYPE_CHECKING, Any, Optional, TextIO, Union
 
 from fastapi import HTTPException
 
@@ -48,6 +49,7 @@ _INIT_THRESHOLD = 1
 
 
 class LitAPIStatus:
+    START = "START"
     OK = "OK"
     ERROR = "ERROR"
     FINISH_STREAMING = "FINISH_STREAMING"
@@ -85,7 +87,7 @@ async def azip(*async_iterables):
 
 
 @contextmanager
-def wrap_litserve_start(server: "LitServer"):
+def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
     """Pytest utility to start the server in a context manager."""
     server.app.response_queue_id = 0
     for lit_api in server.litapi_connector:
@@ -93,10 +95,16 @@ def wrap_litserve_start(server: "LitServer"):
             lit_api.spec.response_queue_id = 0
 
     server.manager = server._init_manager(1)
+
     server.inference_workers = []
     for lit_api in server.litapi_connector:
         server.inference_workers.extend(server.launch_inference_worker(lit_api))
+
     server._prepare_app_run(server.app)
+
+    if worker_monitor:
+        server._start_worker_monitoring(server.manager, {})
+
     if is_package_installed("mcp"):
         from litserve.mcp import _LitMCPServerConnector
 
@@ -339,3 +347,11 @@ def add_ssl_context_from_env(kwargs: dict[str, Any]) -> dict[str, Any]:
 
         # Return a dictionary with Path objects to the created files
         return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
+
+
+@dataclasses.dataclass
+class ResponseBufferItem:
+    event: asyncio.Event
+    response_queue: Optional[deque] = None
+    worker_id: Optional[int] = None
+    response: Optional[Any] = None

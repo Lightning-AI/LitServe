@@ -45,7 +45,18 @@ class SingleLoop(DefaultLoop):
                 if request_data == _SENTINEL_VALUE:
                     logger.debug("Received sentinel value, stopping loop")
                     return
+
                 response_queue_id, uid, timestamp, x_enc = request_data
+
+                self.put_response(
+                    transport=transport,
+                    response_queue_id=response_queue_id,
+                    uid=uid,
+                    response_data=(),
+                    status=LitAPIStatus.START,
+                    response_type=LoopResponseType.REGULAR,
+                )
+
             except (Empty, ValueError):
                 continue
             except KeyboardInterrupt:  # pragma: no cover
@@ -216,10 +227,21 @@ class SingleLoop(DefaultLoop):
             while True:
                 try:
                     request_data = await event_loop.run_in_executor(None, request_queue.get, 1.0)
+
                     if request_data == _SENTINEL_VALUE:
                         logger.debug("Received sentinel value, stopping loop")
                         return
+
                     response_queue_id, uid, timestamp, x_enc = request_data
+
+                    self.put_response(
+                        transport=transport,
+                        response_queue_id=response_queue_id,
+                        uid=uid,
+                        response_data=(),
+                        status=LitAPIStatus.START,
+                        response_type=LoopResponseType.REGULAR,
+                    )
                 except (Empty, ValueError):
                     continue
                 except KeyboardInterrupt:
@@ -301,6 +323,7 @@ class BatchedLoop(DefaultLoop):
                 batches, timed_out_uids = self.get_batch_requests(
                     lit_api,
                     request_queue,
+                    transport,
                 )
             except _StopLoopError:
                 logger.debug("Received sentinel value, stopping loop")

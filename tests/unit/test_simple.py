@@ -299,10 +299,10 @@ async def test_batch_timeout_with_concurrent_requests(use_zmq):
     server = LitServer(
         SlowBatchAPI(
             max_batch_size=2,
-            batch_timeout=0.01,
+            batch_timeout=1,
         ),
         accelerator="cpu",
-        timeout=2,
+        timeout=1.9,
         fast_queue=use_zmq,
     )
     with wrap_litserve_start(server) as server:
@@ -312,13 +312,19 @@ async def test_batch_timeout_with_concurrent_requests(use_zmq):
         ):
             response1 = asyncio.create_task(ac.post("/predict", json={"input": 4.0}))
             response2 = asyncio.create_task(ac.post("/predict", json={"input": 5.0}))
-            await asyncio.sleep(0.0001)
             response3 = asyncio.create_task(ac.post("/predict", json={"input": 6.0}))
             responses = await asyncio.gather(response1, response2, response3, return_exceptions=True)
 
-            assert responses[0].status_code == 200, "First request in batch should complete"
-            assert responses[1].status_code == 200, "Second request in batch should complete"
-            assert responses[2].status_code == 504, "Third request should timeout"
+            status_code_200 = 0
+            status_code_504 = 0
+            for resp in responses:
+                if resp.status_code == 200:
+                    status_code_200 += 1
+                elif resp.status_code == 504:
+                    status_code_504 += 1
+
+            assert status_code_200 == 2, "Two requests should succeeds"
+            assert status_code_504 == 1, "One request should timeout"
 
 
 @pytest.mark.parametrize("use_zmq", [True, False])

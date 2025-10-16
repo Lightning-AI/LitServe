@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os
 from queue import Queue
 
 from litserve import LitAPI
@@ -65,7 +66,10 @@ def inference_worker(
     transport: MessageTransport,
     workers_setup_status: dict[int, str],
     callback_runner: CallbackRunner,
+    restart_workers: bool,
 ):
+    os.environ["LITSERVE_WORKER_ID"] = str(worker_id)
+
     lit_spec = lit_api.spec
     loop: LitLoop = lit_api.loop
     stream = lit_api.stream
@@ -90,6 +94,8 @@ def inference_worker(
 
     if loop == "auto":
         loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
+
+    loop._restart_workers = restart_workers
 
     loop(
         lit_api,

@@ -97,8 +97,10 @@ class _StopLoopError(Exception):
 
 
 def collate_requests(
+    loop: "LitLoop",
     lit_api: LitAPI,
     request_queue: Queue,
+    transport: MessageTransport,
 ) -> tuple[list, list]:
     payloads = []
     timed_out_uids = []
@@ -112,7 +114,18 @@ def collate_requests(
                 request_data = request_queue.get_nowait()
                 if request_data == _SENTINEL_VALUE:
                     raise _StopLoopError()
+
                 response_queue_id, uid, timestamp, x_enc = request_data
+
+                loop.put_response(
+                    transport=transport,
+                    response_queue_id=response_queue_id,
+                    uid=uid,
+                    response_data=(),
+                    status=LitAPIStatus.START,
+                    response_type=LoopResponseType.STREAMING if lit_api.stream else LoopResponseType.REGULAR,
+                )
+
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                     timed_out_uids.append((response_queue_id, uid))
                 else:
@@ -130,7 +143,18 @@ def collate_requests(
             request_data = request_queue.get(timeout=min(remaining_time, 0.001))
             if request_data == _SENTINEL_VALUE:
                 raise _StopLoopError()
+
             response_queue_id, uid, timestamp, x_enc = request_data
+
+            loop.put_response(
+                transport=transport,
+                response_queue_id=response_queue_id,
+                uid=uid,
+                response_data=(),
+                status=LitAPIStatus.START,
+                response_type=LoopResponseType.STREAMING if lit_api.stream else LoopResponseType.REGULAR,
+            )
+
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                 timed_out_uids.append((response_queue_id, uid))
             else:
@@ -198,7 +222,7 @@ class _BaseLoop(ABC):
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: list[Queue],
+        transport: MessageTransport,
     ):
         pass
 
@@ -219,7 +243,7 @@ class _BaseLoop(ABC):
             async def _wrapper():
                 logger.info("Running LitLoop in a asyncio event loop")
                 future = self.schedule_task(lit_api, lit_spec, request_queue, transport)
-                _ = event_loop.create_task(future)
+                schedule_task = event_loop.create_task(future)
                 while True:
                     try:
                         await self.run(
@@ -234,6 +258,19 @@ class _BaseLoop(ABC):
                         await asyncio.sleep(0)
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
+
+                    if not lit_api.has_active_requests() and schedule_task.done():
+                        for uid, response_queue_id in self.response_queue_ids.items():
+                            self.put_error_response(
+                                transport,
+                                response_queue_id,
+                                uid,
+                                Exception("schedule_task task failed"),
+                                LoopResponseType.STREAMING,
+                            )
+                        self.on_schedule_task_done(schedule_task)
+
+                    await asyncio.sleep(0)
 
             event_loop.run_until_complete(_wrapper())
         else:
@@ -260,11 +297,16 @@ class _BaseLoop(ABC):
     ):
         raise NotImplementedError
 
+    def on_schedule_task_done(self, schedule_task: asyncio.Task) -> None:
+        pass
+
 
 class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
         self._server_pid = os.getpid()
+        self._worker_id = None
+        self._restart_workers = False
 
     def kill(self):
         try:
@@ -279,10 +321,13 @@ class LitLoop(_BaseLoop):
         self,
         lit_api: LitAPI,
         request_queue: Queue,
+        transport: MessageTransport,
     ) -> tuple[list, list]:
         batches, timed_out_uids = collate_requests(
-            lit_api,
-            request_queue,
+            loop=self,
+            lit_api=lit_api,
+            request_queue=request_queue,
+            transport=transport,
         )
         return batches, timed_out_uids
 
@@ -296,6 +341,13 @@ class LitLoop(_BaseLoop):
         if lit_spec and hasattr(lit_spec, "populate_context"):
             lit_spec.populate_context(self._context, request)
 
+    @property
+    def worker_id(self) -> Optional[int]:
+        if self._worker_id is None:
+            worker_id = os.environ.get("LITSERVE_WORKER_ID", None)
+            self._worker_id = int(worker_id) if worker_id is not None else worker_id
+        return self._worker_id
+
     def put_response(
         self,
         transport: MessageTransport,
@@ -305,7 +357,11 @@ class LitLoop(_BaseLoop):
         status: LitAPIStatus,
         response_type: LoopResponseType,
     ) -> None:
-        transport.send((uid, (response_data, status, response_type)), consumer_id=response_queue_id)
+        # Skip sending the start status if we dont plan to restart the workers
+        if status == LitAPIStatus.START and not self._restart_workers:
+            return
+
+        transport.send((uid, (response_data, status, response_type, self.worker_id)), consumer_id=response_queue_id)
 
     def put_error_response(
         self,

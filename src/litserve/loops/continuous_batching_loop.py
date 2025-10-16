@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from queue import Queue
 from typing import Any, Optional
@@ -53,7 +54,7 @@ class Output:
 
 
 class ContinuousBatchingLoop(LitLoop):
-    def __init__(self, max_sequence_length: int = 2048):
+    def __init__(self, max_sequence_length: int = 2048, no_pending_requests: bool = False, sleep_delay: float = 0.001):
         """Runs continuous batching loop. This loop handles adding new requests, processing them in batches, and
         managing the state of active sequences.
 
@@ -72,6 +73,8 @@ class ContinuousBatchingLoop(LitLoop):
         self.active_sequences: dict[str, dict] = {}  # uid -> {input, current_length, generated_sequence}
         self.max_sequence_length = max_sequence_length
         self.response_queue_ids: dict[str, int] = {}  # uid -> response_queue_id
+        self.no_pending_requests = no_pending_requests
+        self.sleep_delay = sleep_delay
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         """Check if the lit_api has the necessary methods and if streaming is enabled."""
@@ -104,7 +107,14 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             return False
         """)
 
-    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
+    def add_request(
+        self,
+        uid: str,
+        request: Any,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        transport: Optional[MessageTransport] = None,
+    ) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
         lit_api.add_request(uid, request)
         self.active_sequences[uid] = {"input": request}
@@ -125,7 +135,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: list[Queue] = None,
+        transport: MessageTransport,
         max_batch_size: Optional[int] = None,
         batch_timeout: Optional[float] = None,
     ) -> list[tuple[str, Any]]:
@@ -133,22 +143,42 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         # First process existing pending requests
         while pending_requests and self.has_capacity(lit_api):
             response_queue_id, uid, input = pending_requests.pop(0)
-            self.add_request(uid, input, lit_api, lit_spec)
+            self.add_request(uid, input, lit_api, lit_spec, transport)
             self.response_queue_ids[uid] = response_queue_id
 
         while True:
+            if self.no_pending_requests and lit_api.has_active_requests():
+                await asyncio.sleep(self.sleep_delay)
+                return pending_requests
+
             request = await asyncio.to_thread(self.get_request, request_queue, timeout=1, block=True)
             if request is None:
                 break
+
+            response_queue_id, uid, timestamp, input = request
+
+            logger.debug(
+                f"[worker {self.worker_id}] uid:{uid}, duration:{time.monotonic() - timestamp},"
+                f"pending_requests: {len(pending_requests)}"
+            )
+
+            self.put_response(
+                transport=transport,
+                response_queue_id=response_queue_id,
+                uid=uid,
+                response_data=(),
+                status=LitAPIStatus.START,
+                response_type=LoopResponseType.STREAMING,
+            )
+
             if self.has_capacity(lit_api):
-                response_queue_id, uid, _, input = request
                 logger.debug(f"New request: {uid}, {input}")
                 self.response_queue_ids[uid] = response_queue_id
-                self.add_request(uid, input, lit_api, lit_spec)
+                self.add_request(uid, input, lit_api, lit_spec, transport)
             else:
-                response_queue_id, uid, _, input = request
                 pending_requests.append((response_queue_id, uid, input))
                 break
+
         return pending_requests
 
     async def schedule_task(
@@ -156,7 +186,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         lit_api: LitAPI,
         lit_spec: Optional[LitSpec],
         request_queue: Queue,
-        response_queues: list[Queue],
+        transport: MessageTransport,
     ):
         logger.info("Running prefill in background")
         try:
@@ -167,7 +197,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                     lit_api,
                     lit_spec,
                     request_queue,
-                    response_queues,
+                    transport,
                     max_batch_size=lit_api.max_batch_size,
                     batch_timeout=lit_api.batch_timeout,
                 )
@@ -236,6 +266,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
             self.response_queue_ids.clear()
             self.active_sequences.clear()
+
+    def on_schedule_task_error(self, exception: Exception):
+        pass
 
 
 class DefaultContinuousBatchingLoop(ContinuousBatchingLoop):
