@@ -333,6 +333,13 @@ class LitLoop(_BaseLoop):
         if lit_spec and hasattr(lit_spec, "populate_context"):
             lit_spec.populate_context(self._context, request)
 
+    @property
+    def worker_id(self) -> Optional[int]:
+        if self._worker_id is None:
+            worker_id = os.environ.get("LITSERVE_WORKER_ID", None)
+            self._worker_id = int(worker_id) if worker_id is not None else worker_id
+        return self._worker_id
+
     def put_response(
         self,
         transport: MessageTransport,
@@ -342,14 +349,11 @@ class LitLoop(_BaseLoop):
         status: LitAPIStatus,
         response_type: LoopResponseType,
     ) -> None:
-        if self._worker_id is None:
-            self._worker_id = os.environ.get("LITSERVE_WORKER_ID", None)
+        # Skip sending the start status if we dont plan to restart the workers
+        if status == LitAPIStatus.START and not self._restart_workers:
+            return
 
-        # # Skip sending the start status if we dont plan to restart the workers
-        # if status == LitAPIStatus.START and not self._restart_workers:
-        #     return
-
-        transport.send((uid, (response_data, status, response_type, self._worker_id)), consumer_id=response_queue_id)
+        transport.send((uid, (response_data, status, response_type, self.worker_id)), consumer_id=response_queue_id)
 
     def put_error_response(
         self,
