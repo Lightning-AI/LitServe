@@ -25,11 +25,12 @@ import time
 import uuid
 import warnings
 from abc import ABCMeta
+from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, Union
+from typing import TYPE_CHECKING, Any, Optional, TextIO, Union
 
 from fastapi import HTTPException
 
@@ -346,3 +347,11 @@ def add_ssl_context_from_env(kwargs: dict[str, Any]) -> dict[str, Any]:
 
         # Return a dictionary with Path objects to the created files
         return {"ssl_keyfile": Path(key_file.name), "ssl_certfile": Path(cert_file.name), **kwargs}
+
+
+@dataclasses.dataclass
+class ResponseBufferItem:
+    event: asyncio.Event
+    response_queue: Optional[deque] = None
+    worker_id: Optional[str] = None
+    response: Optional[Any] = None

@@ -55,6 +55,7 @@ from litserve.transport.factory import TransportConfig, create_transport_from_co
 from litserve.utils import (
     LitAPIStatus,
     LoopResponseType,
+    ResponseBufferItem,
     WorkerSetupStatus,
     add_ssl_context_from_env,
     call_after_stream,
@@ -95,7 +96,7 @@ def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
 
 async def _mixed_response_to_buffer(
     transport: MessageTransport,
-    response_buffer: dict[str, Union[tuple[deque, asyncio.Event], asyncio.Event]],
+    response_buffer: dict[str, ResponseBufferItem],
     consumer_id: int = 0,
 ):
     """Handle both regular and streaming responses.
@@ -112,17 +113,15 @@ async def _mixed_response_to_buffer(
             uid, (*response, response_type, worker_id) = result
 
             if response[1] == LitAPIStatus.START:
-                response_buffer[uid] = (*response_buffer[uid][:-1], worker_id)
+                response_buffer[uid].worker_id = worker_id
                 continue
 
             if response_type == LoopResponseType.STREAMING:
-                stream_response_buffer, event = response_buffer[uid]
-                stream_response_buffer.append(response)
-                event.set()
+                response_buffer[uid].response_queue.append(response)
+                response_buffer[uid].event.set()
             else:
-                event = response_buffer.pop(uid)
-                response_buffer[uid] = response
-                event.set()
+                response_buffer[uid].response = response
+                response_buffer[uid].event.set()
         except asyncio.CancelledError:
             logger.debug("Response queue to buffer task was cancelled")
             break
@@ -133,7 +132,7 @@ async def _mixed_response_to_buffer(
 
 async def response_queue_to_buffer(
     transport: MessageTransport,
-    response_buffer: dict[str, Union[tuple[deque, asyncio.Event], asyncio.Event]],
+    response_buffer: dict[str, ResponseBufferItem],
     consumer_id: int,
     litapi_connector: "_LitAPIConnector",
 ):
@@ -156,12 +155,11 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    response_buffer[uid] = (*response_buffer[uid][:-1], worker_id)
+                    response_buffer[uid].worker_id = worker_id
                     continue
 
-                stream_response_buffer, event, _ = response_buffer[uid]
-                stream_response_buffer.append(response)
-                event.set()
+                response_buffer[uid].response_queue.append(response)
+                response_buffer[uid].event.set()
             except asyncio.CancelledError:
                 logger.debug("Response queue to buffer task was cancelled")
                 break
@@ -179,12 +177,11 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    response_buffer[uid] = (*response_buffer[uid][:-1], worker_id)
+                    response_buffer[uid].worker_id = worker_id
                     continue
 
-                event, *_ = response_buffer.pop(uid)
-                response_buffer[uid] = response
-                event.set()
+                response_buffer[uid].response = response
+                response_buffer[uid].event.set()
             except asyncio.CancelledError:
                 logger.debug("Response queue to buffer task was cancelled")
                 break
@@ -328,12 +325,13 @@ class RegularRequestHandler(BaseRequestHandler):
 
             # Wait for response
             event = asyncio.Event()
-            self.server.response_buffer[uid] = (event, None)
+            self.server.response_buffer[uid] = ResponseBufferItem(event)
 
             await event.wait()
 
             # Process response
-            response, status = self.server.response_buffer.pop(uid)
+            response_buffer_item = self.server.response_buffer.pop(uid)
+            response, status = response_buffer_item.response
 
             if status == LitAPIStatus.ERROR:
                 self._handle_error_response(response)
@@ -381,7 +379,7 @@ class StreamingRequestHandler(BaseRequestHandler):
             # Set up streaming response
             event = asyncio.Event()
             response_queue = deque()
-            self.server.response_buffer[uid] = (response_queue, event, None)
+            self.server.response_buffer[uid] = ResponseBufferItem(event=event, response_queue=response_queue)
 
             # Create streaming response
             response_generator = call_after_stream(
@@ -778,7 +776,7 @@ class LitServer:
         self._disable_openapi_url = disable_openapi_url
 
         self.app.response_queue_id = None
-        self.response_buffer = {}
+        self.response_buffer: dict[str, ResponseBufferItem] = {}
         # gzip does not play nicely with streaming, see https://github.com/tiangolo/fastapi/discussions/8448
         if not self.litapi_connector.any_stream():
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
@@ -1521,19 +1519,14 @@ class LitServer:
                         lit_api_id = idx // len(self.inference_workers_config)
                         worker_id = idx % len(self.inference_workers_config)
 
-                        for uid, resp in self.response_buffer.items():
-                            if len(resp) == 3:
-                                response_queue, event, resp_worker_id = resp
-                                response_queue.append((None, LitAPIStatus.ERROR))
-                                if int(resp_worker_id) == worker_id:
-                                    event.set()
-                                self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
+                        for resp in self.response_buffer.values():
+                            if resp.worker_id is None or resp.worker_id != worker_id:
+                                continue
 
-                            elif len(resp) == 2:
-                                event, resp_worker_id = resp
-                                if int(resp_worker_id) == worker_id:
-                                    event.set()
-                                self.response_buffer[uid] = (None, LitAPIStatus.ERROR)
+                            if resp.response_queue is not None:
+                                resp.response_queue.append((None, LitAPIStatus.ERROR))
+
+                            resp.event.set()
 
                         print(f"Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
