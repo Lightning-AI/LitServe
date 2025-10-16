@@ -260,14 +260,14 @@ class _BaseLoop(ABC):
                         logger.exception("An error occurred in the loop: %s", e)
 
                     if not lit_api.has_active_requests() and schedule_task.done():
-                        for uid, response_queue_id in self.response_queue_ids.items():
-                            self.put_error_response(
-                                transport,
-                                response_queue_id,
-                                uid,
-                                Exception("schedule_task task failed"),
-                                LoopResponseType.STREAMING,
-                            )
+                        # for uid, response_queue_id in self.response_queue_ids.items():
+                        #     self.put_error_response(
+                        #         transport,
+                        #         response_queue_id,
+                        #         uid,
+                        #         Exception("schedule_task task failed"),
+                        #         LoopResponseType.STREAMING,
+                        #     )
                         self.on_schedule_task_done(schedule_task)
 
             event_loop.run_until_complete(_wrapper())
