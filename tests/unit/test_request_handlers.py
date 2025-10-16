@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import json
 from queue import Queue
 from unittest import mock
@@ -21,7 +22,7 @@ from fastapi import HTTPException, Request
 
 from litserve.server import BaseRequestHandler, RegularRequestHandler
 from litserve.test_examples import SimpleLitAPI
-from litserve.utils import LitAPIStatus
+from litserve.utils import LitAPIStatus, ResponseBufferItem
 
 
 @pytest.fixture
@@ -87,7 +88,9 @@ async def test_request_handler_streaming(mock_event, mock_lit_api):
     mock_server = MockServer(mock_lit_api)
     mock_request = MockRequest()
     mock_server.response_buffer = MagicMock()
-    mock_server.response_buffer.pop.return_value = ("test-response", LitAPIStatus.OK)
+    mock_server.response_buffer.pop.return_value = ResponseBufferItem(
+        asyncio.Event(), response=("test-response", LitAPIStatus.OK)
+    )
     handler = RegularRequestHandler(mock_lit_api, mock_server)
     response = await handler.handle_request(mock_request, Request)
     assert mock_server.request_queue.qsize() == 1

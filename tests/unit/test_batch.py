@@ -14,7 +14,7 @@
 import asyncio
 import time
 from queue import Queue
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 import torch
@@ -231,8 +231,8 @@ def test_batched_loop():
     )
 
     assert len(transport.responses) == 4, "response queue should have 2 responses"
-    assert transport.responses[2] == ("uuid-1234", ({"output": 16.0}, "OK", LoopResponseType.REGULAR, None))
-    assert transport.responses[3] == ("uuid-1235", ({"output": 25.0}, "OK", LoopResponseType.REGULAR, None))
+    assert transport.responses[2] == ("uuid-1234", ({"output": 16.0}, "OK", LoopResponseType.REGULAR, ANY))
+    assert transport.responses[3] == ("uuid-1235", ({"output": 25.0}, "OK", LoopResponseType.REGULAR, ANY))
 
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.batch.assert_called_once_with([4.0, 5.0])

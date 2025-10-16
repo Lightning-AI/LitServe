@@ -154,6 +154,8 @@ async def response_queue_to_buffer(
 
                 uid, (*response, response_type, worker_id) = result
 
+                print("HERE", response)
+
                 if response[1] == LitAPIStatus.START:
                     response_buffer[uid].worker_id = int(worker_id)
                     continue
@@ -331,6 +333,7 @@ class RegularRequestHandler(BaseRequestHandler):
 
             # Process response
             response_buffer_item = self.server.response_buffer.pop(uid)
+            print("HERE", self.server.response_buffer[uid], response_buffer_item)
             response, status = response_buffer_item.response
 
             if status == LitAPIStatus.ERROR:

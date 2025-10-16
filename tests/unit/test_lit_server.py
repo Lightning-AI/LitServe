@@ -775,7 +775,7 @@ async def test_worker_restart_and_server_shutdown():
             await asyncio.sleep(0.5)
 
             tasks = []
-            for _ in range(10):
+            for _ in range(50):
                 tasks.append(asyncio.create_task(ac.post("/predict", json={"input": 1})))
 
             responses = await asyncio.gather(*tasks, return_exceptions=True)

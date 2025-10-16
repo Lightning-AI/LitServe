@@ -345,9 +345,9 @@ class LitLoop(_BaseLoop):
         if self._worker_id is None:
             self._worker_id = os.environ.get("LITSERVE_WORKER_ID", None)
 
-        # Skip sending the start status if we dont plan to restart the workers
-        if status == LitAPIStatus.START and not self._restart_workers:
-            return
+        # # Skip sending the start status if we dont plan to restart the workers
+        # if status == LitAPIStatus.START and not self._restart_workers:
+        #     return
 
         transport.send((uid, (response_data, status, response_type, self._worker_id)), consumer_id=response_queue_id)
 
