@@ -147,7 +147,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
         while True:
             if self.no_pending_requests and lit_api.has_active_requests():
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0)
                 return pending_requests
 
             request = await asyncio.to_thread(self.get_request, request_queue, timeout=1, block=True)
