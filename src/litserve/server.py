@@ -113,7 +113,7 @@ async def _mixed_response_to_buffer(
             uid, (*response, response_type, worker_id) = result
 
             if response[1] == LitAPIStatus.START:
-                response_buffer[uid].worker_id = worker_id
+                response_buffer[uid].worker_id = int(worker_id)
                 continue
 
             if response_type == LoopResponseType.STREAMING:
@@ -155,7 +155,7 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    response_buffer[uid].worker_id = worker_id
+                    response_buffer[uid].worker_id = int(worker_id)
                     continue
 
                 response_buffer[uid].response_queue.append(response)
@@ -177,7 +177,7 @@ async def response_queue_to_buffer(
                 uid, (*response, response_type, worker_id) = result
 
                 if response[1] == LitAPIStatus.START:
-                    response_buffer[uid].worker_id = worker_id
+                    response_buffer[uid].worker_id = int(worker_id)
                     continue
 
                 response_buffer[uid].response = response
@@ -799,7 +799,7 @@ class LitServer:
         self._shutdown_event: Optional[mp.Event] = None
         self.uvicorn_graceful_timeout = 30
         self.restart_workers = restart_workers or False
-        self.monitor_internal = 5
+        self.monitor_internal = 2
         self.mcp_server = None
 
         self._monitor_workers = True
@@ -1525,6 +1525,8 @@ class LitServer:
 
                             if resp.response_queue is not None:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
+                            else:
+                                resp.response = (None, LitAPIStatus.ERROR)
 
                             resp.event.set()
 

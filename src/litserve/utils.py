@@ -353,5 +353,5 @@ def add_ssl_context_from_env(kwargs: dict[str, Any]) -> dict[str, Any]:
 class ResponseBufferItem:
     event: asyncio.Event
     response_queue: Optional[deque] = None
-    worker_id: Optional[str] = None
+    worker_id: Optional[int] = None
     response: Optional[Any] = None

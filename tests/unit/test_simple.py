@@ -253,7 +253,6 @@ class SlowLitAPI(LitAPI):
         return request["input"]
 
     def predict(self, x):
-        print(x)
         time.sleep(2)
         return self.model(x)
 

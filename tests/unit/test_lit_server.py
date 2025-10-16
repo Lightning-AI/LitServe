@@ -746,10 +746,10 @@ class FailingLitAPI(LitAPI):
     def predict(self, x):
         if x == 0:
             os._exit(1)  # This will terminate the worker process
-        return 1
+        return int(os.environ.get("LITSERVE_WORKER_ID", "0"))
 
     def encode_response(self, output):
-        return {"output": float(output)}
+        return {"output": output}
 
 
 @pytest.mark.asyncio
@@ -772,6 +772,28 @@ async def test_worker_restart_and_server_shutdown():
             resp = await ac.post("/predict", json={"input": 0}, timeout=2)
             assert resp.status_code == 500
 
+            await asyncio.sleep(0.5)
+
+            tasks = []
+            for _ in range(10):
+                tasks.append(asyncio.create_task(ac.post("/predict", json={"input": 1})))
+
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            worker_0_count = 0
+            worker_1_count = 0
+
+            for response in responses:
+                assert response.status_code == 200
+                output = response.json()
+                if output["output"] == 0:
+                    worker_0_count += 1
+                else:
+                    worker_1_count += 1
+
+            assert worker_0_count > 0
+            assert worker_1_count > 0
+
 
 class FailingLitAPIStreaming(LitAPI):
     def setup(self, device):
@@ -783,9 +805,7 @@ class FailingLitAPIStreaming(LitAPI):
 
     def predict(self, x):
         for value in x:
-            print("HERE", value)
             if value == 0:
-                print("EXITING WORKER")
                 os._exit(1)  # This will terminate the worker process
             yield value
 
