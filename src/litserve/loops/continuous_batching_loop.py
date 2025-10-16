@@ -106,7 +106,14 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             return False
         """)
 
-    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
+    def add_request(
+        self,
+        uid: str,
+        request: Any,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        transport: Optional[MessageTransport] = None,
+    ) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
         lit_api.add_request(uid, request)
         self.active_sequences[uid] = {"input": request}
@@ -135,7 +142,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         # First process existing pending requests
         while pending_requests and self.has_capacity(lit_api):
             response_queue_id, uid, input = pending_requests.pop(0)
-            self.add_request(uid, input, lit_api, lit_spec)
+            self.add_request(uid, input, lit_api, lit_spec, transport)
             self.response_queue_ids[uid] = response_queue_id
 
         while True:
@@ -166,7 +173,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             if self.has_capacity(lit_api):
                 logger.debug(f"New request: {uid}, {input}")
                 self.response_queue_ids[uid] = response_queue_id
-                self.add_request(uid, input, lit_api, lit_spec)
+                self.add_request(uid, input, lit_api, lit_spec, transport)
             else:
                 pending_requests.append((response_queue_id, uid, input))
                 break
