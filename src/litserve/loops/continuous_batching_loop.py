@@ -54,7 +54,7 @@ class Output:
 
 
 class ContinuousBatchingLoop(LitLoop):
-    def __init__(self, max_sequence_length: int = 2048, no_pending_requests: bool = False):
+    def __init__(self, max_sequence_length: int = 2048, no_pending_requests: bool = False, sleep_delay: float = 0.01):
         """Runs continuous batching loop. This loop handles adding new requests, processing them in batches, and
         managing the state of active sequences.
 
@@ -74,6 +74,7 @@ class ContinuousBatchingLoop(LitLoop):
         self.max_sequence_length = max_sequence_length
         self.response_queue_ids: dict[str, int] = {}  # uid -> response_queue_id
         self.no_pending_requests = no_pending_requests
+        self.sleep_delay = sleep_delay
 
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         """Check if the lit_api has the necessary methods and if streaming is enabled."""
@@ -147,7 +148,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
         while True:
             if self.no_pending_requests and lit_api.has_active_requests():
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(self.sleep_delay)
                 return pending_requests
 
             request = await asyncio.to_thread(self.get_request, request_queue, timeout=1, block=True)
