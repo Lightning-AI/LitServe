@@ -1528,7 +1528,7 @@ class LitServer:
                         lit_api_id = idx // len(self.inference_workers_config)
                         worker_id = idx % len(self.inference_workers_config)
 
-                        for resp in self.response_buffer.values():
+                        for uid, resp in self.response_buffer.items():
                             if resp.worker_id is None or resp.worker_id != worker_id:
                                 continue
 
@@ -1538,11 +1538,12 @@ class LitServer:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
 
                             resp.event.set()
+                            print(f"[monoriting] Marked {uid} set")
 
-                        print(f"Worker {worker_id} is dead. Restarting it")
+                        print(f"[monoriting] Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_single_inference_worker(lit_api, worker_id)
-                        print(f"Worker {worker_id} has been started.")
+                        print(f"[monoriting] Worker {worker_id} has been started.")
 
                     time.sleep(self.monitor_internal)
 
