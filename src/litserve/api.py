@@ -120,6 +120,8 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         - Use batching for GPU models to maximize utilization
         - Enable streaming for operations taking >1 second
         - Use async for I/O-bound operations (databases, external APIs)
+        - In batched streaming, return None from encode_response for finished items
+          to avoid sending unnecessary tokens past EOS
         - Load models in setup(), not __init__
         - Monitor GPU memory usage with larger batch sizes
 
@@ -298,6 +300,24 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.
+
+        For batched streaming, when an item in the batch has finished generating
+        (reached EOS/end-of-sequence), return None for that item to signal completion.
+        The server will stop sending data for that specific item and send the finish
+        signal, preventing unnecessary token transmission.
+
+        Example for batched streaming:
+            ```python
+            def encode_response(self, output_stream, context):
+                for outputs in output_stream:
+                    encoded = []
+                    for output in outputs:
+                        if output is None:  # Item finished
+                            encoded.append(None)
+                        else:
+                            encoded.append({"content": output})
+                    yield encoded
+            ```
 
         """
         if self._spec:
