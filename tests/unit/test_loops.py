@@ -164,6 +164,7 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     lit_api_mock, requests_queue = async_loop_args
 
     loop = SingleLoop()
+    loop._restart_workers = True
 
     # Patch kill to do nothing in test
     monkeypatch.setattr(loop, "kill", lambda: None)
@@ -391,6 +392,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         MagicMock(),
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
+        restart_workers=True,
     )
     mock_batched_loop.assert_called_once()
 
@@ -410,6 +412,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         MagicMock(),
         workers_setup_status={},
         callback_runner=NOOP_CB_RUNNER,
+        restart_workers=True,
     )
     mock_single_loop.assert_called_once()
 
@@ -459,6 +462,7 @@ async def test_run_single_loop_timeout():
     request_queue.put(old_request)
 
     lit_loop = SingleLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_single_loop, args=(lit_api, request_queue, transport, NOOP_CB_RUNNER)
     )
@@ -491,6 +495,7 @@ async def test_run_batched_loop():
         request_queue.put(req)
 
     lit_loop = BatchedLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
         args=(lit_api, request_queue, transport, NOOP_CB_RUNNER),
@@ -537,6 +542,7 @@ async def test_run_batched_loop_timeout(mock_transport):
         request_queue.put(req)
 
     lit_loop = BatchedLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_loop,
         args=(lit_api, request_queue, transport, NOOP_CB_RUNNER),
@@ -570,6 +576,7 @@ async def test_run_streaming_loop(mock_transport):
 
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, NOOP_CB_RUNNER)
     )
@@ -603,6 +610,7 @@ async def test_run_streaming_loop_timeout(mock_transport):
 
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, NOOP_CB_RUNNER)
     )
@@ -641,6 +649,7 @@ def off_test_run_batched_streaming_loop(openai_request_data):
 
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = BatchedStreamingLoop()
+    lit_loop._restart_workers = True
     loop_thread = threading.Thread(
         target=lit_loop.run_batched_streaming_loop,
         args=(lit_api, spec, request_queue, response_queues, NOOP_CB_RUNNER),
@@ -733,6 +742,7 @@ class TestLitAPI(ls.test_examples.SimpleLitAPI):
 @pytest.mark.parametrize("fast_queue", [True, False])
 async def test_loop_with_server_async(fast_queue):
     loop = TestLoop()
+    loop._restart_workers = True
     lit_api = TestLitAPI()
     server = ls.LitServer(lit_api, loop=loop, fast_queue=fast_queue)
 
@@ -747,6 +757,7 @@ async def test_loop_with_server_async(fast_queue):
 
 def test_loop_with_server_sync():
     loop = TestLoop()
+    loop._restart_workers = True
     lit_api = TestLitAPI()
     server = ls.LitServer(lit_api, loop=loop, fast_queue=True)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
@@ -759,24 +770,28 @@ def test_get_default_loop():
     lit_api.stream = False
     lit_api.max_batch_size = 1
     loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
+    loop._restart_workers = True
     assert isinstance(loop, ls.loops.SingleLoop), "SingleLoop must be returned when stream=False"
 
     lit_api = MagicMock()
     lit_api.stream = False
     lit_api.max_batch_size = 4
     loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
+    loop._restart_workers = True
     assert isinstance(loop, ls.loops.BatchedLoop), "BatchedLoop must be returned when stream=False and max_batch_size>1"
 
     lit_api = MagicMock()
     lit_api.stream = True
     lit_api.max_batch_size = 1
     loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
+    loop._restart_workers = True
     assert isinstance(loop, ls.loops.StreamingLoop), "StreamingLoop must be returned when stream=True"
 
     lit_api = MagicMock()
     lit_api.stream = True
     lit_api.max_batch_size = 4
     loop = ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size)
+    loop._restart_workers = True
     assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
         "BatchedStreamingLoop must be returned when stream=True and max_batch_size>1"
     )

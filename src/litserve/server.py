@@ -513,6 +513,14 @@ class LitServer:
             - Requires authentication token (set LIT_SHUTDOWN_API_KEY env var)
             - Useful for automated deployment pipelines
 
+        restart_workers:
+            Enable this option to automatically restart
+            workers if a critical error occurs. Defaults to False.
+
+            - When enabled, the worker loop will exit using `os._exit(1)`,
+            allowing the main process to recreate the worker.
+
+
     Content & Middleware:
         max_payload_size:
             Maximum request size. Defaults to "100MB".
@@ -848,6 +856,7 @@ class LitServer:
                     self._transport,
                     self.workers_setup_status,
                     self._callback_runner,
+                    self.restart_workers,
                 ),
                 name="inference-worker",
             )

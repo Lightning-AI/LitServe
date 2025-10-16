@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from queue import Queue
 from typing import Any, Optional
@@ -141,7 +142,13 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
             if request is None:
                 break
 
-            response_queue_id, uid, _, input = request
+            response_queue_id, uid, timestamp, input = request
+
+            print(
+                "Prefilling",
+                self._server_pid,
+                time.monotonic() - timestamp,
+            )
 
             self.put_response(
                 transport=transport,
@@ -246,6 +253,9 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.STREAMING)
             self.response_queue_ids.clear()
             self.active_sequences.clear()
+
+    def on_schedule_task_error(self, exception: Exception):
+        pass
 
 
 class DefaultContinuousBatchingLoop(ContinuousBatchingLoop):

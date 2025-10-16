@@ -66,6 +66,7 @@ def inference_worker(
     transport: MessageTransport,
     workers_setup_status: dict[int, str],
     callback_runner: CallbackRunner,
+    restart_workers: bool,
 ):
     os.environ["LITSERVE_WORKER_ID"] = str(worker_id)
 
@@ -93,6 +94,8 @@ def inference_worker(
 
     if loop == "auto":
         loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
+
+    loop._restart_workers = restart_workers
 
     loop(
         lit_api,

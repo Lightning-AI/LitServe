@@ -243,7 +243,7 @@ class _BaseLoop(ABC):
             async def _wrapper():
                 logger.info("Running LitLoop in a asyncio event loop")
                 future = self.schedule_task(lit_api, lit_spec, request_queue, transport)
-                _ = event_loop.create_task(future)
+                schedule_task = event_loop.create_task(future)
                 while True:
                     try:
                         await self.run(
@@ -258,6 +258,9 @@ class _BaseLoop(ABC):
                         await asyncio.sleep(0)
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
+
+                    if schedule_task.done():
+                        self.on_schedule_task_done(schedule_task)
 
             event_loop.run_until_complete(_wrapper())
         else:
@@ -284,12 +287,16 @@ class _BaseLoop(ABC):
     ):
         raise NotImplementedError
 
+    def on_schedule_task_done(self, schedule_task: asyncio.Task) -> None:
+        pass
+
 
 class LitLoop(_BaseLoop):
     def __init__(self):
         self._context = {}
         self._server_pid = os.getpid()
         self._worker_id = None
+        self._restart_workers = False
 
     def kill(self):
         try:
@@ -335,6 +342,10 @@ class LitLoop(_BaseLoop):
     ) -> None:
         if self._worker_id is None:
             self._worker_id = os.environ.get("LITSERVE_WORKER_ID", None)
+
+        # Skip sending the start status if we dont plan to restart the workers
+        if status == LitAPIStatus.START and not self._restart_workers:
+            return
 
         transport.send((uid, (response_data, status, response_type, self._worker_id)), consumer_id=response_queue_id)
 
