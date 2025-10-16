@@ -752,6 +752,7 @@ class FailingLitAPI(LitAPI):
         return {"output": output}
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @pytest.mark.asyncio
 async def test_worker_restart_and_server_shutdown():
     api = FailingLitAPI()
