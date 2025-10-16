@@ -333,7 +333,6 @@ class RegularRequestHandler(BaseRequestHandler):
 
             # Process response
             response_buffer_item = self.server.response_buffer.pop(uid)
-            print("HERE", self.server.response_buffer[uid], response_buffer_item)
             response, status = response_buffer_item.response
 
             if status == LitAPIStatus.ERROR:

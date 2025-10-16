@@ -222,6 +222,7 @@ def test_batched_loop():
     lit_api_mock.encode_response = MagicMock(side_effect=lambda x: {"output": x})
 
     loop = BatchedLoop()
+    loop._restart_workers = False
     transport = FakeTransport()
     loop.run_batched_loop(
         lit_api_mock,
