@@ -3,7 +3,7 @@
 <h2>
   The framework to build custom inference engines with expert control.   
   <br/>
-  Runtimes for models, agents, MCP, multi-modal, RAG, and pipelines.
+  Engines for models, agents, MCP, multi-modal, RAG, and pipelines.
   <br/>
   No MLOps. No YAML.
 </h2>    
