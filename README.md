@@ -1,7 +1,7 @@
 <div align='center'>
 
 <h2>
-  The framework to build custom model runtimes with expert control.   
+  The framework to build custom inference engines with expert control.   
   <br/>
   Runtimes for models, agents, MCP, multi-modal, RAG, and pipelines.
   <br/>
