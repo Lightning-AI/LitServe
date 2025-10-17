@@ -1,9 +1,9 @@
 <div align='center'>
 
 <h2>
-  The framework to build your own inference engine with expert control.   
+  The framework to build custom model runtimes with expert control.   
   <br/>
-  Build inference APIs, agents, MCP servers, RAG, and pipelines.
+  Runtimes for models, agents, MCP, multi-modal, RAG, and pipelines.
   <br/>
   No MLOps. No YAML.
 </h2>    
