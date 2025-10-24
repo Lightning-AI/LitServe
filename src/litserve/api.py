@@ -268,13 +268,39 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         return inputs
 
     def predict(self, x, **kwargs):
-        """Run the model on the input and return or yield the output."""
+        """Run the model on the input and return or yield the output.
+
+        When batching is enabled (max_batch_size > 1), this method receives
+        a batched input and must return a list-like structure where each element
+        corresponds to one input in the batch.
+
+        Returns:
+            For non-batched mode: Single prediction output
+            For batched mode: List, tuple, or array with one output per input
+
+        """
         raise NotImplementedError("predict is not implemented")
 
     def _unbatch_no_stream(self, output):
         if isinstance(output, str):
             warnings.warn(
                 "The 'predict' method returned a string instead of a list of predictions. "
+                "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
+                "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
+                UserWarning,
+            )
+        elif isinstance(output, dict):
+            warnings.warn(
+                "The 'predict' method returned a dict instead of a list of predictions. "
+                "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
+                "For example, return [{'class_A': 0.2, 'class_B': 0.8}, {'class_A': 0.5, 'class_B': 0.5}] "
+                "instead of {'class_A': [0.2, 0.5], 'class_B': [0.8, 0.5]}. "
+                "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
+                UserWarning,
+            )
+        elif isinstance(output, set):
+            warnings.warn(
+                "The 'predict' method returned a set instead of a list of predictions. "
                 "When batching is enabled, 'predict' must return a list to handle multiple inputs correctly. "
                 "Please update the 'predict' method to return a list of predictions to avoid unexpected behavior.",
                 UserWarning,
@@ -286,7 +312,21 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
             yield list(output)
 
     def unbatch(self, output):
-        """Convert a batched output to a list of outputs."""
+        """Convert a batched output to a list of outputs.
+
+        When using batching, the predict method should return a list-like structure
+        (list, tuple, or array) where each element corresponds to one input.
+
+        For example, for a batch of 2 inputs, predict should return:
+            [output1, output2]  # Correct
+
+        Not:
+            {"key1": [val1, val2], "key2": [val3, val4]}  # Incorrect
+
+        If you need to return dictionaries, return a list of dicts:
+            [{"key1": val1, "key2": val3}, {"key1": val2, "key2": val4}]  # Correct
+
+        """
         if self._default_unbatch is None:
             raise ValueError(
                 "Default implementation for `LitAPI.unbatch` method was not found. "
