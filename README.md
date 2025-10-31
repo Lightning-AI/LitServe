@@ -78,32 +78,32 @@ Install LitServe via pip ([more options](https://lightning.ai/docs/litserve/home
 pip install litserve
 ```
 
-[Example 1](#inference-pipeline-example): Toy inference pipeline with multiple models.   
+[Example 1](#inference-engine-example): Toy inference pipeline with multiple models.   
 [Example 2](#agent-example): Minimal agent to fetch the news (with OpenAI API).    
 ([Advanced examples](#featured-examples)):    
 
-### Inference pipeline example   
+### Inference engine example   
 
 ```python
 import litserve as ls
 
 # define the api to include any number of models, dbs, etc...
-class InferencePipeline(ls.LitAPI):
+class InferenceEngine(ls.LitAPI):
     def setup(self, device):
-        self.model1 = lambda x: x**2
-        self.model2 = lambda x: x**3
+        self.text_model = lambda x: x**2
+        self.vision_model = lambda x: x**3
 
     def predict(self, request):
         x = request["input"]    
         # perform calculations using both models
-        a = self.model1(x)
-        b = self.model2(x)
+        a = self.text_model(x)
+        b = self.vision_model(x)
         c = a + b
         return {"output": c}
 
 if __name__ == "__main__":
     # 12+ features like batching, streaming, etc...
-    server = ls.LitServer(InferencePipeline(max_batch_size=1), accelerator="auto")
+    server = ls.LitServer(InferenceEngine(max_batch_size=1), accelerator="auto")
     server.run(port=8000)
 ```
 
