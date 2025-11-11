@@ -233,11 +233,14 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
                     # Log once every 10 seconds
-                    if warning_counter % 1000 == 0:
+                    if warning_counter == 0:
                         logger.warning("No responses from step() but has_active_requests() is true")
 
                     # increment the counter
-                    warning_counter = (warning_counter + 1) % 1000
+                    warning_counter += 1
+
+                    if warning_counter > 1000:
+                        warning_counter = 0
 
                     # sleep to avoid starving the cpu
                     time.sleep(0.01)
