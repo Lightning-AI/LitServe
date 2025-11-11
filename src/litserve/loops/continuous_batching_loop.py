@@ -237,7 +237,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                         logger.warning("No responses from step() but has_active_requests() is true")
 
                     # increment the counter
-                    warning_counter += 1
+                    warning_counter = (warning_counter + 1) % 1000
 
                     # sleep to avoid starving the cpu
                     time.sleep(0.01)
