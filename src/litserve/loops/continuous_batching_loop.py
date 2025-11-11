@@ -232,7 +232,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
-                    if warning_counter % 100 == 0:
+                    # Log once every 10 seconds
+                    if warning_counter % 1000 == 0:
                         logger.warning("No responses from step() but has_active_requests() is true")
                         warning_counter += 1
 
