@@ -243,7 +243,7 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                         warning_counter = 0
 
                     # sleep to avoid starving the cpu
-                    asyncio.sleep(0.01)
+                    await asyncio.sleep(0.01)
                     continue
 
                 if responses and not isinstance(responses[0], Output):
