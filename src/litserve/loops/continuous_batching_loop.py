@@ -223,6 +223,8 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
         callback_runner: CallbackRunner,
     ):
         """Main loop that processes batches of requests."""
+
+        warning_counter = 0
         lit_spec = lit_api.spec
         try:
             prev_outputs = None
@@ -230,8 +232,13 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
                 # Process one step for all active sequences
                 responses = await self.step(prev_outputs, lit_api, lit_spec)
                 if len(responses) == 0:
-                    logger.warning("No responses from step() but has_active_requests() is true")
+                    if warning_counter % 100 == 0:
+                        logger.warning("No responses from step() but has_active_requests() is true")
+                        warning_counter += 1
+
+                    time.sleep(0.01)
                     continue
+
                 if responses and not isinstance(responses[0], Output):
                     raise HTTPException(500, "Expected StepOutput from step()")
 
