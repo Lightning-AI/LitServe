@@ -64,9 +64,9 @@ Over 340,000 developers use [Lightning Cloud](https://lightning.ai/?utm_source=p
 - [Inference](https://lightning.ai/deploy?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): Deploy models as inference APIs.   
 
 # Why LitServe?
-LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multi-model orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
+LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multimodel orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
 
-Self host LitServe or deploy in one-click to [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
+Self-host LitServe or deploy in one-click to [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
 
 &nbsp;
 
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     server.run(port=8000)
 ```
 
-Deploy for free to [Lightning cloud](#hosting-options) (or self host anywhere):
+Deploy for free to [Lightning cloud](#hosting-options) (or self-host anywhere):
 
 ```bash
 # Deploy for free with autoscaling, monitoring, etc...
@@ -161,7 +161,7 @@ curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -
 A few key benefits:
 
 - **Deploy any pipeline or model**: Agents, pipelines, RAG, chatbots, image models, video, speech, text, etc...
-- **No MLOps glue:** LitAPI lets you build full AI systems (multi-model, agent, RAG) in one place ([more](https://lightning.ai/docs/litserve/api-reference/litapi?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).   
+- **No MLOps glue:** LitAPI lets you build full AI systems (multimodel, agent, RAG) in one place ([more](https://lightning.ai/docs/litserve/api-reference/litapi?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).   
 - **Instant setup:** Connect models, DBs, and data in a few lines with `setup()` ([more](https://lightning.ai/docs/litserve/api-reference/litapi?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme#setup)).    
 - **Optimized:** autoscaling, GPU support, and fast inference included ([more](https://lightning.ai/docs/litserve/api-reference/litserver?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).    
 - **Deploy anywhere:** self-host or one-click deploy with Lightning ([more](https://lightning.ai/docs/litserve/features/deploy-on-cloud?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme)).

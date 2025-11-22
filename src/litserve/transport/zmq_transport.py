@@ -13,7 +13,7 @@ class ZMQTransport(MessageTransport):
         self._zmq: Union[Producer, AsyncConsumer, None] = None
 
     def setup(self, operation: Literal[zmq.SUB, zmq.PUB], consumer_id: Optional[int] = None) -> None:
-        """Must be called in the subprocess to setup the ZMQ transport."""
+        """Must be called in the subprocess to set up the ZMQ transport."""
         if operation == zmq.PUB:
             self._zmq = Producer(address=self.backend_address)
             self._zmq.wait_for_subscribers()

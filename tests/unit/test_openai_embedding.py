@@ -203,7 +203,7 @@ async def test_batching_with_client_side_batching(openai_embedding_request_data_
         ):
             resp = await ac.post("/v1/embeddings", json=openai_embedding_request_data_array, timeout=10)
 
-            assert resp.status_code == 400, "Cient side batching is not supported with dynamic batching"
+            assert resp.status_code == 400, "Client side batching is not supported with dynamic batching"
             assert (
                 resp.json()["detail"]
                 == "The OpenAIEmbedding spec does not support dynamic batching when client-side batching is used. "
