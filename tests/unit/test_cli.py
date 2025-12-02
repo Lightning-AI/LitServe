@@ -40,9 +40,7 @@ def test_ensure_lightning_installed_with_pip(mock_run, mock_which, mock_is_packa
     mock_is_package_installed.return_value = False
     mock_which.return_value = None  # uv not available
     _ensure_lightning_installed()
-    mock_run.assert_called_once_with(
-        [sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"], check=True
-    )
+    mock_run.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"], check=True)
 
 
 @patch("litserve.cli.is_package_installed")
