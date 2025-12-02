@@ -357,7 +357,7 @@ class LitLoop(_BaseLoop):
         status: LitAPIStatus,
         response_type: LoopResponseType,
     ) -> None:
-        # Skip sending the start status if we dont plan to restart the workers
+        # Skip sending the start status if we don't plan to restart the workers
         if status == LitAPIStatus.START and not self._restart_workers:
             return
 
