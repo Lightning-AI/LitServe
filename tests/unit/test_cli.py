@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -51,6 +52,20 @@ def test_ensure_lightning_installed_with_uv(mock_run, mock_which, mock_is_packag
     mock_which.return_value = "/usr/bin/uv"  # uv available
     _ensure_lightning_installed()
     mock_run.assert_called_once_with(["uv", "pip", "install", "-U", "lightning-sdk"], check=True)
+
+
+@patch("litserve.cli.is_package_installed")
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
+def test_ensure_lightning_installed_failure(mock_run, mock_which, mock_is_package_installed):
+    mock_is_package_installed.return_value = False
+    mock_which.return_value = None
+    mock_run.side_effect = subprocess.CalledProcessError(1, "pip")
+
+    with pytest.raises(SystemExit) as excinfo:
+        _ensure_lightning_installed()
+
+    assert "Failed to install lightning-sdk" in str(excinfo.value.code)
 
 
 # TODO: Remove this once we have a fix for Python 3.9 and 3.10
