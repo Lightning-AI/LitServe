@@ -34,19 +34,34 @@ def test_dockerize_command(monkeypatch, capsys):
 
 
 @patch("litserve.cli.is_package_installed")
-@patch("subprocess.check_call")
-def test_ensure_lightning_installed(mock_check_call, mock_is_package_installed):
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
+def test_ensure_lightning_installed_with_pip(mock_run, mock_which, mock_is_package_installed):
     mock_is_package_installed.return_value = False
+    mock_which.return_value = None  # uv not available
     _ensure_lightning_installed()
-    mock_check_call.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
+    mock_run.assert_called_once_with(
+        [sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"], check=True
+    )
+
+
+@patch("litserve.cli.is_package_installed")
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
+def test_ensure_lightning_installed_with_uv(mock_run, mock_which, mock_is_package_installed):
+    mock_is_package_installed.return_value = False
+    mock_which.return_value = "/usr/bin/uv"  # uv available
+    _ensure_lightning_installed()
+    mock_run.assert_called_once_with(["uv", "pip", "install", "-U", "lightning-sdk"], check=True)
 
 
 # TODO: Remove this once we have a fix for Python 3.9 and 3.10
 @pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
 @patch("litserve.cli.is_package_installed")
-@patch("subprocess.check_call")
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
 @patch("builtins.__import__")
-def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_is_package_installed):
+def test_cli_main_lightning_not_installed(mock_import, mock_run, mock_which, mock_is_package_installed):
     # Create a mock for the lightning_sdk module and its components
     mock_lightning_sdk = MagicMock()
     mock_lightning_sdk.cli.entrypoint.main_cli = MagicMock()
@@ -58,6 +73,7 @@ def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_is_
         return __import__(name, *args, **kwargs)
 
     mock_import.side_effect = side_effect
+    mock_which.return_value = None  # uv not available
 
     # Test when lightning_sdk is not installed but gets installed dynamically
     mock_is_package_installed.side_effect = [False, True]  # First call returns False, second call returns True
@@ -66,7 +82,7 @@ def test_cli_main_lightning_not_installed(mock_import, mock_check_call, mock_is_
     with patch.object(sys, "argv", test_args):
         cli_main()
 
-    mock_check_call.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
+    mock_run.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"], check=True)
 
 
 @pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
