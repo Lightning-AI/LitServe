@@ -115,7 +115,9 @@ async def test_request_tracker_with_openai_spec(capfd):
             LifespanManager(server.app) as manager,
             AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
         ):
-            resp = await ac.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "test"}], "model": "test"})
+            resp = await ac.post(
+                "/v1/chat/completions", json={"messages": [{"role": "user", "content": "test"}], "model": "test"}
+            )
             assert resp.status_code == 200
 
     captured = capfd.readouterr()
