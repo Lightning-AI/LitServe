@@ -50,6 +50,19 @@ def test_ensure_lightning_installed_with_pip(mock_run, mock_which, mock_find_spe
 @patch("litserve.cli.importlib.util.find_spec")
 @patch("litserve.cli.shutil.which")
 @patch("subprocess.run")
+def test_ensure_lightning_installed_pip_preferred(mock_run, mock_which, mock_find_spec, mock_is_package_installed):
+    """When both pip and uv are available, pip should be used first."""
+    mock_is_package_installed.return_value = False
+    mock_find_spec.return_value = True  # pip available
+    mock_which.return_value = "/usr/bin/uv"  # uv also available
+    _ensure_lightning_installed()
+    mock_run.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"], check=True)
+
+
+@patch("litserve.cli.is_package_installed")
+@patch("litserve.cli.importlib.util.find_spec")
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
 def test_ensure_lightning_installed_with_uv(mock_run, mock_which, mock_find_spec, mock_is_package_installed):
     mock_is_package_installed.return_value = False
     mock_find_spec.return_value = None  # pip not available
@@ -62,16 +75,48 @@ def test_ensure_lightning_installed_with_uv(mock_run, mock_which, mock_find_spec
 @patch("litserve.cli.importlib.util.find_spec")
 @patch("litserve.cli.shutil.which")
 @patch("subprocess.run")
-def test_ensure_lightning_installed_failure(mock_run, mock_which, mock_find_spec, mock_is_package_installed):
+def test_ensure_lightning_installed_fallback_to_uv(mock_run, mock_which, mock_find_spec, mock_is_package_installed):
+    """When pip fails, should fall back to uv."""
     mock_is_package_installed.return_value = False
     mock_find_spec.return_value = True  # pip available
-    mock_which.return_value = None  # uv not available
-    mock_run.side_effect = subprocess.CalledProcessError(1, "pip")
+    mock_which.return_value = "/usr/bin/uv"  # uv also available
+    mock_run.side_effect = [subprocess.CalledProcessError(1, "pip"), None]  # pip fails, uv succeeds
+    _ensure_lightning_installed()
+    assert mock_run.call_count == 2
+    mock_run.assert_called_with(["uv", "pip", "install", "-U", "lightning-sdk"], check=True)
 
-    with pytest.raises(SystemExit) as excinfo:
+
+@patch("litserve.cli.is_package_installed")
+@patch("litserve.cli.importlib.util.find_spec")
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
+def test_ensure_lightning_installed_failure(mock_run, mock_which, mock_find_spec, mock_is_package_installed):
+    """When all available installers fail, should exit with error."""
+    mock_is_package_installed.return_value = False
+    mock_find_spec.return_value = True  # pip available
+    mock_which.return_value = "/usr/bin/uv"  # uv also available
+    mock_run.side_effect = subprocess.CalledProcessError(1, "install")  # both fail
+
+    with pytest.raises(SystemExit, match="Failed to install lightning-sdk"):
         _ensure_lightning_installed()
+    assert mock_run.call_count == 2  # tried both pip and uv
 
-    assert "Failed to install lightning-sdk" in str(excinfo.value.code)
+
+@patch("litserve.cli.is_package_installed")
+@patch("litserve.cli.importlib.util.find_spec")
+@patch("litserve.cli.shutil.which")
+@patch("subprocess.run")
+def test_ensure_lightning_installed_no_installer_available(
+    mock_run, mock_which, mock_find_spec, mock_is_package_installed
+):
+    """When neither pip nor uv is available, should exit with error."""
+    mock_is_package_installed.return_value = False
+    mock_find_spec.return_value = None  # pip not available
+    mock_which.return_value = None  # uv not available
+
+    with pytest.raises(SystemExit, match="Failed to install lightning-sdk"):
+        _ensure_lightning_installed()
+    mock_run.assert_not_called()  # no installer was tried
 
 
 # TODO: Remove this once we have a fix for Python 3.9 and 3.10
