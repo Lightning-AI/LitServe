@@ -1,3 +1,4 @@
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -11,12 +12,22 @@ def _ensure_lightning_installed():
         return
 
     print("Lightning CLI not found. Installing lightning-sdk...")
-    pip = ["uv", "pip"] if shutil.which("uv") else [sys.executable, "-m", "pip"]
 
-    try:
-        subprocess.run([*pip, "install", "-U", "lightning-sdk"], check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        sys.exit("Failed to install lightning-sdk. Run: pip install lightning-sdk")
+    # Build list of available installers (pip first as it respects the active environment)
+    installers = []
+    if importlib.util.find_spec("pip"):
+        installers.append([sys.executable, "-m", "pip"])
+    if shutil.which("uv"):
+        installers.append(["uv", "pip"])
+
+    for installer in installers:
+        try:
+            subprocess.run([*installer, "install", "-U", "lightning-sdk"], check=True)
+            return
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+
+    sys.exit("Failed to install lightning-sdk. Run: pip install lightning-sdk")
 
 
 def main():
