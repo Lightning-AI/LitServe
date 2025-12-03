@@ -28,6 +28,7 @@ from fastapi import BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from litserve.callbacks.base import EventTypes
 from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec, _AsyncSpecWrapper
 from litserve.utils import LitAPIStatus, ResponseBufferItem, azip
@@ -502,6 +503,14 @@ class OpenAISpec(LitSpec):
         uids = [uuid.uuid4() for _ in range(request.n)]
         self.queues = []
         self.events = []
+
+        # Trigger callback
+        self._server._callback_runner.trigger_event(
+            EventTypes.ON_REQUEST.value,
+            active_requests=self._server.active_requests,
+            litserver=self._server,
+        )
+
         for uid in uids:
             request_el = request.model_copy()
             request_el.n = 1
