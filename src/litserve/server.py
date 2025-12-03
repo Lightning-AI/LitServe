@@ -1071,6 +1071,8 @@ class LitServer:
         specs = [lit_api.spec] if lit_api.spec else []
         for spec in specs:
             spec: LitSpec
+            # Set the server reference for callback triggering in spec endpoints
+            spec._server = self
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(

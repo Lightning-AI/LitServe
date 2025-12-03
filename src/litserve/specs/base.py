@@ -31,6 +31,12 @@ class LitSpec:
         self.request_queue = None
         self.response_queue_id = None
 
+    def __getstate__(self):
+        """Exclude _server from pickling as it contains unpickleable objects."""
+        state = self.__dict__.copy()
+        state["_server"] = None
+        return state
+
     @property
     def stream(self):
         return False
