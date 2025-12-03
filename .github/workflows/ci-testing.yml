@@ -30,7 +30,7 @@ jobs:
       TORCH_URL: "https://download.pytorch.org/whl/cpu/torch_stable.html"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Install uv and setup python
         uses: astral-sh/setup-uv@v7
         with:
