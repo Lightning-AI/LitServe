@@ -1,5 +1,4 @@
 import inspect
-import sys
 from typing import Optional
 from unittest.mock import patch
 
@@ -7,9 +6,6 @@ import pytest
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from starlette.applications import Starlette
-
-if sys.version_info < (3, 10):
-    pytest.skip("Skipping test_mcp.py on Python < 3.10", allow_module_level=True)
 
 import litserve as ls
 from litserve.mcp import (

@@ -16,9 +16,9 @@ import inspect
 import json
 import warnings
 from abc import ABC
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from pydantic import BaseModel
 

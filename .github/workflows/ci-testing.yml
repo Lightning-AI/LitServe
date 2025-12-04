@@ -19,11 +19,11 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.9", "3.10", "3.11"] # todo, "3.12"
+        python-version: ["3.10", "3.11"] # todo, "3.12"
         include:
           - { os: "macos-latest", python-version: "3.12" }
           - { os: "windows-latest", python-version: "3.11" }
-          - { os: "ubuntu-22.04", python-version: "3.9", requires: "oldest" }
+          - { os: "ubuntu-22.04", python-version: "3.10", requires: "oldest" }
 
     timeout-minutes: 35
     env:
