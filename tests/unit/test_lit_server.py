@@ -836,3 +836,38 @@ async def test_worker_restart_and_server_shutdown_streaming():
         ):
             resp = await ac.post("/predict", json={"input": 0})
             assert resp.status_code == 200
+
+
+class MultiRouteAPI(ls.test_examples.SimpleLitAPI):
+    def __init__(self, api_path="/predict"):
+        super().__init__(api_path=api_path)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@pytest.mark.parametrize(
+    ("workers_cfg", "expected_workers"),
+    [
+        ({"/sentiment": 2, "/generate": 3}, {"/sentiment": 2, "/generate": 3}),
+        ([2, 3], {"/sentiment": 2, "/generate": 3}),
+    ],
+)
+def test_per_route_workers(monkeypatch, workers_cfg, expected_workers):
+    sentiment = MultiRouteAPI(api_path="/sentiment")
+    generate = MultiRouteAPI(api_path="/generate")
+    server = LitServer([sentiment, generate], accelerator="cuda", devices=[0, 1], workers_per_device=workers_cfg)
+
+    launch_calls = []
+
+    def fake_launch(api, *args, **kwargs):
+        launch_calls.append((api.api_path, kwargs["num_workers"] if "num_workers" in kwargs else args[1]))
+        return [MagicMock()]
+
+    monkeypatch.setattr(LitServer, "launch_inference_worker", fake_launch)
+    server.verify_worker_status = MagicMock()
+    server._start_server = MagicMock()
+    server._transport = MagicMock()
+
+    with patch("litserve.server.mp.Manager", return_value=MagicMock()):
+        server.run(api_server_worker_type="process")
+
+    assert dict(launch_calls) == expected_workers
