@@ -29,10 +29,10 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
