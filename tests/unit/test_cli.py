@@ -119,8 +119,8 @@ def test_ensure_lightning_installed_no_installer_available(
     mock_run.assert_not_called()  # no installer was tried
 
 
-# TODO: Remove this once we have a fix for Python 3.9 and 3.10
-@pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
+# TODO: Remove this once we have a fix for Python 3.10
+@pytest.mark.skipif(sys.version_info[:2] in [(3, 10)], reason="Test fails on Python 3.10")
 @patch("litserve.cli.is_package_installed")
 @patch("litserve.cli.importlib.util.find_spec")
 @patch("litserve.cli.shutil.which")
@@ -151,7 +151,7 @@ def test_cli_main_lightning_not_installed(mock_import, mock_run, mock_which, moc
     mock_run.assert_called_once_with([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"], check=True)
 
 
-@pytest.mark.skipif(sys.version_info[:2] in [(3, 9), (3, 10)], reason="Test fails on Python 3.9 and 3.10")
+@pytest.mark.skipif(sys.version_info[:2] in [(3, 10)], reason="Test fails on Python 3.10")
 @patch("importlib.util.find_spec")
 @patch("builtins.__import__")
 def test_cli_main_import_error(mock_import, mock_find_spec, capsys):
