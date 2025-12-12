@@ -430,7 +430,7 @@ class LitServer:
             The core component - one or more LitAPI instances defining model logic.
 
             - Single API: `MyAPI()` for serving one model
-            - Multiple APIs: `[API1(), API2()]` for multi-model serving
+            - Multiple APIs: `[API1(), API2()]` for multimodel serving
 
             Each LitAPI must implement:
             - `setup(device)`: Initialize the model

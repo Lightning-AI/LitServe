@@ -243,7 +243,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
             raise ValueError(error_msg)
 
     def setup(self, device):
-        """Setup the model so it can be called in `predict`."""
+        """Set up the model so it can be called in `predict`."""
         pass
 
     def decode_request(self, request, **kwargs):
