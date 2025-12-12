@@ -11,7 +11,7 @@ license = {text = "Apache-2.0"}
 authors = [
     {name = "Lightning-AI et al.", email = "community@lightning.ai"}
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["deep learning", "pytorch", "AI"]
 classifiers = [
     "Environment :: Console",
@@ -23,8 +23,6 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -110,7 +108,7 @@ blank = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"
 # Enable Pyflakes `E` and `F` codes by default.
 lint.select = [
     "E", "W",  # see: https://pypi.org/project/pycodestyle
@@ -129,6 +127,8 @@ lint.extend-select = [
 ]
 lint.ignore = [
     "E731",  # Do not assign a lambda expression, use a def
+    "UP045",  # TODO: non-pep604-annotation-optional
+    "UP007",  # TODO: non-pep604-annotation-union
 ]
 # Exclude a variety of commonly ignored directories.
 exclude = [
