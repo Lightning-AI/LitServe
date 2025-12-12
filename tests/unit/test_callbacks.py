@@ -80,3 +80,45 @@ async def test_request_tracker(capfd):
     await run_simple_request(server, 4)
     captured = capfd.readouterr()
     assert "Active requests: 4" in captured.out, f"Expected pattern not found in output: {captured.out}"
+
+
+@pytest.mark.asyncio
+async def test_request_tracker_with_spec(capfd):
+    from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
+    from litserve.test_examples.openai_embedding_spec_example import TestEmbedAPI
+
+    lit_api = TestEmbedAPI(spec=OpenAIEmbeddingSpec())
+    server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/v1/embeddings", json={"input": "test", "model": "test"})
+            assert resp.status_code == 200
+
+    captured = capfd.readouterr()
+    assert "Active requests: 1" in captured.out, f"Expected pattern not found in output: {captured.out}"
+
+
+@pytest.mark.asyncio
+async def test_request_tracker_with_openai_spec(capfd):
+    from litserve.specs.openai import OpenAISpec
+    from litserve.test_examples.openai_spec_example import TestAPI
+
+    lit_api = TestAPI(spec=OpenAISpec())
+    server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post(
+                "/v1/chat/completions", json={"messages": [{"role": "user", "content": "test"}], "model": "test"}
+            )
+            assert resp.status_code == 200
+
+    captured = capfd.readouterr()
+    assert "Active requests: 1" in captured.out, f"Expected pattern not found in output: {captured.out}"

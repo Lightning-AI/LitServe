@@ -24,6 +24,7 @@ from fastapi import HTTPException, Request, Response, status
 from fastapi import status as status_code
 from pydantic import BaseModel
 
+from litserve.callbacks.base import EventTypes
 from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec
 from litserve.utils import LitAPIStatus, ResponseBufferItem
@@ -260,6 +261,13 @@ class OpenAIEmbeddingSpec(LitSpec):
         uid = uuid.uuid4()
         event = asyncio.Event()
         self.response_buffer[uid] = ResponseBufferItem(event=event)
+
+        # Trigger callback
+        self._server._callback_runner.trigger_event(
+            EventTypes.ON_REQUEST.value,
+            active_requests=self._server.active_requests,
+            litserver=self._server,
+        )
 
         self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
         await event.wait()
