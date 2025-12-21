@@ -54,6 +54,13 @@
 
 &nbsp; 
 
+# Why LitServe?
+LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multi-model orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
+
+Self host LitServe or deploy in one-click to [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
+
+&nbsp;
+
 # Looking for GPUs and an inference platform?
 Over 340,000 developers use [Lightning Cloud](https://lightning.ai/?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme) - purpose-built for PyTorch and PyTorch Lightning. 
 - [GPUs](https://lightning.ai/pricing?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme) from $0.19.   
@@ -62,13 +69,6 @@ Over 340,000 developers use [Lightning Cloud](https://lightning.ai/?utm_source=p
 - [AI Studio (vibe deploy)](https://lightning.ai/studios?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): workspaces where AI helps you optimize, and deploy models.     
 - [Notebooks](https://lightning.ai/notebooks?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): Persistent GPU workspaces where AI helps you code and analyze.
 - [Inference](https://lightning.ai/deploy?utm_source=ptl_readme&utm_medium=referral&utm_campaign=ptl_readme): Deploy models as inference APIs.   
-
-# Why LitServe?
-LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multi-model orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
-
-Self host LitServe or deploy in one-click to [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
-
-&nbsp;
 
 # Quick start
 
