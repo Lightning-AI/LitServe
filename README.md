@@ -1,12 +1,14 @@
 <div align='center'>
 
-<h2>
-  The framework to build custom inference engines with expert control.   
+<h1>
+  Build custom inference servers in pure Python
   <br/>
-  Engines for models, agents, MCP, multi-modal, RAG, and pipelines.
+</h1> 
+<h4>
+  Define exactly how inference works for models, agents, RAG, or pipelines. 
   <br/>
-  No MLOps. No YAML.
-</h2>    
+  Control batching, routing, streaming, and orchestration without MLOps glue or config files.
+</h4> 
 
 <img alt="Lightning" src="https://pl-bolts-doc-images.s3.us-east-2.amazonaws.com/app-2/ls_banner2.png" width="800px" style="max-width: 100%;">
 
@@ -16,10 +18,10 @@
 <div align='center'>
   
 <pre>
-✅ Build your own inference engine ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
-✅ Custom logic + control          ✅ Any PyTorch model          ✅ Self-host or managed        
-✅ Multi-GPU autoscaling           ✅ Batching + streaming       ✅ BYO model or vLLM           
-✅ No MLOps glue code              ✅ Easy setup in Python       ✅ Serverless support          
+✅ Custom inference logic  ✅ 2× faster than FastAPI     ✅ Agents, RAG, pipelines, more
+✅ Custom logic + control  ✅ Any PyTorch model          ✅ Self-host or managed        
+✅ Multi-GPU autoscaling   ✅ Batching + streaming       ✅ BYO model or vLLM           
+✅ No MLOps glue code      ✅ Easy setup in Python       ✅ Serverless support          
 
 </pre>
 
@@ -55,9 +57,9 @@
 &nbsp; 
 
 # Why LitServe?
-LitServe lets you build your own inference engine. Serving engines such as vLLM serve specific model types (LLMs) with rigid abstractions. LitServe gives you the low-level control to serve any model (vision, audio, text, multi-modal), and define exactly how inference works - from batching, caching, streaming, and routing, to multi-model orchestration and custom logic. LitServe is perfect for building inference APIs, agents, chatbots, MCP servers, RAG, pipelines and more.
+Most serving tools (vLLM, etc..) are built for a single model type and enforce rigid abstractions. They work well until you need custom logic, multiple models, agents, or non standard pipelines. LitServe lets you write your own inference engine in Python. You define how requests are handled, how models are loaded, how batching and routing work, and how outputs are produced. LitServe handles performance, concurrency, scaling, and deployment. Use LitServe to build inference APIs, agents, chatbots, RAG systems, MCP servers, or multi model pipelines. 
 
-Self host LitServe or deploy in one-click to [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
+Run it locally, self host anywhere, or deploy with one click on [Lightning AI](https://lightning.ai/litserve?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme).
 
 &nbsp;
 
