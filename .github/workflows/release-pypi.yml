@@ -33,7 +33,7 @@ jobs:
         run: pip install -r ./.cicd/requirements/gha-package.txt
       - name: Create 📦 package
         uses: ./.cicd/.github/actions/pkg-create
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: pypi-packages-${{ github.sha }}
           path: dist
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: pypi-packages-${{ github.sha }}
           path: dist
