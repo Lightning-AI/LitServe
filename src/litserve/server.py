@@ -1204,7 +1204,8 @@ class LitServer:
         if isinstance(workers_per_device, (list, tuple)):
             if len(workers_per_device) != len(api_paths):
                 raise ValueError(
-                    f"workers_per_device list length must match number of APIs ({len(api_paths)}), got {len(workers_per_device)}"
+                    f"workers_per_device list length must match number of APIs \n"
+                    f"({len(api_paths)}), got {len(workers_per_device)}"
                 )
             cfg = {}
             for p, w in zip(api_paths, workers_per_device):
