@@ -1576,8 +1576,25 @@ class LitServer:
                         broken_workers[i] = proc
 
                     for idx, proc in broken_workers.items():
-                        lit_api_id = idx // len(self.inference_workers_config)
-                        worker_id = idx % len(self.inference_workers_config)
+                        lit_api_id = 0
+                        worker_id = 0
+                        count = 0
+                        found = False
+
+                        for i, lit_api in enumerate(self.litapi_connector):
+                            workers_conf = self._inference_workers_config_for_api(lit_api.api_path)
+                            num_workers_for_api = len(workers_conf)
+                            
+                            if idx < count + num_workers_for_api:
+                                lit_api_id = i
+                                worker_id = idx - count
+                                found = True
+                                break
+                            count += num_workers_for_api
+                        
+                        if not found:
+                            logger.error(f"Could not map worker index {idx} to an API.")
+                            continue
 
                         for uid, resp in self.response_buffer.items():
                             if resp.worker_id is None or resp.worker_id != worker_id:
