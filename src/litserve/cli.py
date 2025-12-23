@@ -1,3 +1,5 @@
+import importlib.util
+import shutil
 import subprocess
 import sys
 
@@ -5,9 +7,27 @@ from litserve.utils import is_package_installed
 
 
 def _ensure_lightning_installed():
-    if not is_package_installed("lightning_sdk"):
-        print("Lightning CLI not found. Installing...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "lightning-sdk"])
+    """Ensure lightning-sdk is installed, attempting auto-installation if needed."""
+    if is_package_installed("lightning_sdk"):
+        return
+
+    print("Lightning CLI not found. Installing lightning-sdk...")
+
+    # Build list of available installers (pip first as it respects the active environment)
+    installers = []
+    if importlib.util.find_spec("pip"):
+        installers.append([sys.executable, "-m", "pip"])
+    if shutil.which("uv"):
+        installers.append(["uv", "pip"])
+
+    for installer in installers:
+        try:
+            subprocess.run([*installer, "install", "-U", "lightning-sdk"], check=True)
+            return
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+
+    sys.exit("Failed to install lightning-sdk. Run: pip install lightning-sdk")
 
 
 def main():

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import abstractmethod
-from collections.abc import AsyncGenerator, Generator
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from collections.abc import AsyncGenerator, Callable, Generator
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -30,6 +30,12 @@ class LitSpec:
         self.response_buffer = None
         self.request_queue = None
         self.response_queue_id = None
+
+    def __getstate__(self):
+        """Exclude _server from pickling as it contains unpickleable objects."""
+        state = self.__dict__.copy()
+        state["_server"] = None
+        return state
 
     @property
     def stream(self):
