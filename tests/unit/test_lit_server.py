@@ -877,7 +877,7 @@ def test_workers_per_device_can_be_configured_per_route(monkeypatch, workers_cfg
         def kill(self): ...
 
     class FakeCtx:
-        def Process(self, target, args, name): # ignore=E302
+        def Process(self, target, args, name):  # ignore=E302
             return FakeProcess(target=target, args=args, name=name)
 
     monkeypatch.setattr("litserve.server.mp.get_context", lambda *_args, **_kwargs: FakeCtx())

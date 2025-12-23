@@ -1584,14 +1584,14 @@ class LitServer:
                         for i, lit_api in enumerate(self.litapi_connector):
                             workers_conf = self._inference_workers_config_for_api(lit_api.api_path)
                             num_workers_for_api = len(workers_conf)
-                            
+
                             if idx < count + num_workers_for_api:
                                 lit_api_id = i
                                 worker_id = idx - count
                                 found = True
                                 break
                             count += num_workers_for_api
-                        
+
                         if not found:
                             logger.error(f"Could not map worker index {idx} to an API.")
                             continue
