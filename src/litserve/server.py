@@ -29,7 +29,7 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Callable, Iterable, Sequence, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
 from typing import TYPE_CHECKING, Literal, Optional, Union
@@ -1199,7 +1199,7 @@ class LitServer:
         if isinstance(workers_per_device, int):
             if workers_per_device < 1:
                 raise ValueError("workers_per_device must be >= 1")
-            return {p: workers_per_device for p in api_paths}
+            return dict.fromkeys(api_paths, workers_per_device)
 
         if isinstance(workers_per_device, (list, tuple)):
             if len(workers_per_device) != len(api_paths):
@@ -1226,8 +1226,6 @@ class LitServer:
             return cfg
 
         raise TypeError("workers_per_device must be an int, a list/tuple of ints, or a mapping of api_path -> int")
-
-    
 
     def run(
         self,
