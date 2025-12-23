@@ -845,29 +845,71 @@ class MultiRouteAPI(ls.test_examples.SimpleLitAPI):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
 @pytest.mark.parametrize(
-    ("workers_cfg", "expected_workers"),
+    ("workers_cfg", "expected_total_by_path"),
     [
-        ({"/sentiment": 2, "/generate": 3}, {"/sentiment": 2, "/generate": 3}),
-        ([2, 3], {"/sentiment": 2, "/generate": 3}),
+        # dict: explicit per-route config
+        ({"/sentiment": 2, "/generate": 3}, {"/sentiment": 4, "/generate": 6}),
+        # list: per-api (connector order) config
+        ([2, 3], {"/sentiment": 4, "/generate": 6}),
     ],
 )
-def test_per_route_workers(monkeypatch, workers_cfg, expected_workers):
+def test_workers_per_device_can_be_configured_per_route(monkeypatch, workers_cfg, expected_total_by_path):
     sentiment = MultiRouteAPI(api_path="/sentiment")
     generate = MultiRouteAPI(api_path="/generate")
     server = LitServer([sentiment, generate], accelerator="cuda", devices=[0, 1], workers_per_device=workers_cfg)
 
-    launch_calls = []
+    created = []  # list[(api_path, worker_id, device)]
 
-    def fake_launch(api, *args, **kwargs):
-        launch_calls.append((api.api_path, kwargs["num_workers"] if "num_workers" in kwargs else args[1]))
-        return [MagicMock()]
+    class FakeProcess:
+        def __init__(self, target, args, name):
+            # inference_worker args = (lit_api, device, worker_id, request_q, transport, ...)
+            lit_api, device, worker_id = args[0], args[1], args[2]
+            created.append((lit_api.api_path, worker_id, device))
+            self.pid = 123
+            self.name = name
 
-    monkeypatch.setattr(LitServer, "launch_inference_worker", fake_launch)
+        def start(self): ...
+        def terminate(self): ...
+        def join(self, timeout=None): ...
+        def is_alive(self): return False
+        def kill(self): ...
+
+    class FakeCtx:
+        def Process(self, target, args, name):
+            return FakeProcess(target=target, args=args, name=name)
+
+    monkeypatch.setattr("litserve.server.mp.get_context", lambda *_args, **_kwargs: FakeCtx())
+
+    # prevent server.run() from actually running uvicorn / waiting forever
     server.verify_worker_status = MagicMock()
-    server._start_server = MagicMock()
+    server._start_server = MagicMock(return_value={})
+    server._perform_graceful_shutdown = MagicMock()
+    server._start_worker_monitoring = MagicMock()
     server._transport = MagicMock()
+    server._shutdown_event = MagicMock()
+    server._shutdown_event.wait = MagicMock(return_value=None)  # don't block
 
+    # init manager + queues without real multiprocessing manager
     with patch("litserve.server.mp.Manager", return_value=MagicMock()):
-        server.run(api_server_worker_type="process")
+        server.run(api_server_worker_type="process", generate_client_file=False)
 
-    assert dict(launch_calls) == expected_workers
+    # count workers created per api_path
+    total_by_path = {}
+    for api_path, _worker_id, _device in created:
+        total_by_path[api_path] = total_by_path.get(api_path, 0) + 1
+
+    assert total_by_path == expected_total_by_path
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+def test_workers_per_device_per_route_raises_on_unknown_route():
+    sentiment = MultiRouteAPI(api_path="/sentiment")
+    generate = MultiRouteAPI(api_path="/generate")
+
+    with pytest.raises(ValueError, match="workers_per_device.*unknown api_path"):
+        LitServer(
+            [sentiment, generate],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device={"/sentiment": 2, "/unknown": 1},
+        )
