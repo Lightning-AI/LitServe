@@ -855,7 +855,7 @@ class MultiRouteAPI(ls.test_examples.SimpleLitAPI):
 )
 def test_workers_per_device_can_be_configured_per_route(monkeypatch, workers_cfg, expected_total_by_path):
     monkeypatch.setattr("litserve.server.uvicorn", MagicMock())
-    
+
     sentiment = MultiRouteAPI(api_path="/sentiment")
     generate = MultiRouteAPI(api_path="/generate")
     server = LitServer([sentiment, generate], accelerator="cuda", devices=[0, 1], workers_per_device=workers_cfg)
