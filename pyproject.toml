@@ -166,7 +166,7 @@ dev = [
     "fastmcp>=2.9.2 ; python_full_version >= '3.10'",
     "httpx>=0.27.0",
     "lightning>2.0.0",
-    "mypy==1.19.0",
+    "mypy==1.19.1",
     "numpy<3.0",
     "openai>=1.12.0",
     "pillow>=11.3.0",
