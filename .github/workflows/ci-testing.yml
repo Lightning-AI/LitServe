@@ -22,7 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        # Runner images: https://github.com/actions/runner-images
+        os: ["ubuntu-24.04", "macos-15", "windows-2025"]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         include:
           - { os: "ubuntu-22.04", python-version: "3.10", requires: "oldest" }
