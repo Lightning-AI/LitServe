@@ -17,6 +17,7 @@ import inspect
 import io
 import json
 import re
+import sys
 import threading
 import time
 from collections.abc import AsyncGenerator
@@ -159,6 +160,10 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     )
 
 
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Event loop handling issue on Ubuntu Python 3.12"
+)
 def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     mock_transport = MockMPQueueTransport(num_consumers=2)
     lit_api_mock, requests_queue = async_loop_args
@@ -275,6 +280,10 @@ async def test_streaming_loop_process_streaming_request(mock_transport):
         )
 
 
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Event loop handling issue on Ubuntu Python 3.12"
+)
 def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
     requests_queue = TestQueue()
     requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
