@@ -281,7 +281,6 @@ async def test_streaming_loop_process_streaming_request(mock_transport):
         )
 
 
-
 @pytest.mark.timeout(30)
 def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
     requests_queue = TestQueue()
