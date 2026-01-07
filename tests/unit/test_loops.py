@@ -173,13 +173,13 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     with contextlib.suppress(KeyboardInterrupt):
         loop._run_single_loop_with_async(lit_api_mock, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+    response = asyncio.run(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ((), "START", ls.utils.LoopResponseType.REGULAR, ANY))
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+    response = asyncio.run(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY))
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
+    response = asyncio.run(mock_transport.areceive(consumer_id=1))
     assert response == ("uuid-234", ((), "START", ls.utils.LoopResponseType.REGULAR, ANY))
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
+    response = asyncio.run(mock_transport.areceive(consumer_id=1))
     assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY))
 
 
@@ -292,7 +292,7 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
         loop.run_streaming_loop_async(lit_api, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
     for i in range(6):
-        response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+        response = asyncio.run(mock_transport.areceive(consumer_id=0))
         if i == 0:
             assert response == (
                 "uuid-123",
