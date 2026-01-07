@@ -17,7 +17,6 @@ import inspect
 import io
 import json
 import re
-import sys
 import threading
 import time
 from collections.abc import AsyncGenerator
@@ -160,11 +159,6 @@ async def test_single_loop_process_single_async_request(async_loop_args, mock_tr
     )
 
 
-@pytest.mark.timeout(30)
-@pytest.mark.skipif(
-    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
-    reason="Event loop handling issue on Ubuntu Python 3.12",
-)
 def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     mock_transport = MockMPQueueTransport(num_consumers=2)
     lit_api_mock, requests_queue = async_loop_args
@@ -179,13 +173,13 @@ def test_run_single_loop_with_async(async_loop_args, monkeypatch):
     with contextlib.suppress(KeyboardInterrupt):
         loop._run_single_loop_with_async(lit_api_mock, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+    response = asyncio.run(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ((), "START", ls.utils.LoopResponseType.REGULAR, ANY))
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+    response = asyncio.run(mock_transport.areceive(consumer_id=0))
     assert response == ("uuid-123", ({"output": 1}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY))
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
+    response = asyncio.run(mock_transport.areceive(consumer_id=1))
     assert response == ("uuid-234", ((), "START", ls.utils.LoopResponseType.REGULAR, ANY))
-    response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=1))
+    response = asyncio.run(mock_transport.areceive(consumer_id=1))
     assert response == ("uuid-234", ({"output": 4}, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.REGULAR, ANY))
 
 
@@ -281,7 +275,6 @@ async def test_streaming_loop_process_streaming_request(mock_transport):
         )
 
 
-@pytest.mark.timeout(30)
 def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
     requests_queue = TestQueue()
     requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
@@ -299,7 +292,7 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
         loop.run_streaming_loop_async(lit_api, requests_queue, mock_transport, NOOP_CB_RUNNER)
 
     for i in range(6):
-        response = asyncio.get_event_loop().run_until_complete(mock_transport.areceive(consumer_id=0))
+        response = asyncio.run(mock_transport.areceive(consumer_id=0))
         if i == 0:
             assert response == (
                 "uuid-123",
