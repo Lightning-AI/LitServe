@@ -840,6 +840,7 @@ async def test_worker_restart_and_server_shutdown_streaming():
 
 
 class MultiRouteAPI(ls.test_examples.SimpleLitAPI):
+    # Mock API for testing multi-route server behavior
     def __init__(self, api_path="/predict"):
         super().__init__(api_path=api_path)
 
