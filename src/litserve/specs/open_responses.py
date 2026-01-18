@@ -119,7 +119,7 @@ class OpenResponsesSpec(LitSpec):
         # distinct from LitSpec.encode_response, we handle the generator in the endpoint handlers
         return output_generator
 
-    async def create_open_response(self, request: OpenResponseRequest) -> OpenResponseResponse | Response:
+    async def create_open_response(self, request: OpenResponseRequest):
         response_queue_id = self.response_queue_id
         logger.debug("Received open responses request %s", request)
 
