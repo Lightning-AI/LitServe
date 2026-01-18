@@ -16,9 +16,8 @@ import logging
 import time
 import uuid
 from collections import deque
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from beartype.typing import Any, Optional
 from fastapi import HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
@@ -112,12 +111,10 @@ class OpenResponsesSpec(LitSpec):
         data.pop("input")
         context.update(data)
 
-    def decode_request(
-        self, request: OpenResponseRequest, context_kwargs: Optional[dict] = None
-    ) -> OpenResponseRequest:
+    def decode_request(self, request: OpenResponseRequest, context_kwargs: dict | None = None) -> OpenResponseRequest:
         return request
 
-    def encode_response(self, output_generator: Any, context_kwargs: Optional[dict] = None) -> Any:
+    def encode_response(self, output_generator: Any, context_kwargs: dict | None = None) -> Any:
         # distinct from LitSpec.encode_response, we handle the generator in the endpoint handlers
         return output_generator
 
