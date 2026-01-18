@@ -81,8 +81,10 @@ class OpenResponseResponse(BaseModel):
 class OpenResponsesSpec(LitSpec):
     """Spec for OpenResponses API.
 
-    Implements the OpenResponses specification for multi-provider, interoperable LLM interfaces.
-    See https://www.openresponses.org/specification for details.
+    Implements the OpenResponses specification for multi-provider, interoperable LLM interfaces. See
+    https://www.openresponses.org/specification
+    for details.
+
     """
 
     def __init__(self):
