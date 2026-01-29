@@ -638,6 +638,29 @@ class LitServer:
         server = ls.LitServer(StreamingAPI(stream=True))
         ```
 
+        Per-route using dict
+        ```python
+        server = ls.LitServer(
+            [sentiment_api, generate_api],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device={
+                "/sentiment": 2,  # 2 workers per GPU for sentiment
+                "/generate": 3,   # 3 workers per GPU for generation
+            },
+        )
+        ```
+
+        Per-api position
+        ```python
+        server = ls.LitServer(
+            [sentiment_api, generate_api],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device=[2, 3],  # sentiment then generate (same order as API list)
+        )
+        ```
+
     Deployment:
         Self-hosted:
         ```bash
