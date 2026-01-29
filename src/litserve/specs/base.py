@@ -13,7 +13,7 @@
 # limitations under the License.
 from abc import abstractmethod
 from collections.abc import AsyncGenerator, Callable, Generator
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 if TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -59,12 +59,12 @@ class LitSpec:
         return self._endpoints.copy()
 
     @abstractmethod
-    def decode_request(self, request, meta_kwargs):
+    def decode_request(self, request, context_kwargs) -> Any:
         """Convert the request payload to your model input."""
         pass
 
     @abstractmethod
-    def encode_response(self, output, meta_kwargs):
+    def encode_response(self, output, context_kwargs) -> Any:
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.
