@@ -29,7 +29,7 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
 from typing import TYPE_CHECKING, Literal, Optional, Union
@@ -638,6 +638,29 @@ class LitServer:
         server = ls.LitServer(StreamingAPI(stream=True))
         ```
 
+        Per-route using dict
+        ```python
+        server = ls.LitServer(
+            [sentiment_api, generate_api],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device={
+                "/sentiment": 2,  # 2 workers per GPU for sentiment
+                "/generate": 3,   # 3 workers per GPU for generation
+            },
+        )
+        ```
+
+        Per-api position
+        ```python
+        server = ls.LitServer(
+            [sentiment_api, generate_api],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device=[2, 3],  # sentiment then generate (same order as API list)
+        )
+        ```
+
     Deployment:
         Self-hosted:
         ```bash
@@ -797,6 +820,7 @@ class LitServer:
         self.lit_api = lit_api
         self.enable_shutdown_api = enable_shutdown_api
         self.workers_per_device = workers_per_device
+        self._workers_per_device_by_api_path = self._resolve_workers_per_device_config(workers_per_device)
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
@@ -822,11 +846,14 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.inference_workers_config = self.devices * self.workers_per_device
         self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
         # register middleware
         self._register_middleware()
+
+    def _inference_workers_config_for_api(self, api_path: str):
+        wpd = self._workers_per_device_by_api_path[api_path]
+        return self.devices * wpd
 
     def launch_inference_worker(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
@@ -839,7 +866,10 @@ class LitServer:
 
         process_list = []
         endpoint = lit_api.api_path.split("/")[-1]
-        for worker_id, device in enumerate(self.inference_workers_config):
+
+        inference_workers_config = self._inference_workers_config_for_api(lit_api.api_path)
+
+        for worker_id, device in enumerate(inference_workers_config):
             if len(device) == 1:
                 device = device[0]
 
@@ -873,7 +903,8 @@ class LitServer:
             del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
             spec.setup(server_copy)
 
-        device = self.inference_workers_config[worker_id]
+        inference_workers_config = self._inference_workers_config_for_api(lit_api.api_path)
+        device = inference_workers_config[worker_id]
         endpoint = lit_api.api_path.split("/")[-1]
         if len(device) == 1:
             device = device[0]
@@ -1183,6 +1214,42 @@ class LitServer:
 
         manager.shutdown()
 
+    def _resolve_workers_per_device_config(self, workers_per_device):
+        """Resolve workers_per_device into a dict[api_path, workers_per_device_int]."""
+        api_paths = [api.api_path for api in self.litapi_connector]
+
+        if isinstance(workers_per_device, int):
+            if workers_per_device < 1:
+                raise ValueError("workers_per_device must be >= 1")
+            return dict.fromkeys(api_paths, workers_per_device)
+
+        if isinstance(workers_per_device, (list, tuple)):
+            if len(workers_per_device) != len(api_paths):
+                raise ValueError(
+                    f"workers_per_device list length must match number of APIs \n"
+                    f"({len(api_paths)}), got {len(workers_per_device)}"
+                )
+            cfg = {}
+            for p, w in zip(api_paths, workers_per_device):
+                if not isinstance(w, int) or w < 1:
+                    raise ValueError("workers_per_device values must be integers >= 1")
+                cfg[p] = w
+            return cfg
+
+        if isinstance(workers_per_device, Mapping):
+            unknown = sorted(set(workers_per_device.keys()) - set(api_paths))
+            if unknown:
+                raise ValueError(f"workers_per_device contains unknown api_path values: {unknown} (unknown api_path)")
+            cfg = {}
+            for p in api_paths:
+                w = workers_per_device.get(p, 1)
+                if not isinstance(w, int) or w < 1:
+                    raise ValueError("workers_per_device values must be integers >= 1")
+                cfg[p] = w
+            return cfg
+
+        raise TypeError("workers_per_device must be an int, a list/tuple of ints, or a mapping of api_path -> int")
+
     def run(
         self,
         host: str = "0.0.0.0",
@@ -1388,7 +1455,10 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.inference_workers_config)
+            total_workers = 0
+            for lit_api in self.litapi_connector:
+                total_workers += len(self._inference_workers_config_for_api(lit_api.api_path))
+            num_api_servers = total_workers
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
@@ -1528,8 +1598,25 @@ class LitServer:
                         broken_workers[i] = proc
 
                     for idx, proc in broken_workers.items():
-                        lit_api_id = idx // len(self.inference_workers_config)
-                        worker_id = idx % len(self.inference_workers_config)
+                        lit_api_id = 0
+                        worker_id = 0
+                        count = 0
+                        found = False
+
+                        for i, lit_api in enumerate(self.litapi_connector):
+                            workers_conf = self._inference_workers_config_for_api(lit_api.api_path)
+                            num_workers_for_api = len(workers_conf)
+
+                            if idx < count + num_workers_for_api:
+                                lit_api_id = i
+                                worker_id = idx - count
+                                found = True
+                                break
+                            count += num_workers_for_api
+
+                        if not found:
+                            logger.error(f"Could not map worker index {idx} to an API.")
+                            continue
 
                         for uid, resp in self.response_buffer.items():
                             if resp.worker_id is None or resp.worker_id != worker_id:
