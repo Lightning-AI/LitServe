@@ -112,16 +112,20 @@ async def _mixed_response_to_buffer(
 
             uid, (*response, response_type, worker_id) = result
 
+            response_item = response_buffer.get(uid)
+            if response_item is None:
+                continue
+
             if response[1] == LitAPIStatus.START:
-                response_buffer[uid].worker_id = int(worker_id)
+                response_item.worker_id = int(worker_id)
                 continue
 
             if response_type == LoopResponseType.STREAMING:
-                response_buffer[uid].response_queue.append(response)
-                response_buffer[uid].event.set()
+                response_item.response_queue.append(response)
+                response_item.event.set()
             else:
-                response_buffer[uid].response = response
-                response_buffer[uid].event.set()
+                response_item.response = response
+                response_item.event.set()
         except asyncio.CancelledError:
             logger.debug("Response queue to buffer task was cancelled")
             break
@@ -154,12 +158,16 @@ async def response_queue_to_buffer(
 
                 uid, (*response, response_type, worker_id) = result
 
-                if response[1] == LitAPIStatus.START:
-                    response_buffer[uid].worker_id = int(worker_id)
+                response_item = response_buffer.get(uid)
+                if response_item is None:
                     continue
 
-                response_buffer[uid].response_queue.append(response)
-                response_buffer[uid].event.set()
+                if response[1] == LitAPIStatus.START:
+                    response_item.worker_id = int(worker_id)
+                    continue
+
+                response_item.response_queue.append(response)
+                response_item.event.set()
             except asyncio.CancelledError:
                 logger.debug("Response queue to buffer task was cancelled")
                 break
@@ -176,12 +184,16 @@ async def response_queue_to_buffer(
 
                 uid, (*response, response_type, worker_id) = result
 
-                if response[1] == LitAPIStatus.START:
-                    response_buffer[uid].worker_id = int(worker_id)
+                response_item = response_buffer.get(uid)
+                if response_item is None:
                     continue
 
-                response_buffer[uid].response = response
-                response_buffer[uid].event.set()
+                if response[1] == LitAPIStatus.START:
+                    response_item.worker_id = int(worker_id)
+                    continue
+
+                response_item.response = response
+                response_item.event.set()
             except asyncio.CancelledError:
                 logger.debug("Response queue to buffer task was cancelled")
                 break
@@ -389,7 +401,14 @@ class StreamingRequestHandler(BaseRequestHandler):
                 litserver=self.server,
             )
 
-            return StreamingResponse(response_generator)
+            async def stream_with_cleanup():
+                try:
+                    async for item in response_generator:
+                        yield item
+                finally:
+                    self.server.response_buffer.pop(uid, None)
+
+            return StreamingResponse(stream_with_cleanup())
 
         except Exception as e:
             logger.exception(f"Error handling streaming request: {e}")
