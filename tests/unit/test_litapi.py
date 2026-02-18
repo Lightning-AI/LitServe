@@ -277,11 +277,15 @@ def test_log():
     assert server.logger_queue.get() == ("time", 0.1)
 
 
-def test_enable_async_not_set():
-    with pytest.raises(
-        ValueError, match=r"predict must be an async generator or async function when enable_async=True"
-    ):
-        ls.test_examples.SimpleLitAPI(enable_async=True)
+def test_enable_async_with_sync_methods():
+    """Test that enable_async=True allows sync methods (they run in thread pool)."""
+    # This should NOT raise an error - sync methods are allowed with enable_async=True
+    api = ls.test_examples.SimpleLitAPI(enable_async=True)
+    assert api.enable_async is True
+    # Sync methods should be detected correctly
+    assert api._async_method_types['predict'] is False
+    assert api._async_method_types['decode_request'] is False
+    assert api._async_method_types['encode_response'] is False
 
 
 class HeavyInitAPI(ls.LitAPI):
