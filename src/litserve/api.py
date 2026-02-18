@@ -274,6 +274,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                         "user_id": context["user_id"],
                         "language": context["language"]
                     }
+
         """
         if self._spec:
             return self._spec.decode_request(request, **kwargs)
@@ -332,6 +333,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                         "user_id": context["user_id"],
                         "model_version": context["model_version"]
                     }
+
         """
         raise NotImplementedError("predict is not implemented")
 
@@ -408,6 +410,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                 def encode_response(self, output, context):
                     processing_time = time.time() - context["request_time"]
                     return {"result": output, "processing_time": processing_time}
+
         """
         if self._spec:
             return self._spec.encode_response(output, **kwargs)
