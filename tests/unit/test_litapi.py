@@ -283,9 +283,9 @@ def test_enable_async_with_sync_methods():
     api = ls.test_examples.SimpleLitAPI(enable_async=True)
     assert api.enable_async is True
     # Sync methods should be detected correctly
-    assert api._async_method_types['predict'] is False
-    assert api._async_method_types['decode_request'] is False
-    assert api._async_method_types['encode_response'] is False
+    assert api._async_method_types["predict"] is False
+    assert api._async_method_types["decode_request"] is False
+    assert api._async_method_types["encode_response"] is False
 
 
 class HeavyInitAPI(ls.LitAPI):
