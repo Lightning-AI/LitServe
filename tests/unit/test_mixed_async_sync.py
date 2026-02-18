@@ -34,7 +34,7 @@ class TestMixedAsyncSyncAPI(ls.LitAPI):
 def test_mixed_async_sync_without_flag():
     """Test that mixed async/sync works without enable_async flag."""
     api = TestMixedAsyncSyncAPI()
-    server = LitServer(api)
+    LitServer(api)
 
     # Verify auto-detection worked
     assert api.enable_async is True  # Auto-detected from encode_response

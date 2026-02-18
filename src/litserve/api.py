@@ -269,11 +269,10 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                 )
 
         # Streaming-specific validation (if applicable)
-        if self.stream and self._async_method_types.get("predict"):
-            if not inspect.isasyncgenfunction(self.predict):
-                raise ValueError(
-                    "predict must be an async generator (using 'yield') when streaming is enabled with async mode."
-                )
+        if self.stream and self._async_method_types.get("predict") and not inspect.isasyncgenfunction(self.predict):
+            raise ValueError(
+                "predict must be an async generator (using 'yield') when streaming is enabled with async mode."
+            )
 
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
