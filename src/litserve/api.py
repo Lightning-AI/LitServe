@@ -213,23 +213,21 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     def _detect_async_methods(self):
         """Detect which API methods are async (coroutines or async generators).
 
-        Stores results in self._async_method_types dict for later use.
-        Sets self._has_any_async_method flag for auto-detection.
+        Stores results in self._async_method_types dict for later use. Sets self._has_any_async_method flag for auto-
+        detection.
+
         """
         methods_to_check = {
-            'decode_request': self.decode_request,
-            'predict': self.predict,
-            'encode_response': self.encode_response,
+            "decode_request": self.decode_request,
+            "predict": self.predict,
+            "encode_response": self.encode_response,
         }
 
         self._async_method_types = {}
         has_any_async = False
 
         for method_name, method in methods_to_check.items():
-            is_async = (
-                asyncio.iscoroutinefunction(method) or
-                inspect.isasyncgenfunction(method)
-            )
+            is_async = asyncio.iscoroutinefunction(method) or inspect.isasyncgenfunction(method)
             self._async_method_types[method_name] = is_async
             if is_async:
                 has_any_async = True
@@ -243,6 +241,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         - Validates that methods marked as async are properly implemented
         - Allows mixing of async and sync methods
         - Provides info messages about sync methods in async mode
+
         """
         if not self.enable_async:
             return
@@ -270,11 +269,10 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                 )
 
         # Streaming-specific validation (if applicable)
-        if self.stream and self._async_method_types.get('predict'):
+        if self.stream and self._async_method_types.get("predict"):
             if not inspect.isasyncgenfunction(self.predict):
                 raise ValueError(
-                    "predict must be an async generator (using 'yield') when "
-                    "streaming is enabled with async mode."
+                    "predict must be an async generator (using 'yield') when streaming is enabled with async mode."
                 )
 
     def setup(self, device):

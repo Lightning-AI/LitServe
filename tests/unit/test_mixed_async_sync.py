@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pytest
 
 import litserve as ls
 from litserve import LitServer
@@ -39,8 +38,8 @@ def test_mixed_async_sync_without_flag():
 
     # Verify auto-detection worked
     assert api.enable_async is True  # Auto-detected from encode_response
-    assert api._async_method_types['predict'] is False
-    assert api._async_method_types['encode_response'] is True
+    assert api._async_method_types["predict"] is False
+    assert api._async_method_types["encode_response"] is True
 
 
 def test_all_sync_without_flag():
@@ -75,8 +74,8 @@ def test_all_async_without_flag():
 
     api = AllAsyncAPI()
     assert api.enable_async is True  # Auto-detected
-    assert api._async_method_types['predict'] is True
-    assert api._async_method_types['encode_response'] is True
+    assert api._async_method_types["predict"] is True
+    assert api._async_method_types["encode_response"] is True
 
 
 def test_explicit_enable_async_true():
