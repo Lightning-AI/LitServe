@@ -14,6 +14,7 @@
 import asyncio
 import inspect
 import json
+import logging
 import warnings
 from abc import ABC
 from collections.abc import Awaitable, Callable
@@ -28,6 +29,8 @@ from litserve.utils import _TimedInitMeta
 if TYPE_CHECKING:
     from litserve.loops.base import LitLoop
     from litserve.mcp import MCP
+
+logger = logging.getLogger(__name__)
 
 
 class LitAPI(ABC, metaclass=_TimedInitMeta):
@@ -135,6 +138,9 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     _device: Optional[str] = None
     _logger_queue: Optional[Queue] = None
     request_timeout: Optional[float] = None
+    _explicit_enable_async: Optional[bool] = None
+    _async_method_types: dict[str, bool] = {}
+    _has_any_async_method: bool = False
 
     def __init__(
         self,
@@ -145,7 +151,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         loop: Optional[Union[str, "LitLoop"]] = "auto",
         spec: Optional[LitSpec] = None,
         mcp: Optional["MCP"] = None,
-        enable_async: bool = False,
+        enable_async: Optional[bool] = None,
     ):
         """Initialize LitAPI with configuration options."""
 
@@ -186,61 +192,90 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         self._spec = spec
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
-        self.enable_async = enable_async
+
+        # Store explicit setting (None = auto-detect)
+        self._explicit_enable_async = enable_async
+
+        # Auto-detect async methods BEFORE setting self.enable_async
+        self._detect_async_methods()
+
+        # Set enable_async based on explicit value or auto-detection
+        if enable_async is None:
+            self.enable_async = self._has_any_async_method
+        else:
+            self.enable_async = enable_async
+
         self._validate_async_methods()
         self.mcp = mcp
         if mcp:
             mcp._connect(self)
 
+    def _detect_async_methods(self):
+        """Detect which API methods are async (coroutines or async generators).
+
+        Stores results in self._async_method_types dict for later use.
+        Sets self._has_any_async_method flag for auto-detection.
+        """
+        methods_to_check = {
+            'decode_request': self.decode_request,
+            'predict': self.predict,
+            'encode_response': self.encode_response,
+        }
+
+        self._async_method_types = {}
+        has_any_async = False
+
+        for method_name, method in methods_to_check.items():
+            is_async = (
+                asyncio.iscoroutinefunction(method) or
+                inspect.isasyncgenfunction(method)
+            )
+            self._async_method_types[method_name] = is_async
+            if is_async:
+                has_any_async = True
+
+        self._has_any_async_method = has_any_async
+
     def _validate_async_methods(self):
-        """Validate that async methods are properly implemented when enable_async is True."""
+        """Validate async methods are correctly implemented.
+
+        When enable_async=True (explicit or auto-detected):
+        - Validates that methods marked as async are properly implemented
+        - Allows mixing of async and sync methods
+        - Provides info messages about sync methods in async mode
+        """
         if not self.enable_async:
             return
 
-        # Define validation rules for each method
-        validation_rules = {
-            "decode_request": {
-                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
-                "error_type": "warning",
-                "message": "should be an async function or async generator when enable_async=True",
-            },
-            "encode_response": {
-                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
-                "error_type": "warning",
-                "message": "should be an async function or async generator when enable_async=True",
-            },
-            "predict": {
-                "required_types": [inspect.isasyncgenfunction, asyncio.iscoroutinefunction],
-                "error_type": "error",
-                "message": "must be an async generator or async function when enable_async=True",
-            },
-        }
+        # Only validate methods that ARE async
+        for method_name, is_async in self._async_method_types.items():
+            if not is_async:
+                # Method is sync - provide info message
+                method_obj = getattr(self, method_name)
+                if not asyncio.iscoroutinefunction(method_obj) and not inspect.isasyncgenfunction(method_obj):
+                    logger.info(
+                        f"{method_name} is a synchronous method running in async mode. "
+                        f"It will be automatically executed in a thread pool."
+                    )
+                continue
 
-        errors = []
-        warnings_list = []
-
-        for method_name, rules in validation_rules.items():
+            # Method IS async - validate it's correctly implemented
             method_obj = getattr(self, method_name)
 
-            # Check if method satisfies any of the required types
-            is_valid = any(check_func(method_obj) for check_func in rules["required_types"])
+            # Check if it's actually async (not just marked)
+            if not (asyncio.iscoroutinefunction(method_obj) or inspect.isasyncgenfunction(method_obj)):
+                raise ValueError(
+                    f"{method_name} was detected as async but is not a coroutine or async generator. "
+                    f"Please use 'async def' for async methods."
+                )
 
-            if not is_valid:
-                message = f"{method_name} {rules['message']}"
-
-                if rules["error_type"] == "error":
-                    errors.append(message)
-                else:
-                    warnings_list.append(message)
-
-        # Emit warnings
-        for warning_msg in warnings_list:
-            warnings.warn(f"{warning_msg}. LitServe will asyncify the method.", UserWarning)
-
-        # Raise errors if any
-        if errors:
-            error_msg = "Async validation failed:\n" + "\n".join(f"- {err}" for err in errors)
-            raise ValueError(error_msg)
+        # Streaming-specific validation (if applicable)
+        if self.stream and self._async_method_types.get('predict'):
+            if not inspect.isasyncgenfunction(self.predict):
+                raise ValueError(
+                    "predict must be an async generator (using 'yield') when "
+                    "streaming is enabled with async mode."
+                )
 
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""
