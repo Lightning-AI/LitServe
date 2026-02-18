@@ -150,6 +150,63 @@ Test it:
 curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"website_url": "https://text.npr.org/"}'
 ```
 
+### Passing custom data through the request lifecycle
+
+You can pass custom metadata from `decode_request` to other methods using the `context` parameter. This is useful for tracking request IDs, user authentication, timing, or any custom data:
+
+```python
+import time
+import litserve as ls
+
+class ContextAwareAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x ** 2
+
+    def decode_request(self, request, context):
+        # Extract custom metadata from the request
+        context["user_id"] = request.get("user_id")
+        context["request_time"] = time.time()
+        # Return only the model input
+        return request["input"]
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output, context):
+        # Access metadata in the response
+        processing_time = time.time() - context["request_time"]
+        return {
+            "result": output,
+            "user_id": context["user_id"],
+            "processing_time": processing_time
+        }
+
+if __name__ == "__main__":
+    server = ls.LitServer(ContextAwareAPI())
+    server.run(port=8000)
+```
+
+Test it with user metadata:
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"input": 5.0, "user_id": "user123"}'
+```
+
+Response:
+```json
+{
+  "result": 25.0,
+  "user_id": "user123",
+  "processing_time": 0.001
+}
+```
+
+The `context` parameter is a mutable dictionary that flows through the entire request lifecycle. You can:
+- Set data in `decode_request` → Access in `predict` and `encode_response`
+- Update data in `predict` → Access updates in `encode_response`
+- Use it for request tracking, authentication, logging, or custom business logic
+
 &nbsp;
 
 # Key benefits   

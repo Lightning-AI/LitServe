@@ -247,7 +247,34 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         pass
 
     def decode_request(self, request, **kwargs):
-        """Convert the request payload to your model input."""
+        """Convert the request payload to your model input.
+
+        Args:
+            request: The HTTP request object
+            **kwargs: Optional keyword arguments. When the ``context`` parameter is included,
+                it allows you to pass custom metadata through the request lifecycle.
+
+        The context parameter allows you to pass custom metadata through the request lifecycle.
+        Any data added to context in ``decode_request()`` is accessible in ``predict()`` and ``encode_response()``.
+
+        Example:
+            .. code-block:: python
+
+                def decode_request(self, request, context):
+                    # Extract user metadata
+                    context["user_id"] = request.headers.get("X-User-ID")
+                    context["language"] = request.get("language")
+                    # Return just the model input
+                    return request["input"]
+
+                def encode_response(self, output, context):
+                    # Use metadata in response
+                    return {
+                        "result": output,
+                        "user_id": context["user_id"],
+                        "language": context["language"]
+                    }
+        """
         if self._spec:
             return self._spec.decode_request(request, **kwargs)
         return request
@@ -270,6 +297,12 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output.
 
+        Args:
+            x: The input to the model
+            **kwargs: Optional keyword arguments. When the ``context`` parameter is included,
+                it allows access to metadata set in ``decode_request()`` and the ability to
+                add metadata for ``encode_response()``.
+
         When batching is enabled (max_batch_size > 1), this method receives
         a batched input and must return a list-like structure where each element
         corresponds to one input in the batch.
@@ -278,6 +311,27 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
             For non-batched mode: Single prediction output
             For batched mode: List, tuple, or array with one output per input
 
+        Example:
+            .. code-block:: python
+
+                def decode_request(self, request, context):
+                    context["user_id"] = request.get("user_id")
+                    return request["input"]
+
+                def predict(self, x, context):
+                    # Access context metadata
+                    user_id = context.get("user_id")
+                    # Add new metadata
+                    context["model_version"] = "v1.0"
+                    return self.model(x)
+
+                def encode_response(self, output, context):
+                    # Use all metadata
+                    return {
+                        "result": output,
+                        "user_id": context["user_id"],
+                        "model_version": context["model_version"]
+                    }
         """
         raise NotImplementedError("predict is not implemented")
 
@@ -337,8 +391,23 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     def encode_response(self, output, **kwargs):
         """Convert the model output to a response payload.
 
+        Args:
+            output: The model output
+            **kwargs: Optional keyword arguments. When the ``context`` parameter is included,
+                it allows access to metadata set in ``decode_request()`` or ``predict()``.
+
         To enable streaming, it should yield the output.
 
+        Example:
+            .. code-block:: python
+
+                def decode_request(self, request, context):
+                    context["request_time"] = time.time()
+                    return request["input"]
+
+                def encode_response(self, output, context):
+                    processing_time = time.time() - context["request_time"]
+                    return {"result": output, "processing_time": processing_time}
         """
         if self._spec:
             return self._spec.encode_response(output, **kwargs)
