@@ -708,6 +708,9 @@ class LitServer:
         healthcheck_path: str = "/health",
         info_path: str = "/info",
         shutdown_path: str = "/shutdown",
+        startupz_path: str = "/startupz",
+        healthz_path: str = "/healthz",
+        readyz_path: str = "/readyz",
         enable_shutdown_api: bool = False,
         model_metadata: Optional[dict] = None,
         spec: Optional[LitSpec] = None,
@@ -789,6 +792,24 @@ class LitServer:
                 "info_path must start with '/'. Please provide a valid api path like '/info', '/details', or '/v1/info'"
             )
 
+        if not startupz_path.startswith("/"):
+            raise ValueError(
+                "startupz_path must start with '/'. "
+                "Please provide a valid api path like '/startupz', '/startup', or '/v1/startup'"
+            )
+
+        if not healthz_path.startswith("/"):
+            raise ValueError(
+                "healthz_path must start with '/'. "
+                "Please provide a valid api path like '/healthz', '/liveness', or '/v1/liveness'"
+            )
+
+        if not readyz_path.startswith("/"):
+            raise ValueError(
+                "readyz_path must start with '/'. "
+                "Please provide a valid api path like '/readyz', '/ready', or '/v1/ready'"
+            )
+
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
@@ -819,6 +840,9 @@ class LitServer:
         self.healthcheck_path = healthcheck_path
         self.info_path = info_path
         self._shutdown_path = shutdown_path
+        self.startupz_path = startupz_path
+        self.healthz_path = healthz_path
+        self.readyz_path = readyz_path
         self.track_requests = track_requests
         self.timeout = timeout
         self.litapi_connector.set_request_timeout(timeout)
@@ -1062,6 +1086,33 @@ class LitServer:
                     },
                 }
             )
+
+        @self.app.get(self.startupz_path, dependencies=[Depends(self.setup_auth())])
+        async def startupz(request: Request) -> Response:
+            return Response(content="server started", status_code=200)
+
+        @self.app.get(self.healthz_path, dependencies=[Depends(self.setup_auth())])
+        async def healthz(request: Request) -> Response:
+            return Response(content="server alive", status_code=200)
+
+        @self.app.get(self.readyz_path, dependencies=[Depends(self.setup_auth())])
+        async def readyz(request: Request) -> Response:
+            nonlocal workers_ready
+            if not workers_ready:
+                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
+
+            lit_api_health_status = True
+            for lit_api in self.litapi_connector:
+                result = lit_api.health()
+                if inspect.isawaitable(result):
+                    result = await result
+                if not result:
+                    lit_api_health_status = False
+                    break
+            if workers_ready and lit_api_health_status:
+                return Response(content="ok", status_code=200)
+
+            return Response(content="not ready", status_code=503)
 
         if self.enable_shutdown_api:
 

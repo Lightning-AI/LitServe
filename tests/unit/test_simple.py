@@ -177,6 +177,155 @@ def test_workers_health_with_async_health_method(use_zmq):
         assert response.text == "ok"
 
 
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_startupz_immediate_response(use_zmq):
+    """Test that /startupz returns 200 immediately, before workers are ready."""
+    server = LitServer(
+        SlowSetupLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Should return 200 immediately, even though workers are still setting up
+        response = client.get("/startupz")
+        assert response.status_code == 200
+        assert response.text == "server started"
+
+        # Even after 1 second (workers still not ready)
+        time.sleep(1)
+        response = client.get("/startupz")
+        assert response.status_code == 200
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_healthz_server_alive_check(use_zmq):
+    """Test that /healthz returns 200 when server is alive, regardless of worker state."""
+    server = LitServer(
+        SlowSetupLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Should return 200 even though workers are still setting up
+        response = client.get("/healthz")
+        assert response.status_code == 200
+        assert response.text == "server alive"
+
+        # Verify workers are NOT ready
+        response = client.get("/health")
+        assert response.status_code == 503  # Workers not ready yet
+
+        # /healthz should still return 200
+        response = client.get("/healthz")
+        assert response.status_code == 200
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_readyz_same_as_health(use_zmq):
+    """Test that /readyz behaves identically to /health endpoint."""
+    server = LitServer(
+        SlowSetupLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Initially not ready
+        response = client.get("/readyz")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        # Wait for workers to be ready
+        time.sleep(3)
+        response = client.get("/readyz")
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+        # Verify /health returns the same
+        response = client.get("/health")
+        assert response.status_code == 200
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_custom_probe_paths(use_zmq):
+    """Test that custom probe paths work correctly."""
+    server = LitServer(
+        SimpleLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        workers_per_device=1,
+        fast_queue=use_zmq,
+        startupz_path="/custom/startup",
+        healthz_path="/custom/liveness",
+        readyz_path="/custom/readiness",
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # Wait for server to be ready
+        time.sleep(1)
+
+        # Test custom paths
+        response = client.get("/custom/startup")
+        assert response.status_code == 200
+
+        response = client.get("/custom/liveness")
+        assert response.status_code == 200
+
+        response = client.get("/custom/readiness")
+        assert response.status_code == 200
+
+
+def test_probes_require_auth(monkeypatch):
+    """Test that K8s probe endpoints respect authentication."""
+    from litserve import server
+
+    # Set API key via monkeypatch and update the module-level variable
+    monkeypatch.setenv("LIT_SERVER_API_KEY", "test-api-key")
+    monkeypatch.setattr(server, "LIT_SERVER_API_KEY", "test-api-key")
+
+    lit_server = LitServer(
+        SimpleLitAPI(),
+        accelerator="cpu",
+        devices=1,
+        workers_per_device=1,
+    )
+
+    with wrap_litserve_start(lit_server) as lit_server, TestClient(lit_server.app) as client:
+        # Without auth - should fail
+        response = client.get("/startupz")
+        assert response.status_code == 401
+
+        response = client.get("/healthz")
+        assert response.status_code == 401
+
+        response = client.get("/readyz")
+        assert response.status_code == 401
+
+        # With correct auth - should succeed
+        headers = {"X-API-Key": "test-api-key"}
+        response = client.get("/startupz", headers=headers)
+        assert response.status_code == 200
+
+        response = client.get("/healthz", headers=headers)
+        assert response.status_code == 200
+
+    # Clean up
+    monkeypatch.delenv("LIT_SERVER_API_KEY", raising=False)
+    monkeypatch.setattr(server, "LIT_SERVER_API_KEY", None)
+
+
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
         for i in range(100):
