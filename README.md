@@ -265,6 +265,103 @@ These results are for image and text classification ML tasks. The performance re
 
 &nbsp;
 
+# Kubernetes Deployment
+
+LitServe provides Kubernetes-standard health probe endpoints for production deployments:
+
+## Health Probes Overview
+
+LitServe supports three Kubernetes probe types:
+
+- **`/startupz`** - Returns 200 immediately when server starts (before workers ready)
+- **`/healthz`** - Returns 200 if server process is alive (lightweight)
+- **`/readyz`** - Returns 200 only when workers are ready and `LitAPI.health()` passes
+
+## Example Kubernetes Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litserve-model
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: litserve
+  template:
+    metadata:
+      labels:
+        app: litserve
+    spec:
+      containers:
+      - name: litserve
+        image: your-litserve-image:latest
+        ports:
+        - containerPort: 8000
+        # Give slow-starting models time to initialize
+        startupProbe:
+          httpGet:
+            path: /startupz
+            port: 8000
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30  # 30 * 5 = 150s max startup time
+        # Check if server is alive (detects deadlocks)
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        # Check if ready to serve requests
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+```
+
+## Custom Probe Paths
+
+You can customize the probe paths if needed:
+
+```python
+import litserve as ls
+
+server = ls.LitServer(
+    MyAPI(),
+    accelerator="cpu",
+    devices=1,
+    startupz_path="/custom/startup",
+    healthz_path="/custom/liveness",
+    readyz_path="/custom/readiness",
+)
+```
+
+## Authentication
+
+Health probes respect authentication configuration:
+
+```python
+# Set API key for authentication
+import os
+os.environ["LIT_SERVER_API_KEY"] = "your-secret-key"
+
+server = ls.LitServer(MyAPI())
+
+# Probes will require X-API-Key header
+# curl -H "X-API-Key: your-secret-key" http://localhost:8000/healthz
+```
+
+&nbsp;
+
 
 # Community
 LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) - Let's make the world's most advanced AI inference engine.

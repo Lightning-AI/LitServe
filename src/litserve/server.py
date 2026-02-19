@@ -532,6 +532,33 @@ class LitServer:
             - Requires authentication token (set LIT_SHUTDOWN_API_KEY env var)
             - Useful for automated deployment pipelines
 
+        startupz_path:
+            Kubernetes startup probe endpoint. Defaults to "/startupz".
+
+            - Returns 200 immediately when server starts (before workers ready)
+            - Used by K8s to give slow-starting apps time to initialize
+            - Lightweight check (does not verify worker status)
+            - Critical for models with long initialization times
+            - Prevents K8s from killing slow-starting pods during startup
+
+        healthz_path:
+            Kubernetes liveness probe endpoint. Defaults to "/healthz".
+
+            - Returns 200 if server process is alive (lightweight)
+            - Used by K8s to detect and restart deadlocked/hung containers
+            - Does not check worker status (only server process)
+            - Should always return 200 if server process is running
+            - Triggers container restart if fails
+
+        readyz_path:
+            Kubernetes readiness probe endpoint. Defaults to "/readyz".
+
+            - Returns 200 only when workers are ready and LitAPI.health() passes
+            - Used by K8s to remove pod from service if not ready
+            - Same logic as healthcheck_path endpoint
+            - Checks both worker readiness and LitAPI health status
+            - Prevents routing traffic to unready containers
+
         restart_workers:
             Enable this option to automatically restart
             workers if a critical error occurs. Defaults to False.
@@ -1476,6 +1503,9 @@ class LitServer:
             - **Main API**: `POST /predict` (or custom path from LitAPI)
             - **Health Check**: `GET /health` - Returns 200 when ready
             - **Server Info**: `GET /info` - Shows configuration and metadata
+            - **Startup Probe**: `GET /startupz` - Returns 200 immediately (K8s startupProbe)
+            - **Liveness Probe**: `GET /healthz` - Returns 200 if server alive (K8s livenessProbe)
+            - **Readiness Probe**: `GET /readyz` - Returns 200 when workers ready (K8s readinessProbe)
             - **API Documentation**: `GET /docs` - Interactive Swagger UI
             - **OpenAPI Schema**: `GET /openapi.json` - API specification
 
