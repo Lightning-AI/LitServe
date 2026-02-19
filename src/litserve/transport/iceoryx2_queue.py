@@ -134,8 +134,7 @@ class AsyncConsumer:
     def _sync_receive(self) -> bytes:
         """Synchronously receive a message."""
         sample = self._subscriber.receive()
-        data = bytes(sample.payload)
-        return data
+        return bytes(sample.payload)
 
     def _parse_message(self, message: bytes) -> Any:
         """Parse message, filtering by consumer_id."""

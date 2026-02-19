@@ -251,7 +251,7 @@ async def test_async_consumer_invalid_message_format(mock_node, mock_subscriber)
 
     consumer = AsyncConsumer(service_name="test-service", consumer_id=1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not enough values to unpack"):
         await consumer.get()
 
 
