@@ -12,6 +12,7 @@ from fastapi import HTTPException
 
 from litserve.utils import (
     add_ssl_context_from_env,
+    azip,
     call_after_stream,
     configure_logging,
     dump_exception,
@@ -45,6 +46,32 @@ async def test_call_after_stream():
         pass
     callback.assert_called()
     callback.assert_called_with("first_arg", random_arg="second_arg")
+
+
+async def _stream_values(*values):
+    for value in values:
+        yield value
+
+
+async def _stream_error():
+    yield ("ok", "status")
+    raise RuntimeError("stream failed")
+
+
+@pytest.mark.asyncio
+async def test_azip_stops_at_shortest_stream():
+    zipped = []
+    async for item in azip(_stream_values(1, 2), _stream_values("a")):
+        zipped.append(item)
+
+    assert zipped == [(1, "a")]
+
+
+@pytest.mark.asyncio
+async def test_azip_propagates_stream_errors():
+    with pytest.raises(RuntimeError, match="stream failed"):
+        async for _ in azip(_stream_error(), _stream_values(("ok", "status"), ("next", "status"))):
+            pass
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="This test is for non-Windows platforms only.")
