@@ -328,6 +328,23 @@ spec:
           failureThreshold: 3
 ```
 
+## Custom Probe Paths
+
+You can customize the probe paths if needed:
+
+```python
+import litserve as ls
+
+server = ls.LitServer(
+    MyAPI(),
+    accelerator="cpu",
+    devices=1,
+    startupz_path="/custom/startup",
+    healthz_path="/custom/liveness",
+    readyz_path="/custom/readiness",
+)
+```
+
 ## Authentication
 
 Health probes respect authentication configuration:
