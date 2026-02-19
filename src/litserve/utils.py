@@ -81,8 +81,11 @@ async def azip(*async_iterables):
     iterators = [ait.__aiter__() for ait in async_iterables]
     while True:
         results = await asyncio.gather(*(ait.__anext__() for ait in iterators), return_exceptions=True)
-        if any(isinstance(result, StopAsyncIteration) for result in results):
-            break
+        for result in results:
+            if isinstance(result, StopAsyncIteration):
+                return
+            if isinstance(result, Exception):
+                raise result
         yield tuple(results)
 
 
