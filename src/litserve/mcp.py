@@ -406,12 +406,14 @@ class MCP:
         if name.startswith("/"):
             name = name[1:]
         name = name.replace("/", "_")
-        return ToolEndpointType(
+        tool = ToolEndpointType(
             name=name,
             description=description,
             inputSchema=input_schema,
             endpoint=self.lit_api.api_path,
         )
+        tool.lit_api = self.lit_api
+        return tool
 
 
 class _MCPRequestHandler:
@@ -493,9 +495,11 @@ class _LitMCPServerConnector:
         self.tools = []
         self.request_handler = _MCPRequestHandler(self.mcp_server)
         self.tool_endpoint_connections = {}
+        self.tool_lit_api_connections = {}
 
-    def add_tool(self, tool: ToolEndpointType):
+    def add_tool(self, tool: ToolEndpointType, lit_api: "LitAPI"):
         self.tool_endpoint_connections[tool.name] = tool.endpoint
+        self.tool_lit_api_connections[tool.name] = lit_api
         self.tools.append(tool)
 
     def list_tools(self) -> list[ToolEndpointType]:
@@ -532,20 +536,18 @@ class _LitMCPServerConnector:
         @self.mcp_server.call_tool()
         async def _call_tool(name: str, arguments: dict):
             try:
-                endpoint_path = self.tool_endpoint_connections[name]
-                logger.debug(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
-                if endpoint_path is None:
+                lit_api = self.tool_lit_api_connections.get(name)
+                if lit_api is None:
                     raise ValueError(f"Tool {name} not found")
 
-                logger.debug(f"call tool called, endpoint: {endpoint_path}, arguments: {arguments}")
-                for route in app.routes:
-                    if route.path == endpoint_path:
-                        handler = route.endpoint
-                        break
-                else:
-                    raise ValueError(f"Endpoint {endpoint_path} not found")
-                logger.debug(f"call tool called, returning: {handler}")
-                return await _call_handler(handler, **arguments)
+                logger.debug(f"call tool called, tool: {name}, arguments: {arguments}")
+
+                # Call LitAPI methods directly
+                decoded = lit_api.decode_request(arguments)
+                result = await lit_api.predict(decoded)
+                encoded = lit_api.encode_response(result)
+
+                return _convert_to_content(encoded)
             except Exception as e:
                 logger.error(f"Error calling tool {name}: {e}")
                 raise e
@@ -566,7 +568,7 @@ class _LitMCPServerConnector:
             return
 
         for tool in mcp_tools:
-            self.add_tool(tool)
+            self.add_tool(tool, tool.lit_api)
 
         logger.warning(
             "MCP support is in beta and APIs are subject to change. Please report any issues to https://github.com/Lightning-AI/litserve/issues"

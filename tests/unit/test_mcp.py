@@ -262,12 +262,33 @@ def test_mcp_litserve_connector():
     mcp = MCP(description="A simple API", input_schema={"name": "string"})
     api = MCPLitAPI(mcp=mcp)
     tool = mcp.as_tool()
-    connector.add_tool(tool)
+    connector.add_tool(tool, api)
     assert api.mcp is mcp
     assert connector.list_tools() == [tool]
     assert connector.tool_endpoint_connections == {"predict": "/predict"}
+    assert connector.tool_lit_api_connections == {"predict": api}
 
     app = FastAPI()
     connector.connect_mcp_server([tool], app)
     mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
     assert isinstance(mcp_mount.app, Starlette)
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_tool_with_lit_api():
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API")
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
+
+    # Verify tool_lit_api_connections has the correct mapping
+    # Note: weakref.proxy is used, so we check the object is the same one
+    stored_api = connector.tool_lit_api_connections["predict"]
+    assert stored_api is api or stored_api.__repr__() == api.__repr__()
+
+    # This test verifies the storage mechanism works correctly
+    # Full integration test with actual tool calling is in e2e tests
+
+
+

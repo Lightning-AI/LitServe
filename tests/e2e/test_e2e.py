@@ -445,3 +445,30 @@ async def test_mcp_server():
         await session.initialize()
         result = await session.list_tools()
         assert len(result.tools) == 1, f"Expected 1 tool. Result: {result}"
+
+
+@pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
+@e2e_from_file("tests/e2e/default_mcp.py")
+@pytest.mark.asyncio
+async def test_mcp_call_tool():
+    from mcp import ClientSession, types
+    from mcp.client.streamable_http import streamablehttp_client
+
+    async with (
+        streamablehttp_client("http://localhost:8000/mcp/") as (
+            read_stream,
+            write_stream,
+            _,
+        ),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        await session.initialize()
+
+        # Test successful tool call
+        result = await session.call_tool("predict", arguments={"input": 2.0})
+        assert isinstance(result, types.CallToolResult)
+        assert len(result.content) > 0
+        # Verify the response contains the expected output (2.0 squared = 4.0)
+        content_text = result.content[0].text
+        assert "4.0" in content_text, f"Expected 4.0 in response, got: {content_text}"
+
