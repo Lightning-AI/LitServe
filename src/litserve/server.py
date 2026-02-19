@@ -1047,6 +1047,35 @@ class LitServer:
 
             return Response(content="not ready", status_code=503)
 
+        # Register individual health endpoints for each LitAPI
+        for lit_api in self.litapi_connector:
+            api_path = lit_api.api_path
+            endpoint = api_path.split("/")[-1]
+
+            @self.app.get(f"{api_path}/health", dependencies=[Depends(self.setup_auth())])
+            async def individual_health(request: Request, lit_api_ref=lit_api) -> Response:
+                # Check worker readiness for this specific API
+                api_workers_ready = all(
+                    v == WorkerSetupStatus.READY
+                    for k, v in self.workers_setup_status.items()
+                    if k.startswith(f"{endpoint}_")
+                )
+
+                # Check API-specific health
+                try:
+                    result = lit_api_ref.health()
+                    if inspect.isawaitable(result):
+                        result = await result
+                    api_healthy = result
+                except Exception as e:
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Health check failed for {api_path}: {e}")
+                    api_healthy = False
+
+                if api_workers_ready and api_healthy:
+                    return Response(content="ok", status_code=200)
+                return Response(content="not ready", status_code=503)
+
         @self.app.get(self.info_path, dependencies=[Depends(self.setup_auth())])
         async def info(request: Request) -> Response:
             return JSONResponse(
