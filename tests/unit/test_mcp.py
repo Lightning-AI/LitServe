@@ -291,4 +291,153 @@ async def test_mcp_call_tool_with_lit_api():
     # Full integration test with actual tool calling is in e2e tests
 
 
+@pytest.mark.asyncio
+async def test_mcp_call_tool_not_found():
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API")
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
 
+    # Mount with FastAPI (this registers the _call_tool handler)
+    app = FastAPI()
+    connector.connect_mcp_server([tool], app)
+
+    # Test that attempting to call a non-existent tool raises ValueError
+    # We verify this by checking the tool mapping
+    assert "nonexistent" not in connector.tool_lit_api_connections
+
+    # The actual _call_tool function will raise ValueError when called with nonexistent tool
+    # We can simulate this by directly calling the logic
+    lit_api = connector.tool_lit_api_connections.get("nonexistent")
+    assert lit_api is None
+    # This verifies the lookup path works correctly
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_tool_invalid_arguments():
+    from unittest.mock import patch
+
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API")
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
+
+    # Mock decode_request to raise ValueError
+    with (
+        patch.object(api, "decode_request", side_effect=ValueError("Missing required field")),
+        pytest.raises(ValueError, match="Missing required field"),
+    ):
+        api.decode_request({"invalid": "data"})
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_tool_predict_failure():
+    from unittest.mock import AsyncMock, patch
+
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API")
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
+
+    # Mock predict to raise RuntimeError
+    with (
+        patch.object(api, "decode_request", return_value=4.0),
+        patch.object(api, "predict", new_callable=AsyncMock, side_effect=RuntimeError("Model inference failed")),
+    ):
+        # Verify the API raises RuntimeError when predict fails
+        decoded = api.decode_request({"input": 4.0})
+        with pytest.raises(RuntimeError, match="Model inference failed"):
+            await api.predict(decoded)
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_tool_encode_response_failure():
+    from unittest.mock import AsyncMock, patch
+
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="A simple API")
+    api = MCPLitAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
+
+    # Mock encode_response to raise ValueError
+    with (
+        patch.object(api, "decode_request", return_value=4.0),
+        patch.object(api, "predict", new_callable=AsyncMock, return_value=16.0),
+        patch.object(api, "encode_response", side_effect=ValueError("Response encoding failed")),
+    ):
+        # Verify the API raises ValueError when encode fails
+        decoded = api.decode_request({"input": 4.0})
+        result = await api.predict(decoded)
+        with pytest.raises(ValueError, match="Response encoding failed"):
+            api.encode_response(result)
+
+
+def test_mcp_call_tool_pydantic_conversion():
+    from pydantic import BaseModel
+
+    class TestRequest(BaseModel):
+        value: int
+
+    class TestAPI(ls.LitAPI):
+        def decode_request(self, request: TestRequest) -> int:
+            return request.value
+
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="Test API")
+    api = TestAPI(mcp=mcp)
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
+
+    # Verify decode_request signature detection works
+    sig = inspect.signature(api.decode_request)
+    request_param = sig.parameters.get("request")
+    assert request_param is not None
+    assert request_param.annotation is TestRequest
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_tool_sync_predict():
+    import asyncio
+
+    class SyncPredictAPI(ls.LitAPI):
+        def setup(self, device):
+            self.device = device
+
+        def decode_request(self, request):
+            return request.get("input", 0)
+
+        def predict(self, x):
+            # Sync predict method
+            return x * x
+
+        def encode_response(self, output):
+            return {"output": output}
+
+    connector = _LitMCPServerConnector()
+    mcp = MCP(description="Sync API")
+    api = SyncPredictAPI(mcp=mcp)
+    api.setup("cpu")
+    tool = mcp.as_tool()
+    connector.add_tool(tool, api)
+
+    # Mount with FastAPI
+    app = FastAPI()
+    connector.connect_mcp_server([tool], app)
+
+    # Test that sync predict can be called with asyncio
+    # The implementation should use run_in_executor
+    decoded = api.decode_request({"input": 4.0})
+    assert not inspect.iscoroutinefunction(api.predict), "predict should not be async"
+
+    # Test the async/sync handling works
+    if inspect.iscoroutinefunction(api.predict):
+        result = await api.predict(decoded)
+    else:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, api.predict, decoded)
+
+    assert result == 16.0

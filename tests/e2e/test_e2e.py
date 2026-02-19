@@ -472,3 +472,93 @@ async def test_mcp_call_tool():
         content_text = result.content[0].text
         assert "4.0" in content_text, f"Expected 4.0 in response, got: {content_text}"
 
+
+@pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
+@e2e_from_file("tests/e2e/default_mcp.py")
+@pytest.mark.asyncio
+async def test_mcp_call_tool_invalid_arguments_e2e():
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    async with (
+        streamablehttp_client("http://localhost:8000/mcp/") as (
+            read_stream,
+            write_stream,
+            _,
+        ),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        await session.initialize()
+
+        # Try to call with invalid arguments (missing required field)
+        try:
+            await session.call_tool("predict", arguments={})
+            pytest.fail("Should have raised an error for missing input")
+        except Exception as e:
+            # Should get a validation error
+            error_str = str(e).lower()
+            assert (
+                "error" in error_str or "validation" in error_str or "required" in error_str or "missing" in error_str
+            )
+
+
+@pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
+@e2e_from_file("tests/e2e/default_mcp.py")
+@pytest.mark.asyncio
+async def test_mcp_call_tool_concurrent_e2e():
+    import asyncio
+
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    async with (
+        streamablehttp_client("http://localhost:8000/mcp/") as (
+            read_stream,
+            write_stream,
+            _,
+        ),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        await session.initialize()
+
+        # Make multiple concurrent calls
+        tasks = [
+            session.call_tool("predict", arguments={"input": 2.0}),
+            session.call_tool("predict", arguments={"input": 3.0}),
+            session.call_tool("predict", arguments={"input": 4.0}),
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+        # Verify all calls succeeded
+        assert len(results) == 3
+        assert "4.0" in results[0].content[0].text  # 2^2
+        assert "9.0" in results[1].content[0].text  # 3^2
+        assert "16.0" in results[2].content[0].text  # 4^2
+
+
+@pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
+@e2e_from_file("tests/e2e/default_mcp.py")
+@pytest.mark.asyncio
+async def test_mcp_call_tool_empty_arguments_e2e():
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    async with (
+        streamablehttp_client("http://localhost:8000/mcp/") as (
+            read_stream,
+            write_stream,
+            _,
+        ),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        await session.initialize()
+
+        # Try to call with empty arguments
+        try:
+            await session.call_tool("predict", arguments={})
+            pytest.fail("Should have raised an error for empty input")
+        except Exception as e:
+            # Should get a validation error
+            error_str = str(e).lower()
+            assert "error" in error_str or "required" in error_str or "missing" in error_str

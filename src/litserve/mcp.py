@@ -13,6 +13,7 @@
 # limitations under the License.
 """This module helps create MCP servers for LitServe endpoints."""
 
+import asyncio
 import inspect
 import json
 import logging
@@ -542,15 +543,45 @@ class _LitMCPServerConnector:
 
                 logger.debug(f"call tool called, tool: {name}, arguments: {arguments}")
 
-                # Call LitAPI methods directly
-                decoded = lit_api.decode_request(arguments)
-                result = await lit_api.predict(decoded)
+                # Handle Pydantic model conversion for decode_request
+                sig = inspect.signature(lit_api.decode_request)
+                request_param = sig.parameters.get("request")
+                if request_param and request_param.annotation is not request_param.empty:
+                    annotation = request_param.annotation
+                    # Check if it's a Pydantic BaseModel subclass
+                    if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
+                        decoded = lit_api.decode_request(annotation(**arguments))
+                    else:
+                        decoded = lit_api.decode_request(arguments)
+                else:
+                    decoded = lit_api.decode_request(arguments)
+
+                # Handle both sync and async predict
+                if inspect.iscoroutinefunction(lit_api.predict):
+                    result = await lit_api.predict(decoded)
+                else:
+                    # Run sync predict in executor to avoid blocking
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, lit_api.predict, decoded)
                 encoded = lit_api.encode_response(result)
 
                 return _convert_to_content(encoded)
+            except ValueError as e:
+                # Input validation errors
+                logger.error(f"Validation error calling tool {name}: {e}")
+                raise
+            except TypeError as e:
+                # Type conversion errors
+                logger.error(f"Type error calling tool {name}: {e}")
+                raise
+            except RuntimeError as e:
+                # Prediction errors
+                logger.error(f"Prediction error calling tool {name}: {e}")
+                raise
             except Exception as e:
-                logger.error(f"Error calling tool {name}: {e}")
-                raise e
+                # Unexpected errors
+                logger.error(f"Unexpected error calling tool {name}: {e}")
+                raise RuntimeError(f"Tool {name} execution failed: {e}")
 
         starlette_app = self.request_handler.streamable_http_app()
         app.mount("/", starlette_app, name="mcp")
