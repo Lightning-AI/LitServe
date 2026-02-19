@@ -26,17 +26,18 @@ class Iceoryx2Transport(MessageTransport):
         self._iceoryx2: Union[Producer, AsyncConsumer, None] = None
 
     def setup(self, operation: Literal["pub", "sub"], consumer_id: Optional[int] = None) -> None:
-        """Setup in subprocess. Use 'pub' for publisher, 'sub' for subscriber."""
+        """Setup in subprocess.
+
+        Use 'pub' for publisher, 'sub' for subscriber.
+
+        """
         if operation == "pub":
             self._iceoryx2 = Producer(service_name=self.backend_service)
             self._iceoryx2.wait_for_subscribers()
         elif operation == "sub":
             if consumer_id is None:
                 raise ValueError("consumer_id required for subscriber setup")
-            self._iceoryx2 = AsyncConsumer(
-                service_name=self.frontend_service,
-                consumer_id=consumer_id
-            )
+            self._iceoryx2 = AsyncConsumer(service_name=self.frontend_service, consumer_id=consumer_id)
         else:
             raise ValueError(f"Invalid operation {operation}")
 

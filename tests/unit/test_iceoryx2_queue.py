@@ -15,7 +15,7 @@ import asyncio
 import pickle
 import sys
 from queue import Empty
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -27,14 +27,14 @@ try:
         create_iceoryx2_service_names,
         generate_service_name,
     )
+
     ICEORYX2_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     ICEORYX2_AVAILABLE = False
 
 # Skip all tests in this module if iceoryx2 is not available or Windows
 pytestmark = pytest.mark.skipif(
-    sys.platform == "win32" or not ICEORYX2_AVAILABLE,
-    reason="iceoryx2 not available or Windows platform"
+    sys.platform == "win32" or not ICEORYX2_AVAILABLE, reason="iceoryx2 not available or Windows platform"
 )
 
 
@@ -219,9 +219,8 @@ async def test_async_consumer_timeout(mock_node):
     consumer = AsyncConsumer(service_name="test-service", consumer_id=1)
 
     # Simulate timeout by raising in executor
-    with patch.object(consumer, "_sync_receive", side_effect=asyncio.TimeoutError()):
-        with pytest.raises(Empty):
-            await consumer.get(timeout=0.1)
+    with patch.object(consumer, "_sync_receive", side_effect=asyncio.TimeoutError()), pytest.raises(Empty):
+        await consumer.get(timeout=0.1)
 
 
 @pytest.mark.asyncio

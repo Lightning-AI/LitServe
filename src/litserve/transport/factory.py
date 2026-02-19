@@ -8,8 +8,9 @@ from litserve.transport.zmq_queue import Broker
 from litserve.transport.zmq_transport import ZMQTransport
 
 try:
-    from litserve.transport.iceoryx2_transport import Iceoryx2Transport
     from litserve.transport.iceoryx2_queue import create_iceoryx2_service_names
+    from litserve.transport.iceoryx2_transport import Iceoryx2Transport
+
     ICEORYX2_AVAILABLE = True
 except ImportError:
     ICEORYX2_AVAILABLE = False
@@ -40,8 +41,7 @@ def _create_mp_transport(config: TransportConfig):
 def _create_iceoryx2_transport(config: TransportConfig):
     if not ICEORYX2_AVAILABLE:
         raise ImportError(
-            "iceoryx2 transport requested but not installed. "
-            "Install with: pip install litserve[iceoryx2]"
+            "iceoryx2 transport requested but not installed. Install with: pip install litserve[iceoryx2]"
         )
     frontend_service, backend_service = create_iceoryx2_service_names()
     config.frontend_address = frontend_service

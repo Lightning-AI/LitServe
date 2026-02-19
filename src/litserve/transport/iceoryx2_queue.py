@@ -23,10 +23,7 @@ logger = logging.getLogger(__name__)
 try:
     import iceoryx2
 except ImportError:
-    raise ImportError(
-        "iceoryx2 is not installed. "
-        "Install with: pip install litserve[iceoryx2]"
-    )
+    raise ImportError("iceoryx2 is not installed. Install with: pip install litserve[iceoryx2]")
 
 # Constants
 DEFAULT_SERVICE_PREFIX = "litserve"

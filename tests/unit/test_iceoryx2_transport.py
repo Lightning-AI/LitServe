@@ -19,14 +19,14 @@ import pytest
 # Import iceoryx2 modules only if available
 try:
     from litserve.transport.iceoryx2_transport import Iceoryx2Transport
+
     ICEORYX2_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     ICEORYX2_AVAILABLE = False
 
 # Skip all tests in this module if iceoryx2 is not available or Windows
 pytestmark = pytest.mark.skipif(
-    sys.platform == "win32" or not ICEORYX2_AVAILABLE,
-    reason="iceoryx2 not available or Windows platform"
+    sys.platform == "win32" or not ICEORYX2_AVAILABLE, reason="iceoryx2 not available or Windows platform"
 )
 
 
