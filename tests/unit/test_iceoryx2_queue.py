@@ -51,7 +51,8 @@ def mock_node():
 def mock_publisher(mock_node):
     """Create a mock iceoryx2 Publisher."""
     publisher = Mock()
-    mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value.publisher_builder.return_value.create.return_value = publisher
+    pub_sub_builder = mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value
+    pub_sub_builder.publisher_builder.return_value.create.return_value = publisher
 
     # Mock the loan_slice/sample pattern
     sample = Mock()
@@ -72,7 +73,8 @@ def mock_subscriber(mock_node):
     sample.payload = b"1|test_data"
 
     subscriber.receive = Mock(return_value=sample)
-    mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value.subscriber_builder.return_value.create.return_value = subscriber
+    pub_sub_builder = mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value
+    pub_sub_builder.subscriber_builder.return_value.create.return_value = subscriber
 
     return subscriber
 
@@ -214,7 +216,8 @@ async def test_async_consumer_receive_with_timeout(mock_node, mock_subscriber):
 async def test_async_consumer_timeout(mock_node):
     """Test AsyncConsumer timeout handling."""
     subscriber = Mock()
-    mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value.subscriber_builder.return_value.create.return_value = subscriber
+    pub_sub_builder = mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value
+    pub_sub_builder.subscriber_builder.return_value.create.return_value = subscriber
 
     consumer = AsyncConsumer(service_name="test-service", consumer_id=1)
 
@@ -258,7 +261,8 @@ async def test_async_consumer_invalid_message_format(mock_node, mock_subscriber)
 def test_async_consumer_close(mock_node):
     """Test AsyncConsumer.close() method."""
     subscriber = Mock()
-    mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value.subscriber_builder.return_value.create.return_value = subscriber
+    pub_sub_builder = mock_node.service_builder.return_value.publish_subscribe.return_value.open_or_create.return_value
+    pub_sub_builder.subscriber_builder.return_value.create.return_value = subscriber
 
     consumer = AsyncConsumer(service_name="test-service", consumer_id=1)
     consumer.close()
