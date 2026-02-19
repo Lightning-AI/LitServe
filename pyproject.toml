@@ -184,4 +184,10 @@ dev = [
     "jsonargparse",
     "rich",
     "torchvision>=0.22.1",
+    "iceoryx2>=0.1.0 ; sys_platform != 'win32'",
+]
+
+[project.optional-dependencies]
+iceoryx2 = [
+    "iceoryx2>=0.1.0 ; sys_platform != 'win32'",
 ]

@@ -13,6 +13,7 @@
 # limitations under the License.
 import base64
 import random
+import sys
 import time
 from collections.abc import Generator
 
@@ -24,6 +25,14 @@ from fastapi.testclient import TestClient
 from litserve.api import LitAPI
 from litserve.server import LitServer
 from litserve.utils import wrap_litserve_start
+
+
+def pytest_configure(config):
+    """Configure pytest with iceoryx2 skip marker."""
+    config.addinivalue_line(
+        "markers",
+        "skipif_no_iceoryx2: skip test if iceoryx2 is not installed"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
