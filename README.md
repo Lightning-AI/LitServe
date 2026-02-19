@@ -335,8 +335,21 @@ You can customize the probe paths if needed:
 ```python
 import litserve as ls
 
+class SimpleAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output):
+        return {"output": output}
+
 server = ls.LitServer(
-    MyAPI(),
+    SimpleAPI(),
     accelerator="cpu",
     devices=1,
     startupz_path="/custom/startup",
@@ -350,11 +363,26 @@ server = ls.LitServer(
 Health probes respect authentication configuration:
 
 ```python
-# Set API key for authentication
 import os
+import litserve as ls
+
+class SimpleAPI(ls.LitAPI):
+    def setup(self, device):
+        self.model = lambda x: x**2
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, x):
+        return self.model(x)
+
+    def encode_response(self, output):
+        return {"output": output}
+
+# Set API key for authentication
 os.environ["LIT_SERVER_API_KEY"] = "your-secret-key"
 
-server = ls.LitServer(MyAPI())
+server = ls.LitServer(SimpleAPI(), accelerator="cpu", devices=1)
 
 # Probes will require X-API-Key header
 # curl -H "X-API-Key: your-secret-key" http://localhost:8000/healthz
