@@ -328,21 +328,6 @@ spec:
           failureThreshold: 3
 ```
 
-## Authentication
-
-Health probes respect authentication configuration:
-
-```python
-# Set API key for authentication
-import os
-os.environ["LIT_SERVER_API_KEY"] = "your-secret-key"
-
-server = ls.LitServer(MyAPI())
-
-# Probes will require X-API-Key header
-# curl -H "X-API-Key: your-secret-key" http://localhost:8000/healthz
-```
-
 &nbsp;
 
 
