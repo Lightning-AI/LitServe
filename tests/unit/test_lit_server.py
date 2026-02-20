@@ -925,8 +925,9 @@ def test_workers_per_device_per_route_raises_on_unknown_route():
 def test_health_check_returns_503_when_workers_setup_status_is_empty(lifespan_mock, simple_litapi):
     """Health check should return 503 when no workers are registered yet.
 
-    This tests the fix for the bug where `all({}.values())` returns True in Python,
-    causing the health check to incorrectly return 200 when workers_setup_status is empty.
+    This tests the fix for the bug where `all({}.values())` returns True in Python, causing the health check to
+    incorrectly return 200 when workers_setup_status is empty.
+
     """
     server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
     # Ensure workers_setup_status is empty (simulating server startup before workers register)
@@ -941,7 +942,5 @@ def test_health_check_returns_503_when_workers_setup_status_is_empty(lifespan_mo
 
     with TestClient(server.app) as client:
         response = client.get("/health")
-        assert response.status_code == 503, (
-            "Health check should return 503 when no workers are registered"
-        )
+        assert response.status_code == 503, "Health check should return 503 when no workers are registered"
         assert response.text == "not ready"
