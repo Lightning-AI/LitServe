@@ -1032,7 +1032,11 @@ class LitServer:
         async def health(request: Request) -> Response:
             nonlocal workers_ready
             if not workers_ready:
-                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
+                # Fix: Empty dict should return False (no workers ready yet)
+                # all({}.values()) returns True in Python, but we need False when no workers exist
+                workers_ready = bool(self.workers_setup_status) and all(
+                    v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
+                )
 
             lit_api_health_status = True
             for lit_api in self.litapi_connector:
