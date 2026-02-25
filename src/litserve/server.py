@@ -1032,7 +1032,9 @@ class LitServer:
         async def health(request: Request) -> Response:
             nonlocal workers_ready
             if not workers_ready:
-                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
+                workers_ready = bool(self.workers_setup_status) and all(
+                    v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
+                )
 
             lit_api_health_status = True
             for lit_api in self.litapi_connector:
