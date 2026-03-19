@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 from typing import Optional
 from unittest.mock import patch
@@ -11,6 +12,7 @@ import litserve as ls
 from litserve.mcp import (
     MCP,
     _LitMCPServerConnector,
+    _call_handler,
     _param_name_to_title,
     _python_type_to_json_schema,
     extract_input_schema,
@@ -271,3 +273,28 @@ def test_mcp_litserve_connector():
     connector.connect_mcp_server([tool], app)
     mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
     assert isinstance(mcp_mount.app, Starlette)
+
+
+def test_call_handler_with_flat_mcp_arguments():
+    """Test that _call_handler correctly wraps flat MCP arguments into the request model.
+
+    Reproduces the bug from issue #560 where MCP tools/call fails with
+    'endpoint_handler() missing 1 required positional argument: request'
+    because MCP arguments (the model fields) don't match the handler's
+    parameter name.
+    """
+
+    async def endpoint_handler(request: MCPTestModel):
+        return {"name": request.name, "age": request.age}
+
+    # MCP sends model fields directly (flat arguments), not wrapped under "request"
+    result = asyncio.get_event_loop().run_until_complete(
+        _call_handler(endpoint_handler, name="Alice", age=30)
+    )
+    assert any("Alice" in c.text for c in result)
+
+    # Also verify it works when arguments ARE keyed by the parameter name
+    result = asyncio.get_event_loop().run_until_complete(
+        _call_handler(endpoint_handler, request={"name": "Bob", "age": 25})
+    )
+    assert any("Bob" in c.text for c in result)
