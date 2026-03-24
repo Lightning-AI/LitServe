@@ -32,7 +32,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
@@ -1107,7 +1107,7 @@ class LitServer:
 
         # When no Pydantic model is annotated, use Dict[str, Any] so Swagger renders a request body form.
         # FastAPI will parse the JSON body into a dict automatically in this case.
-        swagger_request_type = Dict[str, Any] if request_type is Request else request_type
+        swagger_request_type = dict[str, Any] if request_type is Request else request_type
 
         # Create endpoint function
         async def endpoint_handler(request: swagger_request_type) -> response_type:
