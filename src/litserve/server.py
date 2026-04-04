@@ -1022,26 +1022,27 @@ class LitServer:
         return None
 
     def _register_internal_endpoints(self):
-        workers_ready = False
-
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
         @self.app.get(self.healthcheck_path, dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
-            nonlocal workers_ready
-            if not workers_ready:
-                workers_ready = bool(self.workers_setup_status) and all(
-                    v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
-                )
+            workers_ready = bool(self.workers_setup_status) and all(
+                v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
+            )
 
             lit_api_health_status = True
             for lit_api in self.litapi_connector:
-                result = lit_api.health()
-                if inspect.isawaitable(result):
-                    result = await result
-                if not result:
+                try:
+                    result = lit_api.health()
+                    if inspect.isawaitable(result):
+                        result = await result
+                    if not result:
+                        lit_api_health_status = False
+                        break
+                except Exception:
+                    logger.exception(f"Health check failed for {lit_api.__class__.__name__}")
                     lit_api_health_status = False
                     break
             if workers_ready and lit_api_health_status:
