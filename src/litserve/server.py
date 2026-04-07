@@ -1582,7 +1582,7 @@ class LitServer:
             workers.append(w)
         return dict(enumerate(workers))
 
-    def setup_auth(self, lit_api=None):
+    def setup_auth(self, lit_api: LitAPI | None = None):
         target = lit_api or self.lit_api
         if hasattr(target, "authorize") and callable(target.authorize):
             return target.authorize
