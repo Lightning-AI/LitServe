@@ -92,50 +92,22 @@ def test_not_authorized_api_key():
 # --- Multi-API auth tests ---
 
 
-class AuthedApiAlpha(LitAPI):
-    """API with Bearer token auth (token: 'alpha')."""
+class TokenAuthedLitAPI(SimpleLitAPI):
+    """SimpleLitAPI with Bearer token auth parameterized by token."""
 
-    def setup(self, device):
-        self.model = lambda x: x + 1
-
-    def decode_request(self, request: Request):
-        return request["input"]
-
-    def predict(self, x):
-        return self.model(x)
-
-    def encode_response(self, output) -> Response:
-        return {"output": output}
+    def __init__(self, token: str, **kwargs):
+        super().__init__(**kwargs)
+        self._token = token
 
     def authorize(self, auth: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
-        if auth.scheme != "Bearer" or auth.credentials != "alpha":
-            raise HTTPException(status_code=401, detail="Bad token for API A")
-
-
-class AuthedApiBeta(LitAPI):
-    """API with Bearer token auth (token: 'beta')."""
-
-    def setup(self, device):
-        self.model = lambda x: x * 10
-
-    def decode_request(self, request: Request):
-        return request["input"]
-
-    def predict(self, x):
-        return self.model(x)
-
-    def encode_response(self, output) -> Response:
-        return {"output": output}
-
-    def authorize(self, auth: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
-        if auth.scheme != "Bearer" or auth.credentials != "beta":
-            raise HTTPException(status_code=401, detail="Bad token for API B")
+        if auth.scheme != "Bearer" or auth.credentials != self._token:
+            raise HTTPException(status_code=401, detail="Bad token")
 
 
 def test_multi_api_second_api_auth_enforced():
     """Second API's authorize() must be checked, not just the first API's."""
     api1 = SimpleLitAPI(api_path="/no-auth")
-    api2 = AuthedApiAlpha(api_path="/needs-auth")
+    api2 = TokenAuthedLitAPI(token="alpha", api_path="/needs-auth")
     server = LitServer([api1, api2], accelerator="cpu", devices=1, workers_per_device=1)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
@@ -156,7 +128,7 @@ def test_multi_api_second_api_auth_enforced():
 
 def test_multi_api_mixed_auth():
     """One API with auth, one without -- each should work independently."""
-    api_authed = AuthedApiAlpha(api_path="/protected")
+    api_authed = TokenAuthedLitAPI(token="alpha", api_path="/protected")
     api_open = SimpleLitAPI(api_path="/open")
     server = LitServer([api_authed, api_open], accelerator="cpu", devices=1, workers_per_device=1)
 
@@ -177,8 +149,8 @@ def test_multi_api_mixed_auth():
 
 def test_multi_api_both_with_different_auth():
     """Two APIs with different auth tokens -- each checks its own authorize()."""
-    api_a = AuthedApiAlpha(api_path="/api-a")
-    api_b = AuthedApiBeta(api_path="/api-b")
+    api_a = TokenAuthedLitAPI(token="alpha", api_path="/api-a")
+    api_b = TokenAuthedLitAPI(token="beta", api_path="/api-b")
     server = LitServer([api_a, api_b], accelerator="cpu", devices=1, workers_per_device=1)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
