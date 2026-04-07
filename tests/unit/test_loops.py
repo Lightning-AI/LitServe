@@ -17,6 +17,7 @@ import inspect
 import io
 import json
 import re
+import sys
 import threading
 import time
 from collections.abc import AsyncGenerator
@@ -813,7 +814,8 @@ def test_get_default_loop_enable_async():
 def lit_loop_setup():
     lit_loop = LitLoop()
     lit_loop._restart_workers = True
-    lit_api = MagicMock(request_timeout=0.1)
+    # Windows has ~15ms timer granularity and slower queue ops, so use a larger timeout to avoid flakiness
+    lit_api = MagicMock(request_timeout=0.5 if sys.platform == "win32" else 0.1)
     request_queue = Queue()
     return lit_loop, lit_api, request_queue
 
