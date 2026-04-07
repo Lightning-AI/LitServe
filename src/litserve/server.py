@@ -1114,7 +1114,7 @@ class LitServer:
                 lit_api.api_path,
                 endpoint_handler,
                 methods=["POST"],
-                dependencies=[Depends(self.setup_auth())],
+                dependencies=[Depends(self.setup_auth(lit_api))],
             )
 
         # Handle specs
@@ -1129,7 +1129,7 @@ class LitServer:
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(
-                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
+                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth(lit_api))]
                 )
 
     def _register_middleware(self):
@@ -1583,9 +1583,10 @@ class LitServer:
             workers.append(w)
         return dict(enumerate(workers))
 
-    def setup_auth(self):
-        if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
-            return self.lit_api.authorize
+    def setup_auth(self, lit_api: LitAPI | None = None):
+        target = lit_api or self.lit_api
+        if hasattr(target, "authorize") and callable(target.authorize):
+            return target.authorize
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
