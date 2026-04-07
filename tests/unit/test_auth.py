@@ -42,16 +42,14 @@ class SimpleAuthedLitAPI(LitAPI):
 def test_authorized_custom():
     server = LitServer(SimpleAuthedLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        input = {"input": 4.0}
-        response = client.post("/predict", headers={"Authorization": "Bearer 1234"}, json=input)
+        response = client.post("/predict", headers={"Authorization": "Bearer 1234"}, json={"input": 4.0})
         assert response.status_code == 200
 
 
 def test_not_authorized_custom():
     server = LitServer(SimpleAuthedLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        input = {"input": 4.0}
-        response = client.post("/predict", headers={"Authorization": "Bearer wrong"}, json=input)
+        response = client.post("/predict", headers={"Authorization": "Bearer wrong"}, json={"input": 4.0})
         assert response.status_code == 401
 
 
@@ -74,8 +72,7 @@ def test_authorized_api_key():
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        input = {"input": 4.0}
-        response = client.post("/predict", headers={"X-API-Key": "abcd"}, json=input)
+        response = client.post("/predict", headers={"X-API-Key": "abcd"}, json={"input": 4.0})
         assert response.status_code == 200
 
     litserve.server.LIT_SERVER_API_KEY = None
@@ -86,8 +83,7 @@ def test_not_authorized_api_key():
     server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
-        input = {"input": 4.0}
-        response = client.post("/predict", headers={"X-API-Key": "wrong"}, json=input)
+        response = client.post("/predict", headers={"X-API-Key": "wrong"}, json={"input": 4.0})
         assert response.status_code == 401
 
     litserve.server.LIT_SERVER_API_KEY = None
@@ -136,25 +132,9 @@ class AuthedApiBeta(LitAPI):
             raise HTTPException(status_code=401, detail="Bad token for API B")
 
 
-class NoAuthAPI(LitAPI):
-    """API without any custom auth."""
-
-    def setup(self, device):
-        self.model = lambda x: x - 1
-
-    def decode_request(self, request: Request):
-        return request["input"]
-
-    def predict(self, x):
-        return self.model(x)
-
-    def encode_response(self, output) -> Response:
-        return {"output": output}
-
-
 def test_multi_api_second_api_auth_enforced():
     """Second API's authorize() must be checked, not just the first API's."""
-    api1 = NoAuthAPI(api_path="/no-auth")
+    api1 = SimpleLitAPI(api_path="/no-auth")
     api2 = AuthedApiAlpha(api_path="/needs-auth")
     server = LitServer([api1, api2], accelerator="cpu", devices=1, workers_per_device=1)
 
@@ -177,7 +157,7 @@ def test_multi_api_second_api_auth_enforced():
 def test_multi_api_mixed_auth():
     """One API with auth, one without -- each should work independently."""
     api_authed = AuthedApiAlpha(api_path="/protected")
-    api_open = NoAuthAPI(api_path="/open")
+    api_open = SimpleLitAPI(api_path="/open")
     server = LitServer([api_authed, api_open], accelerator="cpu", devices=1, workers_per_device=1)
 
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
