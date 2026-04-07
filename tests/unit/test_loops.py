@@ -17,7 +17,6 @@ import inspect
 import io
 import json
 import re
-import sys
 import threading
 import time
 from collections.abc import AsyncGenerator
