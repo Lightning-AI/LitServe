@@ -247,9 +247,47 @@ def _param_name_to_title(param_name: str) -> str:
 
 async def _call_handler(handler, **kwargs):
     sig = inspect.signature(handler)
+    params = list(sig.parameters.values())
+
+    # FastAPI endpoint handlers typically have a single parameter (the request model).
+    # MCP arguments may either:
+    #   1. Match the parameter name (e.g. {"request": {...}}) – pass-through after
+    #      constructing the BaseModel if needed.
+    #   2. Represent the *fields* of the request model directly (e.g. {"name": "…",
+    #      "age": 30}) – we must wrap them into the model before calling the handler.
+    if len(params) == 1:
+        param = params[0]
+        annotation = param.annotation
+        is_model = (
+            annotation is not inspect.Parameter.empty
+            and isinstance(annotation, type)
+            and issubclass(annotation, BaseModel)
+        )
+
+        if param.name in kwargs:
+            # Case 1: arguments already keyed by the parameter name
+            value = kwargs[param.name]
+            if is_model and isinstance(value, dict):
+                value = annotation(**value)
+            return _convert_to_content(await handler(value))
+
+        if is_model:
+            # Case 2: arguments are the model fields themselves
+            return _convert_to_content(await handler(annotation(**kwargs)))
+
+    # Fallback: multiple parameters – bind each kwarg to matching params,
+    # constructing BaseModel instances from dicts where appropriate.
     bound = sig.bind_partial(
         **{
-            k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
+            k: (
+                v
+                if not (
+                    p.annotation is not inspect.Parameter.empty
+                    and isinstance(p.annotation, type)
+                    and issubclass(p.annotation, BaseModel)
+                )
+                else p.annotation(**v)
+            )
             for k, v in kwargs.items()
             for name, p in sig.parameters.items()
             if k == name
