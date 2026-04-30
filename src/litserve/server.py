@@ -1022,26 +1022,27 @@ class LitServer:
         return None
 
     def _register_internal_endpoints(self):
-        workers_ready = False
-
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
         @self.app.get(self.healthcheck_path, dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
-            nonlocal workers_ready
-            if not workers_ready:
-                workers_ready = bool(self.workers_setup_status) and all(
-                    v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
-                )
+            workers_ready = bool(self.workers_setup_status) and all(
+                v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
+            )
 
             lit_api_health_status = True
             for lit_api in self.litapi_connector:
-                result = lit_api.health()
-                if inspect.isawaitable(result):
-                    result = await result
-                if not result:
+                try:
+                    result = lit_api.health()
+                    if inspect.isawaitable(result):
+                        result = await result
+                    if not result:
+                        lit_api_health_status = False
+                        break
+                except Exception:
+                    logger.exception(f"Health check failed for {lit_api.__class__.__name__}")
                     lit_api_health_status = False
                     break
             if workers_ready and lit_api_health_status:
@@ -1113,7 +1114,7 @@ class LitServer:
                 lit_api.api_path,
                 endpoint_handler,
                 methods=["POST"],
-                dependencies=[Depends(self.setup_auth())],
+                dependencies=[Depends(self.setup_auth(lit_api))],
             )
 
         # Handle specs
@@ -1128,7 +1129,7 @@ class LitServer:
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(
-                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
+                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth(lit_api))]
                 )
 
     def _register_middleware(self):
@@ -1582,9 +1583,10 @@ class LitServer:
             workers.append(w)
         return dict(enumerate(workers))
 
-    def setup_auth(self):
-        if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
-            return self.lit_api.authorize
+    def setup_auth(self, lit_api: LitAPI | None = None):
+        target = lit_api or self.lit_api
+        if hasattr(target, "authorize") and callable(target.authorize):
+            return target.authorize
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth

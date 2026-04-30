@@ -32,7 +32,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import LitServer
-from litserve.utils import wrap_litserve_start
+from litserve.utils import WorkerSetupStatus, wrap_litserve_start
 
 
 def test_index(sync_testclient):
@@ -944,3 +944,80 @@ def test_health_check_returns_503_when_workers_setup_status_is_empty(lifespan_mo
         response = client.get("/health")
         assert response.status_code == 503, "Health check should return 503 when no workers are registered"
         assert response.text == "not ready"
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_returns_503_on_health_exception(lifespan_mock, simple_litapi):
+    """Health check should return 503 (not 500) when a custom health() method raises an exception."""
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+    server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    for lit_api in server.litapi_connector:
+        lit_api.health = MagicMock(side_effect=RuntimeError("database connection failed"))
+
+    with TestClient(server.app) as client:
+        response = client.get("/health")
+        assert response.status_code == 503, "Health check should return 503 when health() raises, not 500"
+        assert response.text == "not ready"
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_detects_worker_status_change(lifespan_mock, simple_litapi):
+    """Health check should detect when workers transition from READY to a non-READY state."""
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    for lit_api in server.litapi_connector:
+        lit_api.health = MagicMock(return_value=True)
+
+    with TestClient(server.app) as client:
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+        response = client.get("/health")
+        assert response.status_code == 200
+
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.ERROR}
+        response = client.get("/health")
+        assert response.status_code == 503, "Health check should return 503 after worker enters error state"
+        assert response.text == "not ready"
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_no_stale_cache(lifespan_mock, simple_litapi):
+    """Health check should re-evaluate worker status every request, not cache it."""
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    for lit_api in server.litapi_connector:
+        lit_api.health = MagicMock(return_value=True)
+
+    with TestClient(server.app) as client:
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+        response = client.get("/health")
+        assert response.status_code == 200
+
+        response = client.get("/health")
+        assert response.status_code == 200
+
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.ERROR}
+        response = client.get("/health")
+        assert response.status_code == 503, "Should not serve stale cached status"
+
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+        response = client.get("/health")
+        assert response.status_code == 200, "Should recover when workers become ready again"
