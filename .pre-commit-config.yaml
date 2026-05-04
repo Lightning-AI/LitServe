@@ -30,7 +30,7 @@ repos:
         #args: ["--write-changes"]
 
   - repo: https://github.com/JoC0de/pre-commit-prettier
-    rev: v3.8.1
+    rev: v3.8.3
     hooks:
       - id: prettier
         files: \.(json|yml|yaml|toml)
@@ -38,14 +38,14 @@ repos:
         args: ["--print-width=120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.7
+    rev: v1.7.8
     hooks:
       - id: docformatter
         additional_dependencies: [tomli]
         args: ["--in-place"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.9
+    rev: v0.15.12
     hooks:
       - id: ruff
         args: ["--fix"]
