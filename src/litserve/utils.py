@@ -115,8 +115,19 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
     else:
         server.mcp_server = None
 
-    try:
-        yield server
+    else:
+        server.mcp_server = None
+
+        # Wait for all workers to be ready
+        while not all(
+            v == WorkerSetupStatus.READY for v in server.workers_setup_status.values()
+        ):
+            if any(v == WorkerSetupStatus.ERROR for v in server.workers_setup_status.values()):
+                raise RuntimeError("One or more workers failed to start")
+            time.sleep(0.05)
+
+        try:
+            yield server
     finally:
         server._shutdown_event.set()
         # First close the transport to signal to the response_queue_to_buffer task that it should stop
