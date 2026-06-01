@@ -16,6 +16,7 @@ import contextlib
 import json
 import os
 import sys
+import threading
 import time
 from time import sleep
 from unittest.mock import MagicMock, patch
@@ -338,6 +339,28 @@ def test_server_terminate():
         mock_launch.assert_called()
         mock_start.assert_called()
         server._transport.close.assert_called()
+
+
+def test_graceful_shutdown_stops_uvicorn_thread(simple_litapi):
+    server = LitServer(simple_litapi)
+    server._transport = MagicMock()
+    server.inference_workers = []
+    uvicorn_server = MagicMock(should_exit=False)
+
+    def wait_for_shutdown():
+        while not uvicorn_server.should_exit:
+            sleep(0.01)
+
+    worker = threading.Thread(target=wait_for_shutdown, name="LitServer-0")
+    setattr(worker, "_litserve_server", uvicorn_server)
+    worker.start()
+
+    manager = MagicMock()
+    server._perform_graceful_shutdown(manager, {0: worker})
+
+    assert uvicorn_server.should_exit is True
+    assert not worker.is_alive()
+    manager.shutdown.assert_called_once()
 
 
 @pytest.mark.parametrize(("disable_openapi_url", "should_print"), [(False, True), (True, False)])
