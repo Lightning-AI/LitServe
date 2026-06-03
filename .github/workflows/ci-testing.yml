@@ -31,6 +31,7 @@ jobs:
     timeout-minutes: 35
     env:
       TORCH_URL: "https://download.pytorch.org/whl/cpu/torch_stable.html"
+      UV_EXCLUDE_NEWER: "2 days"
       UV_TORCH_BACKEND: "cpu"
 
     steps:
