@@ -1605,8 +1605,8 @@ class LitServer:
         uvicorn_workers: dict[str, Union[mp.Process, threading.Thread]],
     ):
         def monitor():
-            try:
-                while not self._shutdown_event.is_set():
+            while not self._shutdown_event.is_set():
+                try:
                     broken_workers = {}
 
                     for i, proc in enumerate(self.inference_workers):
@@ -1655,17 +1655,15 @@ class LitServer:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
 
                             resp.event.set()
-                            print(f"[monoriting] Marked {uid} set")
 
-                        print(f"[monoriting] Worker {worker_id} is dead. Restarting it")
+                        logger.info(f"Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_single_inference_worker(lit_api, worker_id)
-                        print(f"[monoriting] Worker {worker_id} has been started.")
+                        logger.info(f"Worker {worker_id} has been restarted")
+                except Exception:
+                    logger.exception("Error in worker monitoring loop")
 
-                    time.sleep(self.monitor_internal)
-
-            except Exception as e:
-                print(e)
+                time.sleep(self.monitor_internal)
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()
