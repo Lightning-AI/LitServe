@@ -1,4 +1,9 @@
-"""Sentinel child process. Invoked as: python _child.py <pid> <heartbeat_path> <kill_delay>"""
+"""Sentinel child process.
+
+Invoked as: python _child.py <pid> <heartbeat_path> <kill_delay>
+
+"""
+
 import ctypes
 import os
 import sys
@@ -55,9 +60,8 @@ def _kill_subtree(root_pid):
                 descendants.append(child)
                 queue.append(child)
 
-    PROCESS_TERMINATE = 0x0001
     for cpid in descendants + [root_pid]:
-        h = k32.OpenProcess(PROCESS_TERMINATE, False, cpid)
+        h = k32.OpenProcess(0x0001, False, cpid)
         if h:
             k32.TerminateProcess(h, 1)
             k32.CloseHandle(h)

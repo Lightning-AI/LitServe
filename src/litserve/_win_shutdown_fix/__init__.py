@@ -1,4 +1,5 @@
 """Windows/PyCharm debugger shutdown sentinel."""
+
 import contextlib
 import os
 import sys
@@ -31,7 +32,7 @@ def _create_process_no_window(cmd_line: str) -> bool:
             ("hStdError", wintypes.HANDLE),
         )
 
-    class PROCESS_INFORMATION(ctypes.Structure):
+    class ProcessInformation(ctypes.Structure):
         _fields_ = (
             ("hProcess", wintypes.HANDLE),
             ("hThread", wintypes.HANDLE),
@@ -41,11 +42,19 @@ def _create_process_no_window(cmd_line: str) -> bool:
 
     si = STARTUPINFOW()
     si.cb = ctypes.sizeof(STARTUPINFOW)
-    pi = PROCESS_INFORMATION()
+    pi = ProcessInformation()
     cmd_buf = ctypes.create_unicode_buffer(cmd_line)
     ok = ctypes.windll.kernel32.CreateProcessW(
-        None, cmd_buf, None, None, False, 0x08000000, None, None,
-        ctypes.byref(si), ctypes.byref(pi),
+        None,
+        cmd_buf,
+        None,
+        None,
+        False,
+        0x08000000,
+        None,
+        None,
+        ctypes.byref(si),
+        ctypes.byref(pi),
     )
     if ok:
         ctypes.windll.kernel32.CloseHandle(pi.hProcess)
@@ -59,6 +68,7 @@ def start_heartbeat_sentinel(pid: int, heartbeat_path: str, kill_delay: float) -
     Spawn chain: ctypes.CreateProcessW -> powershell.exe -File <ps1> -> WMI Win32_Process.Create
     -> python.exe _child.py. The final process runs under WmiPrvSE, outside PyCharm's Job
     Object, with no pydevd injected.
+
     """
     if sys.platform != "win32":
         return
@@ -68,15 +78,14 @@ def start_heartbeat_sentinel(pid: int, heartbeat_path: str, kill_delay: float) -
     cmd = f'"{sys.executable}" "{child_py}" {pid} "{heartbeat_path}" {kill_delay}'
     spawn_ps1 = os.path.join(tempfile.gettempdir(), f"litserve_spawn_sentinel_{pid}.ps1")
     ps1_arg = cmd.replace("'", "''")  # escape single quotes for PS single-quoted string
-    with contextlib.suppress(Exception):
-        with open(spawn_ps1, "w") as f:
-            f.write(
-                "try {\n"
-                "    $r = Invoke-WmiMethod -Class Win32_Process -Name Create"
-                f" -ArgumentList '{ps1_arg}'\n"
-                "    exit [int]$r.ReturnValue\n"
-                "} catch { exit 1 }\n"
-            )
+    with contextlib.suppress(Exception), open(spawn_ps1, "w") as f:
+        f.write(
+            "try {\n"
+            "    $r = Invoke-WmiMethod -Class Win32_Process -Name Create"
+            f" -ArgumentList '{ps1_arg}'\n"
+            "    exit [int]$r.ReturnValue\n"
+            "} catch { exit 1 }\n"
+        )
 
     ps_cmd = f'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{spawn_ps1}"'
     with contextlib.suppress(Exception):
