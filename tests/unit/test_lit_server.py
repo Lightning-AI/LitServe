@@ -341,10 +341,10 @@ def test_server_terminate():
 
 
 @pytest.mark.parametrize(("disable_openapi_url", "should_print"), [(False, True), (True, False)])
-@patch("builtins.print")
+@patch("litserve.server.logger")
 @patch("litserve.server.uvicorn")
-def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manager, disable_openapi_url, should_print):
-    """Test that the Swagger UI message is only printed when disable_openapi_url=False."""
+def test_disable_openapi_url_print_message(mock_uvicorn, mock_logger, mock_manager, disable_openapi_url, should_print):
+    """Test that the Swagger UI message is only logged when disable_openapi_url=False."""
     server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url, restart_workers=False)
     server.verify_worker_status = MagicMock()
 
@@ -355,10 +355,11 @@ def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manage
         server._monitor_workers = False
         server.run(port=8000)
 
+    swagger_calls = [c for c in mock_logger.info.call_args_list if c.args and "Swagger UI" in c.args[0]]
     if should_print:
-        mock_print.assert_called_with("Swagger UI is available at http://0.0.0.0:8000/docs")
+        assert len(swagger_calls) == 1
     else:
-        mock_print.assert_not_called()
+        assert len(swagger_calls) == 0
 
 
 class IdentityAPI(ls.test_examples.SimpleLitAPI):
