@@ -423,7 +423,7 @@ class OpenAISpec(LitSpec):
 
     def setup(self, server: "LitServer"):
         super().setup(server)
-        print("OpenAI spec setup complete")
+        logger.info("OpenAI spec setup complete")
 
     def as_async(self) -> "_AsyncOpenAISpecWrapper":
         return _AsyncOpenAISpecWrapper(self)
