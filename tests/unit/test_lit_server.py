@@ -393,6 +393,37 @@ class IdentityBatchedStreamingAPI(ls.test_examples.SimpleBatchedAPI):
             yield [{"output": ctx["input"]} for ctx in context]
 
 
+class BatchUnbatchContextAPI(ls.test_examples.SimpleBatchedAPI):
+    def batch(self, inputs, context):
+        for c, x in zip(context, inputs):
+            c["input"] = float(x)
+        return super().batch(inputs)
+
+    def unbatch(self, output, context):
+        return [c["input"] for c in context]
+
+    def encode_response(self, output):
+        return {"output": output}
+
+
+class BatchUnbatchContextStreamingAPI(ls.test_examples.SimpleBatchedAPI):
+    def batch(self, inputs, context):
+        for c, x in zip(context, inputs):
+            c["input"] = float(x)
+        return super().batch(inputs)
+
+    def predict(self, x_batch):
+        yield self.model(x_batch)
+
+    def unbatch(self, output_stream, context):
+        for _ in output_stream:
+            yield [c["input"] for c in context]
+
+    def encode_response(self, output_stream):
+        for outputs in output_stream:
+            yield [{"output": output} for output in outputs]
+
+
 class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
     def predict(self, x, y, context):
         context["input"] = x
@@ -440,6 +471,29 @@ async def test_inject_context():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         resp = client.post("/predict", json={"input": 5.0}, timeout=10)
         assert resp.status_code == 500, "predict() missed 1 required positional argument: 'y'"
+
+
+@pytest.mark.asyncio
+async def test_inject_context_in_batch_and_unbatch():
+    # Test context injection into batch/unbatch with batched loop
+    server = LitServer(BatchUnbatchContextAPI(max_batch_size=2, batch_timeout=0.01))
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
+
+    # Test context injection into batch/unbatch with batched streaming loop
+    server = LitServer(BatchUnbatchContextStreamingAPI(max_batch_size=2, batch_timeout=0.01, stream=True))
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 5.0}, timeout=10)
+    assert resp.json()["output"] == 5.0, "output from Identity server must be same as input"
 
 
 def test_custom_api_path():
