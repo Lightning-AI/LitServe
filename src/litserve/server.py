@@ -77,6 +77,12 @@ LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
 SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+
+def _display_host_for_url(host: str) -> str:
+    """Return a browser-usable host for user-facing URLs."""
+    return "localhost" if host in {"0.0.0.0", "::"} else host
+
+
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
 # renamed in PR: https://github.com/encode/starlette/pull/2780
@@ -1510,7 +1516,8 @@ class LitServer:
             )
 
             if not self._disable_openapi_url:
-                print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+                display_host = _display_host_for_url(host)
+                print(f"Swagger UI is available at http://{display_host}:{port}/docs")
 
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)

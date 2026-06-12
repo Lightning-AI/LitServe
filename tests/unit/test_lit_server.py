@@ -340,6 +340,14 @@ def test_server_terminate():
         server._transport.close.assert_called()
 
 
+def test_display_host_for_url_uses_browser_address():
+    from litserve.server import _display_host_for_url
+
+    assert _display_host_for_url("0.0.0.0") == "localhost"
+    assert _display_host_for_url("::") == "localhost"
+    assert _display_host_for_url("127.0.0.1") == "127.0.0.1"
+
+
 @pytest.mark.parametrize(("disable_openapi_url", "should_print"), [(False, True), (True, False)])
 @patch("builtins.print")
 @patch("litserve.server.uvicorn")
@@ -356,7 +364,7 @@ def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manage
         server.run(port=8000)
 
     if should_print:
-        mock_print.assert_called_with("Swagger UI is available at http://0.0.0.0:8000/docs")
+        mock_print.assert_called_with("Swagger UI is available at http://localhost:8000/docs")
     else:
         mock_print.assert_not_called()
 
