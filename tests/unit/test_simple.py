@@ -177,6 +177,68 @@ def test_workers_health_with_async_health_method(use_zmq):
         assert response.text == "ok"
 
 
+class UnhealthyLitAPI(SimpleLitAPI):
+    def health(self) -> bool:
+        return False
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_per_api_health(use_zmq):
+    server = LitServer(
+        [SimpleLitAPI(api_path="/healthy"), UnhealthyLitAPI(api_path="/unhealthy")],
+        accelerator="cpu",
+        devices=1,
+        timeout=5,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        # wait for workers to be ready
+        for _ in range(10):
+            response = client.get("/healthy/health")
+            if response.status_code == 200:
+                break
+            time.sleep(0.5)
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+        response = client.get("/unhealthy/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        # global health check aggregates all APIs
+        response = client.get("/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+
+@pytest.mark.parametrize("use_zmq", [True, False])
+def test_per_api_health_custom_path(use_zmq):
+    server = LitServer(
+        SlowSetupLitAPI(api_path="/api1"),
+        accelerator="cpu",
+        healthcheck_path="/my_server/health",
+        devices=1,
+        timeout=5,
+        workers_per_device=2,
+        fast_queue=use_zmq,
+    )
+
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.get("/api1/my_server/health")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+
+        # wait for workers to be ready
+        for _ in range(10):
+            response = client.get("/api1/my_server/health")
+            if response.status_code == 200:
+                break
+            time.sleep(0.5)
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+
 def make_load_request(server, outputs):
     with TestClient(server.app) as client:
         for i in range(100):
