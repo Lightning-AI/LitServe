@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
 
     timeout-minutes: 30
+    env:
+      UV_EXCLUDE_NEWER: "2 days"
 
     steps:
       - uses: actions/checkout@v6
