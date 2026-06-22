@@ -35,7 +35,7 @@ jobs:
       UV_TORCH_BACKEND: "cpu"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv and setup python
         uses: astral-sh/setup-uv@v7
         with:
@@ -70,7 +70,7 @@ jobs:
           coverage xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
