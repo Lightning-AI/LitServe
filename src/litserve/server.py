@@ -217,6 +217,10 @@ def _migration_warning(feature_name):
     )
 
 
+def _swagger_ui_display_host(host: str) -> str:
+    return "localhost" if host in ("0.0.0.0", "::") else host
+
+
 class _LitAPIConnector:
     """A helper class to manage one or more `LitAPI` instances.
 
@@ -1510,7 +1514,7 @@ class LitServer:
             )
 
             if not self._disable_openapi_url:
-                print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+                print(f"Swagger UI is available at http://{_swagger_ui_display_host(host)}:{port}/docs")
 
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)
