@@ -1510,7 +1510,8 @@ class LitServer:
             )
 
             if not self._disable_openapi_url:
-                print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+                host = "127.0.0.1" if sys.platform == "win32" else "0.0.0.0"
+                logger.info(f"Swagger UI is available at http://{host}:{port}/docs")
 
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)
@@ -1655,17 +1656,17 @@ class LitServer:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
 
                             resp.event.set()
-                            print(f"[monoriting] Marked {uid} set")
+                            logger.info(f"[monoriting] Marked {uid} set")
 
-                        print(f"[monoriting] Worker {worker_id} is dead. Restarting it")
+                        logger.info(f"[monoriting] Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_single_inference_worker(lit_api, worker_id)
-                        print(f"[monoriting] Worker {worker_id} has been started.")
+                        logger.info(f"[monoriting] Worker {worker_id} has been started.")
 
                     time.sleep(self.monitor_internal)
 
-            except Exception as e:
-                print(e)
+            except Exception:
+                logger.exception("Monitoring worker crashed")
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()

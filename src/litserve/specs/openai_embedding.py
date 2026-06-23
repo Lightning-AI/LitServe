@@ -168,7 +168,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
     def setup(self, server: "LitServer"):
         super().setup(server)
-        print("OpenAI Embedding Spec is ready.")
+        logger.info("OpenAI Embedding Spec is ready.")
 
     def decode_request(self, request: EmbeddingRequest, context_kwargs: Optional[dict] = None) -> list[str]:
         return request.input
