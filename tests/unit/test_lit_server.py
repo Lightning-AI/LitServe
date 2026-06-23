@@ -356,7 +356,7 @@ def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manage
         server.run(port=8000)
 
     if should_print:
-        mock_print.assert_called_with("Swagger UI is available at http://0.0.0.0:8000/docs")
+        mock_print.assert_called_with("Swagger UI is available at http://localhost:8000/docs")
     else:
         mock_print.assert_not_called()
 
