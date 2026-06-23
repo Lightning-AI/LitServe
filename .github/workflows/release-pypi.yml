@@ -17,22 +17,20 @@ jobs:
   build-package:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      UV_EXCLUDE_NEWER: "2 days"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - name: Install uv and setup python
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
-          python-version: "3.x"
-      - name: Pull reusable 🤖 actions️
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: main
-          path: .cicd
-          repository: Lightning-AI/utilities
+          python-version: "3.12"
+          enable-cache: true
 
-      - name: Prepare build env.
-        run: pip install -r ./.cicd/requirements/gha-package.txt
-      - name: Create 📦 package
-        uses: ./.cicd/.github/actions/pkg-create
+      - name: Build 📦 package
+        run: uv build
+      - name: Check 📦 package
+        run: uvx twine check dist/* --strict
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pypi-packages-${{ github.sha }}
