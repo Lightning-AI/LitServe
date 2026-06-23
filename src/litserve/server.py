@@ -510,6 +510,8 @@ class LitServer:
 
             - Returns 200 when all workers are ready
             - Critical for Kubernetes/Docker deployments
+            - Each LitAPI also gets its own health check endpoint at ``{api_path}{healthcheck_path}``
+              (e.g. "/predict/health") to monitor a single API independently
 
         info_path:
             Server information endpoint. Defaults to "/info".
@@ -1021,6 +1023,22 @@ class LitServer:
             return sum(counter.value for counter in self.active_counters)
         return None
 
+    async def _check_lit_api_health(self, lit_api: LitAPI) -> bool:
+        """Check worker readiness and the user-defined ``LitAPI.health`` hook for a single LitAPI."""
+        endpoint = lit_api.api_path.split("/")[-1]
+        worker_statuses = [v for k, v in self.workers_setup_status.items() if k.rsplit("_", 1)[0] == endpoint]
+        workers_ready = bool(worker_statuses) and all(v == WorkerSetupStatus.READY for v in worker_statuses)
+
+        try:
+            health_status = lit_api.health()
+            if inspect.isawaitable(health_status):
+                health_status = await health_status
+        except Exception:
+            logger.exception(f"Health check failed for {lit_api.__class__.__name__}")
+            health_status = False
+
+        return workers_ready and bool(health_status)
+
     def _register_internal_endpoints(self):
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
@@ -1028,27 +1046,10 @@ class LitServer:
 
         @self.app.get(self.healthcheck_path, dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
-            workers_ready = bool(self.workers_setup_status) and all(
-                v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
-            )
-
-            lit_api_health_status = True
             for lit_api in self.litapi_connector:
-                try:
-                    result = lit_api.health()
-                    if inspect.isawaitable(result):
-                        result = await result
-                    if not result:
-                        lit_api_health_status = False
-                        break
-                except Exception:
-                    logger.exception(f"Health check failed for {lit_api.__class__.__name__}")
-                    lit_api_health_status = False
-                    break
-            if workers_ready and lit_api_health_status:
-                return Response(content="ok", status_code=200)
-
-            return Response(content="not ready", status_code=503)
+                if not await self._check_lit_api_health(lit_api):
+                    return Response(content="not ready", status_code=503)
+            return Response(content="ok", status_code=200)
 
         @self.app.get(self.info_path, dependencies=[Depends(self.setup_auth())])
         async def info(request: Request) -> Response:
@@ -1116,6 +1117,19 @@ class LitServer:
                 methods=["POST"],
                 dependencies=[Depends(self.setup_auth(lit_api))],
             )
+
+        # Register a per-LitAPI health check endpoint, e.g. /predict/health
+        async def health_endpoint(request: Request) -> Response:
+            if await self._check_lit_api_health(lit_api):
+                return Response(content="ok", status_code=200)
+            return Response(content="not ready", status_code=503)
+
+        self.app.add_api_route(
+            f"{lit_api.api_path}{self.healthcheck_path}",
+            health_endpoint,
+            methods=["GET"],
+            dependencies=[Depends(self.setup_auth(lit_api))],
+        )
 
         # Handle specs
         self._register_spec_endpoints(lit_api)
