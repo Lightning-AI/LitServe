@@ -16,7 +16,9 @@ import contextlib
 import json
 import os
 import sys
+import threading
 import time
+import types
 from time import sleep
 from unittest.mock import MagicMock, patch
 
@@ -905,6 +907,125 @@ def test_workers_per_device_can_be_configured_per_route(monkeypatch, workers_cfg
         total_by_path[api_path] = total_by_path.get(api_path, 0) + 1
 
     assert total_by_path == expected_total_by_path
+
+
+# ── _is_pydevd_active ─────────────────────────────────────────────────────────
+
+
+def test_is_pydevd_active_false_no_pydevd(monkeypatch):
+    from litserve.server import _is_pydevd_active
+
+    monkeypatch.delitem(sys.modules, "pydevd", raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert _is_pydevd_active() is False
+
+
+def test_is_pydevd_active_false_on_non_windows(monkeypatch):
+    from litserve.server import _is_pydevd_active
+
+    monkeypatch.setitem(sys.modules, "pydevd", types.ModuleType("pydevd"))
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert _is_pydevd_active() is False
+
+
+def test_is_pydevd_active_true_when_both(monkeypatch):
+    from litserve.server import _is_pydevd_active
+
+    monkeypatch.setitem(sys.modules, "pydevd", types.ModuleType("pydevd"))
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert _is_pydevd_active() is True
+
+
+# ── _perform_graceful_shutdown: Thread vs Process branch ──────────────────────
+
+
+class _FakeUvicornThread(threading.Thread):
+    def __init__(self, alive=True):
+        super().__init__()
+        self.join = MagicMock()
+        self.is_alive = MagicMock(return_value=alive)
+
+
+def test_perform_graceful_shutdown_joins_thread_without_terminate():
+    server = LitServer(SimpleLitAPI())
+    server._transport = MagicMock()
+    server.inference_workers = []
+    t = _FakeUvicornThread(alive=True)
+
+    server._perform_graceful_shutdown(MagicMock(), {0: t})
+
+    t.join.assert_called_once_with(timeout=server.uvicorn_graceful_timeout)
+
+
+def test_perform_graceful_shutdown_terminates_process_worker():
+    mock_proc = MagicMock()
+    mock_proc.is_alive.side_effect = [True, True]  # alive pre-check passes; alive after join → kill
+
+    server = LitServer(SimpleLitAPI())
+    server._transport = MagicMock()
+    server.inference_workers = []
+
+    server._perform_graceful_shutdown(MagicMock(), {0: mock_proc})
+
+    mock_proc.terminate.assert_called_once()
+    mock_proc.join.assert_called_once_with(timeout=server.uvicorn_graceful_timeout)
+    mock_proc.kill.assert_called_once()
+
+
+def test_perform_graceful_shutdown_skips_dead_workers():
+    server = LitServer(SimpleLitAPI())
+    server._transport = MagicMock()
+    server.inference_workers = []
+    t = _FakeUvicornThread(alive=False)
+
+    server._perform_graceful_shutdown(MagicMock(), {0: t})
+
+    t.join.assert_not_called()
+
+
+# ── LitServer.run(): pydevd heartbeat branch ──────────────────────────────────
+
+
+@patch("litserve.server.uvicorn")
+@patch("litserve.server._is_pydevd_active", return_value=True)
+def test_run_starts_heartbeat_sentinel_when_pydevd_active(mock_pydevd, mock_uvicorn, mock_manager):
+    server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
+    server._start_server = MagicMock(return_value={})
+    server._perform_graceful_shutdown = MagicMock()
+    server._monitor_workers = False
+
+    with (
+        patch("litserve._win_shutdown_fix.start_heartbeat_sentinel") as mock_sentinel,
+        patch("litserve.server.mp.Manager", return_value=mock_manager),
+    ):
+        server.run(port=8000)
+
+    mock_sentinel.assert_called_once()
+    pid_arg, path_arg = mock_sentinel.call_args[0][:2]
+    assert pid_arg == os.getpid()
+    assert f"litserve_hb_{os.getpid()}.tmp" in path_arg
+    assert mock_sentinel.call_args[1].get("kill_delay") == 3.0
+
+
+@patch("litserve.server.uvicorn")
+@patch("litserve.server._is_pydevd_active", return_value=False)
+def test_run_no_sentinel_when_pydevd_inactive(mock_pydevd, mock_uvicorn, mock_manager):
+    server = LitServer(SimpleLitAPI())
+    server.verify_worker_status = MagicMock()
+    server.launch_inference_worker = MagicMock(return_value=[MagicMock()])
+    server._start_server = MagicMock(return_value={})
+    server._perform_graceful_shutdown = MagicMock()
+    server._monitor_workers = False
+
+    with (
+        patch("litserve._win_shutdown_fix.start_heartbeat_sentinel") as mock_sentinel,
+        patch("litserve.server.mp.Manager", return_value=mock_manager),
+    ):
+        server.run(port=8000)
+
+    mock_sentinel.assert_not_called()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")

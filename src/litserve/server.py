@@ -23,6 +23,7 @@ import pickle
 import secrets
 import socket
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -42,7 +43,7 @@ from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
-from litserve import LitAPI
+from litserve import LitAPI, _win_shutdown_fix
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
@@ -85,6 +86,10 @@ MultiPartParser.spool_max_size = sys.maxsize
 
 def no_auth():
     pass
+
+
+def _is_pydevd_active() -> bool:
+    return sys.platform == "win32" and "pydevd" in sys.modules
 
 
 def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
@@ -1098,7 +1103,6 @@ class LitServer:
 
     def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
         """Register endpoint routes for the FastAPI app."""
-
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
 
         # Create handlers
@@ -1208,11 +1212,14 @@ class LitServer:
                     logger.warning(f"{log_prefix}: Already not alive.")
                     continue
                 try:
-                    uw.terminate()
-                    uw.join(timeout=self.uvicorn_graceful_timeout)
-                    if uw.is_alive():
-                        logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
-                        uw.kill()
+                    if isinstance(uw, threading.Thread):
+                        uw.join(timeout=self.uvicorn_graceful_timeout)
+                    else:
+                        uw.terminate()
+                        uw.join(timeout=self.uvicorn_graceful_timeout)
+                        if uw.is_alive():
+                            logger.warning(f"{log_prefix}: Did not terminate gracefully. Forcibly killing.")
+                            uw.kill()
                 except Exception as e:
                     logger.error(f"Error during termination of {log_prefix}: {e}")
 
@@ -1502,6 +1509,14 @@ class LitServer:
 
         self.verify_worker_status()
 
+        _pydevd_active = _is_pydevd_active()
+        _heartbeat_path = None
+        if _pydevd_active:
+            _heartbeat_path = os.path.join(tempfile.gettempdir(), f"litserve_hb_{os.getpid()}.tmp")
+            with contextlib.suppress(Exception):
+                open(_heartbeat_path, "w").close()
+            _win_shutdown_fix.start_heartbeat_sentinel(os.getpid(), _heartbeat_path, kill_delay=3.0)
+
         shutdown_reason = "normal"
         uvicorn_workers = {}
         try:
@@ -1515,7 +1530,13 @@ class LitServer:
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)
 
-            self._shutdown_event.wait()
+            if _pydevd_active and _heartbeat_path:
+                while not self._shutdown_event.is_set():
+                    with contextlib.suppress(Exception):
+                        os.utime(_heartbeat_path, None)
+                    time.sleep(0.5)
+            else:
+                self._shutdown_event.wait()
 
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")

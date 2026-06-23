@@ -372,6 +372,9 @@ class MockEvent:
     def wait(self):
         pass
 
+    def is_set(self):
+        return True
+
 
 class MockQueue:
     def put(self, item):
