@@ -253,7 +253,12 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         return request
 
     def batch(self, inputs):
-        """Convert a list of inputs to a batched input."""
+        """Convert a list of inputs to a batched input.
+
+        Accepts an optional ``context`` argument that receives the list of context
+        dicts, one per request in the batch.
+
+        """
         # consider assigning an implementation when starting server
         # to avoid the runtime cost of checking (should be negligible)
         if hasattr(inputs[0], "__torch_function__"):
@@ -325,6 +330,9 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
 
         If you need to return dictionaries, return a list of dicts:
             [{"key1": val1, "key2": val3}, {"key1": val2, "key2": val4}]  # Correct
+
+        Accepts an optional ``context`` argument that receives the list of context
+        dicts, one per request in the batch.
 
         """
         if self._default_unbatch is None:
