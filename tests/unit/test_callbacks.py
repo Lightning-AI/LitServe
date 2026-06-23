@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import re
 import time
 
@@ -12,6 +13,8 @@ from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.callbacks.defaults import PredictionTimeLogger
 from litserve.callbacks.defaults.metric_callback import RequestTracker
 from litserve.utils import wrap_litserve_start
+
+METRIC_CALLBACK_LOGGER = "litserve.callbacks.defaults.metric_callback"
 
 
 async def run_simple_request(server, num_requests=1):
@@ -54,43 +57,45 @@ def test_callback(capfd):
     assert re.search(pattern, captured.out), f"Expected pattern not found in output: {captured.out}"
 
 
-def test_metric_logger(capfd):
+def test_metric_logger(caplog):
     cb = PredictionTimeLogger()
     cb_runner = CallbackRunner()
     cb_runner._add_callbacks(cb)
     assert cb_runner._callbacks == [cb], "Callback not added to runner"
-    cb_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=None)
-    cb_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=None)
 
-    captured = capfd.readouterr()
+    with caplog.at_level(logging.INFO, logger=METRIC_CALLBACK_LOGGER):
+        cb_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=None)
+        cb_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=None)
+
     pattern = r"Prediction took \d+\.\d{2} seconds"
-    assert re.search(pattern, captured.out), f"Expected pattern not found in output: {captured.out}"
+    assert re.search(pattern, caplog.text), f"Expected pattern not found in logs: {caplog.text}"
 
 
 @pytest.mark.asyncio
-async def test_request_tracker(capfd):
+async def test_request_tracker(caplog):
     lit_api = SlowAPI()
 
-    server = ls.LitServer(lit_api, track_requests=False, callbacks=[RequestTracker()])
-    await run_simple_request(server, 1)
-    captured = capfd.readouterr()
-    assert "Active requests: None" in captured.out, f"Expected pattern not found in output: {captured.out}"
+    with caplog.at_level(logging.INFO, logger=METRIC_CALLBACK_LOGGER):
+        server = ls.LitServer(lit_api, track_requests=False, callbacks=[RequestTracker()])
+        await run_simple_request(server, 1)
+    assert "Active requests: None" in caplog.text, f"Expected pattern not found in logs: {caplog.text}"
 
-    server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
-    await run_simple_request(server, 4)
-    captured = capfd.readouterr()
-    assert "Active requests: 4" in captured.out, f"Expected pattern not found in output: {captured.out}"
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger=METRIC_CALLBACK_LOGGER):
+        server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
+        await run_simple_request(server, 4)
+    assert "Active requests: 4" in caplog.text, f"Expected pattern not found in logs: {caplog.text}"
 
 
 @pytest.mark.asyncio
-async def test_request_tracker_with_spec(capfd):
+async def test_request_tracker_with_spec(caplog):
     from litserve.specs.openai_embedding import OpenAIEmbeddingSpec
     from litserve.test_examples.openai_embedding_spec_example import TestEmbedAPI
 
     lit_api = TestEmbedAPI(spec=OpenAIEmbeddingSpec())
     server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
 
-    with wrap_litserve_start(server) as server:
+    with caplog.at_level(logging.INFO, logger=METRIC_CALLBACK_LOGGER), wrap_litserve_start(server) as server:
         async with (
             LifespanManager(server.app) as manager,
             AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
@@ -98,19 +103,18 @@ async def test_request_tracker_with_spec(capfd):
             resp = await ac.post("/v1/embeddings", json={"input": "test", "model": "test"})
             assert resp.status_code == 200
 
-    captured = capfd.readouterr()
-    assert "Active requests: 1" in captured.out, f"Expected pattern not found in output: {captured.out}"
+    assert "Active requests: 1" in caplog.text, f"Expected pattern not found in logs: {caplog.text}"
 
 
 @pytest.mark.asyncio
-async def test_request_tracker_with_openai_spec(capfd):
+async def test_request_tracker_with_openai_spec(caplog):
     from litserve.specs.openai import OpenAISpec
     from litserve.test_examples.openai_spec_example import TestAPI
 
     lit_api = TestAPI(spec=OpenAISpec())
     server = ls.LitServer(lit_api, track_requests=True, callbacks=[RequestTracker()])
 
-    with wrap_litserve_start(server) as server:
+    with caplog.at_level(logging.INFO, logger=METRIC_CALLBACK_LOGGER), wrap_litserve_start(server) as server:
         async with (
             LifespanManager(server.app) as manager,
             AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
@@ -120,5 +124,4 @@ async def test_request_tracker_with_openai_spec(capfd):
             )
             assert resp.status_code == 200
 
-    captured = capfd.readouterr()
-    assert "Active requests: 1" in captured.out, f"Expected pattern not found in output: {captured.out}"
+    assert "Active requests: 1" in caplog.text, f"Expected pattern not found in logs: {caplog.text}"
