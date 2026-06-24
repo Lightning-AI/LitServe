@@ -45,3 +45,19 @@ def test_pydantic():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
+
+
+class NoAnnotationLitAPI(LitAPI):
+    def setup(self, device):
+        pass
+
+    def predict(self, request):
+        return {"output": request["input"] ** 2}
+
+
+def test_swagger_request_body_without_annotation():
+    server = LitServer(NoAnnotationLitAPI(), accelerator="cpu", devices=1, timeout=5)
+    schema = server.app.openapi()
+    predict_post = schema["paths"]["/predict"]["post"]
+    assert "requestBody" in predict_post, "Swagger must expose a requestBody for /predict"
+    assert "application/json" in predict_post["requestBody"]["content"]
