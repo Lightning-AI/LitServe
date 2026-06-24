@@ -20,7 +20,7 @@ import weakref
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Optional, Union, get_args, get_origin
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from starlette.applications import Starlette
 from starlette.routing import Mount
@@ -245,16 +245,58 @@ def _param_name_to_title(param_name: str) -> str:
     return " ".join(word.capitalize() for word in words)
 
 
+class _MCPToolRequest:
+    """Minimal request adapter for MCP tool arguments passed to untyped LitAPI endpoints."""
+
+    headers = {"Content-Type": "application/json"}
+
+    def __init__(self, payload: dict[str, Any]):
+        self._payload = payload
+
+    async def json(self):
+        return self._payload
+
+    async def form(self):
+        return self._payload
+
+
+def _is_pydantic_model(annotation) -> bool:
+    return isinstance(annotation, type) and issubclass(annotation, BaseModel)
+
+
+def _coerce_parameter_value(annotation, value):
+    if _is_pydantic_model(annotation) and isinstance(value, dict):
+        return annotation(**value)
+    return value
+
+
+def _coerce_mcp_arguments_for_parameter(parameter: inspect.Parameter, arguments: dict[str, Any]):
+    if _is_pydantic_model(parameter.annotation):
+        return parameter.annotation(**arguments)
+    if parameter.annotation is Request:
+        return _MCPToolRequest(arguments)
+    return arguments
+
+
 async def _call_handler(handler, **kwargs):
     sig = inspect.signature(handler)
-    bound = sig.bind_partial(
-        **{
-            k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
-            for k, v in kwargs.items()
-            for name, p in sig.parameters.items()
-            if k == name
-        }
-    )
+    coerced_kwargs = {
+        name: _coerce_parameter_value(param.annotation, kwargs[name])
+        for name, param in sig.parameters.items()
+        if name in kwargs
+    }
+    if coerced_kwargs:
+        bound = sig.bind_partial(**coerced_kwargs)
+    else:
+        request_parameters = [
+            param
+            for param in sig.parameters.values()
+            if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY)
+        ]
+        if len(request_parameters) == 1:
+            bound = sig.bind_partial(_coerce_mcp_arguments_for_parameter(request_parameters[0], kwargs))
+        else:
+            bound = sig.bind_partial()
     return _convert_to_content(await handler(*bound.args, **bound.kwargs))
 
 

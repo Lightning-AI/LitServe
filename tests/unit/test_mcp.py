@@ -3,13 +3,14 @@ from typing import Optional
 from unittest.mock import patch
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 from starlette.applications import Starlette
 
 import litserve as ls
 from litserve.mcp import (
     MCP,
+    _call_handler,
     _LitMCPServerConnector,
     _param_name_to_title,
     _python_type_to_json_schema,
@@ -271,3 +272,31 @@ def test_mcp_litserve_connector():
     connector.connect_mcp_server([tool], app)
     mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
     assert isinstance(mcp_mount.app, Starlette)
+
+
+@pytest.mark.asyncio
+async def test_call_handler_collects_direct_tool_arguments_for_request_parameter():
+    async def endpoint_handler(request: dict):
+        return {"response": request["message"]}
+
+    with patch("litserve.mcp._convert_to_content", lambda value: value):
+        assert await _call_handler(endpoint_handler, message="hello") == {"response": "hello"}
+
+
+@pytest.mark.asyncio
+async def test_call_handler_builds_model_from_direct_tool_arguments():
+    async def endpoint_handler(request: MCPTestModel):
+        return {"age": request.age}
+
+    with patch("litserve.mcp._convert_to_content", lambda value: value):
+        assert await _call_handler(endpoint_handler, name="Alice", age=42) == {"age": 42}
+
+
+@pytest.mark.asyncio
+async def test_call_handler_adapts_direct_tool_arguments_to_request_object():
+    async def endpoint_handler(request: Request):
+        payload = await request.json()
+        return {"response": payload["message"]}
+
+    with patch("litserve.mcp._convert_to_content", lambda value: value):
+        assert await _call_handler(endpoint_handler, message="hello") == {"response": "hello"}
