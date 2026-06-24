@@ -32,7 +32,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
@@ -296,6 +296,8 @@ class BaseRequestHandler(ABC):
 
     async def _prepare_request(self, request, request_type) -> dict:
         """Common request preparation logic."""
+        if isinstance(request, dict):
+            return request
         if request_type == Request:
             content_type = request.headers.get("Content-Type", "")
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
@@ -1104,8 +1106,12 @@ class LitServer:
         # Create handlers
         handler = StreamingRequestHandler(lit_api, self) if lit_api.stream else RegularRequestHandler(lit_api, self)
 
+        # When no Pydantic model is annotated, use Dict[str, Any] so Swagger renders a request body form.
+        # FastAPI will parse the JSON body into a dict automatically in this case.
+        swagger_request_type = dict[str, Any] if request_type is Request else request_type
+
         # Create endpoint function
-        async def endpoint_handler(request: request_type) -> response_type:
+        async def endpoint_handler(request: swagger_request_type) -> response_type:
             return await handler.handle_request(request, request_type)
 
         # Register endpoint
