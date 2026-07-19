@@ -21,12 +21,10 @@ or multipart form data:
 
 """
 
-from __future__ import annotations
-
 import tempfile
 from pathlib import Path
-from typing import Any
 
+from fastapi import Request
 import litserve as ls
 
 
@@ -36,7 +34,7 @@ class FunASRSenseVoiceAPI(ls.LitAPI):
 
         self.model = AutoModel(model="iic/SenseVoiceSmall", device=device)
 
-    def decode_request(self, request: Any) -> Path:
+    def decode_request(self, request: Request) -> Path:
         if isinstance(request, dict) and "audio_path" in request:
             return Path(request["audio_path"])
 
