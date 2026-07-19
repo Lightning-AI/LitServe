@@ -18,6 +18,7 @@ or multipart form data:
 
     curl -X POST http://127.0.0.1:8000/predict \
       -F "file=@sample.wav"
+
 """
 
 from __future__ import annotations
