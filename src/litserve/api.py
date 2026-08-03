@@ -148,7 +148,6 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         enable_async: bool = False,
     ):
         """Initialize LitAPI with configuration options."""
-
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
@@ -381,7 +380,6 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
 
     def set_logger_queue(self, queue: Queue):
         """Set the queue for logging events."""
-
         self._logger_queue = queue
 
     def log(self, key, value):
