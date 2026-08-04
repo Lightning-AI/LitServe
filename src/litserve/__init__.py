@@ -37,7 +37,8 @@ __all__ = [
 ]
 
 try:
-    from litserve.metrics import PrometheusLogger
+    from litserve.metrics import PrometheusLogger  # noqa: F401
+
     __all__.append("PrometheusLogger")
 except ImportError:
     pass

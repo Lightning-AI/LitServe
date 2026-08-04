@@ -160,11 +160,11 @@ class _LoggerConnector:
 
         module_logger.debug(f"Starting logger process with {len(logger_proxies)} loggers")
         ctx = mp.get_context("spawn")
-        process = ctx.Process(
+        self._process = ctx.Process(
             target=_LoggerConnector._process_logger_queue,
             args=(
                 logger_proxies,
                 queue,
             ),
         )
-        process.start()
+        self._process.start()

@@ -756,14 +756,20 @@ class LitServer:
         self._metrics_dir = None
         try:
             from litserve.metrics import PrometheusLogger
+
             if loggers is not None:
                 _loggers_list = loggers if isinstance(loggers, list) else [loggers]
                 if any(isinstance(logger, PrometheusLogger) for logger in _loggers_list):
-                    import tempfile
                     import os
+                    import tempfile
+
                     from litserve.metrics import PrometheusMiddleware
+
                     self._metrics_dir = tempfile.mkdtemp(prefix="litserve_prom_")
                     os.environ["PROMETHEUS_MULTIPROC_DIR"] = self._metrics_dir
+                    import prometheus_client.values
+
+                    prometheus_client.values.ValueClass = prometheus_client.values.MultiProcessValue()
                     middlewares.append(PrometheusMiddleware)
         except ImportError:
             pass
@@ -1205,11 +1211,12 @@ class LitServer:
         logger.info("Shutting down LitServe...")
 
         # Handle transport closure based on shutdown reason
-        if shutdown_reason == "keyboard_interrupt":
-            logger.debug("KeyboardInterrupt detected - skipping transport cleanup to avoid hanging")
-            self._transport.close(send_sentinel=False)
-        else:
-            self._transport.close(send_sentinel=True)
+        if hasattr(self, "_transport"):
+            if shutdown_reason == "keyboard_interrupt":  # pragma: no cover
+                logger.debug("KeyboardInterrupt detected - skipping transport cleanup to avoid hanging")
+                self._transport.close(send_sentinel=False)
+            else:
+                self._transport.close(send_sentinel=True)
 
         # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
         if len(uvicorn_workers) > 0:
@@ -1249,8 +1256,23 @@ class LitServer:
             except Exception as e:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
 
+        # terminate logger process
+        if hasattr(self, "_logger_connector") and hasattr(self._logger_connector, "_process"):
+            lp = self._logger_connector._process
+            if lp and lp.is_alive():  # pragma: no cover
+                logger.debug(f"Terminating logger process (PID: {lp.pid})...")
+                try:
+                    lp.terminate()
+                    lp.join(timeout=5)
+                    if lp.is_alive():
+                        logger.warning(f"Logger process (PID: {lp.pid}) did not terminate gracefully. Killing.")
+                        lp.kill()
+                except Exception as e:
+                    logger.error(f"Error during termination of logger process: {e}")
+
         if getattr(self, "_metrics_dir", None) and os.path.exists(self._metrics_dir):
             import shutil
+
             shutil.rmtree(self._metrics_dir, ignore_errors=True)
 
         manager.shutdown()
