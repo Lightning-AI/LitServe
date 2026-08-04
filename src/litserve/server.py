@@ -753,6 +753,21 @@ class LitServer:
             )
             raise ValueError(_msg)
 
+        self._metrics_dir = None
+        try:
+            from litserve.metrics import PrometheusLogger
+            if loggers is not None:
+                _loggers_list = loggers if isinstance(loggers, list) else [loggers]
+                if any(isinstance(logger, PrometheusLogger) for logger in _loggers_list):
+                    import tempfile
+                    import os
+                    from litserve.metrics import PrometheusMiddleware
+                    self._metrics_dir = tempfile.mkdtemp(prefix="litserve_prom_")
+                    os.environ["PROMETHEUS_MULTIPROC_DIR"] = self._metrics_dir
+                    middlewares.append(PrometheusMiddleware)
+        except ImportError:
+            pass
+
         # Handle 0.3.0 migration
         if api_path is not None:
             _migration_warning("api_path")
@@ -1233,6 +1248,10 @@ class LitServer:
                     logger.debug(f"Worker {worker_name} (PID: {worker_pid}): Terminated gracefully.")
             except Exception as e:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
+
+        if getattr(self, "_metrics_dir", None) and os.path.exists(self._metrics_dir):
+            import shutil
+            shutil.rmtree(self._metrics_dir, ignore_errors=True)
 
         manager.shutdown()
 
