@@ -35,3 +35,9 @@ __all__ = [
     "set_trace_if_debug",
     "test_examples",
 ]
+
+try:
+    from litserve.metrics import PrometheusLogger
+    __all__.append("PrometheusLogger")
+except ImportError:
+    pass
