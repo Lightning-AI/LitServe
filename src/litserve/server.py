@@ -1510,8 +1510,9 @@ class LitServer:
             )
 
             if not self._disable_openapi_url:
-                host = "127.0.0.1" if sys.platform == "win32" else "0.0.0.0"
-                logger.info(f"Swagger UI is available at http://{host}:{port}/docs")
+                # Windows can't open http://0.0.0.0 in a browser
+                display_host = "127.0.0.1" if sys.platform == "win32" else host
+                logger.info(f"Swagger UI is available at http://{display_host}:{port}/docs")
 
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)

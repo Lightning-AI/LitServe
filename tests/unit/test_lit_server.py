@@ -18,7 +18,7 @@ import os
 import sys
 import time
 from time import sleep
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 import torch
@@ -355,11 +355,12 @@ def test_disable_openapi_url_print_message(mock_uvicorn, mock_logger, mock_manag
         server._monitor_workers = False
         server.run(port=8000)
 
+    display_host = "127.0.0.1" if sys.platform == "win32" else "0.0.0.0"
     swagger_calls = [c for c in mock_logger.info.call_args_list if c.args and "Swagger UI" in c.args[0]]
     if should_print:
-        assert len(swagger_calls) == 1
+        assert swagger_calls == [call(f"Swagger UI is available at http://{display_host}:8000/docs")]
     else:
-        assert len(swagger_calls) == 0
+        assert swagger_calls == []
 
 
 class IdentityAPI(ls.test_examples.SimpleLitAPI):
