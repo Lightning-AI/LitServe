@@ -28,7 +28,7 @@
 <div align='center'>
 
 [![PyPI Downloads](https://static.pepy.tech/badge/litserve)](https://pepy.tech/projects/litserve)
-[![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20help%20on%20Discord)](https://discord.gg/WajDThKAur)
+[![Discord](https://img.shields.io/discord/1077906959069626439?label=Get%20help%20on%20Discord)](https://discord.com/invite/MWAEvnC5fU)
 ![cpu-tests](https://github.com/Lightning-AI/litserve/actions/workflows/ci-testing.yml/badge.svg)
 [![codecov](https://codecov.io/gh/Lightning-AI/litserve/graph/badge.svg?token=SmzX8mnKlA)](https://codecov.io/gh/Lightning-AI/litserve)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)
@@ -269,5 +269,5 @@ These results are for image and text classification ML tasks. The performance re
 # Community
 LitServe is a [community project accepting contributions](https://lightning.ai/docs/litserve/community?utm_source=litserve_readme&utm_medium=referral&utm_campaign=litserve_readme) - Let's make the world's most advanced AI inference engine.
 
-💬 [Get help on Discord](https://discord.com/invite/XncpTy7DSt)    
+💬 [Get help on Discord](https://discord.com/invite/MWAEvnC5fU)    
 📋 [License: Apache 2.0](https://github.com/Lightning-AI/litserve/blob/main/LICENSE)    
