@@ -753,26 +753,9 @@ class LitServer:
             )
             raise ValueError(_msg)
 
-        self._metrics_dir = None
-        try:
-            from litserve.metrics import PrometheusLogger
+        from litserve.metrics import setup_prometheus
 
-            if loggers is not None:
-                _loggers_list = loggers if isinstance(loggers, list) else [loggers]
-                if any(isinstance(logger, PrometheusLogger) for logger in _loggers_list):
-                    import os
-                    import tempfile
-
-                    from litserve.metrics import PrometheusMiddleware
-
-                    self._metrics_dir = tempfile.mkdtemp(prefix="litserve_prom_")
-                    os.environ["PROMETHEUS_MULTIPROC_DIR"] = self._metrics_dir
-                    import prometheus_client.values
-
-                    prometheus_client.values.ValueClass = prometheus_client.values.MultiProcessValue()
-                    middlewares.append(PrometheusMiddleware)
-        except ImportError:
-            pass
+        self._metrics_dir = setup_prometheus(loggers, middlewares)
 
         # Handle 0.3.0 migration
         if api_path is not None:
@@ -1256,24 +1239,9 @@ class LitServer:
             except Exception as e:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
 
-        # terminate logger process
-        if hasattr(self, "_logger_connector") and hasattr(self._logger_connector, "_process"):
-            lp = self._logger_connector._process
-            if lp and lp.is_alive():  # pragma: no cover
-                logger.debug(f"Terminating logger process (PID: {lp.pid})...")
-                try:
-                    lp.terminate()
-                    lp.join(timeout=5)
-                    if lp.is_alive():
-                        logger.warning(f"Logger process (PID: {lp.pid}) did not terminate gracefully. Killing.")
-                        lp.kill()
-                except Exception as e:
-                    logger.error(f"Error during termination of logger process: {e}")
-
-        if getattr(self, "_metrics_dir", None) and os.path.exists(self._metrics_dir):
-            import shutil
-
-            shutil.rmtree(self._metrics_dir, ignore_errors=True)
+        # terminate logger process and clean up logger resources
+        if hasattr(self, "_logger_connector"):
+            self._logger_connector.close()
 
         manager.shutdown()
 

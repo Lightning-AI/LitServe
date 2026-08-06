@@ -16,6 +16,7 @@ from litserve.__about__ import *  # noqa: F403
 from litserve.api import LitAPI
 from litserve.callbacks import Callback
 from litserve.loggers import Logger
+from litserve.metrics import PrometheusLogger
 from litserve.server import LitServer, Request, Response
 from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec
 from litserve.utils import configure_logging, set_trace, set_trace_if_debug
@@ -29,16 +30,10 @@ __all__ = [
     "Logger",
     "OpenAISpec",
     "OpenAIEmbeddingSpec",
+    "PrometheusLogger",
     "Request",
     "Response",
     "set_trace",
     "set_trace_if_debug",
     "test_examples",
 ]
-
-try:
-    from litserve.metrics import PrometheusLogger  # noqa: F401
-
-    __all__.append("PrometheusLogger")
-except ImportError:
-    pass

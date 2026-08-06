@@ -126,20 +126,8 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
             p.terminate()
             p.join()
 
-        if hasattr(server, "_logger_connector") and hasattr(server._logger_connector, "_process"):
-            lp = server._logger_connector._process
-            if lp and lp.is_alive():  # pragma: no cover
-                lp.terminate()
-                lp.join(timeout=1)
-                if lp.is_alive():
-                    lp.kill()
-
-        if getattr(server, "_metrics_dir", None) and os.path.exists(server._metrics_dir):
-            import contextlib
-            import shutil
-
-            with contextlib.suppress(Exception):
-                shutil.rmtree(server._metrics_dir)
+        if hasattr(server, "_logger_connector"):
+            server._logger_connector.close()
 
         server.manager.shutdown()
 

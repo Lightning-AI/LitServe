@@ -74,6 +74,10 @@ class Logger(ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
+    def close(self) -> None:
+        """Clean up any resources associated with the logger."""
+        pass
+
 
 class _LoggerProxy:
     def __init__(self, logger_class):
@@ -168,3 +172,24 @@ class _LoggerConnector:
             ),
         )
         self._process.start()
+
+    def close(self) -> None:
+        """Terminate the background logger process and close all associated loggers."""
+        if hasattr(self, "_process") and self._process.is_alive():
+            module_logger.info("Terminating logger process...")
+            try:
+                self._process.terminate()
+                self._process.join(timeout=5)
+                if self._process.is_alive():
+                    module_logger.warning(
+                        f"Logger process (PID: {self._process.pid}) did not terminate gracefully. Killing."
+                    )
+                    self._process.kill()
+            except Exception as e:
+                module_logger.error(f"Error during termination of logger process: {e}")
+
+        for logger in self._loggers:
+            try:
+                logger.close()
+            except Exception as e:
+                module_logger.error(f"Error closing logger {logger.__class__.__name__}: {e}")
