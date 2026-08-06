@@ -1657,12 +1657,12 @@ class LitServer:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
 
                             resp.event.set()
-                            logger.info(f"[monoriting] Marked {uid} set")
+                            logger.info(f"[monitoring] Marked {uid} set")
 
-                        logger.info(f"[monoriting] Worker {worker_id} is dead. Restarting it")
+                        logger.info(f"[monitoring] Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_single_inference_worker(lit_api, worker_id)
-                        logger.info(f"[monoriting] Worker {worker_id} has been started.")
+                        logger.info(f"[monitoring] Worker {worker_id} has been started.")
 
                     time.sleep(self.monitor_internal)
 
