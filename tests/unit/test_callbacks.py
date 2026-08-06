@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve.callbacks import CallbackRunner, EventTypes
-from litserve.callbacks.defaults import PredictionTimeLogger
+from litserve.callbacks.defaults import PredictionTimeLogger, metric_callback
 from litserve.callbacks.defaults.metric_callback import RequestTracker
 from litserve.utils import wrap_litserve_start
 
@@ -56,30 +56,9 @@ def test_callback(capfd):
     assert re.search(pattern, captured.out), f"Expected pattern not found in output: {captured.out}"
 
 
-def test_metric_logger():
-    # litserve logger has propagate=False so we add a temporary handler directly
-    log_capture = io.StringIO()
-    handler = logging.StreamHandler(log_capture)
-    metric_logger = logging.getLogger("litserve.callbacks.defaults.metric_callback")
-    metric_logger.addHandler(handler)
-    try:
-        cb = PredictionTimeLogger()
-        cb_runner = CallbackRunner()
-        cb_runner._add_callbacks(cb)
-        assert cb_runner._callbacks == [cb], "Callback not added to runner"
-        cb_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=None)
-        cb_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=None)
-    finally:
-        metric_logger.removeHandler(handler)
-
-    output = log_capture.getvalue()
-    pattern = r"Prediction took \d+\.\d{2} seconds"
-    assert re.search(pattern, output), f"Expected pattern not found in log: {output}"
-
-
 @pytest.fixture
 def metric_log_capture():
-    """Add a StringIO handler to the litserve metric logger and yield the stream.
+    """Add a StringIO handler to the metric callback logger and yield the stream.
 
     litserve's logger has propagate=False so capfd/caplog won't intercept it. For callbacks that fire in the main
     process (e.g. RequestTracker), this is the only reliable way to capture log output on all platforms.
@@ -87,10 +66,25 @@ def metric_log_capture():
     """
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
-    metric_logger = logging.getLogger("litserve.callbacks.defaults.metric_callback")
+    metric_logger = logging.getLogger(metric_callback.__name__)
     metric_logger.addHandler(handler)
-    yield stream
-    metric_logger.removeHandler(handler)
+    try:
+        yield stream
+    finally:
+        metric_logger.removeHandler(handler)
+
+
+def test_metric_logger(metric_log_capture):
+    cb = PredictionTimeLogger()
+    cb_runner = CallbackRunner()
+    cb_runner._add_callbacks(cb)
+    assert cb_runner._callbacks == [cb], "Callback not added to runner"
+    cb_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=None)
+    cb_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=None)
+
+    output = metric_log_capture.getvalue()
+    pattern = r"Prediction took \d+\.\d{2} seconds"
+    assert re.search(pattern, output), f"Expected pattern not found in log: {output}"
 
 
 @pytest.mark.asyncio
