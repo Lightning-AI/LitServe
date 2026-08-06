@@ -38,7 +38,7 @@ repos:
         args: ["--print-width=120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.8
+    rev: v1.7.7
     hooks:
       - id: docformatter
         language_version: python3.13
