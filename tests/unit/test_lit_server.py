@@ -20,7 +20,7 @@ import threading
 import time
 import types
 from time import sleep
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 import torch
@@ -343,10 +343,10 @@ def test_server_terminate():
 
 
 @pytest.mark.parametrize(("disable_openapi_url", "should_print"), [(False, True), (True, False)])
-@patch("builtins.print")
+@patch("litserve.server.logger")
 @patch("litserve.server.uvicorn")
-def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manager, disable_openapi_url, should_print):
-    """Test that the Swagger UI message is only printed when disable_openapi_url=False."""
+def test_disable_openapi_url_print_message(mock_uvicorn, mock_logger, mock_manager, disable_openapi_url, should_print):
+    """Test that the Swagger UI message is only logged when disable_openapi_url=False."""
     server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url, restart_workers=False)
     server.verify_worker_status = MagicMock()
 
@@ -357,10 +357,12 @@ def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manage
         server._monitor_workers = False
         server.run(port=8000)
 
+    display_host = "127.0.0.1" if sys.platform == "win32" else "0.0.0.0"
+    swagger_calls = [c for c in mock_logger.info.call_args_list if c.args and "Swagger UI" in c.args[0]]
     if should_print:
-        mock_print.assert_called_with("Swagger UI is available at http://0.0.0.0:8000/docs")
+        assert swagger_calls == [call(f"Swagger UI is available at http://{display_host}:8000/docs")]
     else:
-        mock_print.assert_not_called()
+        assert swagger_calls == []
 
 
 class IdentityAPI(ls.test_examples.SimpleLitAPI):
@@ -393,6 +395,39 @@ class IdentityBatchedStreamingAPI(ls.test_examples.SimpleBatchedAPI):
     def encode_response(self, output_stream, context):
         for _ in output_stream:
             yield [{"output": ctx["input"]} for ctx in context]
+
+
+class BatchUnbatchContextAPI(ls.test_examples.SimpleBatchedAPI):
+    def batch(self, inputs, context):
+        for c, x in zip(context, inputs):
+            c["input"] = float(x)
+            c["batch_size"] = len(inputs)
+        return super().batch(inputs)
+
+    def unbatch(self, output, context):
+        return [{"input": c["input"], "batch_size": c["batch_size"]} for c in context]
+
+    def encode_response(self, output):
+        return {"output": output["input"], "batch_size": output["batch_size"]}
+
+
+class BatchUnbatchContextStreamingAPI(ls.test_examples.SimpleBatchedAPI):
+    def batch(self, inputs, context):
+        for c, x in zip(context, inputs):
+            c["input"] = float(x)
+            c["batch_size"] = len(inputs)
+        return super().batch(inputs)
+
+    def predict(self, x_batch):
+        yield self.model(x_batch)
+
+    def unbatch(self, output_stream, context):
+        for _ in output_stream:
+            yield [{"input": c["input"], "batch_size": c["batch_size"]} for c in context]
+
+    def encode_response(self, output_stream):
+        for outputs in output_stream:
+            yield [{"output": output["input"], "batch_size": output["batch_size"]} for output in outputs]
 
 
 class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
@@ -442,6 +477,36 @@ async def test_inject_context():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         resp = client.post("/predict", json={"input": 5.0}, timeout=10)
         assert resp.status_code == 500, "predict() missed 1 required positional argument: 'y'"
+
+
+@pytest.mark.asyncio
+async def test_inject_context_in_batch_and_unbatch():
+    # Two requests at once, so each one must get its own context back. batched loop:
+    server = LitServer(BatchUnbatchContextAPI(max_batch_size=2, batch_timeout=4), timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp1 = ac.post("/predict", json={"input": 5.0})
+            resp2 = ac.post("/predict", json={"input": 7.0})
+            resp1, resp2 = await asyncio.gather(resp1, resp2)
+    # batch_size == 2 proves they really shared a batch
+    assert resp1.json() == {"output": 5.0, "batch_size": 2}
+    assert resp2.json() == {"output": 7.0, "batch_size": 2}
+
+    # ...and the same for the batched streaming loop:
+    server = LitServer(BatchUnbatchContextStreamingAPI(max_batch_size=2, batch_timeout=4, stream=True), timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp1 = ac.post("/predict", json={"input": 5.0})
+            resp2 = ac.post("/predict", json={"input": 7.0})
+            resp1, resp2 = await asyncio.gather(resp1, resp2)
+    assert resp1.json() == {"output": 5.0, "batch_size": 2}
+    assert resp2.json() == {"output": 7.0, "batch_size": 2}
 
 
 def test_custom_api_path():
