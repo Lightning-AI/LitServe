@@ -347,13 +347,13 @@ class BatchedStreamingLoop(DefaultLoop):
                 ]
                 callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
-                x = lit_api.batch(x)
+                x = _inject_context(contexts, lit_api.batch, x)
 
                 callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y_iter = _inject_context(contexts, lit_api.predict, x)
                 callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
-                unbatched_iter = lit_api.unbatch(y_iter)
+                unbatched_iter = _inject_context(contexts, lit_api.unbatch, y_iter)
 
                 callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)

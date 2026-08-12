@@ -1,13 +1,19 @@
 # Each line is a file pattern followed by one or more owners.
+# See GOVERNANCE.md for the maintainer model.
 
 # These owners will be the default owners for everything in the repo. Unless a later match takes precedence,
 # @global-owner1 and @global-owner2 will be requested for review when someone opens a pull request.
-* @lantiga @aniketmaurya @ethanwharris @justusschock @tchaton @andyland @k223kim @KaelanDt @dmitsf @Abdul-0x4A
+* @andyland @dmitsf @Abdul-0x4A @tchaton @justusschock @k223kim @KaelanDt @ethanwharris
 
 # CI/CD and configs
-/.github/       @andyland @dmitsf @Abdul-0x4A
-*.yaml          @andyland @dmitsf @Abdul-0x4A
-*.yml           @andyland @dmitsf @Abdul-0x4A
+/.github/       @andyland @dmitsf @Abdul-0x4A @tchaton
+*.yaml          @andyland @dmitsf @Abdul-0x4A @tchaton
+*.yml           @andyland @dmitsf @Abdul-0x4A @tchaton
 
-/README.md                           @williamfalcon @lantiga
-/requirements.txt                    @williamfalcon
+# Docs
+/README.md                           @williamfalcon @andyland
+
+# Retired committers
+#   @aniketmaurya      (Aniket Maurya)
+#   @borda             (Jirka Borovec)
+#   @lantiga           (Luca Antiga)

@@ -92,7 +92,6 @@ def test_middleware_multiple_initialization():
 
 def test_track_requests_middleware_isolation():
     """Test that _prepare_app_run doesn't modify the original app's middleware list."""
-
     lit_api = ls.test_examples.SimpleLitAPI()
     server = ls.LitServer(lit_api, track_requests=True)
 
