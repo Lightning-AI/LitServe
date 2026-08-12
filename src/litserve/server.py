@@ -1207,6 +1207,12 @@ class LitServer:
                     logger.warning(f"{log_prefix}: Already not alive.")
                     continue
                 try:
+                    if isinstance(uw, threading.Thread):
+                        getattr(uw, "_litserve_server").should_exit = True
+                        uw.join(timeout=self.uvicorn_graceful_timeout)
+                        if uw.is_alive():
+                            logger.warning(f"{log_prefix}: Did not terminate gracefully.")
+                        continue
                     uw.terminate()
                     uw.join(timeout=self.uvicorn_graceful_timeout)
                     if uw.is_alive():
@@ -1578,6 +1584,7 @@ class LitServer:
                 w = threading.Thread(
                     target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}"
                 )
+                setattr(w, "_litserve_server", server)
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
             w.start()
