@@ -23,14 +23,14 @@ repos:
       - id: detect-private-key
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
       - id: codespell
         additional_dependencies: [tomli]
         #args: ["--write-changes"]
 
   - repo: https://github.com/JoC0de/pre-commit-prettier
-    rev: v3.7.4
+    rev: v3.9.6
     hooks:
       - id: prettier
         files: \.(json|yml|yaml|toml)
@@ -41,11 +41,12 @@ repos:
     rev: v1.7.7
     hooks:
       - id: docformatter
+        language_version: python3.13
         additional_dependencies: [tomli]
         args: ["--in-place"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10
+    rev: v0.16.1
     hooks:
       - id: ruff
         args: ["--fix"]

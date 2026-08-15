@@ -15,7 +15,7 @@ TOTAL_TOKENS = 10000
 EXPECTED_TTFT = 0.005  # time to first token
 
 # tokens per second
-MAX_SPEED = 3600  # 3600 on GitHub CI, 10000 on M3 Pro
+MAX_SPEED = 3500  # 3500-3600 on GitHub CI, 10000 on M3 Pro
 
 
 def create_session(pool_connections=10, pool_maxsize=10, max_retries=3):

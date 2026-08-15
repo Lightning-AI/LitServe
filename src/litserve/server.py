@@ -29,7 +29,7 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
 from typing import TYPE_CHECKING, Literal, Optional, Union
@@ -112,16 +112,20 @@ async def _mixed_response_to_buffer(
 
             uid, (*response, response_type, worker_id) = result
 
+            response_item = response_buffer.get(uid)
+            if response_item is None:
+                continue
+
             if response[1] == LitAPIStatus.START:
-                response_buffer[uid].worker_id = int(worker_id)
+                response_item.worker_id = int(worker_id)
                 continue
 
             if response_type == LoopResponseType.STREAMING:
-                response_buffer[uid].response_queue.append(response)
-                response_buffer[uid].event.set()
+                response_item.response_queue.append(response)
+                response_item.event.set()
             else:
-                response_buffer[uid].response = response
-                response_buffer[uid].event.set()
+                response_item.response = response
+                response_item.event.set()
         except asyncio.CancelledError:
             logger.debug("Response queue to buffer task was cancelled")
             break
@@ -154,12 +158,16 @@ async def response_queue_to_buffer(
 
                 uid, (*response, response_type, worker_id) = result
 
-                if response[1] == LitAPIStatus.START:
-                    response_buffer[uid].worker_id = int(worker_id)
+                response_item = response_buffer.get(uid)
+                if response_item is None:
                     continue
 
-                response_buffer[uid].response_queue.append(response)
-                response_buffer[uid].event.set()
+                if response[1] == LitAPIStatus.START:
+                    response_item.worker_id = int(worker_id)
+                    continue
+
+                response_item.response_queue.append(response)
+                response_item.event.set()
             except asyncio.CancelledError:
                 logger.debug("Response queue to buffer task was cancelled")
                 break
@@ -176,12 +184,16 @@ async def response_queue_to_buffer(
 
                 uid, (*response, response_type, worker_id) = result
 
-                if response[1] == LitAPIStatus.START:
-                    response_buffer[uid].worker_id = int(worker_id)
+                response_item = response_buffer.get(uid)
+                if response_item is None:
                     continue
 
-                response_buffer[uid].response = response
-                response_buffer[uid].event.set()
+                if response[1] == LitAPIStatus.START:
+                    response_item.worker_id = int(worker_id)
+                    continue
+
+                response_item.response = response
+                response_item.event.set()
             except asyncio.CancelledError:
                 logger.debug("Response queue to buffer task was cancelled")
                 break
@@ -389,7 +401,14 @@ class StreamingRequestHandler(BaseRequestHandler):
                 litserver=self.server,
             )
 
-            return StreamingResponse(response_generator)
+            async def stream_with_cleanup():
+                try:
+                    async for item in response_generator:
+                        yield item
+                finally:
+                    self.server.response_buffer.pop(uid, None)
+
+            return StreamingResponse(stream_with_cleanup())
 
         except Exception as e:
             logger.exception(f"Error handling streaming request: {e}")
@@ -638,6 +657,29 @@ class LitServer:
         server = ls.LitServer(StreamingAPI(stream=True))
         ```
 
+        Per-route using dict
+        ```python
+        server = ls.LitServer(
+            [sentiment_api, generate_api],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device={
+                "/sentiment": 2,  # 2 workers per GPU for sentiment
+                "/generate": 3,   # 3 workers per GPU for generation
+            },
+        )
+        ```
+
+        Per-api position
+        ```python
+        server = ls.LitServer(
+            [sentiment_api, generate_api],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device=[2, 3],  # sentiment then generate (same order as API list)
+        )
+        ```
+
     Deployment:
         Self-hosted:
         ```bash
@@ -797,6 +839,7 @@ class LitServer:
         self.lit_api = lit_api
         self.enable_shutdown_api = enable_shutdown_api
         self.workers_per_device = workers_per_device
+        self._workers_per_device_by_api_path = self._resolve_workers_per_device_config(workers_per_device)
         self.max_payload_size = max_payload_size
         self.model_metadata = model_metadata
         self._connector = _Connector(accelerator=accelerator, devices=devices)
@@ -822,11 +865,14 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.inference_workers_config = self.devices * self.workers_per_device
         self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
         # register middleware
         self._register_middleware()
+
+    def _inference_workers_config_for_api(self, api_path: str):
+        wpd = self._workers_per_device_by_api_path[api_path]
+        return self.devices * wpd
 
     def launch_inference_worker(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
@@ -839,7 +885,10 @@ class LitServer:
 
         process_list = []
         endpoint = lit_api.api_path.split("/")[-1]
-        for worker_id, device in enumerate(self.inference_workers_config):
+
+        inference_workers_config = self._inference_workers_config_for_api(lit_api.api_path)
+
+        for worker_id, device in enumerate(inference_workers_config):
             if len(device) == 1:
                 device = device[0]
 
@@ -873,7 +922,8 @@ class LitServer:
             del server_copy.app, server_copy.transport_config, server_copy.litapi_connector
             spec.setup(server_copy)
 
-        device = self.inference_workers_config[worker_id]
+        inference_workers_config = self._inference_workers_config_for_api(lit_api.api_path)
+        device = inference_workers_config[worker_id]
         endpoint = lit_api.api_path.split("/")[-1]
         if len(device) == 1:
             device = device[0]
@@ -972,24 +1022,27 @@ class LitServer:
         return None
 
     def _register_internal_endpoints(self):
-        workers_ready = False
-
         @self.app.get("/", dependencies=[Depends(self.setup_auth())])
         async def index(request: Request) -> Response:
             return Response(content="litserve running")
 
         @self.app.get(self.healthcheck_path, dependencies=[Depends(self.setup_auth())])
         async def health(request: Request) -> Response:
-            nonlocal workers_ready
-            if not workers_ready:
-                workers_ready = all(v == WorkerSetupStatus.READY for v in self.workers_setup_status.values())
+            workers_ready = bool(self.workers_setup_status) and all(
+                v == WorkerSetupStatus.READY for v in self.workers_setup_status.values()
+            )
 
             lit_api_health_status = True
             for lit_api in self.litapi_connector:
-                result = lit_api.health()
-                if inspect.isawaitable(result):
-                    result = await result
-                if not result:
+                try:
+                    result = lit_api.health()
+                    if inspect.isawaitable(result):
+                        result = await result
+                    if not result:
+                        lit_api_health_status = False
+                        break
+                except Exception:
+                    logger.exception(f"Health check failed for {lit_api.__class__.__name__}")
                     lit_api_health_status = False
                     break
             if workers_ready and lit_api_health_status:
@@ -1045,7 +1098,6 @@ class LitServer:
 
     def _register_api_endpoints(self, lit_api: LitAPI, request_type, response_type):
         """Register endpoint routes for the FastAPI app."""
-
         self._callback_runner.trigger_event(EventTypes.ON_SERVER_START.value, litserver=self)
 
         # Create handlers
@@ -1061,7 +1113,7 @@ class LitServer:
                 lit_api.api_path,
                 endpoint_handler,
                 methods=["POST"],
-                dependencies=[Depends(self.setup_auth())],
+                dependencies=[Depends(self.setup_auth(lit_api))],
             )
 
         # Handle specs
@@ -1076,7 +1128,7 @@ class LitServer:
             # TODO check that path is not clashing
             for path, endpoint, methods in spec.endpoints:
                 self.app.add_api_route(
-                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth())]
+                    path, endpoint=endpoint, methods=methods, dependencies=[Depends(self.setup_auth(lit_api))]
                 )
 
     def _register_middleware(self):
@@ -1182,6 +1234,42 @@ class LitServer:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
 
         manager.shutdown()
+
+    def _resolve_workers_per_device_config(self, workers_per_device):
+        """Resolve workers_per_device into a dict[api_path, workers_per_device_int]."""
+        api_paths = [api.api_path for api in self.litapi_connector]
+
+        if isinstance(workers_per_device, int):
+            if workers_per_device < 1:
+                raise ValueError("workers_per_device must be >= 1")
+            return dict.fromkeys(api_paths, workers_per_device)
+
+        if isinstance(workers_per_device, (list, tuple)):
+            if len(workers_per_device) != len(api_paths):
+                raise ValueError(
+                    f"workers_per_device list length must match number of APIs \n"
+                    f"({len(api_paths)}), got {len(workers_per_device)}"
+                )
+            cfg = {}
+            for p, w in zip(api_paths, workers_per_device):
+                if not isinstance(w, int) or w < 1:
+                    raise ValueError("workers_per_device values must be integers >= 1")
+                cfg[p] = w
+            return cfg
+
+        if isinstance(workers_per_device, Mapping):
+            unknown = sorted(set(workers_per_device.keys()) - set(api_paths))
+            if unknown:
+                raise ValueError(f"workers_per_device contains unknown api_path values: {unknown} (unknown api_path)")
+            cfg = {}
+            for p in api_paths:
+                w = workers_per_device.get(p, 1)
+                if not isinstance(w, int) or w < 1:
+                    raise ValueError("workers_per_device values must be integers >= 1")
+                cfg[p] = w
+            return cfg
+
+        raise TypeError("workers_per_device must be an int, a list/tuple of ints, or a mapping of api_path -> int")
 
     def run(
         self,
@@ -1388,7 +1476,10 @@ class LitServer:
         sockets = [config.bind_socket()]
 
         if num_api_servers is None:
-            num_api_servers = len(self.inference_workers_config)
+            total_workers = 0
+            for lit_api in self.litapi_connector:
+                total_workers += len(self._inference_workers_config_for_api(lit_api.api_path))
+            num_api_servers = total_workers
 
         if num_api_servers < 1:
             raise ValueError("num_api_servers must be greater than 0")
@@ -1418,7 +1509,9 @@ class LitServer:
             )
 
             if not self._disable_openapi_url:
-                print(f"Swagger UI is available at http://0.0.0.0:{port}/docs")
+                # Windows can't open http://0.0.0.0 in a browser
+                display_host = "127.0.0.1" if sys.platform == "win32" else host
+                logger.info(f"Swagger UI is available at http://{display_host}:{port}/docs")
 
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)
@@ -1491,9 +1584,10 @@ class LitServer:
             workers.append(w)
         return dict(enumerate(workers))
 
-    def setup_auth(self):
-        if hasattr(self.lit_api, "authorize") and callable(self.lit_api.authorize):
-            return self.lit_api.authorize
+    def setup_auth(self, lit_api: LitAPI | None = None):
+        target = lit_api or self.lit_api
+        if hasattr(target, "authorize") and callable(target.authorize):
+            return target.authorize
         if LIT_SERVER_API_KEY:
             return api_key_auth
         return no_auth
@@ -1528,8 +1622,25 @@ class LitServer:
                         broken_workers[i] = proc
 
                     for idx, proc in broken_workers.items():
-                        lit_api_id = idx // len(self.inference_workers_config)
-                        worker_id = idx % len(self.inference_workers_config)
+                        lit_api_id = 0
+                        worker_id = 0
+                        count = 0
+                        found = False
+
+                        for i, lit_api in enumerate(self.litapi_connector):
+                            workers_conf = self._inference_workers_config_for_api(lit_api.api_path)
+                            num_workers_for_api = len(workers_conf)
+
+                            if idx < count + num_workers_for_api:
+                                lit_api_id = i
+                                worker_id = idx - count
+                                found = True
+                                break
+                            count += num_workers_for_api
+
+                        if not found:
+                            logger.error(f"Could not map worker index {idx} to an API.")
+                            continue
 
                         for uid, resp in self.response_buffer.items():
                             if resp.worker_id is None or resp.worker_id != worker_id:
@@ -1545,17 +1656,17 @@ class LitServer:
                                 resp.response_queue.append((None, LitAPIStatus.ERROR))
 
                             resp.event.set()
-                            print(f"[monoriting] Marked {uid} set")
+                            logger.info(f"[monitoring] Marked {uid} set")
 
-                        print(f"[monoriting] Worker {worker_id} is dead. Restarting it")
+                        logger.info(f"[monitoring] Worker {worker_id} is dead. Restarting it")
                         lit_api = self.litapi_connector.lit_apis[lit_api_id]
                         self.inference_workers[idx] = self.launch_single_inference_worker(lit_api, worker_id)
-                        print(f"[monoriting] Worker {worker_id} has been started.")
+                        logger.info(f"[monitoring] Worker {worker_id} has been started.")
 
                     time.sleep(self.monitor_internal)
 
-            except Exception as e:
-                print(e)
+            except Exception:
+                logger.exception("Monitoring worker crashed")
 
         t = threading.Thread(target=monitor, daemon=True, name="litserve-monitoring")
         t.start()

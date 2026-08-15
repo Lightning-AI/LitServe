@@ -31,12 +31,13 @@ jobs:
     timeout-minutes: 35
     env:
       TORCH_URL: "https://download.pytorch.org/whl/cpu/torch_stable.html"
+      UV_EXCLUDE_NEWER: "2 days"
       UV_TORCH_BACKEND: "cpu"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv and setup python
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           activate-environment: true
           python-version: ${{ matrix.python-version }}
@@ -69,7 +70,7 @@ jobs:
           coverage xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml

@@ -18,7 +18,7 @@ import os
 import sys
 import time
 from time import sleep
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 import torch
@@ -32,7 +32,7 @@ import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
 from litserve.server import LitServer
-from litserve.utils import wrap_litserve_start
+from litserve.utils import WorkerSetupStatus, wrap_litserve_start
 
 
 def test_index(sync_testclient):
@@ -341,10 +341,10 @@ def test_server_terminate():
 
 
 @pytest.mark.parametrize(("disable_openapi_url", "should_print"), [(False, True), (True, False)])
-@patch("builtins.print")
+@patch("litserve.server.logger")
 @patch("litserve.server.uvicorn")
-def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manager, disable_openapi_url, should_print):
-    """Test that the Swagger UI message is only printed when disable_openapi_url=False."""
+def test_disable_openapi_url_print_message(mock_uvicorn, mock_logger, mock_manager, disable_openapi_url, should_print):
+    """Test that the Swagger UI message is only logged when disable_openapi_url=False."""
     server = LitServer(SimpleLitAPI(), disable_openapi_url=disable_openapi_url, restart_workers=False)
     server.verify_worker_status = MagicMock()
 
@@ -355,10 +355,12 @@ def test_disable_openapi_url_print_message(mock_uvicorn, mock_print, mock_manage
         server._monitor_workers = False
         server.run(port=8000)
 
+    display_host = "127.0.0.1" if sys.platform == "win32" else "0.0.0.0"
+    swagger_calls = [c for c in mock_logger.info.call_args_list if c.args and "Swagger UI" in c.args[0]]
     if should_print:
-        mock_print.assert_called_with("Swagger UI is available at http://0.0.0.0:8000/docs")
+        assert swagger_calls == [call(f"Swagger UI is available at http://{display_host}:8000/docs")]
     else:
-        mock_print.assert_not_called()
+        assert swagger_calls == []
 
 
 class IdentityAPI(ls.test_examples.SimpleLitAPI):
@@ -391,6 +393,39 @@ class IdentityBatchedStreamingAPI(ls.test_examples.SimpleBatchedAPI):
     def encode_response(self, output_stream, context):
         for _ in output_stream:
             yield [{"output": ctx["input"]} for ctx in context]
+
+
+class BatchUnbatchContextAPI(ls.test_examples.SimpleBatchedAPI):
+    def batch(self, inputs, context):
+        for c, x in zip(context, inputs):
+            c["input"] = float(x)
+            c["batch_size"] = len(inputs)
+        return super().batch(inputs)
+
+    def unbatch(self, output, context):
+        return [{"input": c["input"], "batch_size": c["batch_size"]} for c in context]
+
+    def encode_response(self, output):
+        return {"output": output["input"], "batch_size": output["batch_size"]}
+
+
+class BatchUnbatchContextStreamingAPI(ls.test_examples.SimpleBatchedAPI):
+    def batch(self, inputs, context):
+        for c, x in zip(context, inputs):
+            c["input"] = float(x)
+            c["batch_size"] = len(inputs)
+        return super().batch(inputs)
+
+    def predict(self, x_batch):
+        yield self.model(x_batch)
+
+    def unbatch(self, output_stream, context):
+        for _ in output_stream:
+            yield [{"input": c["input"], "batch_size": c["batch_size"]} for c in context]
+
+    def encode_response(self, output_stream):
+        for outputs in output_stream:
+            yield [{"output": output["input"], "batch_size": output["batch_size"]} for output in outputs]
 
 
 class PredictErrorAPI(ls.test_examples.SimpleLitAPI):
@@ -440,6 +475,36 @@ async def test_inject_context():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         resp = client.post("/predict", json={"input": 5.0}, timeout=10)
         assert resp.status_code == 500, "predict() missed 1 required positional argument: 'y'"
+
+
+@pytest.mark.asyncio
+async def test_inject_context_in_batch_and_unbatch():
+    # Two requests at once, so each one must get its own context back. batched loop:
+    server = LitServer(BatchUnbatchContextAPI(max_batch_size=2, batch_timeout=4), timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp1 = ac.post("/predict", json={"input": 5.0})
+            resp2 = ac.post("/predict", json={"input": 7.0})
+            resp1, resp2 = await asyncio.gather(resp1, resp2)
+    # batch_size == 2 proves they really shared a batch
+    assert resp1.json() == {"output": 5.0, "batch_size": 2}
+    assert resp2.json() == {"output": 7.0, "batch_size": 2}
+
+    # ...and the same for the batched streaming loop:
+    server = LitServer(BatchUnbatchContextStreamingAPI(max_batch_size=2, batch_timeout=4, stream=True), timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp1 = ac.post("/predict", json={"input": 5.0})
+            resp2 = ac.post("/predict", json={"input": 7.0})
+            resp1, resp2 = await asyncio.gather(resp1, resp2)
+    assert resp1.json() == {"output": 5.0, "batch_size": 2}
+    assert resp2.json() == {"output": 7.0, "batch_size": 2}
 
 
 def test_custom_api_path():
@@ -837,3 +902,187 @@ async def test_worker_restart_and_server_shutdown_streaming():
         ):
             resp = await ac.post("/predict", json={"input": 0})
             assert resp.status_code == 200
+
+
+class MultiRouteAPI(ls.test_examples.SimpleLitAPI):
+    # Mock API for testing multi-route server behavior
+    def __init__(self, api_path="/predict"):
+        super().__init__(api_path=api_path)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+@pytest.mark.parametrize(
+    ("workers_cfg", "expected_total_by_path"),
+    [
+        # dict: explicit per-route config
+        ({"/sentiment": 2, "/generate": 3}, {"/sentiment": 4, "/generate": 6}),
+        # list: per-api (connector order) config
+        ([2, 3], {"/sentiment": 4, "/generate": 6}),
+    ],
+)
+def test_workers_per_device_can_be_configured_per_route(monkeypatch, workers_cfg, expected_total_by_path):
+    monkeypatch.setattr("litserve.server.uvicorn", MagicMock())
+
+    sentiment = MultiRouteAPI(api_path="/sentiment")
+    generate = MultiRouteAPI(api_path="/generate")
+    server = LitServer([sentiment, generate], accelerator="cuda", devices=[0, 1], workers_per_device=workers_cfg)
+
+    created = []  # list[(api_path, worker_id, device)]
+
+    class FakeProcess:
+        def __init__(self, target, args, name):
+            # inference_worker args = (lit_api, device, worker_id, request_q, transport, ...)
+            lit_api, device, worker_id = args[0], args[1], args[2]
+            created.append((lit_api.api_path, worker_id, device))
+            self.pid = 123
+            self.name = name
+
+        def start(self): ...
+        def terminate(self): ...
+        def join(self, timeout=None): ...
+        def is_alive(self):
+            return False
+
+        def kill(self): ...
+
+    class FakeCtx:
+        def Process(self, target, args, name):  # noqa: N802
+            return FakeProcess(target=target, args=args, name=name)
+
+    monkeypatch.setattr("litserve.server.mp.get_context", lambda *_args, **_kwargs: FakeCtx())
+
+    # prevent server.run() from actually running uvicorn / waiting forever
+    server.verify_worker_status = MagicMock()
+    server._start_server = MagicMock(return_value={})
+    server._perform_graceful_shutdown = MagicMock()
+    server._start_worker_monitoring = MagicMock()
+    server._transport = MagicMock()
+    server._shutdown_event = MagicMock()
+    server._shutdown_event.wait = MagicMock(return_value=None)  # don't block
+
+    # init manager + queues without real multiprocessing manager
+    with patch("litserve.server.mp.Manager", return_value=MagicMock()):
+        server.run(api_server_worker_type="process", generate_client_file=False)
+
+    # count workers created per api_path
+    total_by_path = {}
+    for api_path, _worker_id, _device in created:
+        total_by_path[api_path] = total_by_path.get(api_path, 0) + 1
+
+    assert total_by_path == expected_total_by_path
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+def test_workers_per_device_per_route_raises_on_unknown_route():
+    sentiment = MultiRouteAPI(api_path="/sentiment")
+    generate = MultiRouteAPI(api_path="/generate")
+
+    with pytest.raises(ValueError, match="workers_per_device.*unknown api_path"):
+        LitServer(
+            [sentiment, generate],
+            accelerator="cuda",
+            devices=[0, 1],
+            workers_per_device={"/sentiment": 2, "/unknown": 1},
+        )
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_returns_503_when_workers_setup_status_is_empty(lifespan_mock, simple_litapi):
+    """Health check should return 503 when no workers are registered yet.
+
+    This tests the fix for the bug where `all({}.values())` returns True in Python, causing the health check to
+    incorrectly return 200 when workers_setup_status is empty.
+
+    """
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+    # Ensure workers_setup_status is empty (simulating server startup before workers register)
+    server.workers_setup_status = {}
+
+    # Override the lifespan context to avoid starting workers
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    with TestClient(server.app) as client:
+        response = client.get("/health")
+        assert response.status_code == 503, "Health check should return 503 when no workers are registered"
+        assert response.text == "not ready"
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_returns_503_on_health_exception(lifespan_mock, simple_litapi):
+    """Health check should return 503 (not 500) when a custom health() method raises an exception."""
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+    server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    for lit_api in server.litapi_connector:
+        lit_api.health = MagicMock(side_effect=RuntimeError("database connection failed"))
+
+    with TestClient(server.app) as client:
+        response = client.get("/health")
+        assert response.status_code == 503, "Health check should return 503 when health() raises, not 500"
+        assert response.text == "not ready"
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_detects_worker_status_change(lifespan_mock, simple_litapi):
+    """Health check should detect when workers transition from READY to a non-READY state."""
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    for lit_api in server.litapi_connector:
+        lit_api.health = MagicMock(return_value=True)
+
+    with TestClient(server.app) as client:
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+        response = client.get("/health")
+        assert response.status_code == 200
+
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.ERROR}
+        response = client.get("/health")
+        assert response.status_code == 503, "Health check should return 503 after worker enters error state"
+        assert response.text == "not ready"
+
+
+@patch("litserve.server.LitServer.lifespan")
+def test_health_check_no_stale_cache(lifespan_mock, simple_litapi):
+    """Health check should re-evaluate worker status every request, not cache it."""
+    server = LitServer(simple_litapi, accelerator="cpu", devices=1, timeout=10)
+
+    @contextlib.asynccontextmanager
+    async def mock_lifespan(app):
+        yield {}
+
+    server.app.router.lifespan_context = mock_lifespan
+
+    for lit_api in server.litapi_connector:
+        lit_api.health = MagicMock(return_value=True)
+
+    with TestClient(server.app) as client:
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+        response = client.get("/health")
+        assert response.status_code == 200
+
+        response = client.get("/health")
+        assert response.status_code == 200
+
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.ERROR}
+        response = client.get("/health")
+        assert response.status_code == 503, "Should not serve stale cached status"
+
+        server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
+        response = client.get("/health")
+        assert response.status_code == 200, "Should recover when workers become ready again"

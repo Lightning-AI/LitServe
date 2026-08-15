@@ -1,4 +1,4 @@
 uvloop>=0.21.0
 tenacity>=9.1.2
 jsonargparse
-rich>=14.0.0
+rich>=15.0.0
