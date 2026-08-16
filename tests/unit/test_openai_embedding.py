@@ -209,3 +209,28 @@ async def test_batching_with_client_side_batching(openai_embedding_request_data_
                 == "The OpenAIEmbedding spec does not support dynamic batching when client-side batching is used. "
                 "To resolve this, either set `max_batch_size=1` or send a single input from the client."
             )
+
+
+def test_embedding_request_get_num_items():
+    from litserve.specs.openai_embedding import EmbeddingRequest
+
+    assert EmbeddingRequest(input="", model="text-embedding-3-small").get_num_items() == 1
+    assert EmbeddingRequest(input="hello world", model="text-embedding-3-small").get_num_items() == 1
+    assert EmbeddingRequest(input=["hello", "world"], model="text-embedding-3-small").get_num_items() == 2
+    assert EmbeddingRequest(input=[101, 2054, 2003, 102], model="text-embedding-3-small").get_num_items() == 1
+    assert EmbeddingRequest(input=[[101, 2054], [101, 2003, 102]], model="text-embedding-3-small").get_num_items() == 2
+    assert EmbeddingRequest(input=[], model="text-embedding-3-small").get_num_items() == 0
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_options():
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPI(spec=spec))
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.options("/v1/embeddings", timeout=10)
+            assert resp.status_code == 200, f"Expected 200 OK for OPTIONS request, got {resp.status_code}"

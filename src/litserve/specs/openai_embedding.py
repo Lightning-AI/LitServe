@@ -21,7 +21,6 @@ import warnings
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from fastapi import HTTPException, Request, Response, status
-from fastapi import status as status_code
 from pydantic import BaseModel
 
 from litserve.callbacks.base import EventTypes
@@ -46,10 +45,14 @@ class EmbeddingRequest(BaseModel):
     user: Optional[str] = None
 
     def get_num_items(self) -> int:
-        """Return the number of sentences or tokens in the input."""
+        """Return the number of sentences or items in the input."""
+        if isinstance(self.input, str):
+            return 1
         if isinstance(self.input, list):
-            if isinstance(self.input[0], list):
-                return len(self.input[0])
+            if not self.input:
+                return 0
+            if isinstance(self.input[0], int):
+                return 1
             return len(self.input)
         return 1
 
@@ -144,7 +147,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         # register the endpoint
         self.add_endpoint(self.api_path, self.embeddings_endpoint, ["POST"])
-        self.add_endpoint(self.api_path, self.options_embeddings, ["GET"])
+        self.add_endpoint(self.api_path, self.options_embeddings, ["OPTIONS"])
 
         # validate LitAPI methods
         if inspect.isgeneratorfunction(lit_api.predict):
@@ -226,7 +229,7 @@ class OpenAIEmbeddingSpec(LitSpec):
             embeddings = embeddings.tolist()
 
         # expand dims for list of floats
-        if isinstance(embeddings, (list, tuple)) and isinstance(embeddings[0], (int, float)):
+        if isinstance(embeddings, (list, tuple)) and len(embeddings) > 0 and isinstance(embeddings[0], (int, float)):
             embeddings = [embeddings]
 
         # check if we have total num_items number of embeddings vectors
@@ -273,15 +276,15 @@ class OpenAIEmbeddingSpec(LitSpec):
         await event.wait()
 
         response_buffer_item = self.response_buffer.pop(uid)
-        response, status = response_buffer_item.response
+        response, lit_status = response_buffer_item.response
 
-        if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
+        if lit_status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
             logger.error("Error in embedding request: %s", response)
             raise response
 
-        if status == LitAPIStatus.ERROR:
+        if lit_status == LitAPIStatus.ERROR:
             logger.error("Error in embedding request: %s", response)
-            raise HTTPException(status_code=status_code.HTTP_500_INTERNAL_SERVER_ERROR)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         logger.debug(response)
 
