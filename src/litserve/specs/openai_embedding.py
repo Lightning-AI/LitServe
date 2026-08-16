@@ -245,8 +245,9 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         return result
 
-    async def embeddings_endpoint(self, request: EmbeddingRequest) -> EmbeddingResponse:
+    async def embeddings_endpoint(self, request: EmbeddingRequest, raw_request: Request) -> EmbeddingResponse:
         response_queue_id = self.response_queue_id
+        headers = dict(raw_request.headers)
         num_items = request.get_num_items()
         if num_items > 1 and self._max_batch_size > 1:
             raise HTTPException(
@@ -269,7 +270,7 @@ class OpenAIEmbeddingSpec(LitSpec):
             litserver=self._server,
         )
 
-        self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy()))
+        self.request_queue.put_nowait((response_queue_id, uid, time.monotonic(), request.model_copy(), headers))
         await event.wait()
 
         response_buffer_item = self.response_buffer.pop(uid)

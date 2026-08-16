@@ -38,7 +38,7 @@ MultiPartParser.max_file_size = sys.maxsize
 MultiPartParser.spool_max_size = sys.maxsize
 
 _DEFAULT_STOP_LOOP_MESSAGE = "Received sentinel value, stopping loop"
-_SENTINEL_VALUE = (None, None, None, None)
+_SENTINEL_VALUE = (None, None, None, None, None)
 
 
 def _inject_context(context: Union[list[dict], dict], func, *args, **kwargs):
@@ -115,7 +115,7 @@ def collate_requests(
                 if request_data == _SENTINEL_VALUE:
                     raise _StopLoopError()
 
-                response_queue_id, uid, timestamp, x_enc = request_data
+                response_queue_id, uid, timestamp, x_enc, headers = request_data
 
                 loop.put_response(
                     transport=transport,
@@ -129,7 +129,7 @@ def collate_requests(
                 if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                     timed_out_uids.append((response_queue_id, uid))
                 else:
-                    payloads.append((response_queue_id, uid, x_enc))
+                    payloads.append((response_queue_id, uid, x_enc, headers))
             except Empty:
                 break
         return payloads, timed_out_uids
@@ -144,7 +144,7 @@ def collate_requests(
             if request_data == _SENTINEL_VALUE:
                 raise _StopLoopError()
 
-            response_queue_id, uid, timestamp, x_enc = request_data
+            response_queue_id, uid, timestamp, x_enc, headers = request_data
 
             loop.put_response(
                 transport=transport,
@@ -158,7 +158,7 @@ def collate_requests(
             if apply_timeout and time.monotonic() - timestamp > lit_api.request_timeout:
                 timed_out_uids.append((response_queue_id, uid))
             else:
-                payloads.append((response_queue_id, uid, x_enc))
+                payloads.append((response_queue_id, uid, x_enc, headers))
 
         except Empty:
             continue
@@ -203,7 +203,7 @@ class _BaseLoop(ABC):
             if item is None:
                 return
 
-            response_queue_id, uid, timestamp, x_enc = item
+            response_queue_id, uid, timestamp, x_enc, headers = item
             # Expects LitAPI to implement the load_cache method
             lit_api.load_cache(x_enc)
             x = lit_api.decode_request(x_enc)

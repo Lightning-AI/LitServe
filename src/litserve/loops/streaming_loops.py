@@ -45,7 +45,7 @@ class StreamingLoop(DefaultLoop):
                 if request_data == _SENTINEL_VALUE:
                     logger.debug("Received sentinel value, stopping loop")
                     return
-                response_queue_id, uid, timestamp, x_enc = request_data
+                response_queue_id, uid, timestamp, x_enc, headers = request_data
 
                 self.put_response(
                     transport=transport,
@@ -79,7 +79,7 @@ class StreamingLoop(DefaultLoop):
                 continue
 
             try:
-                context = {}
+                context = {"headers": headers}
                 if hasattr(lit_spec, "populate_context"):
                     lit_spec.populate_context(context, x_enc)
                 x = _inject_context(
@@ -143,9 +143,9 @@ class StreamingLoop(DefaultLoop):
         lit_spec: Optional[LitSpec] = None,
     ):
         lit_spec = lit_api.spec
-        response_queue_id, uid, timestamp, x_enc = request
+        response_queue_id, uid, timestamp, x_enc, headers = request
         try:
-            context = {}
+            context = {"headers": headers}
             if hasattr(lit_spec, "populate_context"):
                 lit_spec.populate_context(context, x_enc)
 
@@ -226,7 +226,7 @@ class StreamingLoop(DefaultLoop):
                         logger.debug("Received sentinel value, stopping loop")
                         return
 
-                    response_queue_id, uid, timestamp, x_enc = request_data
+                    response_queue_id, uid, timestamp, x_enc, headers = request_data
 
                     self.put_response(
                         transport=transport,
@@ -261,7 +261,7 @@ class StreamingLoop(DefaultLoop):
 
                 task = asyncio.create_task(
                     self._process_streaming_request(
-                        (response_queue_id, uid, timestamp, x_enc),
+                        (response_queue_id, uid, timestamp, x_enc, headers),
                         lit_api,
                         transport,
                         callback_runner,
@@ -328,10 +328,10 @@ class BatchedStreamingLoop(DefaultLoop):
 
             if not batches:
                 continue
-            response_queue_ids, uids, inputs = zip(*batches)
+            response_queue_ids, uids, inputs, headers_list = zip(*batches)
             num_inputs = len(inputs)
             try:
-                contexts = [{} for _ in range(num_inputs)]
+                contexts = [{"headers": headers} for headers in headers_list]
                 if hasattr(lit_spec, "populate_context"):
                     for input, context in zip(inputs, contexts):
                         lit_spec.populate_context(context, input)

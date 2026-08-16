@@ -246,7 +246,14 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         pass
 
     def decode_request(self, request, **kwargs):
-        """Convert the request payload to your model input."""
+        """Convert the request payload to your model input.
+
+        Add a context argument, decode_request(self, request, context), to also get the request context. The HTTP
+        request headers are available as context["headers"] (a dict), so hooks such as decode_request, predict, and
+        encode_response can access things like auth tokens, trace/correlation IDs, or user agent without needing them
+        repacked into the request body.
+
+        """
         if self._spec:
             return self._spec.decode_request(request, **kwargs)
         return request
