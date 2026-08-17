@@ -329,7 +329,6 @@ class BatchedStreamingLoop(DefaultLoop):
             if not batches:
                 continue
             response_queue_ids, uids, inputs, headers_list = zip(*batches)
-            num_inputs = len(inputs)
             try:
                 contexts = [{"headers": headers} for headers in headers_list]
                 if hasattr(lit_spec, "populate_context"):
