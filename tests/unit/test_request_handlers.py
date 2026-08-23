@@ -106,7 +106,9 @@ async def test_request_handler_preserves_raw_body(mock_lit_api):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("content_type", ["application/json", "application/vnd.api+json", "application/json; charset=utf-8"])
+@pytest.mark.parametrize(
+    "content_type", ["application/json", "application/vnd.api+json", "application/json; charset=utf-8"]
+)
 async def test_request_handler_preserves_json_decoding(mock_lit_api, content_type):
     handler = TestRequestHandler(mock_lit_api, MockServer(mock_lit_api))
     request = MockRequest(json_data={"input": 1}, content_type=content_type)
