@@ -52,16 +52,22 @@ class MockRequest:
         self._form_data = form_data or {}
         self._body = body
         self.headers = {"Content-Type": content_type}
+        self.json_called = False
+        self.form_called = False
+        self.body_called = False
 
     async def json(self):
+        self.json_called = True
         if self._json_data is None:
             raise json.JSONDecodeError("Invalid JSON", "", 0)
         return self._json_data
 
     async def form(self):
+        self.form_called = True
         return self._form_data
 
     async def body(self):
+        self.body_called = True
         return self._body
 
 
@@ -95,6 +101,30 @@ async def test_request_handler_preserves_raw_body(mock_lit_api):
     await handler.handle_request(mock_request, Request)
 
     assert mock_server.request_queue.get()[3] == body
+    assert mock_request.body_called
+    assert not mock_request.json_called
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content_type", ["application/json", "application/vnd.api+json", "application/json; charset=utf-8"])
+async def test_request_handler_preserves_json_decoding(mock_lit_api, content_type):
+    handler = TestRequestHandler(mock_lit_api, MockServer(mock_lit_api))
+    request = MockRequest(json_data={"input": 1}, content_type=content_type)
+
+    assert await handler._prepare_request(request, Request) == {"input": 1}
+    assert request.json_called
+    assert not request.body_called
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content_type", ["application/x-www-form-urlencoded", "multipart/form-data; boundary=test"])
+async def test_request_handler_preserves_form_decoding(mock_lit_api, content_type):
+    handler = TestRequestHandler(mock_lit_api, MockServer(mock_lit_api))
+    request = MockRequest(form_data={"input": "1"}, content_type=content_type)
+
+    assert await handler._prepare_request(request, Request) == {"input": "1"}
+    assert request.form_called
+    assert not request.body_called
 
 
 @pytest.mark.asyncio
