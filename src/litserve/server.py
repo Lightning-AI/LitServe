@@ -300,7 +300,9 @@ class BaseRequestHandler(ABC):
             content_type = request.headers.get("Content-Type", "")
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
                 return await request.form()
-            return await request.json()
+            if content_type == "application/json" or content_type.endswith("+json"):
+                return await request.json()
+            return await request.body()
         return request
 
     async def _submit_request(self, payload: dict) -> tuple[str, asyncio.Event]:

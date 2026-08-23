@@ -47,9 +47,10 @@ class MockServer:
 class MockRequest:
     """Mock FastAPI Request object for testing."""
 
-    def __init__(self, json_data=None, form_data=None, content_type="application/json"):
+    def __init__(self, json_data=None, form_data=None, body=b"", content_type="application/json"):
         self._json_data = json_data or {}
         self._form_data = form_data or {}
+        self._body = body
         self.headers = {"Content-Type": content_type}
 
     async def json(self):
@@ -59,6 +60,9 @@ class MockRequest:
 
     async def form(self):
         return self._form_data
+
+    async def body(self):
+        return self._body
 
 
 class TestRequestHandler(BaseRequestHandler):
@@ -79,6 +83,18 @@ async def test_request_handler(mock_lit_api):
     mock_request = MockRequest()
     response_queue_id = await handler.handle_request(mock_request, Request)
     assert response_queue_id == 0
+
+
+@pytest.mark.asyncio
+async def test_request_handler_preserves_raw_body(mock_lit_api):
+    mock_server = MockServer(mock_lit_api)
+    handler = TestRequestHandler(mock_lit_api, mock_server)
+    body = b"\x00protobuf-payload\xff"
+    mock_request = MockRequest(body=body, content_type="application/x-recordio-protobuf")
+
+    await handler.handle_request(mock_request, Request)
+
+    assert mock_server.request_queue.get()[3] == body
 
 
 @pytest.mark.asyncio
