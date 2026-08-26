@@ -33,7 +33,7 @@ from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
 from litserve import LitAPI
-from litserve.callbacks import CallbackRunner
+from litserve.callbacks import CallbackRunner, EventTypes
 from litserve.loops import BatchedStreamingLoop, LitLoop, Output, StreamingLoop, inference_worker
 from litserve.loops.base import (
     _SENTINEL_VALUE,
@@ -598,6 +598,137 @@ async def test_run_streaming_loop(mock_transport):
         response = await mock_transport.areceive(0, timeout=10)
         response = json.loads(response[1][0])
         assert response == {"output": f"{i}: Hello"}
+
+
+# predict/encode_response return generators, so no work happens until the stream is consumed. Both
+# "after" events therefore land together at the end, once the generators are exhausted.
+_EXPECTED_STREAMING_EVENTS = [
+    EventTypes.BEFORE_DECODE_REQUEST.value,
+    EventTypes.AFTER_DECODE_REQUEST.value,
+    EventTypes.BEFORE_PREDICT.value,
+    EventTypes.BEFORE_ENCODE_RESPONSE.value,
+    EventTypes.AFTER_PREDICT.value,
+    EventTypes.AFTER_ENCODE_RESPONSE.value,
+]
+
+
+class _EventRecorder(ls.Callback):
+    """Records every lifecycle event fired by the loop, in order."""
+
+    def __init__(self):
+        self.events = []
+
+    def on_before_decode_request(self, *args, **kwargs):
+        self.events.append(EventTypes.BEFORE_DECODE_REQUEST.value)
+
+    def on_after_decode_request(self, *args, **kwargs):
+        self.events.append(EventTypes.AFTER_DECODE_REQUEST.value)
+
+    def on_before_predict(self, *args, **kwargs):
+        self.events.append(EventTypes.BEFORE_PREDICT.value)
+
+    def on_after_predict(self, *args, **kwargs):
+        self.events.append(EventTypes.AFTER_PREDICT.value)
+
+    def on_before_encode_response(self, *args, **kwargs):
+        self.events.append(EventTypes.BEFORE_ENCODE_RESPONSE.value)
+
+    def on_after_encode_response(self, *args, **kwargs):
+        self.events.append(EventTypes.AFTER_ENCODE_RESPONSE.value)
+
+
+@pytest.mark.asyncio
+async def test_run_streaming_loop_triggers_each_callback_event_once(mock_transport):
+    """The sync streaming loop must fire the same event sequence as the other loops, exactly once each."""
+    lit_api = ls.test_examples.SimpleStreamAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 1
+
+    recorder = _EventRecorder()
+    cb_runner = CallbackRunner()
+    cb_runner._add_callbacks(recorder)
+
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
+
+    lit_loop = StreamingLoop()
+    lit_loop._restart_workers = True
+    loop_thread = threading.Thread(
+        target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, cb_runner)
+    )
+    loop_thread.start()
+    time.sleep(1)
+    request_queue.put(_SENTINEL_VALUE)
+    loop_thread.join()
+
+    assert recorder.events == _EXPECTED_STREAMING_EVENTS
+
+
+def test_run_streaming_loop_async_triggers_each_callback_event_once(mock_transport, monkeypatch):
+    """The async streaming path must fire the same sequence as the sync one."""
+    recorder = _EventRecorder()
+    cb_runner = CallbackRunner()
+    cb_runner._add_callbacks(recorder)
+
+    requests_queue = TestQueue()
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
+    requests_queue.put(_SENTINEL_VALUE)
+
+    loop = StreamingLoop()
+    loop._restart_workers = True
+    monkeypatch.setattr(loop, "kill", lambda: None)
+
+    with contextlib.suppress(KeyboardInterrupt):
+        loop.run_streaming_loop_async(AsyncTestStreamLitAPI(), requests_queue, mock_transport, cb_runner)
+
+    assert recorder.events == _EXPECTED_STREAMING_EVENTS
+
+
+@pytest.mark.asyncio
+async def test_run_streaming_loop_after_events_fire_only_once_stream_is_consumed(mock_transport):
+    """AFTER_PREDICT must reflect real prediction time, not the instant the generator was created."""
+
+    class SlowStreamAPI(ls.test_examples.SimpleStreamAPI):
+        def predict(self, x):
+            for i in range(3):
+                time.sleep(0.1)
+                yield f"{i}: {x}"
+
+    lit_api = SlowStreamAPI()
+    lit_api.setup(None)
+    lit_api.request_timeout = 10
+
+    before_predict = []
+    after_predict = []
+
+    class TimingRecorder(ls.Callback):
+        def on_before_predict(self, *args, **kwargs):
+            before_predict.append(time.perf_counter())
+
+        def on_after_predict(self, *args, **kwargs):
+            after_predict.append(time.perf_counter())
+
+    cb_runner = CallbackRunner()
+    cb_runner._add_callbacks(TimingRecorder())
+
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
+
+    lit_loop = StreamingLoop()
+    lit_loop._restart_workers = True
+    loop_thread = threading.Thread(
+        target=lit_loop.run_streaming_loop, args=(lit_api, request_queue, mock_transport, cb_runner)
+    )
+    loop_thread.start()
+    time.sleep(1)
+    request_queue.put(_SENTINEL_VALUE)
+    loop_thread.join()
+
+    assert len(before_predict) == 1, f"BEFORE_PREDICT fired {len(before_predict)} times, expected 1"
+    assert len(after_predict) == 1, f"AFTER_PREDICT fired {len(after_predict)} times, expected 1"
+
+    elapsed = after_predict[0] - before_predict[0]
+    assert elapsed >= 0.3, f"AFTER_PREDICT fired before the stream was consumed (measured {elapsed:.3f}s)"
 
 
 @pytest.mark.asyncio
