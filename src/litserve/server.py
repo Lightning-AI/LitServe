@@ -421,6 +421,24 @@ class _Server(uvicorn.server.Server):
         return super().run(sockets)
 
 
+class _UvicornThread(threading.Thread):
+    def __init__(
+        self,
+        server: _Server,
+        worker_id: int,
+        sockets: Union[list[socket.socket], None],
+        name: str,
+    ) -> None:
+        super().__init__(target=server.run, args=(worker_id, sockets), name=name)
+        self.server = server
+
+    def terminate(self) -> None:
+        self.server.should_exit = True
+
+    def kill(self) -> None:
+        self.server.force_exit = True
+
+
 class LitServer:
     """Initialize a LitServer for high-performance AI model serving.
 
@@ -1575,8 +1593,11 @@ class LitServer:
                     target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}"
                 )
             elif uvicorn_worker_type == "thread":
-                w = threading.Thread(
-                    target=server.run, args=(response_queue_id, sockets), name=f"LitServer-{response_queue_id}"
+                w = _UvicornThread(
+                    server=server,
+                    worker_id=response_queue_id,
+                    sockets=sockets,
+                    name=f"LitServer-{response_queue_id}",
                 )
             else:
                 raise ValueError("Invalid value for api_server_worker_type. Must be 'process' or 'thread'")
