@@ -52,6 +52,4 @@ repos:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
-        # v0.16.6 started formatting python blocks in markdown; keep docs out of scope
-        exclude: '\.md$'
       - id: ruff-check
