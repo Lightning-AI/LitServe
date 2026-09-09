@@ -38,7 +38,8 @@ repos:
         args: ["--print-width=120"]
 
   - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.8
+    # keep at v1.7.7: v1.7.8 mangles non-docstring strings and never converges with ruff-format
+    rev: v1.7.7
     hooks:
       - id: docformatter
         language_version: python3.13
@@ -51,4 +52,6 @@ repos:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
+        # v0.16.6 started formatting python blocks in markdown; keep docs out of scope
+        exclude: '\.md$'
       - id: ruff-check
