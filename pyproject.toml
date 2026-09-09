@@ -165,7 +165,8 @@ max-complexity = 10
 dev = [
     "asgi-lifespan>=2.1.0",
     "coverage[toml]>=7.5.3",
-    "fastmcp>=2.9.2 ; python_full_version >= '3.10'",
+    # fastmcp 4 requires mcp>=2, which removed `mcp.server.fastmcp` (see litserve/mcp.py)
+    "fastmcp>=2.9.2,<4 ; python_full_version >= '3.10'",
     "httpx>=0.27.0",
     "lightning>2.0.0",
     "mypy==2.3.0",
