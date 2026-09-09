@@ -47,9 +47,7 @@ lightning = "litserve.cli:main"
 
 
 [build-system]
-# hatchling 1.32.0 emits Metadata-Version 2.5, which twine/pkginfo don't yet recognize as valid,
-# causing `twine check --strict` to fail. Pin below it until upstream fixes this.
-requires = ["hatchling<1.32"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
@@ -59,6 +57,13 @@ pattern = "__version__ = \"(?P<version>.+)\""
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+# hatchling defaults to Metadata-Version 2.5, which twine 6.x rejects; emit 2.4 until CI is on twine 7
+[tool.hatch.build.targets.wheel]
+core-metadata-version = "2.4"
+
+[tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
 
 [tool.check-manifest]
 ignore = [
