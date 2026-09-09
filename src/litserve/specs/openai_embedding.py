@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import base64
 import inspect
 import logging
+import struct
 import sys
 import time
 import uuid
@@ -59,7 +61,7 @@ class EmbeddingRequest(BaseModel):
 
 class Embedding(BaseModel):
     index: int
-    embedding: list[float]
+    embedding: Union[list[float], str]
     object: Literal["embedding"] = "embedding"
 
 
@@ -287,6 +289,11 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         self._validate_response(response)
         data: list[Embedding] = self._handle_embedding_response(response["embeddings"], num_items)
+        if request.encoding_format == "base64":
+            for item in data:
+                # OpenAI clients decode base64 embeddings as little-endian float32 vectors.
+                packed = struct.pack(f"<{len(item.embedding)}f", *item.embedding)
+                item.embedding = base64.b64encode(packed).decode("ascii")
 
         usage = UsageInfo(**response)
 

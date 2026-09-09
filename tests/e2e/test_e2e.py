@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import json
 import os
 import subprocess
@@ -391,6 +392,13 @@ def test_openai_embedding_parity():
     assert len(response.data) == 2, f"Expected 2 embeddings but got {len(response.data)}"
     for data in response.data:
         assert len(data.embedding) == 768, f"Expected 768 dimensions but got {len(data.embedding)}"
+
+    # the SDK returns the raw payload when the caller explicitly asks for base64
+    response = client.embeddings.create(model="lit", input=input_text, encoding_format="base64")
+    embedding = response.data[0].embedding
+    assert isinstance(embedding, str), "Expected a base64 string but got something else"
+    # decoding gives raw bytes, so the length pins both the dimensions and the 4-byte float32 width
+    assert len(base64.b64decode(embedding)) == 768 * 4, "Expected 768 little-endian float32 values"
 
 
 @e2e_from_file("tests/e2e/default_async_streaming.py")
