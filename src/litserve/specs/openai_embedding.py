@@ -291,7 +291,7 @@ class OpenAIEmbeddingSpec(LitSpec):
         data: list[Embedding] = self._handle_embedding_response(response["embeddings"], num_items)
         if request.encoding_format == "base64":
             for item in data:
-                # OpenAI clients decode base64 embeddings as float32 vectors.
+                # OpenAI clients decode base64 embeddings as little-endian float32 vectors.
                 packed = struct.pack(f"<{len(item.embedding)}f", *item.embedding)
                 item.embedding = base64.b64encode(packed).decode("ascii")
 
