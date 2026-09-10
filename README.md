@@ -83,6 +83,7 @@ pip install litserve
 ```python
 import litserve as ls
 
+
 # define the api to include any number of models, dbs, etc...
 class InferenceEngine(ls.LitAPI):
     def setup(self, device):
@@ -90,12 +91,13 @@ class InferenceEngine(ls.LitAPI):
         self.vision_model = lambda x: x**3
 
     def predict(self, request):
-        x = request["input"]    
+        x = request["input"]
         # perform calculations using both models
         a = self.text_model(x)
         b = self.vision_model(x)
         c = a + b
         return {"output": c}
+
 
 if __name__ == "__main__":
     # 12+ features like batching, streaming, etc...
@@ -125,21 +127,23 @@ curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -
 import re, requests, openai
 import litserve as ls
 
+
 class NewsAgent(ls.LitAPI):
     def setup(self, device):
         self.openai_client = openai.OpenAI(api_key="OPENAI_API_KEY")
 
     def predict(self, request):
         website_url = request.get("website_url", "https://text.npr.org/")
-        website_text = re.sub(r'<[^>]+>', ' ', requests.get(website_url).text)
+        website_text = re.sub(r"<[^>]+>", " ", requests.get(website_url).text)
 
         # ask the LLM to tell you about the news
         llm_response = self.openai_client.chat.completions.create(
-           model="gpt-3.5-turbo", 
-           messages=[{"role": "user", "content": f"Based on this, what is the latest: {website_text}"}],
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": f"Based on this, what is the latest: {website_text}"}],
         )
         output = llm_response.choices[0].message.content.strip()
         return {"output": output}
+
 
 if __name__ == "__main__":
     server = ls.LitServer(NewsAgent())
