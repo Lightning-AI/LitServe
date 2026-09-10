@@ -31,7 +31,7 @@ from httpx import ASGITransport, AsyncClient
 import litserve as ls
 from litserve import LitAPI
 from litserve.connector import _Connector
-from litserve.server import LitServer
+from litserve.server import LitServer, _UvicornThread
 from litserve.utils import WorkerSetupStatus, wrap_litserve_start
 
 
@@ -245,6 +245,17 @@ def test_start_server(mock_server):
     server._start_server(8000, 1, "info", sockets, "process")
     mock_server.assert_called()
     assert server.lit_api.spec.response_queue_id is not None, "response_queue_id must be generated"
+
+
+def test_uvicorn_thread_shutdown_signals():
+    uvicorn_server = MagicMock()
+    worker = _UvicornThread(uvicorn_server, worker_id=0, sockets=None, name="LitServer-0")
+
+    worker.terminate()
+    assert uvicorn_server.should_exit is True
+
+    worker.kill()
+    assert uvicorn_server.force_exit is True
 
 
 @pytest.fixture
