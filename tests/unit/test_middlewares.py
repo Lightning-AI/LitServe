@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import multiprocessing as mp
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -112,3 +114,19 @@ def test_track_requests_middleware_isolation():
         assert any(mw.cls is RequestCountMiddleware for mw in app_copy.user_middleware), (
             "RequestCountMiddleware not found in middleware list"
         )
+
+
+def test_request_count_is_reset_after_error():
+    active_counter = mp.Value("i", 0, lock=True)
+    app = FastAPI()
+    app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+
+    @app.get("/fail")
+    def fail():
+        assert active_counter.value == 1
+        raise RuntimeError("request failed")
+
+    with TestClient(app) as client, pytest.raises(RuntimeError, match="request failed"):
+        client.get("/fail")
+
+    assert active_counter.value == 0
