@@ -100,12 +100,22 @@ class Function(BaseModel):
 class ToolChoice(str, Enum):
     auto: str = "auto"
     none: str = "none"
+    required: str = "required"
     any: str = "any"
 
 
 class Tool(BaseModel):
     type: Literal["function"]
     function: Function
+
+
+class NamedToolChoiceFunction(BaseModel):
+    name: str
+
+
+class NamedToolChoice(BaseModel):
+    type: Literal["function"]
+    function: NamedToolChoiceFunction
 
 
 class FunctionCall(BaseModel):
@@ -178,7 +188,7 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = 0.0
     user: Optional[str] = None
     tools: Optional[list[Tool]] = None
-    tool_choice: Optional[ToolChoice] = ToolChoice.auto
+    tool_choice: Optional[Union[ToolChoice, NamedToolChoice]] = ToolChoice.auto
     response_format: Optional[ResponseFormat] = None
     reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
     metadata: Optional[dict[str, str]] = None
