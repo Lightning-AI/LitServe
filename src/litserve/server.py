@@ -32,7 +32,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
@@ -294,13 +294,15 @@ class BaseRequestHandler(ABC):
         self.lit_api = lit_api
         self.server = server
 
-    async def _prepare_request(self, request, request_type) -> dict:
+    async def _prepare_request(self, request, request_type) -> Any:
         """Common request preparation logic."""
         if request_type == Request:
-            content_type = request.headers.get("Content-Type", "")
+            content_type = request.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
                 return await request.form()
-            return await request.json()
+            if content_type == "application/json" or content_type.endswith("+json"):
+                return await request.json()
+            return await request.body()
         return request
 
     async def _submit_request(self, payload: dict) -> tuple[str, asyncio.Event]:
