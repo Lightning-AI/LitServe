@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-import multiprocessing as mp
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -116,17 +114,22 @@ def test_track_requests_middleware_isolation():
         )
 
 
-def test_request_count_is_reset_after_error():
-    active_counter = mp.Value("i", 0, lock=True)
-    app = FastAPI()
-    app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+def test_active_requests_reset_after_error():
+    """A request that fails should not stay counted in `LitServer.active_requests`."""
+    in_flight = []
 
-    @app.get("/fail")
-    def fail():
-        assert active_counter.value == 1
-        raise RuntimeError("request failed")
+    class FailingMiddleware(BaseHTTPMiddleware):
+        """Fails a request downstream of RequestCountMiddleware, which wraps all user middlewares."""
 
-    with TestClient(app) as client, pytest.raises(RuntimeError, match="request failed"):
-        client.get("/fail")
+        async def dispatch(self, request, call_next):
+            await call_next(request)
+            in_flight.append(server.active_requests)
+            raise RuntimeError("request failed")
 
-    assert active_counter.value == 0
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), track_requests=True, middlewares=[FailingMiddleware])
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        with pytest.raises(RuntimeError, match="request failed"):
+            client.post("/predict", json={"input": 4.0})
+
+        assert in_flight == [1], "request should be counted while it is in flight"
+        assert server.active_requests == 0, "failed request should not stay in the active request count"
