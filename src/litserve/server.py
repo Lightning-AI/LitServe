@@ -294,16 +294,21 @@ class BaseRequestHandler(ABC):
         self.lit_api = lit_api
         self.server = server
 
-    async def _prepare_request(self, request, request_type) -> dict:
-        """Common request preparation logic."""
+    async def _prepare_request(self, request, request_type) -> tuple[dict, dict]:
+        """Common request preparation logic.
+
+        Returns the decoded payload and the request headers.
+
+        """
         if request_type == Request:
             content_type = request.headers.get("Content-Type", "")
+            headers = dict(request.headers)
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
-                return await request.form()
-            return await request.json()
-        return request
+                return await request.form(), headers
+            return await request.json(), headers
+        return request, {}
 
-    async def _submit_request(self, payload: dict) -> tuple[str, asyncio.Event]:
+    async def _submit_request(self, payload: dict, headers: Optional[dict] = None) -> tuple[str, asyncio.Event]:
         """Submit request to worker queue."""
         request_queue = self.server._get_request_queue(self.lit_api.api_path)
         response_queue_id = self.server.app.response_queue_id
@@ -316,7 +321,7 @@ class BaseRequestHandler(ABC):
             litserver=self.server,
         )
 
-        request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+        request_queue.put((response_queue_id, uid, time.monotonic(), payload, headers or {}))
         logger.debug(f"Submitted request uid={uid}")
         return uid, response_queue_id
 
@@ -330,10 +335,10 @@ class RegularRequestHandler(BaseRequestHandler):
         try:
             logger.debug(f"Handling request: {request}")
             # Prepare request
-            payload = await self._prepare_request(request, request_type)
+            payload, headers = await self._prepare_request(request, request_type)
 
             # Submit to worker
-            uid, _ = await self._submit_request(payload)
+            uid, _ = await self._submit_request(payload, headers)
 
             # Wait for response
             event = asyncio.Event()
@@ -383,10 +388,10 @@ class StreamingRequestHandler(BaseRequestHandler):
     async def handle_request(self, request, request_type) -> StreamingResponse:
         try:
             # Prepare request
-            payload = await self._prepare_request(request, request_type)
+            payload, headers = await self._prepare_request(request, request_type)
 
             # Submit to worker
-            uid, _ = await self._submit_request(payload)
+            uid, _ = await self._submit_request(payload, headers)
 
             # Set up streaming response
             event = asyncio.Event()

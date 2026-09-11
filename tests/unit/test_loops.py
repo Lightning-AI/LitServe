@@ -71,8 +71,8 @@ def mock_transport():
 @pytest.fixture
 def loop_args():
     requests_queue = Queue()
-    requests_queue.put((0, "uuid-123", time.monotonic(), 1))  # response_queue_id, uid, timestamp, x_enc
-    requests_queue.put((1, "uuid-234", time.monotonic(), 2))
+    requests_queue.put((0, "uuid-123", time.monotonic(), 1, {}))  # response_queue_id, uid, timestamp, x_enc, headers
+    requests_queue.put((1, "uuid-234", time.monotonic(), 2, {}))
 
     lit_api_mock = MagicMock()
     lit_api_mock.request_timeout = 1
@@ -113,8 +113,8 @@ class AsyncTestLitAPI(LitAPI):
 @pytest.fixture
 def async_loop_args():
     requests_queue = TestQueue()
-    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 1}))
-    requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}))
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 1}, {}))
+    requests_queue.put((1, "uuid-234", time.monotonic(), {"input": 2}, {}))
     requests_queue.put(_SENTINEL_VALUE)
 
     lit_api = AsyncTestLitAPI()
@@ -223,7 +223,7 @@ def test_streaming_loop():
     fake_stream_api.format_encoded_response = MagicMock(side_effect=lambda x: x)
 
     requests_queue = Queue()
-    requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}))
+    requests_queue.put((0, "UUID-1234", time.monotonic(), {"prompt": "Hello"}, {}))
     transport = FakeStreamSender(num_streamed_outputs)
 
     lit_loop = StreamingLoop()
@@ -257,7 +257,7 @@ class AsyncTestStreamLitAPI(LitAPI):
 
 @pytest.mark.asyncio
 async def test_streaming_loop_process_streaming_request(mock_transport):
-    request = (0, "UUID-1234", time.monotonic(), {"input": 5})
+    request = (0, "UUID-1234", time.monotonic(), {"input": 5}, {})
 
     lit_api = AsyncTestStreamLitAPI()
     loop = StreamingLoop()
@@ -278,7 +278,7 @@ async def test_streaming_loop_process_streaming_request(mock_transport):
 
 def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
     requests_queue = TestQueue()
-    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}))
+    requests_queue.put((0, "uuid-123", time.monotonic(), {"input": 5}, {}))
     requests_queue.put(_SENTINEL_VALUE)  # Sentinel to stop the loop
 
     lit_api = AsyncTestStreamLitAPI()
@@ -359,8 +359,8 @@ def test_batched_streaming_loop(mock_transport):
     fake_stream_api.batch_timeout = 2
 
     requests_queue = Queue()
-    requests_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}))
-    requests_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}))
+    requests_queue.put((0, "UUID-001", time.monotonic(), {"prompt": "Hello"}, {}))
+    requests_queue.put((0, "UUID-002", time.monotonic(), {"prompt": "World"}, {}))
 
     lit_loop = BatchedStreamingLoop()
     transport = FakeBatchStreamTransport(num_streamed_outputs)
@@ -426,7 +426,7 @@ async def test_run_single_loop(mock_transport):
     lit_api.request_timeout = 1
 
     request_queue = Queue()
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}, {}))
     transport = mock_transport
 
     # Run the loop in a separate thread to allow it to be stopped
@@ -460,7 +460,7 @@ async def test_run_single_loop_timeout():
 
     request_queue = Queue()
     transport = MockMPQueueTransport()
-    old_request = (0, "UUID-001", time.monotonic(), {"input": 4.0})
+    old_request = (0, "UUID-001", time.monotonic(), {"input": 4.0}, {})
     time.sleep(0.1)  # Age the request
     request_queue.put(old_request)
 
@@ -493,7 +493,10 @@ async def test_run_batched_loop():
     request_queue = Queue()
     transport = MockMPQueueTransport(1)
 
-    requests = [(0, "UUID-001", time.monotonic(), {"input": 4.0}), (0, "UUID-002", time.monotonic(), {"input": 5.0})]
+    requests = [
+        (0, "UUID-001", time.monotonic(), {"input": 4.0}, {}),
+        (0, "UUID-002", time.monotonic(), {"input": 5.0}, {}),
+    ]
     for req in requests:
         request_queue.put(req)
 
@@ -538,8 +541,8 @@ async def test_run_batched_loop_timeout(mock_transport):
 
     # First request will time out, second will succeed
     requests = [
-        (0, "UUID-001", time.monotonic() - 0.2, {"input": 4.0}),  # Old request
-        (0, "UUID-002", time.monotonic(), {"input": 5.0}),  # Fresh request
+        (0, "UUID-001", time.monotonic() - 0.2, {"input": 4.0}, {}),  # Old request
+        (0, "UUID-002", time.monotonic(), {"input": 5.0}, {}),  # Fresh request
     ]
     for req in requests:
         request_queue.put(req)
@@ -575,7 +578,7 @@ async def test_run_streaming_loop(mock_transport):
     lit_api.request_timeout = 1
 
     request_queue = Queue()
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}))
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}, {}))
 
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
@@ -609,7 +612,7 @@ async def test_run_streaming_loop_timeout(mock_transport):
     lit_api.request_timeout = 0.1
 
     request_queue = Queue()
-    request_queue.put((0, "UUID-001", time.monotonic() - 5, {"input": "Hello"}))
+    request_queue.put((0, "UUID-001", time.monotonic() - 5, {"input": "Hello"}, {}))
 
     # Run the loop in a separate thread to allow it to be stopped
     lit_loop = StreamingLoop()
@@ -643,9 +646,9 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     lit_api.pre_setup(spec=spec, timeout=30)
 
     request_queue = Queue()
-    # response_queue_id, uid, timestamp, x_enc
-    r1 = (0, "UUID-001", time.monotonic(), openai_request_data)
-    r2 = (0, "UUID-002", time.monotonic(), openai_request_data)
+    # response_queue_id, uid, timestamp, x_enc, headers
+    r1 = (0, "UUID-001", time.monotonic(), openai_request_data, {})
+    r2 = (0, "UUID-002", time.monotonic(), openai_request_data, {})
     request_queue.put(r1)
     request_queue.put(r2)
     response_queues = [Queue()]
@@ -708,7 +711,7 @@ class TestLoop(LitLoop):
         if item is None:
             return
 
-        response_queue_id, uid, timestamp, x_enc = item
+        response_queue_id, uid, timestamp, x_enc, headers = item
         cache = lit_api.load_cache(x_enc)
         x = lit_api.decode_request(x_enc) * cache
         response = lit_api.predict(x)
@@ -726,7 +729,7 @@ async def test_custom_loop(mock_transport):
     lit_api.load_cache = MagicMock(return_value=1.0)
     lit_api.encode_response = MagicMock(return_value={"output": 16.0})
     request_queue = Queue()
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}, {}))
 
     loop(lit_api, "cpu", 0, request_queue, mock_transport, {}, NOOP_CB_RUNNER)
     response = await mock_transport.areceive(0)
@@ -824,19 +827,19 @@ def test_lit_loop_get_batch_requests(lit_loop_setup):
     lit_loop, lit_api, request_queue = lit_loop_setup
     lit_api.max_batch_size = 2
     lit_api.batch_timeout = 0.2
-    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}))
-    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}))
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": 4.0}, {}))
+    request_queue.put((0, "UUID-002", time.monotonic(), {"input": 5.0}, {}))
     batches, timed_out_uids = lit_loop.get_batch_requests(lit_api, request_queue, MagicMock())
     assert len(batches) == 2
-    assert batches == [(0, "UUID-001", {"input": 4.0}), (0, "UUID-002", {"input": 5.0})]
+    assert batches == [(0, "UUID-001", {"input": 4.0}, {}), (0, "UUID-002", {"input": 5.0}, {})]
     assert timed_out_uids == []
 
 
 def test_lit_loop_get_request(lit_loop_setup):
     lit_loop, _, request_queue = lit_loop_setup
     t = time.monotonic()
-    request_queue.put((0, "UUID-001", t, {"input": 4.0}))
-    response_queue_id, uid, timestamp, x_enc = lit_loop.get_request(request_queue, timeout=1)
+    request_queue.put((0, "UUID-001", t, {"input": 4.0}, {}))
+    response_queue_id, uid, timestamp, x_enc, headers = lit_loop.get_request(request_queue, timeout=1)
     assert uid == "UUID-001"
     assert response_queue_id == 0
     assert timestamp == t
