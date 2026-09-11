@@ -327,6 +327,7 @@ class BaseRequestHandler(ABC):
 
 class RegularRequestHandler(BaseRequestHandler):
     async def handle_request(self, request, request_type) -> Response:
+        uid = None
         try:
             logger.debug(f"Handling request: {request}")
             # Prepare request
@@ -359,6 +360,10 @@ class RegularRequestHandler(BaseRequestHandler):
         except Exception as e:
             logger.error(f"Unhandled exception: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Internal server error") from e
+
+        finally:
+            if uid is not None:
+                self.server.response_buffer.pop(uid, None)
 
     @staticmethod
     def _handle_error_response(response):
