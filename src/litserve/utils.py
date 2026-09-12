@@ -120,10 +120,15 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
     finally:
         server._shutdown_event.set()
         # First close the transport to signal to the response_queue_to_buffer task that it should stop
-        server._transport.close()
+        if hasattr(server, "_transport"):
+            server._transport.close()
         for p in server.inference_workers:
             p.terminate()
             p.join()
+
+        if hasattr(server, "_logger_connector"):
+            server._logger_connector.close()
+
         server.manager.shutdown()
 
 

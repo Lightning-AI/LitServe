@@ -753,6 +753,10 @@ class LitServer:
             )
             raise ValueError(_msg)
 
+        from litserve.metrics import setup_prometheus
+
+        self._metrics_dir = setup_prometheus(loggers, middlewares)
+
         # Handle 0.3.0 migration
         if api_path is not None:
             _migration_warning("api_path")
@@ -1189,11 +1193,12 @@ class LitServer:
         logger.info("Shutting down LitServe...")
 
         # Handle transport closure based on shutdown reason
-        if shutdown_reason == "keyboard_interrupt":
-            logger.debug("KeyboardInterrupt detected - skipping transport cleanup to avoid hanging")
-            self._transport.close(send_sentinel=False)
-        else:
-            self._transport.close(send_sentinel=True)
+        if hasattr(self, "_transport"):
+            if shutdown_reason == "keyboard_interrupt":  # pragma: no cover
+                logger.debug("KeyboardInterrupt detected - skipping transport cleanup to avoid hanging")
+                self._transport.close(send_sentinel=False)
+            else:
+                self._transport.close(send_sentinel=True)
 
         # terminate Uvicorn server workers tracked by LitServe (the master processes/threads)
         if len(uvicorn_workers) > 0:
@@ -1232,6 +1237,10 @@ class LitServer:
                     logger.debug(f"Worker {worker_name} (PID: {worker_pid}): Terminated gracefully.")
             except Exception as e:
                 logger.error(f"Error while terminating worker {worker_name} (PID: {worker_pid}): {e}")
+
+        # terminate logger process and clean up logger resources
+        if hasattr(self, "_logger_connector"):
+            self._logger_connector.close()
 
         manager.shutdown()
 
