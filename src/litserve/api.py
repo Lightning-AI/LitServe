@@ -70,6 +70,8 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     Configuration:
         max_batch_size: Batch multiple requests for better GPU utilization. Defaults to 1.
         batch_timeout: Wait time for batch to fill (seconds). Defaults to 0.0.
+        batched: Always use the batched interface, so `predict` receives a batch (of size 1 or more)
+            regardless of `max_batch_size`. Defaults to False.
         stream: Enable streaming responses for real-time output. Defaults to False.
         api_path: URL endpoint path. Defaults to "/predict".
         enable_async: Enable async/await for non-blocking operations. Defaults to False.
@@ -87,6 +89,10 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
                 return self.model(batch)
 
         api = BatchedAPI(max_batch_size=8, batch_timeout=0.1)
+
+        # `predict` keeps receiving a batch even when batching is turned off,
+        # so the implementation does not have to change with the server config.
+        api = BatchedAPI(batched=True)
         ```
 
         Streaming LLM:
@@ -130,6 +136,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     """
 
     _stream: bool = False
+    _batched: bool = False
     _default_unbatch: Optional[Callable] = None
     _spec: Optional[LitSpec] = None
     _device: Optional[str] = None
@@ -146,6 +153,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         spec: Optional[LitSpec] = None,
         mcp: Optional["MCP"] = None,
         enable_async: bool = False,
+        batched: bool = False,
     ):
         """Initialize LitAPI with configuration options."""
         if max_batch_size <= 0:
@@ -173,7 +181,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         batch_overridden = self.batch.__code__ is not LitAPI.batch.__code__
         unbatch_overridden = self.unbatch.__code__ is not LitAPI.unbatch.__code__
 
-        if batch_overridden and unbatch_overridden and max_batch_size == 1:
+        if batch_overridden and unbatch_overridden and max_batch_size == 1 and not batched:
             warnings.warn(
                 "The LitServer has both batch and unbatch methods implemented, "
                 "but the max_batch_size parameter was not set."
@@ -185,6 +193,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         self._spec = spec
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
+        self._batched = batched
         self.enable_async = enable_async
         self._validate_async_methods()
         self.mcp = mcp
@@ -274,9 +283,11 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
     def predict(self, x, **kwargs):
         """Run the model on the input and return or yield the output.
 
-        When batching is enabled (max_batch_size > 1), this method receives
-        a batched input and must return a list-like structure where each element
-        corresponds to one input in the batch.
+        When batching is enabled (``max_batch_size > 1`` or ``batched=True``), this method
+        receives a batched input and must return a list-like structure where each element
+        corresponds to one input in the batch. Use ``batched=True`` to keep this contract
+        stable even when ``max_batch_size`` is 1, so the implementation does not have to
+        change with the server configuration.
 
         Returns:
             For non-batched mode: Single prediction output
@@ -372,6 +383,20 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         self._stream = value
 
     @property
+    def batched(self) -> bool:
+        """Whether ``predict`` receives a batch of inputs.
+
+        True when ``max_batch_size > 1``, or when ``batched=True`` was passed to keep the batched
+        interface regardless of the batch size.
+
+        """
+        return self._batched or self.max_batch_size > 1
+
+    @batched.setter
+    def batched(self, value: bool):
+        self._batched = value
+
+    @property
     def device(self):
         return self._device
 
@@ -432,7 +457,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         if self._loop == "auto":
             from litserve.loops.loops import get_default_loop
 
-            self._loop = get_default_loop(self.stream, self.max_batch_size, self.enable_async)
+            self._loop = get_default_loop(self.stream, self.max_batch_size, self.enable_async, self.batched)
         return self._loop
 
     @loop.setter

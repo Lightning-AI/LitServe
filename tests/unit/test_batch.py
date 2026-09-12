@@ -28,6 +28,7 @@ from litserve import LitAPI, LitServer
 from litserve.callbacks import CallbackRunner
 from litserve.loops.base import _SENTINEL_VALUE, _StopLoopError, collate_requests
 from litserve.loops.simple_loops import BatchedLoop
+from litserve.loops.streaming_loops import BatchedStreamingLoop
 from litserve.test_examples import SimpleBatchedAPI
 from litserve.transport.base import MessageTransport
 from litserve.utils import LoopResponseType, wrap_litserve_start
@@ -348,3 +349,68 @@ def test_batch_predict_set_warning():
     # When list() is called on a set, the order is arbitrary
     # This could lead to incorrect results
     assert len(outputs) == 2
+
+
+class ConsistentBatchAPI(LitAPI):
+    """A single implementation that works with and without dynamic batching."""
+
+    def setup(self, device):
+        self.model = lambda x: x * 2
+
+    def decode_request(self, request):
+        return request["input"]
+
+    def predict(self, batch):
+        assert isinstance(batch, list), "predict must always receive a list when batched=True"
+        return [self.model(x) for x in batch]
+
+    def encode_response(self, output):
+        return {"output": output, "batch_size": 1}
+
+
+def test_batched_flag_defaults():
+    assert not SimpleBatchedAPI(max_batch_size=1).batched, "batching is off by default"
+    assert SimpleBatchedAPI(max_batch_size=2).batched, "max_batch_size > 1 implies batching"
+    assert SimpleBatchedAPI(max_batch_size=1, batched=True).batched, "batched=True opts into the batched interface"
+
+
+def test_batched_flag_selects_batched_loop():
+    api = ConsistentBatchAPI(batched=True)
+    assert isinstance(api.loop, BatchedLoop), "batched=True must use the batched loop with max_batch_size=1"
+
+    api = ConsistentBatchAPI(batched=True, stream=True)
+    api.predict = MagicMock()
+    assert isinstance(api.loop, BatchedStreamingLoop), "batched=True must use the batched streaming loop"
+
+
+def test_batched_flag_rejects_async():
+    class AsyncAPI(LitAPI):
+        async def predict(self, x):
+            return x
+
+    api = AsyncAPI(enable_async=True, batched=True)
+    with pytest.raises(ValueError, match="Async batching is not supported"):
+        _ = api.loop
+
+
+def test_batched_flag_skips_unset_batch_size_warning(recwarn):
+    SimpleBatchedAPI(max_batch_size=1, batched=True)
+    assert not [w for w in recwarn if "max_batch_size parameter was not set" in str(w.message)]
+
+
+@pytest.mark.parametrize(
+    ("max_batch_size", "batch_timeout"),
+    [(1, 0.0), (4, 0.05)],
+)
+@pytest.mark.asyncio
+async def test_batched_flag_keeps_predict_interface_stable(max_batch_size, batch_timeout):
+    """The same LitAPI must work regardless of the batching configuration."""
+    api = ConsistentBatchAPI(max_batch_size=max_batch_size, batch_timeout=batch_timeout, batched=True)
+    server = LitServer(api, accelerator="cpu", devices=1, timeout=10)
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            response = await ac.post("/predict", json={"input": 4.0})
+    assert response.json() == {"output": 8.0, "batch_size": 1}
