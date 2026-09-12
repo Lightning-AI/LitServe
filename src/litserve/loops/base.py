@@ -394,8 +394,8 @@ class DefaultLoop(LitLoop):
             ]
         ):
             raise ValueError(
-                """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` must not be
-                generator or async generator functions.
+                """When `stream=False`, `lit_api.predict`, `lit_api.encode_response` must not be generator or async
+                generator functions.
 
                 Correct usage:
 
@@ -420,6 +420,7 @@ class DefaultLoop(LitLoop):
                         ...
                         for i in range(max_token_length):
                             yield prediction
+
                 """
             )
         if (
