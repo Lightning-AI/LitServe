@@ -85,16 +85,14 @@ class ContinuousBatchingLoop(LitLoop):
             )
 
         if not hasattr(lit_api, "step") and not hasattr(lit_api, "predict"):
-            raise ValueError(
-                """Using the default step method with Continuous batching loop requires the lit_api to have
+            raise ValueError("""Using the default step method with Continuous batching loop requires the lit_api to have
                              a `predict` method which accepts decoded request inputs and a list of generated_sequence.
                              Please implement the has_finished method in the lit_api.
 
                              class ExampleAPI(LitAPI):     ...     def predict(self, inputs, generated_sequence):
                              # implement predict logic         # return list of new tokens         ...
 
-                             """
-            )
+                             """)
 
         if not hasattr(lit_api, "step") and not hasattr(lit_api, "has_finished"):
             raise ValueError("""Using the default step method with Continuous batching loop requires the lit_api to have
