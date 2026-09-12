@@ -87,12 +87,6 @@ quiet-level = 3
 #  https://github.com/codespell-project/codespell/issues/2243#issuecomment-1732019960
 #ignore-words-list = ""
 
-[tool.docformatter]
-recursive = true
-wrap-summaries = 120
-wrap-descriptions = 120
-blank = true
-
 
 #[tool.mypy]
 #files = [
