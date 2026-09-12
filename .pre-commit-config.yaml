@@ -37,14 +37,6 @@ repos:
         # https://prettier.io/docs/en/options.html#print-width
         args: ["--print-width=120"]
 
-  - repo: https://github.com/PyCQA/docformatter
-    # keep at v1.7.7: v1.7.8 mangles non-docstring strings and never converges with ruff-format
-    rev: v1.7.8
-    hooks:
-      - id: docformatter
-        additional_dependencies: [tomli]
-        args: ["--in-place"]
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.7
     hooks:
