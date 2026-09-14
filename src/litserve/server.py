@@ -865,7 +865,7 @@ class LitServer:
                 device_list = range(devices)
             self.devices = [self.device_identifiers(accelerator, device) for device in device_list]
 
-        self.transport_config = TransportConfig(transport_config="zmq" if self.use_zmq else "mp")
+        self.transport_config = TransportConfig(transport_type="zmq" if self.use_zmq else "mp")
         self.register_endpoints()
         # register middleware
         self._register_middleware()

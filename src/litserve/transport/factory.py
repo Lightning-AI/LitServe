@@ -22,7 +22,7 @@ def _create_zmq_transport(config: TransportConfig):
     broker.start()
     config.frontend_address = broker.frontend_address
     config.backend_address = broker.backend_address
-    return ZMQTransport(config.frontend_address, config.backend_address)
+    return ZMQTransport(backend_address=config.backend_address, frontend_address=config.frontend_address)
 
 
 def _create_mp_transport(config: TransportConfig):
