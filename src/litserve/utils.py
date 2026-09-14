@@ -116,9 +116,7 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
         server.mcp_server = None
 
     # Wait for all workers to be ready
-    while not all(
-        v == WorkerSetupStatus.READY for v in server.workers_setup_status.values()
-    ):
+    while not all(v == WorkerSetupStatus.READY for v in server.workers_setup_status.values()):
         if any(v == WorkerSetupStatus.ERROR for v in server.workers_setup_status.values()):
             raise RuntimeError("One or more workers failed to start")
         time.sleep(0.05)
