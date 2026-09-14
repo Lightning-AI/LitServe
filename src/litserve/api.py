@@ -148,7 +148,6 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         enable_async: bool = False,
     ):
         """Initialize LitAPI with configuration options."""
-
         if max_batch_size <= 0:
             raise ValueError("max_batch_size must be greater than 0")
 
@@ -253,7 +252,12 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         return request
 
     def batch(self, inputs):
-        """Convert a list of inputs to a batched input."""
+        """Convert a list of inputs to a batched input.
+
+        Add a context argument, batch(self, inputs, context), to also get the request context: one dict per input, in
+        the same order. The argument must be named context.
+
+        """
         # consider assigning an implementation when starting server
         # to avoid the runtime cost of checking (should be negligible)
         if hasattr(inputs[0], "__torch_function__"):
@@ -326,6 +330,14 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         If you need to return dictionaries, return a list of dicts:
             [{"key1": val1, "key2": val3}, {"key1": val2, "key2": val4}]  # Correct
 
+        Add a context argument to also get the request context, one dict per request in the same
+        order as the outputs:
+
+            def unbatch(self, output, context):
+                return [ctx["input"] for ctx in context]
+
+        The argument must be named context.
+
         """
         if self._default_unbatch is None:
             raise ValueError(
@@ -381,7 +393,6 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
 
     def set_logger_queue(self, queue: Queue):
         """Set the queue for logging events."""
-
         self._logger_queue = queue
 
     def log(self, key, value):

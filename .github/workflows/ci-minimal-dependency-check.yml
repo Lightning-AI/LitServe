@@ -15,11 +15,13 @@ jobs:
     runs-on: ubuntu-latest
 
     timeout-minutes: 30
+    env:
+      UV_EXCLUDE_NEWER: "2 days"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install uv and setup python
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           activate-environment: true
           python-version: "3.12"

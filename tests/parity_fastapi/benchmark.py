@@ -52,7 +52,6 @@ def send_request(args):
 
 def benchmark(num_requests=100, concurrency_level=100, port=8000):
     """Benchmark the ML server."""
-
     # Create a session with appropriate pool size
     session = create_session(pool_connections=min(concurrency_level, 100), pool_maxsize=min(concurrency_level, 100))
 

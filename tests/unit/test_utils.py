@@ -77,7 +77,6 @@ async def test_azip_propagates_stream_errors():
 @pytest.mark.skipif(sys.platform == "win32", reason="This test is for non-Windows platforms only.")
 def test_generate_random_zmq_address_non_windows(tmpdir):
     """Test generate_random_zmq_address on non-Windows platforms."""
-
     temp_dir = str(tmpdir)
     address1 = generate_random_zmq_address(temp_dir=temp_dir)
     address2 = generate_random_zmq_address(temp_dir=temp_dir)

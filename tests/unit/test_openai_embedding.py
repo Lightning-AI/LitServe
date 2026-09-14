@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+import base64
 import copy
 import time
 
@@ -209,3 +210,23 @@ async def test_batching_with_client_side_batching(openai_embedding_request_data_
                 == "The OpenAIEmbedding spec does not support dynamic batching when client-side batching is used. "
                 "To resolve this, either set `max_batch_size=1` or send a single input from the client."
             )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("request_data", ["openai_embedding_request_data", "openai_embedding_request_data_array"])
+async def test_openai_embedding_spec_with_base64_encoding(request_data, request):
+    request_data = {**request.getfixturevalue(request_data), "encoding_format": "base64"}
+    server = ls.LitServer(TestEmbedAPI(spec=OpenAIEmbeddingSpec()))
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/v1/embeddings", json=request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            for item in resp.json()["data"]:
+                embedding = item["embedding"]
+                assert isinstance(embedding, str), "Embedding should be a base64 string"
+                # OpenAI clients decode base64 embeddings as little-endian float32 vectors
+                assert len(np.frombuffer(base64.b64decode(embedding), dtype="<f4")) == 768
