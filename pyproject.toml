@@ -1,7 +1,3 @@
-[metadata]
-license_file = "LICENSE"
-description-file = "README.md"
-
 [project]
 name = "litserve"
 dynamic = ["version"]
