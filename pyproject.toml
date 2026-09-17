@@ -1,8 +1,6 @@
 [build-system]
 build-backend = "hatchling.build"
-# hatchling 1.32.0 emits Metadata-Version 2.5, which twine/pkginfo don't yet recognize as valid,
-# causing `twine check --strict` to fail. Pin below it until upstream fixes this.
-requires = [ "hatchling<1.32" ]
+requires = [ "hatchling" ]
 
 [project]
 name = "litserve"
@@ -49,11 +47,12 @@ Download = "https://github.com/Lightning-AI/litserve"
 dev = [
   "asgi-lifespan>=2.1.0",
   "coverage[toml]>=7.5.3",
-  "fastmcp>=2.9.2; python_full_version>='3.10'",
+  # fastmcp 4 requires mcp>=2, which removed `mcp.server.fastmcp` (see litserve/mcp.py)
+  "fastmcp>=2.9.2,<4; python_full_version>='3.10'",
   "httpx>=0.27.0",
   "jsonargparse",
   "lightning>2.0.0",
-  "mypy==2.3.0",
+  "mypy==2.3.1",
   "numpy<3.0",
   "openai>=1.12.0",
   "pillow>=11.3.0",
@@ -76,6 +75,9 @@ dev = [
 version.path = "src/litserve/__about__.py"
 version.pattern = '__version__ = "(?P<version>.+)"'
 metadata.allow-direct-references = true
+# hatchling defaults to Metadata-Version 2.5, which twine 6.x rejects; emit 2.4 until CI is on twine 7
+build.targets.wheel.core-metadata-version = "2.4"
+build.targets.sdist.core-metadata-version = "2.4"
 
 # [tool.mypy]
 # files = [
