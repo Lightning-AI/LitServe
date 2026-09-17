@@ -1,82 +1,140 @@
-[project]
-name = "litserve"
-dynamic = ["version"]
-description = "Lightweight AI server."
-readme = "README.md"
-license = {text = "Apache-2.0"}
-authors = [
-    {name = "Lightning-AI et al.", email = "community@lightning.ai"}
-]
-requires-python = ">=3.10"
-keywords = ["deep learning", "pytorch", "AI"]
-classifiers = [
-    "Environment :: Console",
-    "Natural Language :: English",
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Information Analysis",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-]
-
-dependencies = [
-    "fastapi>=0.112",
-    "pyzmq>=22.0.0",
-    "uvicorn[standard]>=0.29.0",
-]
-
-[project.urls]
-Homepage = "https://github.com/Lightning-AI/litserve"
-"Bug Tracker" = "https://github.com/Lightning-AI/litserve/issues"
-Documentation = "https://lightning-ai.github.io/litserve/"
-"Source Code" = "https://github.com/Lightning-AI/litserve"
-Download = "https://github.com/Lightning-AI/litserve"
-
-[project.scripts]
-litserve = "litserve.__main__:main"
-lightning = "litserve.cli:main"
-
-
 [build-system]
+build-backend = "hatchling.build"
 # hatchling 1.32.0 emits Metadata-Version 2.5, which twine/pkginfo don't yet recognize as valid,
 # causing `twine check --strict` to fail. Pin below it until upstream fixes this.
-requires = ["hatchling<1.32"]
-build-backend = "hatchling.build"
+requires = [ "hatchling<1.32" ]
 
-[tool.hatch.version]
-path = "src/litserve/__about__.py"
-pattern = "__version__ = \"(?P<version>.+)\""
+[project]
+name = "litserve"
+description = "Lightweight AI server."
+readme = "README.md"
+keywords = [ "AI", "deep learning", "pytorch" ]
+license = { text = "Apache-2.0" }
+authors = [ { name = "Lightning-AI et al.", email = "community@lightning.ai" } ]
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dynamic = [ "version" ]
+dependencies = [
+  "fastapi>=0.112",
+  "pyzmq>=22",
+  "uvicorn[standard]>=0.29",
+]
+urls."Bug Tracker" = "https://github.com/Lightning-AI/litserve/issues"
+urls."Source Code" = "https://github.com/Lightning-AI/litserve"
+urls.Documentation = "https://lightning-ai.github.io/litserve/"
+urls.Download = "https://github.com/Lightning-AI/litserve"
+urls.Homepage = "https://github.com/Lightning-AI/litserve"
+scripts.lightning = "litserve.cli:main"
+scripts.litserve = "litserve.__main__:main"
 
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-[tool.check-manifest]
-ignore = [
-    "*.yml",
-    ".github",
-    ".github/*"
+[dependency-groups]
+dev = [
+  "asgi-lifespan>=2.1",
+  "coverage[toml]>=7.5.3",
+  "fastmcp>=2.9.2; python_full_version>='3.10'",
+  "httpx>=0.27",
+  "jsonargparse",
+  "lightning>2",
+  "mypy==2.3",
+  "numpy<3",
+  "openai>=1.12",
+  "pillow>=11.3",
+  "psutil>=7",
+  "pytest>=8",
+  "pytest-asyncio>=1",
+  "pytest-cov>=6.2.1",
+  "pytest-retry>=1.6.3",
+  "python-multipart>=0.0.20",
+  "requests>=2.32.4",
+  "rich",
+  "tenacity>=9.1.2",
+  "torch>2",
+  "torchvision>=0.22.1",
+  "transformers>=4.53",
+  "uvloop>=0.21; sys_platform!='win32'",
 ]
 
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "pass",
+[tool.hatch]
+version.path = "src/litserve/__about__.py"
+version.pattern = '__version__ = "(?P<version>.+)"'
+metadata.allow-direct-references = true
+
+# [tool.mypy]
+# files = [
+#    "src",
+# ]
+# install_types = true
+# non_interactive = true
+# disallow_untyped_defs = true
+# ignore_missing_imports = true
+# show_error_codes = true
+# warn_redundant_casts = true
+# warn_unused_configs = true
+# warn_unused_ignores = true
+# allow_redefinition = true
+## disable this rule as the Trainer attributes are defined in the connectors, not in its __init__
+# disable_error_code = "attr-defined"
+## style choices
+# warn_no_return = false
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+# Exclude a variety of commonly ignored directories.
+exclude = [ ".eggs", ".git", ".mypy_cache", ".ruff_cache", "__pypackages__", "_build", "build", "dist", "docs" ]
+# Enable Pyflakes `E` and `F` codes by default.
+lint.select = [
+  "E",
+  "F",      # see: https://pypi.org/project/pyflakes
+  # "D",  # see: https://pypi.org/project/pydocstyle
+  "I",      # implementation for isort
+  "N",      # see: https://pypi.org/project/pep8-naming
+  "RUF100", # implementation for yesqa
+  "UP",     # implementation for pyupgrade
+  "W",      # see: https://pypi.org/project/pycodestyle
 ]
+lint.extend-select = [
+  "C4",  # see: https://pypi.org/project/flake8-comprehensions
+  "PT",  # see: https://pypi.org/project/flake8-pytest-style
+  "RET", # see: https://pypi.org/project/flake8-return
+  "SIM", # see: https://pypi.org/project/flake8-simplify
+]
+lint.ignore = [
+  "E731",  # Do not assign a lambda expression, use a def
+  "UP007", # TODO: non-pep604-annotation-union
+  "UP045", # TODO: non-pep604-annotation-optional
+]
+lint.per-file-ignores."__about__.py" = [ "D100" ]
+lint.per-file-ignores."__init__.py" = [ "D100" ]
+lint.per-file-ignores."setup.py" = [ "D100", "SIM115" ]
+# [tool.ruff.pycodestyle]
+# ignore-overlong-task-comments = true
+# Unlike Flake8, default to a complexity level of 10.
+lint.mccabe.max-complexity = 10
+# Use Google-style docstrings.
+lint.pydocstyle.convention = "google"
 
 [tool.codespell]
-#skip = '*.py'
-quiet-level = 3
 # comma separated list of words; waiting for:
 #  https://github.com/codespell-project/codespell/issues/2839#issuecomment-1731601603
 # also adding links until they ignored by its: nature
 #  https://github.com/codespell-project/codespell/issues/2243#issuecomment-1732019960
-#ignore-words-list = ""
+# ignore-words-list = ""
+# skip = "*.py"
+quiet-level = 3
 
 [tool.docformatter]
 recursive = true
@@ -84,102 +142,15 @@ wrap-summaries = 120
 wrap-descriptions = 120
 blank = true
 
+[tool.check-manifest]
+ignore = [ "*.yml", ".github", ".github/*" ]
 
-#[tool.mypy]
-#files = [
-#    "src",
-#]
-#install_types = true
-#non_interactive = true
-#disallow_untyped_defs = true
-#ignore_missing_imports = true
-#show_error_codes = true
-#warn_redundant_casts = true
-#warn_unused_configs = true
-#warn_unused_ignores = true
-#allow_redefinition = true
-## disable this rule as the Trainer attributes are defined in the connectors, not in its __init__
-#disable_error_code = "attr-defined"
-## style choices
-#warn_no_return = false
+[tool.pyproject-fmt]
+# keep generated classifiers in step with the CI matrix in ci-testing.yml
+max_supported_python = "3.13"
 
-
-[tool.ruff]
-line-length = 120
-target-version = "py310"
-# Enable Pyflakes `E` and `F` codes by default.
-lint.select = [
-    "E", "W",  # see: https://pypi.org/project/pycodestyle
-    "F",  # see: https://pypi.org/project/pyflakes
-    "N",  # see: https://pypi.org/project/pep8-naming
-#    "D",  # see: https://pypi.org/project/pydocstyle
-    "I", # implementation for isort
-    "UP", # implementation for pyupgrade
-    "RUF100", # implementation for yesqa
-]
-lint.extend-select = [
-    "C4",  # see: https://pypi.org/project/flake8-comprehensions
-    "PT",  # see: https://pypi.org/project/flake8-pytest-style
-    "RET",  # see: https://pypi.org/project/flake8-return
-    "SIM",  # see: https://pypi.org/project/flake8-simplify
-]
-lint.ignore = [
-    "E731",  # Do not assign a lambda expression, use a def
-    "UP045",  # TODO: non-pep604-annotation-optional
-    "UP007",  # TODO: non-pep604-annotation-union
-]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".eggs",
-    ".git",
-    ".mypy_cache",
-    ".ruff_cache",
-    "__pypackages__",
-    "_build",
-    "build",
-    "dist",
-    "docs"
-]
-
-[tool.ruff.lint.per-file-ignores]
-"setup.py" = ["D100", "SIM115"]
-"__about__.py" = ["D100"]
-"__init__.py" = ["D100"]
-
-[tool.ruff.lint.pydocstyle]
-# Use Google-style docstrings.
-convention = "google"
-
-#[tool.ruff.pycodestyle]
-#ignore-overlong-task-comments = true
-
-[tool.ruff.lint.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
-max-complexity = 10
-
-[dependency-groups]
-dev = [
-    "asgi-lifespan>=2.1.0",
-    "coverage[toml]>=7.5.3",
-    "fastmcp>=2.9.2 ; python_full_version >= '3.10'",
-    "httpx>=0.27.0",
-    "lightning>2.0.0",
-    "mypy==2.3.0",
-    "numpy<3.0",
-    "openai>=1.12.0",
-    "pillow>=11.3.0",
-    "psutil>=7.0.0",
-    "pytest>=8.0",
-    "pytest-asyncio>=1.0.0",
-    "pytest-cov>=6.2.1",
-    "pytest-retry>=1.6.3",
-    "python-multipart>=0.0.20",
-    "requests>=2.32.4",
-    "torch>2.0.0",
-    "transformers>=4.53.0",
-    "uvloop>=0.21.0 ; sys_platform != 'win32'",
-    "tenacity>=9.1.2",
-    "jsonargparse",
-    "rich",
-    "torchvision>=0.22.1",
+[tool.coverage]
+report.exclude_lines = [
+  "pass",
+  "pragma: no cover",
 ]
