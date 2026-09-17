@@ -121,15 +121,21 @@ lint.ignore = [
   "UP007", # TODO: non-pep604-annotation-union
   "UP045", # TODO: non-pep604-annotation-optional
 ]
-lint.per-file-ignores."__about__.py" = [ "D100" ]
-lint.per-file-ignores."__init__.py" = [ "D100" ]
-lint.per-file-ignores."setup.py" = [ "D100", "SIM115" ]
+
 # [tool.ruff.pycodestyle]
 # ignore-overlong-task-comments = true
+[tool.ruff.lint.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
-lint.mccabe.max-complexity = 10
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"setup.py" = [ "D100", "SIM115" ]
+"__about__.py" = [ "D100" ]
+"__init__.py" = [ "D100" ]
+
+[tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings.
-lint.pydocstyle.convention = "google"
+convention = "google"
 
 [tool.codespell]
 # comma separated list of words; waiting for:
@@ -154,7 +160,13 @@ ignore = [ "*.yml", ".github", ".github/*" ]
 keep_full_version = true
 # keep generated classifiers in step with the CI matrix in ci-testing.yml
 max_supported_python = "3.13"
-expand_tables = [ "project.scripts", "project.urls" ]
+expand_tables = [
+  "project.scripts",
+  "project.urls",
+  "tool.ruff.lint.mccabe",
+  "tool.ruff.lint.per-file-ignores",
+  "tool.ruff.lint.pydocstyle",
+]
 
 [tool.coverage]
 report.exclude_lines = [
