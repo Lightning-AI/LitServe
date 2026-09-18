@@ -92,7 +92,9 @@ def test_workers_health(use_zmq):
 @pytest.mark.parametrize("use_zmq", [True, False])
 def test_wrap_litserve_start_wait_for_workers(use_zmq):
     """wait_for_workers=True yields only once every worker finished setup()."""
-    server = LitServer(SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2, fast_queue=use_zmq)
+    server = LitServer(
+        SlowSetupLitAPI(), accelerator="cpu", devices=1, timeout=5, workers_per_device=2, fast_queue=use_zmq
+    )
 
     with wrap_litserve_start(server, wait_for_workers=True) as server, TestClient(server.app) as client:
         # setup() sleeps 2s; the wait already covered it, so health must be green immediately

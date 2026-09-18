@@ -103,6 +103,7 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False, wait_
             not-yet-listening worker (e.g. synchronous ``TestClient.post()`` calls
             against a slow-loading model). A ``RuntimeError`` is raised if any worker
             reports a setup error.
+
     """
     server.app.response_queue_id = 0
     for lit_api in server.litapi_connector:
