@@ -306,6 +306,103 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
             )
 
 
+class _ExitTestLoop(BaseException):
+    """Escapes the loop's `except Exception`, so a test can stop `__call__` deterministically."""
+
+
+def _async_loop_lit_api(has_active_requests=False):
+    lit_api = MagicMock()
+    lit_api.spec = None
+    if has_active_requests is NotImplementedError:
+        lit_api.has_active_requests.side_effect = NotImplementedError
+    else:
+        lit_api.has_active_requests.return_value = has_active_requests
+    return lit_api
+
+
+class ScheduledAsyncLoop(LitLoop):
+    """An async loop that overrides `schedule_task` with one that dies immediately."""
+
+    def __init__(self, stop_after=3):
+        super().__init__()
+        self.stop_after = stop_after
+        self.run_calls = 0
+        self.schedule_task_done_calls = 0
+
+    async def schedule_task(self, lit_api, lit_spec, request_queue, transport):
+        raise RuntimeError("prefill died")
+
+    async def run(self, lit_api, device, worker_id, request_queue, transport, workers_setup_status, callback_runner):
+        self.run_calls += 1
+        if self.run_calls >= self.stop_after:
+            raise _ExitTestLoop
+
+    def on_schedule_task_done(self, schedule_task):
+        self.schedule_task_done_calls += 1
+
+
+def _drive_async_loop(loop, lit_api, transport):
+    with pytest.raises(_ExitTestLoop):
+        loop(lit_api, "cpu", 0, Queue(), transport, {}, NOOP_CB_RUNNER)
+
+
+def test_failed_schedule_task_reports_each_uid_once(mock_transport):
+    """Without clearing `response_queue_ids`, every later iteration re-sends the same error."""
+    loop = ScheduledAsyncLoop(stop_after=4)
+    loop.response_queue_ids = {"uuid-123": 0}
+
+    _drive_async_loop(loop, _async_loop_lit_api(), mock_transport)
+
+    uid, (_, status, _, _) = asyncio.run(mock_transport.areceive(consumer_id=0))
+    assert uid == "uuid-123"
+    assert status == ls.utils.LitAPIStatus.ERROR
+
+    with pytest.raises(Empty):
+        mock_transport._queues[0].get_nowait()
+
+    assert loop.response_queue_ids == {}
+    assert loop.schedule_task_done_calls == 1
+
+
+def test_failed_schedule_task_survives_unimplemented_has_active_requests(mock_transport):
+    """`has_active_requests` sat outside the try; its default raises and killed the worker."""
+    loop = ScheduledAsyncLoop(stop_after=3)
+
+    _drive_async_loop(loop, _async_loop_lit_api(NotImplementedError), mock_transport)
+
+    assert loop.schedule_task_done_calls == 1
+
+
+class PlainAsyncLoop(LitLoop):
+    """An async loop that does not override `schedule_task`, so the no-op task finishes at once."""
+
+    def __init__(self, stop_after=3):
+        super().__init__()
+        self.stop_after = stop_after
+        self.run_calls = 0
+        self.schedule_task_done_calls = 0
+
+    async def run(self, lit_api, device, worker_id, request_queue, transport, workers_setup_status, callback_runner):
+        self.run_calls += 1
+        if self.run_calls >= self.stop_after:
+            raise _ExitTestLoop
+
+    def on_schedule_task_done(self, schedule_task):
+        self.schedule_task_done_calls += 1
+
+
+def test_default_schedule_task_is_not_treated_as_a_failure(mock_transport):
+    """The base `schedule_task` is a no-op; its completion must not be reported as an error."""
+    loop = PlainAsyncLoop(stop_after=3)
+
+    _drive_async_loop(loop, _async_loop_lit_api(NotImplementedError), mock_transport)
+
+    assert loop.run_calls == 3
+    assert loop.schedule_task_done_calls == 0
+    with pytest.raises(Empty):
+        mock_transport._queues[0].get_nowait()
+
+
 class FakeBatchStreamTransport(DummyMessageTransport):
     def __init__(self, num_streamed_outputs):
         super().__init__()
