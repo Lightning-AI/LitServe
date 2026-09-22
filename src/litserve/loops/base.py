@@ -214,6 +214,13 @@ class _BaseLoop(ABC):
 
     """
 
+    # How long to idle between iterations once `schedule_task` has died: nothing can
+    # feed the loop any more, so re-running `run` at full speed just burns a core.
+    _schedule_task_failed_delay: float = 0.1
+
+    def __init__(self):
+        self.response_queue_ids: dict[str, int] = {}  # uid -> response_queue_id
+
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         pass
 
@@ -244,6 +251,10 @@ class _BaseLoop(ABC):
                 logger.info("Running LitLoop in a asyncio event loop")
                 future = self.schedule_task(lit_api, lit_spec, request_queue, transport)
                 schedule_task = event_loop.create_task(future)
+                # The base `schedule_task` is a no-op that completes immediately, so a finished
+                # task only means something for loops that actually override it.
+                schedules_work = type(self).schedule_task is not _BaseLoop.schedule_task
+                schedule_task_failed = False
                 while True:
                     try:
                         await self.run(
@@ -259,18 +270,28 @@ class _BaseLoop(ABC):
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
 
-                    if not lit_api.has_active_requests() and schedule_task.done():
-                        for uid, response_queue_id in self.response_queue_ids.items():
-                            self.put_error_response(
-                                transport,
-                                response_queue_id,
-                                uid,
-                                Exception("schedule_task task failed"),
-                                LoopResponseType.STREAMING,
-                            )
-                        self.on_schedule_task_done(schedule_task)
+                    if schedules_work and not schedule_task_failed and schedule_task.done():
+                        try:
+                            has_active_requests = lit_api.has_active_requests()
+                        except NotImplementedError:
+                            has_active_requests = False
 
-                    await asyncio.sleep(0)
+                        if not has_active_requests:
+                            # Report once: without clearing, every later iteration re-sends an
+                            # error for the same uids at full speed.
+                            schedule_task_failed = True
+                            for uid, response_queue_id in self.response_queue_ids.items():
+                                self.put_error_response(
+                                    transport,
+                                    response_queue_id,
+                                    uid,
+                                    Exception("schedule_task task failed"),
+                                    LoopResponseType.STREAMING,
+                                )
+                            self.response_queue_ids.clear()
+                            self.on_schedule_task_done(schedule_task)
+
+                    await asyncio.sleep(self._schedule_task_failed_delay if schedule_task_failed else 0)
 
             event_loop.run_until_complete(_wrapper())
         else:
@@ -303,6 +324,7 @@ class _BaseLoop(ABC):
 
 class LitLoop(_BaseLoop):
     def __init__(self):
+        super().__init__()
         self._context = {}
         self._server_pid = os.getpid()
         self._worker_id = None
