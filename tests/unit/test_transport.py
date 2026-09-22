@@ -1,5 +1,6 @@
 import asyncio
 import multiprocessing as mp
+import time
 from queue import Empty
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +8,7 @@ import pytest
 
 from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.transport.process_transport import MPQueueTransport
+from litserve.transport.zmq_transport import ZMQTransport
 
 
 class TestMPQueueTransport:
@@ -116,6 +118,60 @@ class TestTransportFactory:
 
             with pytest.raises(ValueError, match="Invalid transport type"):
                 create_transport_from_config(mock_validate.return_value)
+
+    def test_create_zmq_transport_wiring(self):
+        """The broker backend/frontend addresses must not be swapped."""
+        config = TransportConfig(transport_type="zmq", num_consumers=1)
+
+        transport = create_transport_from_config(config)
+
+        assert isinstance(transport, ZMQTransport)
+        assert transport.backend_address == config.backend_address
+        assert transport.frontend_address == config.frontend_address
+
+    @pytest.mark.asyncio
+    async def test_zmq_transport_send_receive(self):
+        """A response produced on the backend must be delivered to the consumer on the frontend."""
+        config = TransportConfig(transport_type="zmq", num_consumers=1)
+        transport = create_transport_from_config(config)
+        test_item = ("uid", ({"output": 1},), "REGULAR", 0)
+
+        receive_task = asyncio.create_task(transport.areceive(consumer_id=0))
+        # Give the SUB socket time to connect and propagate its subscription
+        await asyncio.sleep(0.5)
+
+        # Simulate a worker process producing a response on the backend
+        sender = ZMQTransport(
+            backend_address=transport.backend_address,
+            frontend_address=transport.frontend_address,
+        )
+        try:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                sender.send(test_item, consumer_id=0)
+                if receive_task.done():
+                    break
+                await asyncio.sleep(0.1)
+
+            result = await asyncio.wait_for(receive_task, timeout=5)
+            assert result == test_item
+        finally:
+            transport.close()
+            sender.close()
+
+
+class TestFastQueue:
+    def test_fast_queue_selects_zmq_transport(self, simple_litapi):
+        from litserve.server import LitServer
+
+        server = LitServer(simple_litapi, fast_queue=True)
+        assert server.transport_config.transport_type == "zmq"
+
+    def test_fast_queue_disabled_uses_mp_transport(self, simple_litapi):
+        from litserve.server import LitServer
+
+        server = LitServer(simple_litapi)
+        assert server.transport_config.transport_type == "mp"
 
 
 @pytest.mark.integration
