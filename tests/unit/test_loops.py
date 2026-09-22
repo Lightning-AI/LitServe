@@ -16,6 +16,7 @@ import contextlib
 import inspect
 import io
 import json
+import pickle
 import re
 import sys
 import threading
@@ -304,6 +305,24 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
                 "uuid-123",
                 (i - 1, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, ANY),
             )
+
+
+class UnpicklableError(Exception):
+    """A user exception that cannot be pickled, e.g. one holding a socket or a local lambda."""
+
+    def __reduce__(self):
+        raise TypeError("cannot pickle UnpicklableError")
+
+
+def test_put_error_response_survives_unpicklable_exception(mock_transport):
+    """`pickle.dumps` runs inside the caller's `except` block; raising there kills the worker."""
+    loop = SingleLoop()
+    loop.put_error_response(mock_transport, 0, "uuid-123", UnpicklableError("boom"))
+
+    uid, (response_data, status, response_type, _) = asyncio.run(mock_transport.areceive(consumer_id=0))
+    assert uid == "uuid-123"
+    assert status == ls.utils.LitAPIStatus.ERROR
+    assert str(pickle.loads(response_data)) == "UnpicklableError: boom"
 
 
 class FakeBatchStreamTransport(DummyMessageTransport):

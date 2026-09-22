@@ -32,6 +32,22 @@ def test_dump_exception():
     assert pickle.loads(dump_exception(exc)).status_code == 400
 
 
+class UnpicklableError(Exception):
+    """A user exception that cannot be pickled, e.g. one holding a socket or a local lambda."""
+
+    def __reduce__(self):
+        raise TypeError("cannot pickle UnpicklableError")
+
+
+def test_dump_exception_falls_back_when_unpicklable():
+    """An unpicklable user exception must not escape and kill the worker process."""
+    dumped = dump_exception(UnpicklableError("boom"))
+
+    restored = pickle.loads(dumped)
+    assert isinstance(restored, RuntimeError)
+    assert str(restored) == "UnpicklableError: boom"
+
+
 async def dummy_streamer():
     for i in range(10):
         yield i
