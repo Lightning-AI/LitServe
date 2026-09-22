@@ -313,6 +313,7 @@ class RecordingQueue(Queue):
     ``timeout`` there and the loops look correct. A real ``Queue`` binds it to ``block``
     instead, leaving ``timeout=None`` — the async loops then park an executor thread
     forever and never raise ``Empty``.
+
     """
 
     def __init__(self, *args, **kwargs):
