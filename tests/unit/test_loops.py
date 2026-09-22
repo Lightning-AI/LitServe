@@ -385,6 +385,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock.stream = False
     lit_api_mock.api_path = "/predict"
     lit_api_mock.loop = "auto"
+    lit_api_mock.batched = True
 
     inference_worker(
         lit_api_mock,
@@ -405,6 +406,7 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
     lit_api_mock.stream = False
     lit_api_mock.api_path = "/predict"
     lit_api_mock.loop = "auto"
+    lit_api_mock.batched = False
 
     inference_worker(
         lit_api_mock,
@@ -417,6 +419,29 @@ def test_inference_worker(mock_single_loop, mock_batched_loop):
         restart_workers=True,
     )
     mock_single_loop.assert_called_once()
+
+    # batched=True keeps the batched loop even when max_batch_size is 1
+    mock_batched_loop.reset_mock()
+    lit_api_mock = MagicMock()
+    lit_api_mock.max_batch_size = 1
+    lit_api_mock.batch_timeout = 0
+    lit_api_mock.enable_async = False
+    lit_api_mock.stream = False
+    lit_api_mock.api_path = "/predict"
+    lit_api_mock.loop = "auto"
+    lit_api_mock.batched = True
+
+    inference_worker(
+        lit_api_mock,
+        "cpu",
+        0,
+        MagicMock(),
+        MagicMock(),
+        workers_setup_status={},
+        callback_runner=NOOP_CB_RUNNER,
+        restart_workers=True,
+    )
+    mock_batched_loop.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -800,6 +825,16 @@ def test_get_default_loop():
     )
 
 
+def test_get_default_loop_batched():
+    loop = ls.loops.get_default_loop(stream=False, max_batch_size=1, batched=True)
+    assert isinstance(loop, ls.loops.BatchedLoop), "BatchedLoop must be returned when batched=True"
+
+    loop = ls.loops.get_default_loop(stream=True, max_batch_size=1, batched=True)
+    assert isinstance(loop, ls.loops.BatchedStreamingLoop), (
+        "BatchedStreamingLoop must be returned when stream=True and batched=True"
+    )
+
+
 def test_get_default_loop_enable_async():
     lit_api = MagicMock()
     lit_api.max_batch_size = 2
@@ -808,6 +843,11 @@ def test_get_default_loop_enable_async():
         ValueError, match="Async batching is not supported. Please use enable_async=False with batching."
     ):
         ls.loops.get_default_loop(lit_api.stream, lit_api.max_batch_size, lit_api.enable_async)
+
+    with pytest.raises(
+        ValueError, match="Async batching is not supported. Please use enable_async=False with batching."
+    ):
+        ls.loops.get_default_loop(stream=False, max_batch_size=1, enable_async=True, batched=True)
 
 
 @pytest.fixture

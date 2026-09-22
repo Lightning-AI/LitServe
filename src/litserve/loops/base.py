@@ -424,7 +424,7 @@ class DefaultLoop(LitLoop):
             )
         if (
             lit_api.stream
-            and lit_api.max_batch_size > 1
+            and lit_api.batched
             and not all(
                 [
                     inspect.isgeneratorfunction(lit_api.predict) or inspect.isasyncgenfunction(lit_api.predict),
@@ -439,7 +439,7 @@ class DefaultLoop(LitLoop):
             )
         ):
             raise ValueError(
-                """When `stream=True` with max_batch_size > 1, `lit_api.predict`, `lit_api.encode_response` and
+                """When `stream=True` with batching enabled, `lit_api.predict`, `lit_api.encode_response` and
                 `lit_api.unbatch` must generate values using `yield` (can be regular or async generators).
 
              Example:
