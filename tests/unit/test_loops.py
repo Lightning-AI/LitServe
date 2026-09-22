@@ -306,6 +306,46 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
             )
 
 
+class RecordingQueue(Queue):
+    """Queue with the real ``Queue.get`` signature, recording how the loop calls it.
+
+    ``TestQueue`` declares ``get(self, timeout=None)``, so a positional ``1.0`` binds to
+    ``timeout`` there and the loops look correct. A real ``Queue`` binds it to ``block``
+    instead, leaving ``timeout=None`` — the async loops then park an executor thread
+    forever and never raise ``Empty``.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.get_calls = []
+
+    def get(self, block=True, timeout=None):
+        self.get_calls.append((block, timeout))
+        if timeout is None:
+            raise AssertionError("request_queue.get() called without a timeout")
+        return super().get(block=block, timeout=timeout)
+
+
+@pytest.mark.parametrize(
+    ("loop", "runner", "lit_api"),
+    [
+        pytest.param(SingleLoop(), "_run_single_loop_with_async", AsyncTestLitAPI(), id="single"),
+        pytest.param(StreamingLoop(), "run_streaming_loop_async", AsyncTestStreamLitAPI(), id="streaming"),
+    ],
+)
+def test_async_loops_poll_queue_with_timeout(loop, runner, lit_api, mock_transport, monkeypatch):
+    """Async loops must pass ``timeout`` by keyword so an empty queue raises ``Empty``."""
+    requests_queue = RecordingQueue()
+    requests_queue.put(_SENTINEL_VALUE)
+
+    monkeypatch.setattr(loop, "kill", lambda: None)
+    with contextlib.suppress(KeyboardInterrupt):
+        getattr(loop, runner)(lit_api, requests_queue, mock_transport, NOOP_CB_RUNNER)
+
+    assert requests_queue.get_calls == [(True, 1.0)]
+
+
 class FakeBatchStreamTransport(DummyMessageTransport):
     def __init__(self, num_streamed_outputs):
         super().__init__()
