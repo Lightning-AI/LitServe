@@ -44,6 +44,7 @@ from litserve.loops.base import (
 )
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
+    DefaultContinuousBatchingLoop,
     notify_timed_out_requests,
 )
 from litserve.loops.simple_loops import BatchedLoop, SingleLoop
@@ -949,6 +950,22 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
         ),
     ):
         lit_loop.pre_setup(lit_api, None)
+
+
+def test_default_continuous_batching_add_request_matches_prefill_call(mock_transport):
+    """``prefill`` calls ``add_request`` with five positional args; the override must accept them."""
+    lit_api = ContinuousBatchingAPI()
+    lit_api.stream = True
+    lit_api.setup(None)
+
+    lit_loop = DefaultContinuousBatchingLoop()
+    lit_loop.add_request("UUID-001", "Hello", lit_api, None, mock_transport)
+
+    assert lit_loop.active_sequences["UUID-001"] == {
+        "input": "Hello",
+        "current_length": 0,
+        "generated_sequence": [],
+    }
 
 
 @pytest.mark.asyncio
