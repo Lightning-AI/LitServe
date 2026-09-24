@@ -66,5 +66,7 @@ class RequestCountMiddleware(BaseHTTPMiddleware):
             return
 
         self.active_counter.value += 1
-        await self.app(scope, receive, send)
-        self.active_counter.value -= 1
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            self.active_counter.value -= 1
