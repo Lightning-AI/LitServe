@@ -497,9 +497,12 @@ class OpenAISpec(LitSpec):
     async def options_chat_completions(self, request: Request):
         return Response(status_code=200)
 
-    async def chat_completion(self, request: ChatCompletionRequest, background_tasks: BackgroundTasks):
+    async def chat_completion(
+        self, request: ChatCompletionRequest, raw_request: Request, background_tasks: BackgroundTasks
+    ):
         response_queue_id = self.response_queue_id
         logger.debug("Received chat completion request %s", request)
+        headers = dict(raw_request.headers)
         uids = [uuid.uuid4() for _ in range(request.n)]
         self.queues = []
         self.events = []
@@ -517,7 +520,7 @@ class OpenAISpec(LitSpec):
             q = deque()
             event = asyncio.Event()
             self.response_buffer[uid] = ResponseBufferItem(response_queue=q, event=event)
-            self.request_queue.put((response_queue_id, uid, time.monotonic(), request_el))
+            self.request_queue.put((response_queue_id, uid, time.monotonic(), request_el, headers))
             self.queues.append(q)
             self.events.append(event)
 

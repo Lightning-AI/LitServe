@@ -208,8 +208,8 @@ class FakeTransport(MessageTransport):
 def test_batched_loop():
     requests_queue = Queue()
     response_queue_id = 0
-    requests_queue.put((response_queue_id, "uuid-1234", time.monotonic(), {"input": 4.0}))
-    requests_queue.put((response_queue_id, "uuid-1235", time.monotonic(), {"input": 5.0}))
+    requests_queue.put((response_queue_id, "uuid-1234", time.monotonic(), {"input": 4.0}, {}))
+    requests_queue.put((response_queue_id, "uuid-1235", time.monotonic(), {"input": 5.0}, {}))
     requests_queue.put(_SENTINEL_VALUE)
 
     lit_api_mock = MagicMock()
@@ -256,7 +256,9 @@ def test_collate_requests(batch_timeout, batch_size):
     api.request_timeout = 5
     request_queue = Queue()
     for i in range(batch_size):
-        request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i))  # response_queue_id, uid, timestamp, x_enc
+        request_queue.put(
+            (i, f"uuid-abc-{i}", time.monotonic(), i, {})
+        )  # response_queue_id, uid, timestamp, x_enc, headers
     payloads, timed_out_uids = collate_requests(MagicMock(), api, request_queue, MagicMock())
     assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"

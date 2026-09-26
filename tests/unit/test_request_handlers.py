@@ -67,8 +67,8 @@ class TestRequestHandler(BaseRequestHandler):
         self.litapi_request_queues = {"/predict": Queue()}
 
     async def handle_request(self, request, request_type):
-        payload = await self._prepare_request(request, request_type)
-        uid, response_queue_id = await self._submit_request(payload)
+        payload, headers = await self._prepare_request(request, request_type)
+        uid, response_queue_id = await self._submit_request(payload, headers)
         return response_queue_id
 
 
