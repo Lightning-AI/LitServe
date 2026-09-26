@@ -112,3 +112,24 @@ def test_track_requests_middleware_isolation():
         assert any(mw.cls is RequestCountMiddleware for mw in app_copy.user_middleware), (
             "RequestCountMiddleware not found in middleware list"
         )
+
+
+def test_active_requests_reset_after_error():
+    """A request that fails should not stay counted in `LitServer.active_requests`."""
+    in_flight = []
+
+    class FailingMiddleware(BaseHTTPMiddleware):
+        """Fails a request downstream of RequestCountMiddleware, which wraps all user middlewares."""
+
+        async def dispatch(self, request, call_next):
+            await call_next(request)
+            in_flight.append(server.active_requests)
+            raise RuntimeError("request failed")
+
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), track_requests=True, middlewares=[FailingMiddleware])
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        with pytest.raises(RuntimeError, match="request failed"):
+            client.post("/predict", json={"input": 4.0})
+
+        assert in_flight == [1], "request should be counted while it is in flight"
+        assert server.active_requests == 0, "failed request should not stay in the active request count"

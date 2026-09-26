@@ -20,7 +20,6 @@ import logging
 import multiprocessing as mp
 import os
 import pickle
-import secrets
 import socket
 import sys
 import threading
@@ -38,11 +37,11 @@ import uvicorn
 import uvicorn.server
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from starlette.formparsers import MultiPartParser
 from starlette.middleware.gzip import GZipMiddleware
 
 from litserve import LitAPI
+from litserve.auth import _keys_match, api_key_auth, no_auth, oauth2_scheme
 from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
@@ -72,26 +71,10 @@ mp.allow_connection_pickling()
 
 logger = logging.getLogger(__name__)
 
-# if defined, it will require clients to auth with X-API-Key in the header
-LIT_SERVER_API_KEY = os.environ.get("LIT_SERVER_API_KEY")
-SHUTDOWN_API_KEY = os.environ.get("LIT_SHUTDOWN_API_KEY")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
 MultiPartParser.max_file_size = sys.maxsize
 # renamed in PR: https://github.com/encode/starlette/pull/2780
 MultiPartParser.spool_max_size = sys.maxsize
-
-
-def no_auth():
-    pass
-
-
-def api_key_auth(x_api_key: str = Depends(APIKeyHeader(name="X-API-Key"))):
-    if x_api_key != LIT_SERVER_API_KEY:
-        raise HTTPException(
-            status_code=401, detail="Invalid API Key. Check that you are passing a correct 'X-API-Key' in your header."
-        )
 
 
 async def _mixed_response_to_buffer(
@@ -534,7 +517,7 @@ class LitServer:
         enable_shutdown_api:
             Enable remote shutdown capability. Defaults to False.
 
-            - Requires authentication token (set LIT_SHUTDOWN_API_KEY env var)
+            - Requires the `LIT_SHUTDOWN_API_KEY` env var to be set, otherwise `LitServer` raises a `ValueError`
             - Useful for automated deployment pipelines
 
         restart_workers:
@@ -797,21 +780,24 @@ class LitServer:
         if enable_shutdown_api and not shutdown_path.startswith("/"):
             raise ValueError("shutdown_path must start with '/'. Please provide a valid api path like '/shutdown'")
 
-        global SHUTDOWN_API_KEY
-        if enable_shutdown_api and not SHUTDOWN_API_KEY:
-            SHUTDOWN_API_KEY = secrets.token_urlsafe(32)
-            logger.warning(
-                "LitServe's Shutdown API is enabled, but the `LIT_SHUTDOWN_API_KEY` environment variable is missing."
-                f"Generated shutdown API key: {SHUTDOWN_API_KEY}"
-            )
+        # Held on the instance so two servers in one process don't clobber each other's key.
+        self._shutdown_api_key = os.environ.get("LIT_SHUTDOWN_API_KEY")
         if enable_shutdown_api:
+            if not self._shutdown_api_key:
+                raise ValueError(
+                    "The Shutdown API is enabled but no shutdown key is set. Set the `LIT_SHUTDOWN_API_KEY` "
+                    "environment variable to a secret value, for example:\n"
+                    "    export LIT_SHUTDOWN_API_KEY="
+                    "\"$(python -c 'import secrets; print(secrets.token_urlsafe(32))')\""
+                )
+            # Never log the key itself. Double quotes so the shell expands the variable.
             curl_command = (
-                "curl -X 'POST' 'http://localhost:8000/shutdown' "
+                f"curl -X 'POST' 'http://localhost:8000{shutdown_path}' "
                 "-H 'accept: application/json' "
-                f"-H 'Authorization: Bearer {SHUTDOWN_API_KEY}' "
+                '-H "Authorization: Bearer $LIT_SHUTDOWN_API_KEY" '
                 "-d ''"
             )
-            logger.info(f"To shutdown the server, run command: \n{curl_command}\n")
+            logger.info(f"To shutdown the server, export LIT_SHUTDOWN_API_KEY and run command: \n{curl_command}\n")
         try:
             json.dumps(model_metadata)
         except (TypeError, ValueError):
@@ -1593,12 +1579,12 @@ class LitServer:
         target = lit_api or self.lit_api
         if hasattr(target, "authorize") and callable(target.authorize):
             return target.authorize
-        if LIT_SERVER_API_KEY:
+        if os.environ.get("LIT_SERVER_API_KEY"):
             return api_key_auth
         return no_auth
 
     def shutdown_api_key_auth(self, shutdown_api_key: str = Depends(oauth2_scheme)):
-        if not SHUTDOWN_API_KEY or shutdown_api_key != SHUTDOWN_API_KEY:
+        if not _keys_match(shutdown_api_key, self._shutdown_api_key):
             raise HTTPException(
                 status_code=401,
                 detail="Invalid Bearer token for Shutdown API."

@@ -38,6 +38,7 @@ repos:
         args: ["--print-width=120"]
 
   - repo: https://github.com/PyCQA/docformatter
+    # keep at v1.7.7: v1.7.8 mangles non-docstring strings and never converges with ruff-format
     rev: v1.7.7
     hooks:
       - id: docformatter
@@ -46,9 +47,20 @@ repos:
         args: ["--in-place"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.1
+    rev: v0.16.6
     hooks:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
       - id: ruff-check
+
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.26.0
+    hooks:
+      - id: pyproject-fmt
+        additional_dependencies: [tox]
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.25
+    hooks:
+      - id: validate-pyproject
