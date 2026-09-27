@@ -82,11 +82,14 @@ class StreamingLoop(DefaultLoop):
                 context = {}
                 if hasattr(lit_spec, "populate_context"):
                     lit_spec.populate_context(context, x_enc)
+
+                callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
                 x = _inject_context(
                     context,
                     lit_api.decode_request,
                     x_enc,
                 )
+                callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
                 callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y_gen = _inject_context(
@@ -94,7 +97,6 @@ class StreamingLoop(DefaultLoop):
                     lit_api.predict,
                     x,
                 )
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
                 callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_gen = _inject_context(
@@ -111,6 +113,8 @@ class StreamingLoop(DefaultLoop):
                     transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
                 )
 
+                # predict/encode_response are lazy generators: the work happens while the stream is
+                # consumed above, so both "after" events only become meaningful once it is exhausted.
                 callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
@@ -163,7 +167,6 @@ class StreamingLoop(DefaultLoop):
                 lit_api.predict,
                 x,
             )
-            callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
             callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
 
@@ -184,6 +187,8 @@ class StreamingLoop(DefaultLoop):
             self.put_response(
                 transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
             )
+            # See run_streaming_loop: the async generators only do their work as the stream is consumed.
+            callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
             callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
         except HTTPException as e:
@@ -351,13 +356,11 @@ class BatchedStreamingLoop(DefaultLoop):
 
                 callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
                 y_iter = _inject_context(contexts, lit_api.predict, x)
-                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
 
                 unbatched_iter = _inject_context(contexts, lit_api.unbatch, y_iter)
 
                 callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_iter = _inject_context(contexts, lit_api.encode_response, unbatched_iter)
-                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
                 # y_enc_iter -> [[response-1, response-2], [response-1, response-2]]
                 for y_batch in y_enc_iter:
@@ -371,6 +374,10 @@ class BatchedStreamingLoop(DefaultLoop):
                     self.put_response(
                         transport, response_queue_id, uid, "", LitAPIStatus.FINISH_STREAMING, LoopResponseType.STREAMING
                     )
+
+                # See run_streaming_loop: predict/unbatch/encode_response are lazy here too.
+                callback_runner.trigger_event(EventTypes.AFTER_PREDICT.value, lit_api=lit_api)
+                callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
             except KeyboardInterrupt:  # pragma: no cover
                 self.kill()
                 return
