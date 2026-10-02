@@ -60,6 +60,14 @@ class LoopResponseType(Enum):
     REGULAR = "REGULAR"
 
 
+@dataclasses.dataclass
+class _RawRequest:
+    """Carry a raw body and its media type across the worker queue."""
+
+    body: bytes
+    content_type: str
+
+
 class PickleableHTTPException(HTTPException):
     @staticmethod
     def from_exception(exc: HTTPException):

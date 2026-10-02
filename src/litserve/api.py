@@ -246,7 +246,19 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         pass
 
     def decode_request(self, request, **kwargs):
-        """Convert the request payload to your model input."""
+        """Convert the request payload to your model input.
+
+        Annotate ``request`` with ``bytes`` to receive the unmodified HTTP body instead of parsed JSON or form data.
+        Add an argument named ``context`` to access the original Content-Type header (or an empty string if absent):
+
+            def decode_request(self, request: bytes, context):
+                content_type = context["content_type"]
+                return deserialize(request, content_type)
+
+        Raw bodies are passed as ordinary bytes, including empty bodies, regardless of their Content-Type.
+        Without the bytes annotation, the existing JSON, form, and typed request handling is unchanged.
+
+        """
         if self._spec:
             return self._spec.decode_request(request, **kwargs)
         return request

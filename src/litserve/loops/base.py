@@ -29,7 +29,7 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus, LoopResponseType
+from litserve.utils import LitAPIStatus, LoopResponseType, _RawRequest
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -42,6 +42,10 @@ _SENTINEL_VALUE = (None, None, None, None)
 
 
 def _inject_context(context: Union[list[dict], dict], func, *args, **kwargs):
+    if args and isinstance(args[0], _RawRequest):
+        request, *args = args
+        context["content_type"] = request.content_type
+        args = (request.body, *args)
     sig = inspect.signature(func)
     if "context" in sig.parameters:
         return func(*args, **kwargs, context=context)
@@ -81,6 +85,10 @@ async def _handle_async_function(func, *args, **kwargs):
 
 
 async def _async_inject_context(context: Union[list[dict], dict], func, *args, **kwargs):
+    if args and isinstance(args[0], _RawRequest):
+        request, *args = args
+        context["content_type"] = request.content_type
+        args = (request.body, *args)
     sig = inspect.signature(func)
 
     # Determine if we need to inject context
