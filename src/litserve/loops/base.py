@@ -23,6 +23,7 @@ from abc import ABC
 from queue import Empty, Queue
 from typing import Any, Optional, Union
 
+from starlette.concurrency import iterate_in_threadpool
 from starlette.formparsers import MultiPartParser
 
 from litserve import LitAPI
@@ -50,13 +51,7 @@ def _inject_context(context: Union[list[dict], dict], func, *args, **kwargs):
 
 async def _sync_fn_to_async_fn(func, *args, **kwargs):
     if inspect.isgeneratorfunction(func):
-
-        async def async_fn(*args, **kwargs):
-            for item in func(*args, **kwargs):
-                yield item
-            return
-
-        return async_fn(*args, **kwargs)
+        return iterate_in_threadpool(func(*args, **kwargs))
 
     return await asyncio.to_thread(func, *args, **kwargs)
 

@@ -72,7 +72,11 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         batch_timeout: Wait time for batch to fill (seconds). Defaults to 0.0.
         stream: Enable streaming responses for real-time output. Defaults to False.
         api_path: URL endpoint path. Defaults to "/predict".
-        enable_async: Enable async/await for non-blocking operations. Defaults to False.
+        enable_async: None (default) detects async decode_request, predict, or encode_response methods.
+            True enables async execution explicitly; False selects synchronous execution.
+            In async mode, synchronous methods run in a thread pool and coroutine methods are awaited.
+            Concurrent requests can execute synchronous methods simultaneously.
+            Async batching is not supported. Streaming encoders must consume an async iterator in async mode.
         spec: API specification (e.g., OpenAISpec for OpenAI compatibility). Defaults to None.
         mcp: Model Context Protocol integration for AI assistants. Defaults to None.
 
@@ -145,7 +149,7 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         loop: Optional[Union[str, "LitLoop"]] = "auto",
         spec: Optional[LitSpec] = None,
         mcp: Optional["MCP"] = None,
-        enable_async: bool = False,
+        enable_async: Optional[bool] = None,
     ):
         """Initialize LitAPI with configuration options."""
         if max_batch_size <= 0:
@@ -185,61 +189,17 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         self._spec = spec
         self.max_batch_size = max_batch_size
         self.batch_timeout = batch_timeout
-        self.enable_async = enable_async
-        self._validate_async_methods()
+        self.enable_async = self._detect_async_methods() if enable_async is None else enable_async
         self.mcp = mcp
         if mcp:
             mcp._connect(self)
 
-    def _validate_async_methods(self):
-        """Validate that async methods are properly implemented when enable_async is True."""
-        if not self.enable_async:
-            return
-
-        # Define validation rules for each method
-        validation_rules = {
-            "decode_request": {
-                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
-                "error_type": "warning",
-                "message": "should be an async function or async generator when enable_async=True",
-            },
-            "encode_response": {
-                "required_types": [asyncio.iscoroutinefunction, inspect.isasyncgenfunction],
-                "error_type": "warning",
-                "message": "should be an async function or async generator when enable_async=True",
-            },
-            "predict": {
-                "required_types": [inspect.isasyncgenfunction, asyncio.iscoroutinefunction],
-                "error_type": "error",
-                "message": "must be an async generator or async function when enable_async=True",
-            },
-        }
-
-        errors = []
-        warnings_list = []
-
-        for method_name, rules in validation_rules.items():
-            method_obj = getattr(self, method_name)
-
-            # Check if method satisfies any of the required types
-            is_valid = any(check_func(method_obj) for check_func in rules["required_types"])
-
-            if not is_valid:
-                message = f"{method_name} {rules['message']}"
-
-                if rules["error_type"] == "error":
-                    errors.append(message)
-                else:
-                    warnings_list.append(message)
-
-        # Emit warnings
-        for warning_msg in warnings_list:
-            warnings.warn(f"{warning_msg}. LitServe will asyncify the method.", UserWarning)
-
-        # Raise errors if any
-        if errors:
-            error_msg = "Async validation failed:\n" + "\n".join(f"- {err}" for err in errors)
-            raise ValueError(error_msg)
+    def _detect_async_methods(self) -> bool:
+        """Detect asynchronous request-processing methods, including inherited implementations."""
+        return any(
+            asyncio.iscoroutinefunction(method) or inspect.isasyncgenfunction(method)
+            for method in (self.decode_request, self.predict, self.encode_response)
+        )
 
     def setup(self, device):
         """Setup the model so it can be called in `predict`."""

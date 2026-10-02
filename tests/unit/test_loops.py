@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import contextlib
+import contextvars
 import inspect
 import io
 import json
@@ -1016,3 +1017,42 @@ async def test_sync_fn_to_async_fn():
     assert await _sync_fn_to_async_fn(sync_func) == "sync-to-async"
     async_gen = await _sync_fn_to_async_fn(sync_gen)
     assert isinstance(async_gen, AsyncGenerator)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+async def test_sync_methods_run_outside_event_loop(stream):
+    event_loop_thread = threading.get_ident()
+    request_id = contextvars.ContextVar("request_id")
+    request_id.set("request-123")
+    context = {}
+
+    def sync_func(value, context):
+        assert threading.get_ident() != event_loop_thread
+        assert request_id.get() == "request-123"
+        context["value"] = value
+        return value
+
+    def sync_gen(value, context):
+        for item in range(value):
+            yield sync_func(item, context)
+
+    result = await _async_inject_context(context, sync_gen if stream else sync_func, 3)
+    if stream:
+        assert [item async for item in result] == [0, 1, 2]
+        assert context == {"value": 2}
+    else:
+        assert result == 3
+        assert context == {"value": 3}
+
+
+@pytest.mark.asyncio
+async def test_sync_generator_error_propagates():
+    def sync_gen():
+        yield "first"
+        raise HTTPException(422, "stream failed")
+
+    result = await _handle_async_function(sync_gen)
+    assert await anext(result) == "first"
+    with pytest.raises(HTTPException, match="stream failed"):
+        await anext(result)
