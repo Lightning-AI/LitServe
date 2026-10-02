@@ -256,9 +256,8 @@ def test_collate_requests(batch_timeout, batch_size):
     api.request_timeout = 5
     request_queue = Queue()
     for i in range(batch_size):
-        request_queue.put(
-            (i, f"uuid-abc-{i}", time.monotonic(), i, {})
-        )  # response_queue_id, uid, timestamp, x_enc, headers
+        # response_queue_id, uid, timestamp, x_enc, headers
+        request_queue.put((i, f"uuid-abc-{i}", time.monotonic(), i, {}))
     payloads, timed_out_uids = collate_requests(MagicMock(), api, request_queue, MagicMock())
     assert len(payloads) == batch_size, f"Should have {batch_size} payloads, got {len(payloads)}"
     assert len(timed_out_uids) == 0, "No timed out uids"
