@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import json
+import pickle
 from queue import Queue
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,6 +21,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException, Request
 
+from litserve import LitAPI, LitServer
+from litserve.loops.base import _async_inject_context, _inject_context
+from litserve.loops.continuous_batching_loop import DefaultContinuousBatchingLoop
 from litserve.server import BaseRequestHandler, RegularRequestHandler
 from litserve.test_examples import SimpleLitAPI
 from litserve.utils import LitAPIStatus, ResponseBufferItem
@@ -107,3 +111,83 @@ def test_regular_handler_error_response():
         RegularRequestHandler._handle_error_response(Exception("test exception"))
     assert e.value.status_code == 500
     assert e.value.detail == "Internal server error"
+
+
+def make_request(body, content_type):
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    headers = [(b"content-type", content_type.encode())] if content_type else []
+    return Request({"type": "http", "headers": headers}, receive)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [b"\x00\xff\x80", b"", b'{"input": 4}'])
+@pytest.mark.parametrize("content_type", ["application/x-recordio-protobuf", "application/json; charset=utf-8", ""])
+async def test_raw_request_transport(mock_lit_api, body, content_type):
+    server = MockServer(mock_lit_api)
+    handler = TestRequestHandler(mock_lit_api, server)
+    await handler.handle_request(make_request(body, content_type), bytes)
+    request_data = pickle.loads(pickle.dumps(server.request_queue.get_nowait()))
+    assert len(request_data) == 4
+    payload = request_data[3]
+
+    def decode(request, context):
+        assert type(request) is bytes
+        assert request == body
+        assert context == {"content_type": content_type}
+        return request
+
+    assert _inject_context({}, decode, payload) == body
+    assert await _async_inject_context({}, decode, payload) == body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content_type",
+    ["application/json", "application/json; charset=utf-8", "application/vnd.api+json", "text/plain", ""],
+)
+async def test_default_request_still_parses_json(mock_lit_api, content_type):
+    handler = TestRequestHandler(mock_lit_api, MockServer(mock_lit_api))
+    request = make_request(b'{"input": 4}', content_type)
+    assert await handler._prepare_request(request, Request) == {"input": 4}
+
+
+@pytest.mark.asyncio
+async def test_default_request_does_not_fall_back_to_bytes(mock_lit_api):
+    handler = TestRequestHandler(mock_lit_api, MockServer(mock_lit_api))
+    request = make_request(b"\xff\x00", "application/x-recordio-protobuf")
+    with pytest.raises((json.JSONDecodeError, UnicodeDecodeError)):
+        await handler._prepare_request(request, Request)
+
+
+class BinaryRequestAPI(LitAPI):
+    def decode_request(self, request: bytes, context):
+        assert type(request) is bytes
+        return request, context["content_type"]
+
+
+class ForwardAnnotatedBinaryRequestAPI(BinaryRequestAPI):
+    def decode_request(self, request: "bytes", context) -> "ModelInput":  # noqa: F821
+        return super().decode_request(request, context)
+
+
+@pytest.mark.parametrize("api_cls", [BinaryRequestAPI, ForwardAnnotatedBinaryRequestAPI])
+def test_binary_request_openapi(api_cls):
+    server = LitServer(api_cls(), accelerator="cpu", devices=1)
+    operation = server.app.openapi()["paths"]["/predict"]["post"]
+    assert not any(parameter["name"] == "request" for parameter in operation.get("parameters", []))
+    assert operation["requestBody"]["content"]["application/octet-stream"]["schema"] == {
+        "type": "string",
+        "format": "binary",
+    }
+
+
+@pytest.mark.asyncio
+async def test_continuous_batching_decodes_raw_request():
+    api = BinaryRequestAPI()
+    handler = TestRequestHandler(api, MockServer(api))
+    payload = await handler._prepare_request(make_request(b"\xff\x00", "application/x-recordio-protobuf"), bytes)
+    loop = DefaultContinuousBatchingLoop()
+    loop.add_request("request-1", payload, api, None)
+    assert loop.active_sequences["request-1"]["input"] == (b"\xff\x00", "application/x-recordio-protobuf")

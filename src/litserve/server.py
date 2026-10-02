@@ -31,7 +31,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from queue import Queue
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import uvicorn
 import uvicorn.server
@@ -56,6 +56,7 @@ from litserve.utils import (
     LoopResponseType,
     ResponseBufferItem,
     WorkerSetupStatus,
+    _RawRequest,
     add_ssl_context_from_env,
     call_after_stream,
     configure_logging,
@@ -277,8 +278,10 @@ class BaseRequestHandler(ABC):
         self.lit_api = lit_api
         self.server = server
 
-    async def _prepare_request(self, request, request_type) -> dict:
+    async def _prepare_request(self, request, request_type) -> Any:
         """Common request preparation logic."""
+        if request_type is bytes:
+            return _RawRequest(await request.body(), request.headers.get("Content-Type", ""))
         if request_type == Request:
             content_type = request.headers.get("Content-Type", "")
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
@@ -286,7 +289,7 @@ class BaseRequestHandler(ABC):
             return await request.json()
         return request
 
-    async def _submit_request(self, payload: dict) -> tuple[str, asyncio.Event]:
+    async def _submit_request(self, payload: Any) -> tuple[str, asyncio.Event]:
         """Submit request to worker queue."""
         request_queue = self.server._get_request_queue(self.lit_api.api_path)
         response_queue_id = self.server.app.response_queue_id
@@ -1073,6 +1076,8 @@ class LitServer:
             request_type = decode_request_signature.parameters["request"].annotation
             if request_type == decode_request_signature.empty:
                 request_type = Request
+            elif request_type == "bytes":
+                request_type = bytes
 
             response_type = encode_response_signature.return_annotation
             if response_type == encode_response_signature.empty:
@@ -1090,7 +1095,9 @@ class LitServer:
         handler = StreamingRequestHandler(lit_api, self) if lit_api.stream else RegularRequestHandler(lit_api, self)
 
         # Create endpoint function
-        async def endpoint_handler(request: request_type) -> response_type:
+        endpoint_request_type = Request if request_type is bytes else request_type
+
+        async def endpoint_handler(request: endpoint_request_type) -> response_type:
             return await handler.handle_request(request, request_type)
 
         # Register endpoint
@@ -1100,6 +1107,13 @@ class LitServer:
                 endpoint_handler,
                 methods=["POST"],
                 dependencies=[Depends(self.setup_auth(lit_api))],
+                openapi_extra={
+                    "requestBody": {
+                        "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}
+                    }
+                }
+                if request_type is bytes
+                else None,
             )
 
         # Handle specs
