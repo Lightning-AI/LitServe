@@ -952,20 +952,20 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
         lit_loop.pre_setup(lit_api, None)
 
 
-def test_default_continuous_batching_add_request_matches_prefill_call(mock_transport):
-    """``prefill`` calls ``add_request`` with five positional args; the override must accept them."""
-    lit_api = ContinuousBatchingAPI()
-    lit_api.stream = True
-    lit_api.setup(None)
+@pytest.mark.asyncio
+async def test_default_continuous_batching_prefill(mock_transport):
+    lit_api = ContinuousBatchingAPI()  # max_batch_size=1, so the second request stays pending
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic(), "Hello"))
+    request_queue.put((0, "UUID-002", time.monotonic(), "World"))
 
     lit_loop = DefaultContinuousBatchingLoop()
-    lit_loop.add_request("UUID-001", "Hello", lit_api, None, mock_transport)
+    pending_requests = await lit_loop.prefill([], lit_api, None, request_queue, mock_transport)
 
-    assert lit_loop.active_sequences["UUID-001"] == {
-        "input": "Hello",
-        "current_length": 0,
-        "generated_sequence": [],
+    assert lit_loop.active_sequences == {
+        "UUID-001": {"input": "Hello", "current_length": 0, "generated_sequence": []},
     }
+    assert pending_requests == [(0, "UUID-002", "World")]
 
 
 @pytest.mark.asyncio
