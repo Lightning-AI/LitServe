@@ -981,6 +981,15 @@ async def test_continuous_batching_run(continuous_batching_setup):
 
 
 @pytest.mark.asyncio
+async def test_continuous_batching_prefill(continuous_batching_setup):
+    lit_api, lit_loop, request_queue, mock_transport = continuous_batching_setup
+    request_queue.put((0, "UUID-001", time.monotonic(), {"input": "Hello"}, {"x-request-id": "req-1"}))
+    pending_requests = await lit_loop.prefill([], lit_api, None, request_queue, mock_transport)
+    assert pending_requests == []
+    assert lit_loop.response_queue_ids == {"UUID-001": 0}
+
+
+@pytest.mark.asyncio
 async def test_handle_async_function():
     async def async_func():
         return "async"
