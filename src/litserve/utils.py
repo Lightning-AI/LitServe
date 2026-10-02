@@ -76,10 +76,8 @@ def dump_exception(exception):
         exception = PickleableHTTPException.from_exception(exception)
     try:
         return pickle.dumps(exception)
-    except Exception:
-        # A user exception that cannot be pickled must not escape into the caller's
-        # `except` block and take the worker process down with it.
-        logger.exception("Could not pickle %s, sending a generic error instead.", type(exception).__name__)
+    except Exception as e:
+        logger.warning("Could not pickle %s (%s), sending it as a RuntimeError.", type(exception).__name__, e)
         return pickle.dumps(RuntimeError(f"{type(exception).__name__}: {exception}"))
 
 

@@ -308,14 +308,11 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
 
 
 class UnpicklableError(Exception):
-    """A user exception that cannot be pickled, e.g. one holding a socket or a local lambda."""
-
     def __reduce__(self):
         raise TypeError("cannot pickle UnpicklableError")
 
 
-def test_put_error_response_survives_unpicklable_exception(mock_transport):
-    """`pickle.dumps` runs inside the caller's `except` block; raising there kills the worker."""
+def test_put_error_response_with_unpicklable_exception(mock_transport):
     loop = SingleLoop()
     loop.put_error_response(mock_transport, 0, "uuid-123", UnpicklableError("boom"))
 
