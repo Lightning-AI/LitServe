@@ -277,19 +277,14 @@ class BaseRequestHandler(ABC):
         self.lit_api = lit_api
         self.server = server
 
-    async def _prepare_request(self, request, request_type) -> tuple[dict, dict]:
-        """Common request preparation logic.
-
-        Returns the decoded payload and the request headers.
-
-        """
+    async def _prepare_request(self, request, request_type) -> dict:
+        """Common request preparation logic."""
         if request_type == Request:
             content_type = request.headers.get("Content-Type", "")
-            headers = dict(request.headers)
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
-                return await request.form(), headers
-            return await request.json(), headers
-        return request, {}
+                return await request.form()
+            return await request.json()
+        return request
 
     async def _submit_request(self, payload: dict, headers: Optional[dict] = None) -> tuple[str, asyncio.Event]:
         """Submit request to worker queue."""
@@ -309,16 +304,16 @@ class BaseRequestHandler(ABC):
         return uid, response_queue_id
 
     @abstractmethod
-    async def handle_request(self, request, request_type) -> Response:
+    async def handle_request(self, request, request_type, headers: Optional[dict] = None) -> Response:
         pass
 
 
 class RegularRequestHandler(BaseRequestHandler):
-    async def handle_request(self, request, request_type) -> Response:
+    async def handle_request(self, request, request_type, headers: Optional[dict] = None) -> Response:
         try:
             logger.debug(f"Handling request: {request}")
             # Prepare request
-            payload, headers = await self._prepare_request(request, request_type)
+            payload = await self._prepare_request(request, request_type)
 
             # Submit to worker
             uid, _ = await self._submit_request(payload, headers)
@@ -368,10 +363,10 @@ class RegularRequestHandler(BaseRequestHandler):
 
 
 class StreamingRequestHandler(BaseRequestHandler):
-    async def handle_request(self, request, request_type) -> StreamingResponse:
+    async def handle_request(self, request, request_type, headers: Optional[dict] = None) -> StreamingResponse:
         try:
             # Prepare request
-            payload, headers = await self._prepare_request(request, request_type)
+            payload = await self._prepare_request(request, request_type)
 
             # Submit to worker
             uid, _ = await self._submit_request(payload, headers)
@@ -1095,8 +1090,20 @@ class LitServer:
         handler = StreamingRequestHandler(lit_api, self) if lit_api.stream else RegularRequestHandler(lit_api, self)
 
         # Create endpoint function
-        async def endpoint_handler(request: request_type) -> response_type:
-            return await handler.handle_request(request, request_type)
+        if request_type == Request:
+
+            async def endpoint_handler(request: Request) -> response_type:
+                return await handler.handle_request(request, request_type, headers=dict(request.headers))
+
+        else:
+            # `request` is the parsed model, so headers come from `raw_request`. It is None when MCP calls this
+            # handler directly. Keep the bare `Request` annotation: FastAPI rejects `Optional[Request]`.
+            async def endpoint_handler(
+                request: request_type,
+                raw_request: Request = None,  # type: ignore
+            ) -> response_type:
+                headers = dict(raw_request.headers) if raw_request is not None else {}
+                return await handler.handle_request(request, request_type, headers=headers)
 
         # Register endpoint
         if not lit_api.spec:
