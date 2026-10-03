@@ -1002,6 +1002,14 @@ class LitServer:
             data_available.clear()
 
     @property
+    def _internal_paths(self) -> list[str]:
+        """Paths of LitServe's own endpoints (not user inference requests)."""
+        paths = ["/", "/metrics", self.healthcheck_path, self.info_path]
+        if self.enable_shutdown_api:
+            paths.append(self._shutdown_path)
+        return paths
+
+    @property
     def active_requests(self):
         if self.track_requests and self.active_counters:
             return sum(counter.value for counter in self.active_counters)
@@ -1518,7 +1526,9 @@ class LitServer:
             # Add middleware to count active requests
             active_counter = mp.Value("i", 0, lock=True)
             self.active_counters.append(active_counter)
-            app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+            app.add_middleware(
+                RequestCountMiddleware, active_counter=active_counter, excluded_paths=self._internal_paths
+            )
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         workers = []

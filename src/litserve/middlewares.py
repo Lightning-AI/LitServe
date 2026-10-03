@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import multiprocessing
+from collections.abc import Collection
 from typing import Optional
 
 from fastapi import HTTPException
@@ -56,17 +57,25 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
 class RequestCountMiddleware(BaseHTTPMiddleware):
     """Adds a header to the response with the number of active requests."""
 
-    def __init__(self, app: ASGIApp, active_counter: multiprocessing.Value) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        active_counter: multiprocessing.Value,
+        excluded_paths: Collection[str] = ("/", "/health", "/metrics"),
+    ) -> None:
         self.app = app
         self.active_counter = active_counter
+        self.excluded_paths = frozenset(excluded_paths)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or (scope["type"] == "http" and scope["path"] in ["/", "/health", "/metrics"]):
+        if scope["type"] != "http" or scope["path"] in self.excluded_paths:
             await self.app(scope, receive, send)
             return
 
-        self.active_counter.value += 1
+        with self.active_counter.get_lock():
+            self.active_counter.value += 1
         try:
             await self.app(scope, receive, send)
         finally:
-            self.active_counter.value -= 1
+            with self.active_counter.get_lock():
+                self.active_counter.value -= 1
