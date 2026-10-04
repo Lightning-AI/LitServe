@@ -68,6 +68,7 @@ dev = [
   "torch>2.0.0",
   "torchvision>=0.22.1",
   "transformers>=4.53.0",
+  "typesafe-sdk>=0.7.2",
   "uvloop>=0.21.0; sys_platform!='win32'",
 ]
 
