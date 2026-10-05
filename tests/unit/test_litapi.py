@@ -13,6 +13,7 @@
 # limitations under the License.
 import json
 import time
+from itertools import product
 
 import numpy as np
 import pytest
@@ -277,11 +278,43 @@ def test_log():
     assert server.logger_queue.get() == ("time", 0.1)
 
 
-def test_enable_async_not_set():
-    with pytest.raises(
-        ValueError, match=r"predict must be an async generator or async function when enable_async=True"
-    ):
-        ls.test_examples.SimpleLitAPI(enable_async=True)
+@pytest.mark.parametrize("async_methods", list(product([False, True], repeat=3)))
+@pytest.mark.parametrize("enable_async", [None, False, True])
+def test_enable_async_detection(async_methods, enable_async, recwarn):
+    def sync_method(self, value):
+        return value
+
+    async def async_method(self, value):
+        return value
+
+    methods = {
+        name: async_method if is_async else sync_method
+        for name, is_async in zip(("decode_request", "predict", "encode_response"), async_methods)
+    }
+    api_cls = type("MixedAPI", (ls.LitAPI,), methods)
+    api = api_cls() if enable_async is None else api_cls(enable_async=enable_async)
+    assert api.enable_async is (any(async_methods) if enable_async is None else enable_async)
+    assert not recwarn
+
+
+def test_async_detection_ignores_health():
+    class AsyncHealthAPI(ls.test_examples.SimpleLitAPI):
+        async def health(self):
+            return True
+
+    api = AsyncHealthAPI(max_batch_size=2)
+    assert api.enable_async is False
+    assert isinstance(api.loop, ls.loops.BatchedLoop)
+
+
+def test_detected_async_batching_is_rejected():
+    class AsyncEncodeAPI(ls.test_examples.SimpleLitAPI):
+        async def encode_response(self, output):
+            return output
+
+    api = AsyncEncodeAPI(max_batch_size=2)
+    with pytest.raises(ValueError, match="Async batching is not supported"):
+        _ = api.loop
 
 
 class HeavyInitAPI(ls.LitAPI):
