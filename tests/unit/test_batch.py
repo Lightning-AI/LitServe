@@ -246,7 +246,7 @@ def test_batched_loop():
     [
         pytest.param(0, 2),
         pytest.param(0, 1000),
-        pytest.param(0.1, 2),
+        pytest.param(0.5, 2),
         pytest.param(1000, 2),
         pytest.param(0.5, 1000),
     ],
