@@ -74,7 +74,11 @@ class PickleableHTTPException(HTTPException):
 def dump_exception(exception):
     if isinstance(exception, HTTPException):
         exception = PickleableHTTPException.from_exception(exception)
-    return pickle.dumps(exception)
+    try:
+        return pickle.dumps(exception)
+    except Exception as e:
+        logger.warning("Could not pickle %s (%s), sending it as a RuntimeError.", type(exception).__name__, e)
+        return pickle.dumps(RuntimeError(f"{type(exception).__name__}: {exception}"))
 
 
 async def azip(*async_iterables):

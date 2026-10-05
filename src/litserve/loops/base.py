@@ -15,7 +15,6 @@ import asyncio
 import inspect
 import logging
 import os
-import pickle
 import signal
 import sys
 import time
@@ -29,7 +28,7 @@ from litserve import LitAPI
 from litserve.callbacks import CallbackRunner
 from litserve.specs.base import LitSpec
 from litserve.transport.base import MessageTransport
-from litserve.utils import LitAPIStatus, LoopResponseType
+from litserve.utils import LitAPIStatus, LoopResponseType, dump_exception
 
 logger = logging.getLogger(__name__)
 # FastAPI writes form files to disk over 1MB by default, which prevents serialization by multiprocessing
@@ -371,7 +370,7 @@ class LitLoop(_BaseLoop):
         error: Exception,
         response_type: LoopResponseType = LoopResponseType.REGULAR,
     ) -> None:
-        error = pickle.dumps(error)
+        error = dump_exception(error)
         self.put_response(transport, response_queue_id, uid, error, LitAPIStatus.ERROR, response_type)
 
 
