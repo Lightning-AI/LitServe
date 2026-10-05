@@ -14,6 +14,7 @@
 import asyncio
 import logging
 import time
+from functools import partial
 from queue import Empty, Queue
 from typing import Optional
 
@@ -220,7 +221,7 @@ class StreamingLoop(DefaultLoop):
 
             while True:
                 try:
-                    request_data = await event_loop.run_in_executor(None, request_queue.get, 1.0)
+                    request_data = await event_loop.run_in_executor(None, partial(request_queue.get, timeout=1.0))
 
                     if request_data == _SENTINEL_VALUE:
                         logger.debug("Received sentinel value, stopping loop")
