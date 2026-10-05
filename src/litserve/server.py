@@ -286,7 +286,7 @@ class BaseRequestHandler(ABC):
             return await request.json()
         return request
 
-    async def _submit_request(self, payload: dict) -> tuple[str, asyncio.Event]:
+    async def _submit_request(self, payload: dict, headers: Optional[dict] = None) -> tuple[str, asyncio.Event]:
         """Submit request to worker queue."""
         request_queue = self.server._get_request_queue(self.lit_api.api_path)
         response_queue_id = self.server.app.response_queue_id
@@ -299,24 +299,24 @@ class BaseRequestHandler(ABC):
             litserver=self.server,
         )
 
-        request_queue.put((response_queue_id, uid, time.monotonic(), payload))
+        request_queue.put((response_queue_id, uid, time.monotonic(), payload, headers or {}))
         logger.debug(f"Submitted request uid={uid}")
         return uid, response_queue_id
 
     @abstractmethod
-    async def handle_request(self, request, request_type) -> Response:
+    async def handle_request(self, request, request_type, headers: Optional[dict] = None) -> Response:
         pass
 
 
 class RegularRequestHandler(BaseRequestHandler):
-    async def handle_request(self, request, request_type) -> Response:
+    async def handle_request(self, request, request_type, headers: Optional[dict] = None) -> Response:
         try:
             logger.debug(f"Handling request: {request}")
             # Prepare request
             payload = await self._prepare_request(request, request_type)
 
             # Submit to worker
-            uid, _ = await self._submit_request(payload)
+            uid, _ = await self._submit_request(payload, headers)
 
             # Wait for response
             event = asyncio.Event()
@@ -363,13 +363,13 @@ class RegularRequestHandler(BaseRequestHandler):
 
 
 class StreamingRequestHandler(BaseRequestHandler):
-    async def handle_request(self, request, request_type) -> StreamingResponse:
+    async def handle_request(self, request, request_type, headers: Optional[dict] = None) -> StreamingResponse:
         try:
             # Prepare request
             payload = await self._prepare_request(request, request_type)
 
             # Submit to worker
-            uid, _ = await self._submit_request(payload)
+            uid, _ = await self._submit_request(payload, headers)
 
             # Set up streaming response
             event = asyncio.Event()
@@ -1098,8 +1098,20 @@ class LitServer:
         handler = StreamingRequestHandler(lit_api, self) if lit_api.stream else RegularRequestHandler(lit_api, self)
 
         # Create endpoint function
-        async def endpoint_handler(request: request_type) -> response_type:
-            return await handler.handle_request(request, request_type)
+        if request_type == Request:
+
+            async def endpoint_handler(request: Request) -> response_type:
+                return await handler.handle_request(request, request_type, headers=dict(request.headers))
+
+        else:
+            # `request` is the parsed model, so headers come from `raw_request`. It is None when MCP calls this
+            # handler directly. Keep the bare `Request` annotation: FastAPI rejects `Optional[Request]`.
+            async def endpoint_handler(
+                request: request_type,
+                raw_request: Request = None,  # type: ignore
+            ) -> response_type:
+                headers = dict(raw_request.headers) if raw_request is not None else {}
+                return await handler.handle_request(request, request_type, headers=headers)
 
         # Register endpoint
         if not lit_api.spec:
