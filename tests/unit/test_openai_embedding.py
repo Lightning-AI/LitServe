@@ -155,6 +155,28 @@ async def test_openai_embedding_spec_with_missing_embeddings(openai_embedding_re
                 await ac.post("/v1/embeddings", json=openai_embedding_request_data, timeout=10)
 
 
+class HeadersEmbedAPI(TestEmbedAPI):
+    def predict(self, x, context):
+        if context["headers"].get("x-request-id") != "req-1":
+            raise ValueError("missing x-request-id header")
+        return super().predict(x)
+
+
+@pytest.mark.asyncio
+async def test_openai_embedding_spec_request_headers_in_context(openai_embedding_request_data):
+    server = ls.LitServer(HeadersEmbedAPI(spec=OpenAIEmbeddingSpec()))
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post(
+                "/v1/embeddings", json=openai_embedding_request_data, headers={"X-Request-ID": "req-1"}, timeout=10
+            )
+            assert resp.status_code == 200, resp.text
+
+
 class TestOpenAIWithBatching(TestEmbedAPI):
     def predict(self, batch):
         time.sleep(2)

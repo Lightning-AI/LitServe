@@ -14,6 +14,7 @@
 import asyncio
 import logging
 import time
+from functools import partial
 from queue import Empty, Queue
 from typing import Optional
 
@@ -46,7 +47,7 @@ class SingleLoop(DefaultLoop):
                     logger.debug("Received sentinel value, stopping loop")
                     return
 
-                response_queue_id, uid, timestamp, x_enc = request_data
+                response_queue_id, uid, timestamp, x_enc, headers = request_data
 
                 self.put_response(
                     transport=transport,
@@ -83,7 +84,7 @@ class SingleLoop(DefaultLoop):
                 )
                 continue
             try:
-                context = {}
+                context = {"headers": headers}
                 if hasattr(lit_spec, "populate_context"):
                     lit_spec.populate_context(context, x_enc)
 
@@ -152,9 +153,9 @@ class SingleLoop(DefaultLoop):
         lit_spec: Optional[LitSpec] = None,
     ):
         lit_spec = lit_spec or lit_api.spec
-        response_queue_id, uid, timestamp, x_enc = request
+        response_queue_id, uid, timestamp, x_enc, headers = request
         try:
-            context = {}
+            context = {"headers": headers}
             if hasattr(lit_spec, "populate_context"):
                 lit_spec.populate_context(context, x_enc)
 
@@ -226,13 +227,13 @@ class SingleLoop(DefaultLoop):
             pending_tasks = set()
             while True:
                 try:
-                    request_data = await event_loop.run_in_executor(None, request_queue.get, 1.0)
+                    request_data = await event_loop.run_in_executor(None, partial(request_queue.get, timeout=1.0))
 
                     if request_data == _SENTINEL_VALUE:
                         logger.debug("Received sentinel value, stopping loop")
                         return
 
-                    response_queue_id, uid, timestamp, x_enc = request_data
+                    response_queue_id, uid, timestamp, x_enc, headers = request_data
 
                     self.put_response(
                         transport=transport,
@@ -269,7 +270,7 @@ class SingleLoop(DefaultLoop):
                 # of multiple requests
                 task = asyncio.create_task(
                     self._process_single_request(
-                        (response_queue_id, uid, timestamp, x_enc),
+                        (response_queue_id, uid, timestamp, x_enc, headers),
                         lit_api,
                         transport,
                         callback_runner,
@@ -347,10 +348,10 @@ class BatchedLoop(DefaultLoop):
             if not batches:
                 continue
             logger.debug(f"{len(batches)} batched requests received")
-            response_queue_ids, uids, inputs = zip(*batches)
+            response_queue_ids, uids, inputs, headers_list = zip(*batches)
             num_inputs = len(inputs)
             try:
-                contexts = [{} for _ in range(num_inputs)]
+                contexts = [{"headers": headers} for headers in headers_list]
                 if hasattr(lit_spec, "populate_context"):
                     for input, context in zip(inputs, contexts):
                         lit_spec.populate_context(context, input)
