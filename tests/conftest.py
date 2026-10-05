@@ -398,3 +398,24 @@ def mock_manager():
 @pytest.fixture
 def port():
     return random.randint(10000, 65535)
+
+
+@pytest.fixture
+def system_one_request_data():
+    return {
+        "model": "lit",
+        "state": "Shoes arrived two weeks late. Also I see two charges on my card.",
+        "questions": {
+            "department": {
+                "type": "choice",
+                "instructions": "Which team should handle this?",
+                "criteria": {"returns": "Exchanges, refunds", "shipping": None, "billing": "Charges"},
+            },
+            "escalate": {"type": "noul", "instructions": "Does this need urgent human attention?"},
+            "frustration": {
+                "type": "score",
+                "instructions": "How frustrated is the customer?",
+                "criteria": ["Calm", "Frustrated", "Very angry"],
+            },
+        },
+    }

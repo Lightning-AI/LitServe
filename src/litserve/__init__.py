@@ -17,7 +17,7 @@ from litserve.api import LitAPI
 from litserve.callbacks import Callback
 from litserve.loggers import Logger
 from litserve.server import LitServer, Request, Response
-from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec
+from litserve.specs import OpenAIEmbeddingSpec, OpenAISpec, SystemOneSpec
 from litserve.utils import configure_logging, set_trace, set_trace_if_debug
 
 configure_logging()
@@ -31,6 +31,7 @@ __all__ = [
     "OpenAIEmbeddingSpec",
     "Request",
     "Response",
+    "SystemOneSpec",
     "set_trace",
     "set_trace_if_debug",
     "test_examples",
