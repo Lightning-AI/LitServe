@@ -321,8 +321,8 @@ def test_put_error_response_with_unpicklable_exception(mock_transport):
     assert uid == "uuid-123"
     assert status == ls.utils.LitAPIStatus.ERROR
     assert str(pickle.loads(response_data)) == "UnpicklableError: boom"
-    
-    
+
+
 class RecordingQueue(Queue):
     """Queue with the real ``Queue.get`` signature that records its calls."""
 
