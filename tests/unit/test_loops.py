@@ -45,6 +45,7 @@ from litserve.loops.base import (
 )
 from litserve.loops.continuous_batching_loop import (
     ContinuousBatchingLoop,
+    DefaultContinuousBatchingLoop,
     notify_timed_out_requests,
 )
 from litserve.loops.simple_loops import BatchedLoop, SingleLoop
@@ -320,6 +321,36 @@ def test_put_error_response_with_unpicklable_exception(mock_transport):
     assert uid == "uuid-123"
     assert status == ls.utils.LitAPIStatus.ERROR
     assert str(pickle.loads(response_data)) == "UnpicklableError: boom"
+    
+    
+class RecordingQueue(Queue):
+    """Queue with the real ``Queue.get`` signature that records its calls."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.get_calls = []
+
+    def get(self, block=True, timeout=None):
+        self.get_calls.append((block, timeout))
+        return super().get(block=block, timeout=timeout)
+
+
+@pytest.mark.parametrize(
+    ("loop", "runner", "lit_api"),
+    [
+        pytest.param(SingleLoop(), "_run_single_loop_with_async", AsyncTestLitAPI(), id="single"),
+        pytest.param(StreamingLoop(), "run_streaming_loop_async", AsyncTestStreamLitAPI(), id="streaming"),
+    ],
+)
+def test_async_loops_poll_queue_with_timeout(loop, runner, lit_api, mock_transport, monkeypatch):
+    requests_queue = RecordingQueue()
+    requests_queue.put(_SENTINEL_VALUE)
+
+    monkeypatch.setattr(loop, "kill", lambda: None)
+    with contextlib.suppress(KeyboardInterrupt):
+        getattr(loop, runner)(lit_api, requests_queue, mock_transport, NOOP_CB_RUNNER)
+
+    assert requests_queue.get_calls == [(True, 1.0)]
 
 
 class FakeBatchStreamTransport(DummyMessageTransport):
@@ -965,6 +996,22 @@ def test_continuous_batching_pre_setup(continuous_batching_setup):
         ),
     ):
         lit_loop.pre_setup(lit_api, None)
+
+
+@pytest.mark.asyncio
+async def test_default_continuous_batching_prefill(mock_transport):
+    lit_api = ContinuousBatchingAPI()  # max_batch_size=1, so the second request stays pending
+    request_queue = Queue()
+    request_queue.put((0, "UUID-001", time.monotonic(), "Hello"))
+    request_queue.put((0, "UUID-002", time.monotonic(), "World"))
+
+    lit_loop = DefaultContinuousBatchingLoop()
+    pending_requests = await lit_loop.prefill([], lit_api, None, request_queue, mock_transport)
+
+    assert lit_loop.active_sequences == {
+        "UUID-001": {"input": "Hello", "current_length": 0, "generated_sequence": []},
+    }
+    assert pending_requests == [(0, "UUID-002", "World")]
 
 
 @pytest.mark.asyncio

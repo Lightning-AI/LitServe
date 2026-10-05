@@ -286,7 +286,14 @@ requires the lit_api to have a has_finished method. Please implement the has_fin
 
 
 class DefaultContinuousBatchingLoop(ContinuousBatchingLoop):
-    def add_request(self, uid: str, request: Any, lit_api: LitAPI, lit_spec: Optional[LitSpec]) -> None:
+    def add_request(
+        self,
+        uid: str,
+        request: Any,
+        lit_api: LitAPI,
+        lit_spec: Optional[LitSpec],
+        transport: Optional[MessageTransport] = None,
+    ) -> None:
         """Add a new sequence to active sequences and perform any action before prediction such as filling the cache."""
         decoded_request = lit_api.decode_request(request)
         self.active_sequences[uid] = {"input": decoded_request, "current_length": 0, "generated_sequence": []}
