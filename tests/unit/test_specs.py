@@ -86,6 +86,31 @@ async def test_openai_spec(openai_request_data, api):
             assert final_output == "This is a generated output ", f"final_output: {final_output}"
 
 
+@pytest.mark.parametrize(
+    "tool_choice",
+    [
+        "any",
+        "required",
+        {"type": "function", "function": {"name": "lookup_weather"}},
+    ],
+)
+@pytest.mark.asyncio
+async def test_openai_spec_tool_choice(openai_request_data, tool_choice):
+    openai_request_data["tool_choice"] = tool_choice
+    request = ChatCompletionRequest(**openai_request_data)
+    assert request.model_dump(mode="json")["tool_choice"] == tool_choice
+
+    server = ls.LitServer(TestAPI(spec=OpenAISpec()))
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            response = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+
+    assert response.status_code == 200
+
+
 # OpenAIWithUsage
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
