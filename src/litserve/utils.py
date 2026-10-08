@@ -90,8 +90,21 @@ async def azip(*async_iterables):
 
 
 @contextmanager
-def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
-    """Pytest utility to start the server in a context manager."""
+def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False, wait_for_workers: bool = False):
+    """Pytest utility to start the server in a context manager.
+
+    Args:
+        server: the LitServer instance to start.
+        worker_monitor: enable the worker monitor loop.
+        wait_for_workers: block until every inference worker has finished ``setup()``
+            before yielding. By default the context manager yields immediately — the
+            ``/health`` endpoint then reports 503 until workers become ready, which the
+            health tests rely on. Set to ``True`` when the test cannot tolerate a
+            not-yet-listening worker (e.g. synchronous ``TestClient.post()`` calls
+            against a slow-loading model). A ``RuntimeError`` is raised if any worker
+            reports a setup error.
+
+    """
     server.app.response_queue_id = 0
     for lit_api in server.litapi_connector:
         if lit_api.spec:
@@ -114,6 +127,15 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
         server.mcp_server = _LitMCPServerConnector()
     else:
         server.mcp_server = None
+
+    # Optionally wait for all workers to be ready before yielding.
+    if wait_for_workers:
+        while not all(v == WorkerSetupStatus.READY for v in server.workers_setup_status.values()):
+            if any(v == WorkerSetupStatus.ERROR for v in server.workers_setup_status.values()):
+                raise RuntimeError("One or more workers failed to start")
+            if server._shutdown_event.is_set():
+                raise RuntimeError("Server shut down before workers became ready")
+            time.sleep(0.05)
 
     try:
         yield server
