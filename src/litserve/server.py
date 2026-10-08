@@ -283,8 +283,21 @@ class BaseRequestHandler(ABC):
             content_type = request.headers.get("Content-Type", "")
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
                 return await request.form()
-            return await request.json()
+            return await self._parse_json_body(request)
         return request
+
+    @staticmethod
+    async def _parse_json_body(request: Request) -> dict:
+        """Parse the request body as JSON, rejecting an empty or malformed body with a 400 instead of a 500."""
+        try:
+            return await request.json()
+        except ValueError as e:  # json.JSONDecodeError and UnicodeDecodeError are both ValueError subclasses
+            body = await request.body()
+            if not body.strip():
+                detail = "Request body is empty. Send a JSON payload in the request body."
+            else:
+                detail = f"Request body is not valid JSON: {e}"
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from None
 
     async def _submit_request(self, payload: dict, headers: Optional[dict] = None) -> tuple[str, asyncio.Event]:
         """Submit request to worker queue."""
@@ -392,6 +405,9 @@ class StreamingRequestHandler(BaseRequestHandler):
                     self.server.response_buffer.pop(uid, None)
 
             return StreamingResponse(stream_with_cleanup())
+
+        except HTTPException as e:
+            raise e from None
 
         except Exception as e:
             logger.exception(f"Error handling streaming request: {e}")
@@ -1112,10 +1128,29 @@ class LitServer:
                 endpoint_handler,
                 methods=["POST"],
                 dependencies=[Depends(self.setup_auth(lit_api))],
+                openapi_extra=self._openapi_request_body(request_type),
             )
 
         # Handle specs
         self._register_spec_endpoints(lit_api)
+
+    @staticmethod
+    def _openapi_request_body(request_type) -> Optional[dict]:
+        """Declare a JSON request body in the OpenAPI schema when `decode_request` takes a raw `Request`.
+
+        FastAPI only documents a request body for endpoints whose parameter is a Pydantic model. When
+        `decode_request` is annotated with (or defaults to) `fastapi.Request`, the body is read manually, so
+        without this the Swagger UI (`/docs`) shows no input box and "Execute" sends an empty body.
+
+        """
+        if request_type != Request:
+            return None
+        return {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "object", "additionalProperties": True}}},
+            }
+        }
 
     def _register_spec_endpoints(self, lit_api: LitAPI):
         specs = [lit_api.spec] if lit_api.spec else []
