@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import multiprocessing as mp
 
 import pytest
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -133,3 +135,60 @@ def test_active_requests_reset_after_error():
 
         assert in_flight == [1], "request should be counted while it is in flight"
         assert server.active_requests == 0, "failed request should not stay in the active request count"
+
+
+@pytest.mark.parametrize(
+    ("server_kwargs", "internal_paths"),
+    [
+        ({}, ["/", "/health", "/info"]),
+        ({"healthcheck_path": "/healthz", "info_path": "/details"}, ["/", "/healthz", "/details"]),
+    ],
+)
+def test_internal_paths_not_counted_in_active_requests(server_kwargs, internal_paths):
+    """Internal endpoints, on default or custom paths, should not count as active requests."""
+    in_flight = {}
+
+    class RecordingMiddleware(BaseHTTPMiddleware):
+        """Runs inside RequestCountMiddleware, so it sees the count while the request is in flight."""
+
+        async def dispatch(self, request, call_next):
+            in_flight[request.url.path] = server.active_requests
+            return await call_next(request)
+
+    server = ls.LitServer(
+        ls.test_examples.SimpleLitAPI(), track_requests=True, middlewares=[RecordingMiddleware], **server_kwargs
+    )
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        for path in internal_paths:
+            client.get(path)  # status is irrelevant here, e.g. health is 503 without ready workers
+        assert client.post("/predict", json={"input": 4.0}).status_code == 200
+
+        assert {path: in_flight[path] for path in internal_paths} == dict.fromkeys(internal_paths, 0)
+        assert in_flight["/predict"] == 1, "regular endpoints should still be counted"
+        assert server.active_requests == 0
+
+
+def test_internal_paths_include_shutdown_path_only_when_enabled(monkeypatch):
+    monkeypatch.setenv("LIT_SHUTDOWN_API_KEY", "secret")
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), enable_shutdown_api=True, shutdown_path="/stop")
+    assert "/stop" in server._internal_paths
+    assert "/shutdown" not in ls.LitServer(ls.test_examples.SimpleLitAPI())._internal_paths
+
+
+def test_request_count_middleware_default_excluded_paths():
+    """Constructing the middleware directly keeps skipping the historical default paths."""
+    counter = mp.Value("i", 0, lock=True)
+    app = FastAPI()
+    in_flight = {}
+
+    @app.get("/health")
+    @app.get("/predict")
+    def handler(request: Request):
+        in_flight[request.url.path] = counter.value
+
+    app.add_middleware(RequestCountMiddleware, active_counter=counter)
+    client = TestClient(app)
+    client.get("/health")
+    client.get("/predict")
+    assert in_flight == {"/health": 0, "/predict": 1}
+    assert counter.value == 0
