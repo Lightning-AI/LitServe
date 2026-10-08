@@ -30,37 +30,27 @@ repos:
         #args: ["--write-changes"]
 
   - repo: https://github.com/JoC0de/pre-commit-prettier
-    rev: v3.9.6
+    rev: v3.9.9
     hooks:
       - id: prettier
         files: \.(json|yml|yaml|toml)
         # https://prettier.io/docs/en/options.html#print-width
         args: ["--print-width=120"]
 
-  - repo: https://github.com/PyCQA/docformatter
-    # keep at v1.7.7: v1.7.8 mangles non-docstring strings and never converges with ruff-format
-    rev: v1.7.7
-    hooks:
-      - id: docformatter
-        language_version: python3.13
-        additional_dependencies: [tomli]
-        args: ["--in-place"]
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.6
+    rev: v0.16.10
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: ["--fix"]
       - id: ruff-format
-      - id: ruff-check
 
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.26.0
+    rev: v2.30.1
     hooks:
       - id: pyproject-fmt
         additional_dependencies: [tox]
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.25
+    rev: "0.26"
     hooks:
       - id: validate-pyproject

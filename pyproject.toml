@@ -33,16 +33,16 @@ dependencies = [
   "uvicorn[standard]>=0.29.0",
 ]
 
-[project.scripts]
-litserve = "litserve.__main__:main"
-lightning = "litserve.cli:main"
-
 [project.urls]
 Homepage = "https://github.com/Lightning-AI/litserve"
 "Bug Tracker" = "https://github.com/Lightning-AI/litserve/issues"
 Documentation = "https://lightning-ai.github.io/litserve/"
 "Source Code" = "https://github.com/Lightning-AI/litserve"
 Download = "https://github.com/Lightning-AI/litserve"
+
+[project.scripts]
+litserve = "litserve.__main__:main"
+lightning = "litserve.cli:main"
 
 [dependency-groups]
 dev = [
@@ -125,16 +125,16 @@ lint.ignore = [
   "UP045", # TODO: non-pep604-annotation-optional
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"setup.py" = [ "D100", "SIM115" ]
+"__about__.py" = [ "D100" ]
+"__init__.py" = [ "D100" ]
+
 # [tool.ruff.pycodestyle]
 # ignore-overlong-task-comments = true
 [tool.ruff.lint.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
-
-[tool.ruff.lint.per-file-ignores]
-"setup.py" = [ "D100", "SIM115" ]
-"__about__.py" = [ "D100" ]
-"__init__.py" = [ "D100" ]
 
 [tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings.
@@ -148,12 +148,6 @@ convention = "google"
 # ignore-words-list = ""
 # skip = "*.py"
 quiet-level = 3
-
-[tool.docformatter]
-recursive = true
-wrap-summaries = 120
-wrap-descriptions = 120
-blank = true
 
 [tool.check-manifest]
 ignore = [ "*.yml", ".github", ".github/*" ]
