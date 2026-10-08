@@ -149,12 +149,6 @@ convention = "google"
 # skip = "*.py"
 quiet-level = 3
 
-[tool.docformatter]
-recursive = true
-wrap-summaries = 120
-wrap-descriptions = 120
-blank = true
-
 [tool.check-manifest]
 ignore = [ "*.yml", ".github", ".github/*" ]
 
