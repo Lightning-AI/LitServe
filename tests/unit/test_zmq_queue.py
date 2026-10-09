@@ -108,6 +108,7 @@ def test_producer_wait_for_subscribers_not_sent_to_consumers(mock_context):
 
     topic = socket.send.call_args[0][0].split(b"|", 1)[0]
     # consumers subscribe to their numeric id as a prefix, so the ping topic must not start with a digit
+    assert topic
     assert not topic[:1].isdigit()
 
 
