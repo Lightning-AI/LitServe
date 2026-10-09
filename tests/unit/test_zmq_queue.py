@@ -122,6 +122,14 @@ async def test_async_consumer(mock_async_context, timeout):
         await consumer.get(timeout=timeout)
 
 
+@pytest.mark.parametrize("consumer_id", [1, 10])
+def test_async_consumer_subscribes_with_delimiter(mock_async_context, consumer_id):
+    """Subscription is a byte-prefix match, so it must include the "|" delimiter to avoid matching other ids."""
+    _, socket = mock_async_context
+    AsyncConsumer(consumer_id=consumer_id, address="test_addr")
+    socket.setsockopt_string.assert_called_once_with(zmq.SUBSCRIBE, f"{consumer_id}|")
+
+
 @pytest.mark.asyncio
 async def test_async_consumer_cleanup():
     with patch("zmq.asyncio.Context") as mock_ctx:

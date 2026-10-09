@@ -168,7 +168,7 @@ class AsyncConsumer(BaseConsumer):
         self._context = zmq.asyncio.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.connect(self.address)
-        self._socket.setsockopt_string(zmq.SUBSCRIBE, str(self.consumer_id))
+        self._socket.setsockopt_string(zmq.SUBSCRIBE, f"{self.consumer_id}|")
 
     async def get(self, timeout: Optional[float] = None) -> Any:
         """Get an item from the queue asynchronously."""
