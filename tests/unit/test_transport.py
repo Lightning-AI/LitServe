@@ -201,13 +201,18 @@ class TestTransportIntegration:
 
 
 class TestZMQTransport:
-    def test_close_without_setup(self):
-        """Closing a transport that was never set up is a no-op."""
-        transport = ZMQTransport("ipc:///tmp/litserve-test-backend", "ipc:///tmp/litserve-test-frontend")
+    @pytest.fixture
+    def transport(self):
+        return ZMQTransport("ipc:///tmp/litserve-test-backend", "ipc:///tmp/litserve-test-frontend")
+
+    def test_close_without_setup(self, transport):
         transport.close(send_sentinel=True)
 
-    def test_close_after_setup(self):
-        transport = ZMQTransport("ipc:///tmp/litserve-test-backend", "ipc:///tmp/litserve-test-frontend")
+        assert transport._zmq is None
+
+    def test_close_after_setup(self, transport):
         transport._zmq = MagicMock()
+
         transport.close()
+
         transport._zmq.close.assert_called_once()
