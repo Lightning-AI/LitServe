@@ -100,9 +100,9 @@ class Producer:
         """
         start_time = time.time()
         while time.time() - start_time < timeout:
-            # Send a ping message to consumer 0 (special system messages)
+            # Send a ping on a control topic that no consumer subscribes to
             try:
-                self._socket.send(b"0|__ping__", zmq.NOBLOCK)
+                self._socket.send(b"__ctl__|__ping__", zmq.NOBLOCK)
                 time.sleep(0.1)  # Give time for subscription to propagate
                 return True
             except zmq.ZMQError:
