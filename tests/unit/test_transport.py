@@ -202,8 +202,8 @@ class TestTransportIntegration:
 
 class TestZMQTransport:
     @pytest.fixture
-    def transport(self):
-        return ZMQTransport("ipc:///tmp/litserve-test-backend", "ipc:///tmp/litserve-test-frontend")
+    def transport(self, tmp_path):
+        return ZMQTransport(f"ipc://{tmp_path}/backend", f"ipc://{tmp_path}/frontend")
 
     def test_close_without_setup(self, transport):
         transport.close(send_sentinel=True)
