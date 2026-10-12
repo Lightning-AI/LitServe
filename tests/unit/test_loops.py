@@ -16,6 +16,7 @@ import contextlib
 import inspect
 import io
 import json
+import logging
 import re
 import sys
 import threading
@@ -305,52 +306,6 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
                 "uuid-123",
                 (i - 1, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, ANY),
             )
-
-
-class _ExitTestLoop(BaseException):
-    """Escapes the loop's ``except Exception`` so a test can stop ``__call__``."""
-
-
-class AsyncTestLoop(LitLoop):
-    def __init__(self, stop_after):
-        super().__init__()
-        self.stop_after = stop_after
-        self.run_calls = 0
-        self.on_schedule_task_done = MagicMock()
-
-    async def run(self, *args):
-        self.run_calls += 1
-        if self.run_calls >= self.stop_after:
-            raise _ExitTestLoop
-
-
-class FailingScheduleTaskLoop(AsyncTestLoop):
-    async def schedule_task(self, lit_api, lit_spec, request_queue, transport):
-        raise RuntimeError("prefill died")
-
-
-@pytest.mark.parametrize("loop_cls", [AsyncTestLoop, FailingScheduleTaskLoop])
-def test_async_loop_schedule_task_done(loop_cls, mock_transport):
-    loop = loop_cls(stop_after=4)
-    loop.response_queue_ids = {"uuid-123": 0}
-    lit_api = MagicMock()
-    lit_api.has_active_requests.return_value = False
-
-    with pytest.raises(_ExitTestLoop):
-        loop(lit_api, "cpu", 0, Queue(), mock_transport, {}, NOOP_CB_RUNNER)
-
-    response_queue = mock_transport._queues[0]
-    if loop_cls is AsyncTestLoop:
-        # the base `schedule_task` is a no-op, so finishing is not a failure
-        assert response_queue.empty()
-        loop.on_schedule_task_done.assert_not_called()
-    else:
-        # the failure is reported once per uid, not on every iteration
-        uid, (_, status, _, _) = response_queue.get_nowait()
-        assert (uid, status) == ("uuid-123", ls.utils.LitAPIStatus.ERROR)
-        assert response_queue.empty()
-        assert loop.response_queue_ids == {}
-        loop.on_schedule_task_done.assert_called_once()
 
 
 class RecordingQueue(Queue):
@@ -748,6 +703,60 @@ def off_test_run_batched_streaming_loop(openai_request_data):
 
     response = response_queues[0].get(timeout=5)[1]
     assert response[0] == {"role": "assistant", "content": "10 + 6 is equal to 16."}
+
+
+class _ExitTestLoop(BaseException):
+    """Escapes the loop's ``except Exception`` so a test can stop ``__call__``."""
+
+
+class AsyncTestLoop(LitLoop):
+    def __init__(self, stop_after):
+        super().__init__()
+        self.stop_after = stop_after
+        self.run_calls = 0
+        self.on_schedule_task_done = MagicMock()
+
+    async def run(self, *args):
+        self.run_calls += 1
+        if self.run_calls >= self.stop_after:
+            raise _ExitTestLoop
+
+
+class FailingScheduleTaskLoop(AsyncTestLoop):
+    async def schedule_task(self, lit_api, lit_spec, request_queue, transport):
+        raise RuntimeError("prefill died")
+
+
+@pytest.mark.parametrize("loop_cls", [AsyncTestLoop, FailingScheduleTaskLoop])
+def test_async_loop_schedule_task_done(loop_cls, mock_transport, caplog, monkeypatch):
+    loop = loop_cls(stop_after=3)
+    loop.response_queue_ids = {"uuid-123": 0}
+    lit_api = MagicMock()
+    lit_api.has_active_requests.return_value = False
+
+    # litserve's logger sets `propagate = False`, so caplog misses it by default
+    monkeypatch.setattr(logging.getLogger("litserve"), "propagate", True)
+    with caplog.at_level(logging.ERROR, logger="litserve.loops.base"), pytest.raises(_ExitTestLoop):
+        loop(lit_api, "cpu", 0, Queue(), mock_transport, {}, NOOP_CB_RUNNER)
+
+    failure_logs = [r for r in caplog.records if "schedule_task exited unexpectedly" in r.getMessage()]
+
+    response_queue = mock_transport._queues[0]
+    if loop_cls is AsyncTestLoop:
+        # the base `schedule_task` is a no-op, so finishing is not a failure
+        assert response_queue.empty()
+        loop.on_schedule_task_done.assert_not_called()
+        assert failure_logs == []
+    else:
+        # the failure is reported once per uid, not on every iteration
+        uid, (_, status, _, _) = response_queue.get_nowait()
+        assert (uid, status) == ("uuid-123", ls.utils.LitAPIStatus.ERROR)
+        assert response_queue.empty()
+        assert loop.response_queue_ids == {}
+        loop.on_schedule_task_done.assert_called_once()
+        # the cause is logged exactly once, with the original exception attached
+        assert len(failure_logs) == 1
+        assert str(failure_logs[0].exc_info[1]) == "prefill died"
 
 
 class TestLoop(LitLoop):

@@ -273,6 +273,16 @@ class _BaseLoop(ABC):
                     ):
                         # Report each uid once, then back off: nothing feeds the loop any more.
                         schedule_task_failed = True
+                        if schedule_task.cancelled():
+                            logger.error(
+                                "schedule_task was cancelled; worker %s will no longer process requests", worker_id
+                            )
+                        else:
+                            logger.error(
+                                "schedule_task exited unexpectedly; worker %s will no longer process requests",
+                                worker_id,
+                                exc_info=schedule_task.exception(),
+                            )
                         for uid, response_queue_id in self.response_queue_ids.items():
                             self.put_error_response(
                                 transport,
