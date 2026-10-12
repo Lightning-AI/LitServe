@@ -1075,3 +1075,14 @@ async def test_sync_fn_to_async_fn():
     assert await _sync_fn_to_async_fn(sync_func) == "sync-to-async"
     async_gen = await _sync_fn_to_async_fn(sync_gen)
     assert isinstance(async_gen, AsyncGenerator)
+
+
+def test_put_error_response_with_unpicklable_exception(mock_transport):
+    exc = ValueError("boom")
+    exc.lock = threading.Lock()
+    SingleLoop().put_error_response(mock_transport, 0, "uuid-123", exc)
+
+    uid, (response_data, status, _, _) = asyncio.run(mock_transport.areceive(consumer_id=0))
+    assert uid == "uuid-123"
+    assert status == ls.utils.LitAPIStatus.ERROR
+    assert response_data == ls.utils.dump_exception(exc)  # the RuntimeError fallback
