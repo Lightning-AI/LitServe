@@ -54,6 +54,14 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
         await self.app(scope, rcv, send)
 
 
+def _route_path(scope: Scope) -> str:
+    """Return ``scope["path"]`` without ``root_path``, which uvicorn prepends to it."""
+    path, root_path = scope["path"], scope.get("root_path", "")
+    if root_path and (path == root_path or path.startswith(root_path + "/")):
+        return path[len(root_path) :] or "/"
+    return path
+
+
 class RequestCountMiddleware(BaseHTTPMiddleware):
     """Tracks in-flight requests in ``active_counter``, skipping ``excluded_paths``."""
 
@@ -69,16 +77,7 @@ class RequestCountMiddleware(BaseHTTPMiddleware):
         self.excluded_paths = frozenset(excluded_paths)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        path = scope["path"]
-        root_path = scope.get("root_path", "")
-        if root_path and (path == root_path or path.startswith(root_path + "/")):
-            path = path[len(root_path) :] or "/"
-
-        if path in self.excluded_paths:
+        if scope["type"] != "http" or _route_path(scope) in self.excluded_paths:
             await self.app(scope, receive, send)
             return
 

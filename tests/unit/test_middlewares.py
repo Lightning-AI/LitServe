@@ -15,7 +15,6 @@ import copy
 import multiprocessing as mp
 
 import pytest
-from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
@@ -163,33 +162,13 @@ def test_internal_paths_not_counted_in_active_requests(server_kwargs, internal_p
             client.get(path)  # status is irrelevant here, e.g. health is 503 without ready workers
         assert client.post("/predict", json={"input": 4.0}).status_code == 200
 
-        assert {path: in_flight[path] for path in internal_paths} == dict.fromkeys(internal_paths, 0)
-        assert in_flight["/predict"] == 1, "regular endpoints should still be counted"
+        assert in_flight == {**dict.fromkeys(internal_paths, 0), "/predict": 1}
         assert server.active_requests == 0
 
 
-def test_request_count_middleware_default_excluded_paths():
-    """Constructing the middleware directly keeps skipping the historical default paths."""
-    counter = mp.Value("i", 0, lock=True)
-    app = FastAPI()
-    in_flight = {}
-
-    @app.get("/health")
-    @app.get("/predict")
-    def handler(request: Request):
-        in_flight[request.url.path] = counter.value
-
-    app.add_middleware(RequestCountMiddleware, active_counter=counter)
-    client = TestClient(app)
-    client.get("/health")
-    client.get("/predict")
-    assert in_flight == {"/health": 0, "/predict": 1}
-    assert counter.value == 0
-
-
 @pytest.mark.asyncio
-async def test_request_count_middleware_honors_root_path():
-    """Uvicorn sets scope["path"] to root_path + path, so excluded paths must be matched without the prefix."""
+async def test_request_count_middleware_excluded_paths():
+    """Default excluded paths are skipped, also when uvicorn prefixes scope["path"] with root_path."""
     counter = mp.Value("i", 0, lock=True)
     in_flight = {}
 
@@ -201,9 +180,18 @@ async def test_request_count_middleware_honors_root_path():
     async def call(path, root_path="/api"):
         await middleware({"type": "http", "path": path, "root_path": root_path}, None, None)
 
+    await call("/health", root_path="")
+    await call("/predict", root_path="")
     await call("/api/health")
     await call("/api")
     await call("/api/predict")
     await call("/apiary/health")
-    assert in_flight == {"/api/health": 0, "/api": 0, "/api/predict": 1, "/apiary/health": 1}
+    assert in_flight == {
+        "/health": 0,
+        "/predict": 1,
+        "/api/health": 0,
+        "/api": 0,
+        "/api/predict": 1,
+        "/apiary/health": 1,
+    }
     assert counter.value == 0
