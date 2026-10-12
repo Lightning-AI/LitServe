@@ -696,7 +696,7 @@ class LitServer:
         enable_shutdown_api: bool = False,
         model_metadata: Optional[dict] = None,
         spec: Optional[LitSpec] = None,
-        max_payload_size=None,
+        max_payload_size: Optional[Union[int, float, str]] = None,
         track_requests: bool = False,
         callbacks: Optional[Union[list[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
@@ -819,7 +819,7 @@ class LitServer:
         if not self.litapi_connector.any_stream():
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
-            max_payload_size = parse_size(max_payload_size)
+            max_payload_size = parse_size(max_payload_size, name="max_payload_size")
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
         self.active_counters: list[mp.Value] = []
         self.middlewares = middlewares

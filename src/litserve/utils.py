@@ -16,6 +16,7 @@ import base64
 import dataclasses
 import importlib.util
 import logging
+import math
 import os
 import pdb
 import pickle
@@ -300,7 +301,7 @@ class _TimedInitMeta(ABCMeta):
 _SIZE_UNITS = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3}
 
 
-def parse_size(size: Union[int, float, str]) -> int:
+def parse_size(size: Union[int, float, str], *, name: str = "size") -> int:
     """Convert a size such as ``1048576``, ``"500KB"``, ``"2MB"`` or ``"1GB"`` to a number of bytes.
 
     Units are binary (1KB = 1024 bytes) and case-insensitive. Numbers and plain numeric strings are bytes.
@@ -309,15 +310,15 @@ def parse_size(size: Union[int, float, str]) -> int:
         ValueError: If the size is malformed or not positive.
 
     """
-    msg = f"max_payload_size must be a positive number of bytes or a string like '10MB', but got {size!r}"
+    msg = f"{name} must be a positive number of bytes or a string like '10MB', but got {size!r}"
     if isinstance(size, bool) or not isinstance(size, (int, float, str)):
         raise ValueError(msg)
     if isinstance(size, str):
-        match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([KMG]?B)?\s*", size.upper())
+        match = re.fullmatch(r"\s*([0-9]+(?:\.[0-9]+)?)\s*([KMG]?B)?\s*", size.upper())
         if match is None:
             raise ValueError(msg)
         size = float(match.group(1)) * _SIZE_UNITS[match.group(2) or "B"]
-    if not size >= 1:
+    if not 1 <= size < math.inf:  # also rejects nan
         raise ValueError(msg)
     return int(size)
 
