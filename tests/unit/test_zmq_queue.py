@@ -122,6 +122,42 @@ async def test_async_consumer(mock_async_context, timeout):
         await consumer.get(timeout=timeout)
 
 
+@pytest.mark.parametrize("consumer_id", [1, 10])
+def test_async_consumer_subscribes_with_delimiter(mock_async_context, consumer_id):
+    """Subscription is a byte-prefix match, so it must include the "|" delimiter to avoid matching other ids."""
+    _, socket = mock_async_context
+    AsyncConsumer(consumer_id=consumer_id, address="test_addr")
+    socket.setsockopt_string.assert_called_once_with(zmq.SUBSCRIBE, f"{consumer_id}|")
+
+
+@pytest.mark.asyncio
+async def test_async_consumer_does_not_receive_prefix_matching_ids():
+    """With real sockets, consumer 1 must not receive messages addressed to consumer 10."""
+    broker = Broker()
+    broker.start()
+    producer = Producer(address=broker.backend_address)
+    consumer_1 = AsyncConsumer(consumer_id=1, address=broker.frontend_address)
+    consumer_10 = AsyncConsumer(consumer_id=10, address=broker.frontend_address)
+    try:
+        # PUB/SUB drops messages until the subscription propagates, so resend until consumer 10 gets one
+        received = None
+        for _ in range(50):
+            producer.put({"to": 10}, consumer_id=10)
+            try:
+                received = await consumer_10.get(timeout=0.1)
+                break
+            except Empty:
+                continue
+        assert received == {"to": 10}
+
+        with pytest.raises(Empty):
+            await consumer_1.get(timeout=0.2)
+    finally:
+        consumer_1.close()
+        consumer_10.close()
+        producer.close()
+
+
 @pytest.mark.asyncio
 async def test_async_consumer_cleanup():
     with patch("zmq.asyncio.Context") as mock_ctx:
