@@ -101,6 +101,17 @@ def test_producer_wait_for_subscribers(mock_context):
     assert not producer.wait_for_subscribers(timeout=0.1)
 
 
+def test_producer_wait_for_subscribers_not_sent_to_consumers(mock_context):
+    _, socket = mock_context
+    producer = Producer(address="test_addr")
+    producer.wait_for_subscribers(timeout=0.1)
+
+    topic = socket.send.call_args[0][0].split(b"|", 1)[0]
+    # consumers subscribe to their numeric id as a prefix, so the ping topic must not start with a digit
+    assert topic
+    assert not topic[:1].isdigit()
+
+
 @pytest.mark.parametrize("timeout", [1.0, None])
 @pytest.mark.asyncio
 async def test_async_consumer(mock_async_context, timeout):
