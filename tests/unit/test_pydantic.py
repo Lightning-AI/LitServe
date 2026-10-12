@@ -45,3 +45,15 @@ def test_pydantic():
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         response = client.post("/predict", json={"input": 4.0})
         assert response.json() == {"output": 16.0}
+
+
+def test_pydantic_openapi_request_body():
+    """A Pydantic-annotated `decode_request` keeps its model schema in OpenAPI and rejects an empty body with 422."""
+    server = LitServer(SimpleLitAPI(), accelerator="cpu", devices=1, timeout=5)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        spec = client.get("/openapi.json").json()
+        body = spec["paths"]["/predict"]["post"]["requestBody"]
+        assert body["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/PredictRequest"}
+
+        response = client.post("/predict")
+        assert response.status_code == 422
