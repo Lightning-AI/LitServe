@@ -16,7 +16,6 @@ import contextlib
 import inspect
 import io
 import json
-import pickle
 import re
 import sys
 import threading
@@ -306,21 +305,6 @@ def test_run_streaming_loop_with_async(mock_transport, monkeypatch):
                 "uuid-123",
                 (i - 1, ls.utils.LitAPIStatus.OK, ls.utils.LoopResponseType.STREAMING, ANY),
             )
-
-
-class UnpicklableError(Exception):
-    def __reduce__(self):
-        raise TypeError("cannot pickle UnpicklableError")
-
-
-def test_put_error_response_with_unpicklable_exception(mock_transport):
-    loop = SingleLoop()
-    loop.put_error_response(mock_transport, 0, "uuid-123", UnpicklableError("boom"))
-
-    uid, (response_data, status, response_type, _) = asyncio.run(mock_transport.areceive(consumer_id=0))
-    assert uid == "uuid-123"
-    assert status == ls.utils.LitAPIStatus.ERROR
-    assert str(pickle.loads(response_data)) == "UnpicklableError: boom"
 
 
 class RecordingQueue(Queue):
@@ -1091,3 +1075,14 @@ async def test_sync_fn_to_async_fn():
     assert await _sync_fn_to_async_fn(sync_func) == "sync-to-async"
     async_gen = await _sync_fn_to_async_fn(sync_gen)
     assert isinstance(async_gen, AsyncGenerator)
+
+
+def test_put_error_response_with_unpicklable_exception(mock_transport):
+    exc = ValueError("boom")
+    exc.lock = threading.Lock()
+    SingleLoop().put_error_response(mock_transport, 0, "uuid-123", exc)
+
+    uid, (response_data, status, _, _) = asyncio.run(mock_transport.areceive(consumer_id=0))
+    assert uid == "uuid-123"
+    assert status == ls.utils.LitAPIStatus.ERROR
+    assert response_data == ls.utils.dump_exception(exc)  # the RuntimeError fallback
