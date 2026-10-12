@@ -16,7 +16,6 @@ import contextlib
 import inspect
 import io
 import json
-import logging
 import re
 import sys
 import threading
@@ -728,25 +727,21 @@ class FailingScheduleTaskLoop(AsyncTestLoop):
 
 
 @pytest.mark.parametrize("loop_cls", [AsyncTestLoop, FailingScheduleTaskLoop])
-def test_async_loop_schedule_task_done(loop_cls, mock_transport, caplog, monkeypatch):
+def test_async_loop_schedule_task_done(loop_cls, mock_transport):
     loop = loop_cls(stop_after=3)
     loop.response_queue_ids = {"uuid-123": 0}
     lit_api = MagicMock()
     lit_api.has_active_requests.return_value = False
 
-    # litserve's logger sets `propagate = False`, so caplog misses it by default
-    monkeypatch.setattr(logging.getLogger("litserve"), "propagate", True)
-    with caplog.at_level(logging.ERROR, logger="litserve.loops.base"), pytest.raises(_ExitTestLoop):
+    with patch("litserve.loops.base.logger") as mock_logger, pytest.raises(_ExitTestLoop):
         loop(lit_api, "cpu", 0, Queue(), mock_transport, {}, NOOP_CB_RUNNER)
-
-    failure_logs = [r for r in caplog.records if "schedule_task exited unexpectedly" in r.getMessage()]
 
     response_queue = mock_transport._queues[0]
     if loop_cls is AsyncTestLoop:
         # the base `schedule_task` is a no-op, so finishing is not a failure
         assert response_queue.empty()
         loop.on_schedule_task_done.assert_not_called()
-        assert failure_logs == []
+        mock_logger.error.assert_not_called()
     else:
         # the failure is reported once per uid, not on every iteration
         uid, (_, status, _, _) = response_queue.get_nowait()
@@ -755,8 +750,8 @@ def test_async_loop_schedule_task_done(loop_cls, mock_transport, caplog, monkeyp
         assert loop.response_queue_ids == {}
         loop.on_schedule_task_done.assert_called_once()
         # the cause is logged exactly once, with the original exception attached
-        assert len(failure_logs) == 1
-        assert str(failure_logs[0].exc_info[1]) == "prefill died"
+        mock_logger.error.assert_called_once()
+        assert str(mock_logger.error.call_args.kwargs["exc_info"]) == "prefill died"
 
 
 class TestLoop(LitLoop):
