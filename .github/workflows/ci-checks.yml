@@ -29,7 +29,7 @@ jobs:
       artifact-name: dist-packages-${{ github.sha }}
       testing-matrix: |
         {
-          "os": ["ubuntu-latest", "macos-latest", "windows-latest"],
+          "os": ["ubuntu-24.04", "macos-26", "windows-2025"],
           "python-version": ["3.10"],
         }
 

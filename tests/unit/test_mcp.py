@@ -1,6 +1,6 @@
 import inspect
 from typing import Optional
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -10,6 +10,7 @@ from starlette.applications import Starlette
 import litserve as ls
 from litserve.mcp import (
     MCP,
+    _call_handler,
     _LitMCPServerConnector,
     _param_name_to_title,
     _python_type_to_json_schema,
@@ -271,3 +272,17 @@ def test_mcp_litserve_connector():
     connector.connect_mcp_server([tool], app)
     mcp_mount = list(filter(lambda route: route.name == "mcp", app.routes))[0]
     assert isinstance(mcp_mount.app, Starlette)
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_handler_without_http_request():
+    # MCP calls the endpoint directly, without an HTTP request, so headers are empty
+    server = ls.LitServer(MCPLitAPI(mcp=MCP(description="A simple API")))
+    endpoint = next(route.endpoint for route in server.app.routes if route.path == "/predict")
+    with patch("litserve.server.RegularRequestHandler.handle_request", new_callable=AsyncMock) as handle_request:
+        handle_request.return_value = {"output": 1}
+        await _call_handler(endpoint, request={"name": "John", "age": 30})
+    request, request_type = handle_request.call_args.args
+    assert request == MCPTestModel(name="John", age=30)
+    assert request_type is MCPTestModel
+    assert handle_request.call_args.kwargs == {"headers": {}}

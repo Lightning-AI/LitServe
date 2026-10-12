@@ -27,6 +27,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import HTTPException, Request, Response
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
+from pydantic import BaseModel
 
 import litserve as ls
 from litserve import LitAPI
@@ -505,6 +506,87 @@ async def test_inject_context_in_batch_and_unbatch():
             resp1, resp2 = await asyncio.gather(resp1, resp2)
     assert resp1.json() == {"output": 5.0, "batch_size": 2}
     assert resp2.json() == {"output": 7.0, "batch_size": 2}
+
+
+class HeadersRequest(BaseModel):
+    input: float
+
+
+class HeadersAPI(ls.test_examples.SimpleLitAPI):
+    def predict(self, x, context):
+        return context["headers"]["x-request-id"]
+
+    def encode_response(self, output):
+        return {"output": output}
+
+
+class HeadersPydanticAPI(HeadersAPI):
+    def decode_request(self, request: HeadersRequest):
+        return request.input
+
+
+class HeadersAsyncAPI(ls.LitAPI):
+    def setup(self, device):
+        pass
+
+    async def decode_request(self, request):
+        return request["input"]
+
+    async def predict(self, x, context):
+        return context["headers"]["x-request-id"]
+
+    async def encode_response(self, output):
+        return {"output": output}
+
+
+class HeadersStreamingAPI(HeadersAPI):
+    def predict(self, x, context):
+        yield context["headers"]["x-request-id"]
+
+    def encode_response(self, output_stream):
+        for output in output_stream:
+            yield {"output": output}
+
+
+class HeadersBatchedAPI(ls.test_examples.SimpleBatchedAPI):
+    def predict(self, x_batch, context):
+        return [c["headers"]["x-request-id"] for c in context]
+
+    def encode_response(self, output):
+        return {"output": output}
+
+
+class HeadersBatchedStreamingAPI(ls.test_examples.SimpleBatchedAPI):
+    def predict(self, x_batch, context):
+        yield [c["headers"]["x-request-id"] for c in context]
+
+    def encode_response(self, output_stream):
+        for outputs in output_stream:
+            yield [{"output": output} for output in outputs]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "api",
+    [
+        HeadersAPI(),
+        HeadersPydanticAPI(),
+        HeadersAsyncAPI(enable_async=True),
+        HeadersStreamingAPI(stream=True),
+        HeadersBatchedAPI(max_batch_size=2, batch_timeout=0.01),
+        HeadersBatchedStreamingAPI(max_batch_size=2, batch_timeout=0.01, stream=True),
+    ],
+)
+async def test_request_headers_in_context(api):
+    server = LitServer(api)
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/predict", json={"input": 5.0}, headers={"X-Request-ID": "req-1"}, timeout=10)
+    assert resp.status_code == 200, resp.text
+    assert json.loads(resp.text) == {"output": "req-1"}
 
 
 def test_custom_api_path():

@@ -299,6 +299,28 @@ async def test_openai_spec_metadata_required_fail(openai_request_data):
             assert "Missing required metadata" in resp.text
 
 
+class HeadersOpenAIAPI(ls.LitAPI):
+    def setup(self, device):
+        pass
+
+    def predict(self, x, context):
+        yield context["headers"]["x-request-id"]
+
+
+@pytest.mark.asyncio
+async def test_openai_spec_request_headers_in_context(openai_request_data):
+    server = ls.LitServer(HeadersOpenAIAPI(spec=OpenAISpec()))
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data, headers={"X-Request-ID": "req-1"})
+            assert resp.status_code == 200, resp.text
+            assert resp.json()["choices"][0]["message"]["content"] == "req-1"
+
+
 class TestAPIWithReasoningEffort(TestAPI):
     def encode_response(self, output, context):
         yield ChatMessage(

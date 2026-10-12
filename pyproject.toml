@@ -28,7 +28,8 @@ classifiers = [
 dynamic = [ "version" ]
 dependencies = [
   "fastapi>=0.112",
-  "pyzmq>=22.0.0",
+  # first release with py3.10 wheels
+  "pyzmq>=22.2.1",
   "uvicorn[standard]>=0.29.0",
 ]
 

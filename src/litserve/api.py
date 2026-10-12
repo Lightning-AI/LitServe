@@ -246,7 +246,12 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         pass
 
     def decode_request(self, request, **kwargs):
-        """Convert the request payload to your model input."""
+        """Convert the request payload to your model input.
+
+        Add a context argument, decode_request(self, request, context), to also get the request context. The HTTP
+        request headers are available as context["headers"], with lower-cased names. The argument must be named context.
+
+        """
         if self._spec:
             return self._spec.decode_request(request, **kwargs)
         return request
