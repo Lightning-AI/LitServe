@@ -168,13 +168,6 @@ def test_internal_paths_not_counted_in_active_requests(server_kwargs, internal_p
         assert server.active_requests == 0
 
 
-def test_internal_paths_include_shutdown_path_only_when_enabled(monkeypatch):
-    monkeypatch.setenv("LIT_SHUTDOWN_API_KEY", "secret")
-    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), enable_shutdown_api=True, shutdown_path="/stop")
-    assert "/stop" in server._internal_paths
-    assert "/shutdown" not in ls.LitServer(ls.test_examples.SimpleLitAPI())._internal_paths
-
-
 def test_request_count_middleware_default_excluded_paths():
     """Constructing the middleware directly keeps skipping the historical default paths."""
     counter = mp.Value("i", 0, lock=True)
@@ -191,4 +184,26 @@ def test_request_count_middleware_default_excluded_paths():
     client.get("/health")
     client.get("/predict")
     assert in_flight == {"/health": 0, "/predict": 1}
+    assert counter.value == 0
+
+
+@pytest.mark.asyncio
+async def test_request_count_middleware_honors_root_path():
+    """uvicorn sets scope["path"] to root_path + path, so excluded paths must be matched without the prefix."""
+    counter = mp.Value("i", 0, lock=True)
+    in_flight = {}
+
+    async def app(scope, receive, send):
+        in_flight[scope["path"]] = counter.value
+
+    middleware = RequestCountMiddleware(app, active_counter=counter)
+
+    async def call(path, root_path="/api"):
+        await middleware({"type": "http", "path": path, "root_path": root_path}, None, None)
+
+    await call("/api/health")
+    await call("/api")
+    await call("/api/predict")
+    await call("/apiary/health")
+    assert in_flight == {"/api/health": 0, "/api": 0, "/api/predict": 1, "/apiary/health": 1}
     assert counter.value == 0

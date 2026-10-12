@@ -55,11 +55,12 @@ class MaxSizeMiddleware(BaseHTTPMiddleware):
 
 
 class RequestCountMiddleware(BaseHTTPMiddleware):
-    """Adds a header to the response with the number of active requests."""
+    """Tracks in-flight requests in ``active_counter``, skipping ``excluded_paths``."""
 
     def __init__(
         self,
         app: ASGIApp,
+        *,
         active_counter: multiprocessing.Value,
         excluded_paths: Collection[str] = ("/", "/health", "/metrics"),
     ) -> None:
@@ -68,7 +69,16 @@ class RequestCountMiddleware(BaseHTTPMiddleware):
         self.excluded_paths = frozenset(excluded_paths)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["path"] in self.excluded_paths:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope["path"]
+        root_path = scope.get("root_path", "")
+        if root_path and (path == root_path or path.startswith(root_path + "/")):
+            path = path[len(root_path) :] or "/"
+
+        if path in self.excluded_paths:
             await self.app(scope, receive, send)
             return
 
