@@ -23,10 +23,11 @@ jobs:
       fail-fast: false
       matrix:
         # Runner images: https://github.com/actions/runner-images
-        os: ["ubuntu-24.04", "macos-15", "windows-2025"]
+        os: ["ubuntu-24.04", "macos-26", "windows-2025"]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        requires: ["latest"]
         include:
-          - { os: "ubuntu-22.04", python-version: "3.10", requires: "oldest" }
+          - { os: "ubuntu-24.04", python-version: "3.10", requires: "oldest" }
 
     timeout-minutes: 35
     env:
