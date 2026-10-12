@@ -189,7 +189,7 @@ def test_request_count_middleware_default_excluded_paths():
 
 @pytest.mark.asyncio
 async def test_request_count_middleware_honors_root_path():
-    """uvicorn sets scope["path"] to root_path + path, so excluded paths must be matched without the prefix."""
+    """Uvicorn sets scope["path"] to root_path + path, so excluded paths must be matched without the prefix."""
     counter = mp.Value("i", 0, lock=True)
     in_flight = {}
 
