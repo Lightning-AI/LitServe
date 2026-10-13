@@ -22,7 +22,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp
 
 import litserve as ls
-from litserve.middlewares import RequestCountMiddleware
+from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.utils import wrap_litserve_start
 
 
@@ -79,6 +79,46 @@ def test_middlewares_inputs():
 
     with pytest.raises(ValueError, match="middlewares must be a list of tuples"):
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
+
+
+@pytest.mark.parametrize(
+    ("max_payload_size", "expected"),
+    [
+        (1000, 1000),
+        (1048576.0, 1048576),
+        ("500KB", 500 * 1024),
+        ("2MB", 2 * 1024**2),
+        ("1GB", 1024**3),
+        ("1.5mb", int(1.5 * 1024**2)),
+        (" 2 MB ", 2 * 1024**2),
+        ("10B", 10),
+    ],
+)
+def test_max_payload_size_parsed_at_init(max_payload_size, expected):
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size=max_payload_size)
+    assert server.max_payload_size == expected
+    assert (MaxSizeMiddleware, {"max_size": expected}) in server.middlewares
+
+
+def test_max_payload_size_none_adds_no_middleware():
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size=None)
+    assert server.max_payload_size is None
+    assert all(middleware is not MaxSizeMiddleware for middleware, _ in server.middlewares)
+
+
+@pytest.mark.parametrize(
+    "max_payload_size", ["abc", "MB", "2XB", "", "-1MB", -1, 0, "0MB", True, [1], float("inf"), float("nan")]
+)
+def test_max_payload_size_invalid(max_payload_size):
+    with pytest.raises(ValueError, match="max_payload_size"):
+        ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size=max_payload_size)
+
+
+def test_max_payload_size_string_enforced_on_requests():
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size="1KB")
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        assert client.post("/predict", json={"input": 4.0}).status_code == 200
+        assert client.post("/predict", json={"input": "x" * 2048}).status_code == 413
 
 
 def test_middleware_multiple_initialization():
