@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import multiprocessing as mp
 
 import pytest
 from fastapi.testclient import TestClient
@@ -133,3 +134,64 @@ def test_active_requests_reset_after_error():
 
         assert in_flight == [1], "request should be counted while it is in flight"
         assert server.active_requests == 0, "failed request should not stay in the active request count"
+
+
+@pytest.mark.parametrize(
+    ("server_kwargs", "internal_paths"),
+    [
+        ({}, ["/", "/health", "/info"]),
+        ({"healthcheck_path": "/healthz", "info_path": "/details"}, ["/", "/healthz", "/details"]),
+    ],
+)
+def test_internal_paths_not_counted_in_active_requests(server_kwargs, internal_paths):
+    """Internal endpoints, on default or custom paths, should not count as active requests."""
+    in_flight = {}
+
+    class RecordingMiddleware(BaseHTTPMiddleware):
+        """Runs inside RequestCountMiddleware, so it sees the count while the request is in flight."""
+
+        async def dispatch(self, request, call_next):
+            in_flight[request.url.path] = server.active_requests
+            return await call_next(request)
+
+    server = ls.LitServer(
+        ls.test_examples.SimpleLitAPI(), track_requests=True, middlewares=[RecordingMiddleware], **server_kwargs
+    )
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        for path in internal_paths:
+            client.get(path)  # status is irrelevant here, e.g. health is 503 without ready workers
+        assert client.post("/predict", json={"input": 4.0}).status_code == 200
+
+        assert in_flight == {**dict.fromkeys(internal_paths, 0), "/predict": 1}
+        assert server.active_requests == 0
+
+
+@pytest.mark.asyncio
+async def test_request_count_middleware_excluded_paths():
+    """Default excluded paths are skipped, also when uvicorn prefixes scope["path"] with root_path."""
+    counter = mp.Value("i", 0, lock=True)
+    in_flight = {}
+
+    async def app(scope, receive, send):
+        in_flight[scope["path"]] = counter.value
+
+    middleware = RequestCountMiddleware(app, active_counter=counter)
+
+    async def call(path, root_path="/api"):
+        await middleware({"type": "http", "path": path, "root_path": root_path}, None, None)
+
+    await call("/health", root_path="")
+    await call("/predict", root_path="")
+    await call("/api/health")
+    await call("/api")
+    await call("/api/predict")
+    await call("/apiary/health")
+    assert in_flight == {
+        "/health": 0,
+        "/predict": 1,
+        "/api/health": 0,
+        "/api": 0,
+        "/api/predict": 1,
+        "/apiary/health": 1,
+    }
+    assert counter.value == 0
