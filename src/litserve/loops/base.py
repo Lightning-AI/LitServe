@@ -213,6 +213,9 @@ class _BaseLoop(ABC):
 
     """
 
+    def __init__(self):
+        self.response_queue_ids: dict[str, int] = {}  # uid -> response_queue_id
+
     def pre_setup(self, lit_api: LitAPI, spec: Optional[LitSpec] = None):
         pass
 
@@ -243,6 +246,9 @@ class _BaseLoop(ABC):
                 logger.info("Running LitLoop in a asyncio event loop")
                 future = self.schedule_task(lit_api, lit_spec, request_queue, transport)
                 schedule_task = event_loop.create_task(future)
+                # The base `schedule_task` is a no-op that finishes at once; only an override can fail.
+                schedule_task_overridden = self.schedule_task.__code__ is not _BaseLoop.schedule_task.__code__
+                schedule_task_failed = False
                 while True:
                     try:
                         await self.run(
@@ -258,7 +264,24 @@ class _BaseLoop(ABC):
                     except Exception as e:
                         logger.exception("An error occurred in the loop: %s", e)
 
-                    if not lit_api.has_active_requests() and schedule_task.done():
+                    if (
+                        schedule_task_overridden
+                        and not schedule_task_failed
+                        and not lit_api.has_active_requests()
+                        and schedule_task.done()
+                    ):
+                        # Report each uid once, then back off: nothing feeds the loop any more.
+                        schedule_task_failed = True
+                        if schedule_task.cancelled():
+                            logger.error(
+                                "schedule_task was cancelled; worker %s will no longer process requests", worker_id
+                            )
+                        else:
+                            logger.error(
+                                "schedule_task exited unexpectedly; worker %s will no longer process requests",
+                                worker_id,
+                                exc_info=schedule_task.exception(),
+                            )
                         for uid, response_queue_id in self.response_queue_ids.items():
                             self.put_error_response(
                                 transport,
@@ -267,9 +290,10 @@ class _BaseLoop(ABC):
                                 Exception("schedule_task task failed"),
                                 LoopResponseType.STREAMING,
                             )
+                        self.response_queue_ids.clear()
                         self.on_schedule_task_done(schedule_task)
 
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(0.1 if schedule_task_failed else 0)
 
             event_loop.run_until_complete(_wrapper())
         else:
@@ -302,6 +326,7 @@ class _BaseLoop(ABC):
 
 class LitLoop(_BaseLoop):
     def __init__(self):
+        super().__init__()
         self._context = {}
         self._server_pid = os.getpid()
         self._worker_id = None
