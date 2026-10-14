@@ -40,7 +40,7 @@ lightning = "litserve.cli:main"
 [project.urls]
 Homepage = "https://github.com/Lightning-AI/litserve"
 "Bug Tracker" = "https://github.com/Lightning-AI/litserve/issues"
-Documentation = "https://lightning-ai.github.io/litserve/"
+Documentation = "https://lightning.ai/docs/litserve"
 "Source Code" = "https://github.com/Lightning-AI/litserve"
 Download = "https://github.com/Lightning-AI/litserve"
 
