@@ -7,6 +7,7 @@ import pytest
 
 from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.transport.process_transport import MPQueueTransport
+from litserve.transport.zmq_transport import ZMQTransport
 
 
 class TestMPQueueTransport:
@@ -197,3 +198,21 @@ class TestTransportIntegration:
 
         # Assert
         assert result is True
+
+
+class TestZMQTransport:
+    @pytest.fixture
+    def transport(self, tmp_path):
+        return ZMQTransport(f"ipc://{tmp_path}/backend", f"ipc://{tmp_path}/frontend")
+
+    def test_close_without_setup(self, transport):
+        transport.close(send_sentinel=True)
+
+        assert transport._zmq is None
+
+    def test_close_after_setup(self, transport):
+        transport._zmq = MagicMock()
+
+        transport.close()
+
+        transport._zmq.close.assert_called_once()

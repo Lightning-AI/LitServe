@@ -35,8 +35,6 @@ class ZMQTransport(MessageTransport):
     def close(self, **kwargs) -> None:
         if self._zmq:
             self._zmq.close()
-        else:
-            raise ValueError("ZMQ not initialized, make sure ZMQTransport.setup() is called.")
 
     def __reduce__(self):
         return ZMQTransport, (self.backend_address, self.frontend_address)
