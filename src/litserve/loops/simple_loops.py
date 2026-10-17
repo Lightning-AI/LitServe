@@ -348,25 +348,30 @@ class BatchedLoop(DefaultLoop):
             if not batches:
                 continue
             logger.debug(f"{len(batches)} batched requests received")
-            response_queue_ids, uids, inputs, headers_list = zip(*batches)
-            num_inputs = len(inputs)
+            pending_requests = {uid: response_queue_id for response_queue_id, uid, _, _ in batches}
             try:
-                contexts = [{"headers": headers} for headers in headers_list]
-                if hasattr(lit_spec, "populate_context"):
-                    for input, context in zip(inputs, contexts):
-                        lit_spec.populate_context(context, input)
-
                 callback_runner.trigger_event(EventTypes.BEFORE_DECODE_REQUEST.value, lit_api=lit_api)
-                x = [
-                    _inject_context(
-                        context,
-                        lit_api.decode_request,
-                        input,
-                    )
-                    for input, context in zip(inputs, contexts)
-                ]
+                x, contexts, decoded_requests = [], [], []
+                for response_queue_id, uid, input, headers in batches:
+                    try:
+                        context = {"headers": headers}
+                        if hasattr(lit_spec, "populate_context"):
+                            lit_spec.populate_context(context, input)
+                        decoded = _inject_context(context, lit_api.decode_request, input)
+                    except Exception as e:
+                        if not isinstance(e, HTTPException):
+                            logger.exception("LitAPI failed to decode request uid=%s.", uid)
+                        self.put_error_response(transport, response_queue_id, uid, e)
+                        del pending_requests[uid]
+                        continue
+                    x.append(decoded)
+                    contexts.append(context)
+                    decoded_requests.append((response_queue_id, uid))
                 callback_runner.trigger_event(EventTypes.AFTER_DECODE_REQUEST.value, lit_api=lit_api)
 
+                if not x:
+                    continue
+                num_inputs = len(x)
                 x = _inject_context(contexts, lit_api.batch, x)
 
                 callback_runner.trigger_event(EventTypes.BEFORE_PREDICT.value, lit_api=lit_api)
@@ -387,8 +392,15 @@ class BatchedLoop(DefaultLoop):
 
                 callback_runner.trigger_event(EventTypes.BEFORE_ENCODE_RESPONSE.value, lit_api=lit_api)
                 y_enc_list = []
-                for response_queue_id, y, uid, context in zip(response_queue_ids, outputs, uids, contexts):
-                    y_enc = _inject_context(context, lit_api.encode_response, y)
+                for (response_queue_id, uid), y, context in zip(decoded_requests, outputs, contexts):
+                    try:
+                        y_enc = _inject_context(context, lit_api.encode_response, y)
+                    except Exception as e:
+                        if not isinstance(e, HTTPException):
+                            logger.exception("LitAPI failed to encode response uid=%s.", uid)
+                        self.put_error_response(transport, response_queue_id, uid, e)
+                        del pending_requests[uid]
+                        continue
                     y_enc_list.append((response_queue_id, uid, y_enc))
                 callback_runner.trigger_event(EventTypes.AFTER_ENCODE_RESPONSE.value, lit_api=lit_api)
 
@@ -396,9 +408,10 @@ class BatchedLoop(DefaultLoop):
                     self.put_response(
                         transport, response_queue_id, uid, y_enc, LitAPIStatus.OK, LoopResponseType.REGULAR
                     )
+                    del pending_requests[uid]
 
             except HTTPException as e:
-                for response_queue_id, uid in zip(response_queue_ids, uids):
+                for uid, response_queue_id in pending_requests.items():
                     self.put_response(
                         transport,
                         response_queue_id,
@@ -415,7 +428,7 @@ class BatchedLoop(DefaultLoop):
                     "LitAPI ran into an error while processing the batched request.\n"
                     "Please check the error trace for more details."
                 )
-                for response_queue_id, uid in zip(response_queue_ids, uids):
+                for uid, response_queue_id in pending_requests.items():
                     self.put_error_response(transport, response_queue_id, uid, e, LoopResponseType.REGULAR)
 
     def __call__(
