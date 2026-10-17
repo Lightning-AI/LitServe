@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import pickle
 import time
 from queue import Queue
 from unittest.mock import ANY, MagicMock
@@ -20,7 +21,7 @@ import pytest
 import torch
 import torch.nn as nn
 from asgi_lifespan import LifespanManager
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response
 from httpx import ASGITransport, AsyncClient
 
 import litserve as ls
@@ -30,7 +31,7 @@ from litserve.loops.base import _SENTINEL_VALUE, _StopLoopError, collate_request
 from litserve.loops.simple_loops import BatchedLoop
 from litserve.test_examples import SimpleBatchedAPI
 from litserve.transport.base import MessageTransport
-from litserve.utils import LoopResponseType, wrap_litserve_start
+from litserve.utils import LitAPIStatus, LoopResponseType, PickleableHTTPException, wrap_litserve_start
 
 NOOP_CB_RUNNER = CallbackRunner()
 
@@ -239,6 +240,136 @@ def test_batched_loop():
     lit_api_mock.batch.assert_called_once()
     lit_api_mock.batch.assert_called_once_with([4.0, 5.0])
     lit_api_mock.unbatch.assert_called_once()
+
+
+class BatchErrorAPI(LitAPI):
+    def __init__(self, error_stage, error, shared_error_stage=None, **kwargs):
+        super().__init__(**kwargs)
+        self.error_stage = error_stage
+        self.error = error
+        self.shared_error_stage = shared_error_stage
+        self.calls = []
+        self.decode_inputs = []
+        self.batch_inputs = None
+        self.batch_headers = None
+
+    def setup(self, device):
+        pass
+
+    def decode_request(self, request, context):
+        self.decode_inputs.append(request)
+        if self.error_stage == "decode" and request < 0:
+            raise self.error
+        return request
+
+    def batch(self, inputs, context):
+        self.calls.append("batch")
+        self.batch_inputs = inputs
+        self.batch_headers = [item["headers"]["x-id"] for item in context]
+        if self.shared_error_stage == "batch":
+            raise RuntimeError("batch failed")
+        return inputs
+
+    def predict(self, inputs, context):
+        self.calls.append("predict")
+        assert [item["headers"]["x-id"] for item in context] == self.batch_headers
+        if self.shared_error_stage == "predict":
+            raise RuntimeError("predict failed")
+        return inputs
+
+    def unbatch(self, outputs, context):
+        self.calls.append("unbatch")
+        assert [item["headers"]["x-id"] for item in context] == self.batch_headers
+        if self.shared_error_stage == "unbatch":
+            raise RuntimeError("unbatch failed")
+        return outputs
+
+    def encode_response(self, output, context):
+        if self.error_stage == "encode" and output < 0:
+            raise self.error
+        return {"output": output, "header": context["headers"]["x-id"]}
+
+
+def run_error_batch(api, inputs):
+    api.request_timeout = 30
+    request_queue = Queue()
+    for i, value in enumerate(inputs):
+        request_queue.put((0, str(i), time.monotonic(), value, {"x-id": str(value)}))
+    request_queue.put(_SENTINEL_VALUE)
+    transport = FakeTransport()
+    BatchedLoop().run_batched_loop(api, request_queue, transport, NOOP_CB_RUNNER)
+    assert len(transport.responses) == len(inputs)
+    responses = dict(transport.responses)
+    assert set(responses) == {str(i) for i in range(len(inputs))}
+    return responses
+
+
+@pytest.mark.parametrize("error_stage", ["decode", "encode"])
+@pytest.mark.parametrize("error_type", [HTTPException, PickleableHTTPException, ValueError])
+def test_batched_loop_isolates_request_errors(error_stage, error_type):
+    error = error_type(422, "invalid input") if issubclass(error_type, HTTPException) else error_type("invalid input")
+    api = BatchErrorAPI(error_stage, error, max_batch_size=3)
+
+    responses = run_error_batch(api, [3, -1, 5])
+
+    for uid, value in [("0", 3), ("2", 5)]:
+        assert responses[uid] == (
+            {"output": value, "header": str(value)},
+            LitAPIStatus.OK,
+            LoopResponseType.REGULAR,
+            ANY,
+        )
+    data, status, response_type, _ = responses["1"]
+    assert status == LitAPIStatus.ERROR
+    assert response_type == LoopResponseType.REGULAR
+    if issubclass(error_type, HTTPException):
+        exception = pickle.loads(data) if isinstance(data, bytes) else data
+        assert isinstance(exception, HTTPException)
+        assert exception.status_code == 422
+        assert exception.detail == "invalid input"
+    else:
+        exception = pickle.loads(data)
+        assert isinstance(exception, ValueError)
+        assert str(exception) == "invalid input"
+    expected_inputs = [3, 5] if error_stage == "decode" else [3, -1, 5]
+    assert api.batch_inputs == expected_inputs
+    assert api.batch_headers == [str(value) for value in expected_inputs]
+    assert api.calls == ["batch", "predict", "unbatch"]
+
+
+def test_batched_loop_skips_batch_when_all_decodes_fail():
+    api = BatchErrorAPI("decode", HTTPException(422, "invalid input"), max_batch_size=2)
+
+    responses = run_error_batch(api, [-1, -2])
+
+    assert api.calls == []
+    assert api.decode_inputs == [-1, -2]
+    for data, status, _, _ in responses.values():
+        assert status == LitAPIStatus.ERROR
+        exception = pickle.loads(data) if isinstance(data, bytes) else data
+        assert exception.status_code == 422
+
+
+@pytest.mark.parametrize("shared_error_stage", ["batch", "predict", "unbatch"])
+def test_batched_loop_shared_failure_only_affects_decoded_requests(shared_error_stage):
+    api = BatchErrorAPI(
+        "decode", HTTPException(422, "invalid input"), shared_error_stage=shared_error_stage, max_batch_size=3
+    )
+
+    responses = run_error_batch(api, [3, -1, 5])
+
+    data = responses["1"][0]
+    exception = pickle.loads(data) if isinstance(data, bytes) else data
+    assert exception.status_code == 422
+    for uid in ["0", "2"]:
+        data, status, _, _ = responses[uid]
+        assert status == LitAPIStatus.ERROR
+        assert isinstance(data, bytes)
+        exception = pickle.loads(data)
+        assert isinstance(exception, RuntimeError)
+        assert str(exception) == f"{shared_error_stage} failed"
+    assert api.batch_inputs == [3, 5]
+    assert api.batch_headers == ["3", "5"]
 
 
 @pytest.mark.parametrize(

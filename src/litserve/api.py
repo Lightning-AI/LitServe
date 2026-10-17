@@ -251,6 +251,9 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         Add a context argument, decode_request(self, request, context), to also get the request context. The HTTP
         request headers are available as context["headers"], with lower-cased names. The argument must be named context.
 
+        With non-streaming batching, a decoding error fails only this request. The remaining decoded inputs are passed
+        to batch and predict. If every request fails to decode, prediction is skipped.
+
         """
         if self._spec:
             return self._spec.decode_request(request, **kwargs)
@@ -355,6 +358,9 @@ class LitAPI(ABC, metaclass=_TimedInitMeta):
         """Convert the model output to a response payload.
 
         To enable streaming, it should yield the output.
+
+        With non-streaming batching, an encoding error fails only this request. Other responses in the batch are still
+        returned. Errors in batch, predict, or unbatch affect all requests that decoded successfully.
 
         """
         if self._spec:
