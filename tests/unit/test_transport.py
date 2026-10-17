@@ -1,12 +1,16 @@
 import asyncio
 import multiprocessing as mp
+import sys
 from queue import Empty
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from litserve.server import LitServer
+from litserve.test_examples import SimpleLitAPI
 from litserve.transport.factory import TransportConfig, create_transport_from_config
 from litserve.transport.process_transport import MPQueueTransport
+from litserve.transport.zmq_transport import ZMQTransport
 
 
 class TestMPQueueTransport:
@@ -197,3 +201,33 @@ class TestTransportIntegration:
 
         # Assert
         assert result is True
+
+
+class TestZMQTransportWiring:
+    def test_create_zmq_transport_addresses(self):
+        config = TransportConfig(transport_type="zmq", num_consumers=1)
+
+        with patch("litserve.transport.factory.Broker") as mock_broker_cls:
+            mock_broker = mock_broker_cls.return_value
+            mock_broker.frontend_address = "ipc:///tmp/frontend"
+            mock_broker.backend_address = "ipc:///tmp/backend"
+
+            transport = create_transport_from_config(config)
+
+        assert isinstance(transport, ZMQTransport)
+        # producers publish to the broker's XSUB backend, consumers subscribe to its XPUB frontend
+        assert transport.backend_address == "ipc:///tmp/backend"
+        assert transport.frontend_address == "ipc:///tmp/frontend"
+        mock_broker.start.assert_called_once()
+
+    def test_close_without_setup(self):
+        transport = ZMQTransport(backend_address="ipc:///tmp/backend", frontend_address="ipc:///tmp/frontend")
+
+        transport.close(send_sentinel=True)
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="fast_queue is disabled on Windows")
+    @pytest.mark.parametrize(("fast_queue", "expected"), [(True, "zmq"), (False, "mp")])
+    def test_server_fast_queue_selects_transport(self, fast_queue, expected):
+        server = LitServer(SimpleLitAPI(), fast_queue=fast_queue)
+
+        assert server.transport_config.transport_type == expected
