@@ -33,10 +33,10 @@ class ZMQTransport(MessageTransport):
         return await self._zmq.get(timeout=timeout)
 
     def close(self, **kwargs) -> None:
+        # The main process never calls setup(); only workers and API servers do on their own copies.
         if self._zmq:
             self._zmq.close()
-        else:
-            raise ValueError("ZMQ not initialized, make sure ZMQTransport.setup() is called.")
+            self._zmq = None
 
     def __reduce__(self):
         return ZMQTransport, (self.backend_address, self.frontend_address)
