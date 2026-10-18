@@ -47,12 +47,18 @@ class MockServer:
 class MockRequest:
     """Mock FastAPI Request object for testing."""
 
-    def __init__(self, json_data=None, form_data=None, content_type="application/json"):
+    def __init__(self, json_data=None, form_data=None, content_type="application/json", raw_body=None):
         self._json_data = json_data or {}
         self._form_data = form_data or {}
+        self._raw_body = raw_body
         self.headers = {"Content-Type": content_type}
 
+    async def body(self):
+        return b"" if self._raw_body is None else self._raw_body
+
     async def json(self):
+        if self._raw_body is not None:
+            return json.loads(self._raw_body)
         if self._json_data is None:
             raise json.JSONDecodeError("Invalid JSON", "", 0)
         return self._json_data
@@ -107,3 +113,21 @@ def test_regular_handler_error_response():
         RegularRequestHandler._handle_error_response(Exception("test exception"))
     assert e.value.status_code == 500
     assert e.value.detail == "Internal server error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("raw_body", "expected_detail"),
+    [
+        (b"", "Request body is empty. Send a JSON payload in the request body."),
+        (b"not json", "Request body is not valid JSON: Expecting value: line 1 column 1 (char 0)"),
+    ],
+    ids=["empty", "malformed"],
+)
+async def test_prepare_request_rejects_invalid_json_with_400(mock_lit_api, raw_body, expected_detail):
+    handler = TestRequestHandler(mock_lit_api, MockServer(mock_lit_api))
+    mock_request = MockRequest(raw_body=raw_body)
+    with pytest.raises(HTTPException) as e:
+        await handler.handle_request(mock_request, Request)
+    assert e.value.status_code == 400
+    assert e.value.detail == expected_detail

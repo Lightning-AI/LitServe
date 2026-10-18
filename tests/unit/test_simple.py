@@ -345,3 +345,47 @@ def test_exception():
         response = client.post("/predict", json={"input": 4.0})
         assert response.status_code == 500
         assert response.json() == {"detail": "Internal server error"}
+
+
+@pytest.mark.parametrize(
+    ("content", "headers"),
+    [
+        (None, {}),
+        (None, {"Content-Type": "application/json"}),
+        (b"   ", {"Content-Type": "application/json"}),
+        (b"not json", {"Content-Type": "application/json"}),
+    ],
+    ids=["no-body", "empty-json-body", "whitespace-body", "malformed-json"],
+)
+def test_predict_empty_or_malformed_body_returns_400(lit_server, content, headers):
+    """An empty or non-JSON body (e.g. Swagger UI "Execute" with no input) must be a 400, not a 500."""
+    with TestClient(lit_server.app) as client:
+        response = client.post("/predict", content=content, headers=headers)
+        assert response.status_code == 400
+        assert "JSON" in response.json()["detail"]
+
+        # the server must still serve valid requests afterwards
+        response = client.post("/predict", json={"input": 4.0})
+        assert response.status_code == 200
+        assert response.json() == {"output": 16.0}
+
+
+def test_predict_empty_body_returns_400_streaming(simple_stream_api):
+    server = LitServer(simple_stream_api, accelerator="cpu", devices=1, timeout=10)
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        response = client.post("/predict")
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Request body is empty. Send a JSON payload in the request body."}
+
+
+def test_openapi_declares_request_body_for_raw_request(lit_server):
+    """`decode_request(self, request: Request)` reads the body manually, so the OpenAPI schema must still declare a JSON
+    request body for `/predict`; otherwise Swagger UI (`/docs`) shows no input box."""
+    with TestClient(lit_server.app) as client:
+        spec = client.get("/openapi.json").json()
+    predict = spec["paths"]["/predict"]["post"]
+    assert predict["requestBody"]["required"] is True
+    assert predict["requestBody"]["content"]["application/json"]["schema"] == {
+        "type": "object",
+        "additionalProperties": True,
+    }
