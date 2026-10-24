@@ -117,6 +117,40 @@ async def test_openai_token_usage(api_cls, batch_size, openai_request_data, open
             assert result["usage"] == openai_response_data["usage"]
 
 
+class UnevenChoicesAPI(ls.LitAPI):
+    def setup(self, device):
+        self.num_requests = 0
+
+    def predict(self, x):
+        # each choice arrives as its own request; give them different lengths
+        self.num_requests += 1
+        words = ["a", "b"] if self.num_requests % 2 else ["a", "b", "c", "d"]
+        for word in words:
+            yield word + " "
+
+
+@pytest.mark.asyncio
+async def test_openai_spec_streaming_choices_with_different_lengths(openai_request_data):
+    server = ls.LitServer(UnevenChoicesAPI(spec=OpenAISpec()))
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            openai_request_data["stream"] = True
+            openai_request_data["n"] = 2
+            resp = await ac.post("/v1/chat/completions", json=openai_request_data, timeout=10)
+            assert resp.status_code == 200, "Status code should be 200"
+            outputs = {0: "", 1: ""}
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: ") or line == "data: [DONE]":
+                    continue
+                for choice in json.loads(line[6:])["choices"]:
+                    outputs[choice["index"]] += choice["delta"].get("content") or ""
+
+            assert sorted(outputs.values()) == ["a b ", "a b c d "], "every choice should be streamed in full"
+
+
 class OpenAIWithUsagePerToken(ls.LitAPI):
     def setup(self, device):
         self.model = None

@@ -98,6 +98,26 @@ async def azip(*async_iterables):
         yield tuple(results)
 
 
+async def azip_longest(*async_iterables, fillvalue=None):
+    """Zip async iterables until the longest one is exhausted, using ``fillvalue`` for the finished ones."""
+    iterators = [ait.__aiter__() for ait in async_iterables]
+    active = [True] * len(iterators)
+    while True:
+        pending = [i for i, is_active in enumerate(active) if is_active]
+        results = await asyncio.gather(*(iterators[i].__anext__() for i in pending), return_exceptions=True)
+        values = [fillvalue] * len(iterators)
+        for i, result in zip(pending, results):
+            if isinstance(result, StopAsyncIteration):
+                active[i] = False
+            elif isinstance(result, Exception):
+                raise result
+            else:
+                values[i] = result
+        if not any(active):
+            return
+        yield tuple(values)
+
+
 @contextmanager
 def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
     """Pytest utility to start the server in a context manager."""
