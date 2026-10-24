@@ -14,6 +14,7 @@ from fastapi import HTTPException
 from litserve.utils import (
     add_ssl_context_from_env,
     azip,
+    azip_longest,
     call_after_stream,
     configure_logging,
     dump_exception,
@@ -107,6 +108,15 @@ async def test_azip_propagates_stream_errors():
     with pytest.raises(RuntimeError, match="stream failed"):
         async for _ in azip(_stream_error(), _stream_values(("ok", "status"), ("next", "status"))):
             pass
+
+
+@pytest.mark.asyncio
+async def test_azip_longest_runs_until_longest_stream():
+    zipped = []
+    async for item in azip_longest(_stream_values(1, 2, 3), _stream_values("a")):
+        zipped.append(item)
+
+    assert zipped == [(1, "a"), (2, None), (3, None)]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="This test is for non-Windows platforms only.")

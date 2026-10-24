@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 from litserve.callbacks.base import EventTypes
 from litserve.constants import _DEFAULT_LIT_API_PATH
 from litserve.specs.base import LitSpec, _AsyncSpecWrapper
-from litserve.utils import LitAPIStatus, ResponseBufferItem, azip
+from litserve.utils import LitAPIStatus, ResponseBufferItem, azip_longest
 
 if typing.TYPE_CHECKING:
     from litserve import LitAPI, LitServer
@@ -539,12 +539,15 @@ class OpenAISpec(LitSpec):
     async def streaming_completion(self, request: ChatCompletionRequest, pipe_responses: list):
         try:
             model = request.model
-            usage_info = None
-            async for streaming_response in azip(*pipe_responses):
+            last_usage_infos = {}
+            async for streaming_response in azip_longest(*pipe_responses):
                 choices = []
-                usage_infos = []
                 # iterate over n choices
-                for i, (response, status) in enumerate(streaming_response):
+                for i, item in enumerate(streaming_response):
+                    if item is None:
+                        # this choice finished streaming before the others
+                        continue
+                    response, status = item
                     if status == LitAPIStatus.ERROR and isinstance(response, HTTPException):
                         raise response
                     elif status == LitAPIStatus.ERROR:
@@ -553,15 +556,13 @@ class OpenAISpec(LitSpec):
                     encoded_response = json.loads(response)
                     logger.debug(encoded_response)
                     chat_msg = ChoiceDelta(**encoded_response)
-                    usage_infos.append(UsageInfo(**encoded_response))
+                    last_usage_infos[i] = UsageInfo(**encoded_response)
                     choice = ChatCompletionStreamingChoice(
                         index=i, delta=chat_msg, system_fingerprint="", finish_reason=None
                     )
 
                     choices.append(choice)
 
-                # Only use the last item from encode_response
-                usage_info = sum(usage_infos)
                 chunk = ChatCompletionChunk(model=model, choices=choices, usage=None)
                 logger.debug(chunk)
                 yield f"data: {chunk.model_dump_json(by_alias=True)}\n\n"
@@ -574,6 +575,8 @@ class OpenAISpec(LitSpec):
                 )
                 for i in range(request.n)
             ]
+            # Only use the last item from encode_response of each choice
+            usage_info = sum(last_usage_infos.values()) if last_usage_infos else None
             last_chunk = ChatCompletionChunk(
                 model=model,
                 choices=choices,
