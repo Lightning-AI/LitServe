@@ -704,6 +704,56 @@ def off_test_run_batched_streaming_loop(openai_request_data):
     assert response[0] == {"role": "assistant", "content": "10 + 6 is equal to 16."}
 
 
+class _ExitTestLoop(BaseException):
+    """Escapes the loop's ``except Exception`` so a test can stop ``__call__``."""
+
+
+class AsyncTestLoop(LitLoop):
+    def __init__(self, stop_after):
+        super().__init__()
+        self.stop_after = stop_after
+        self.run_calls = 0
+        self.on_schedule_task_done = MagicMock()
+
+    async def run(self, *args):
+        self.run_calls += 1
+        if self.run_calls >= self.stop_after:
+            raise _ExitTestLoop
+
+
+class FailingScheduleTaskLoop(AsyncTestLoop):
+    async def schedule_task(self, lit_api, lit_spec, request_queue, transport):
+        raise RuntimeError("prefill died")
+
+
+@pytest.mark.parametrize("loop_cls", [AsyncTestLoop, FailingScheduleTaskLoop])
+def test_async_loop_schedule_task_done(loop_cls, mock_transport):
+    loop = loop_cls(stop_after=3)
+    loop.response_queue_ids = {"uuid-123": 0}
+    lit_api = MagicMock()
+    lit_api.has_active_requests.return_value = False
+
+    with patch("litserve.loops.base.logger") as mock_logger, pytest.raises(_ExitTestLoop):
+        loop(lit_api, "cpu", 0, Queue(), mock_transport, {}, NOOP_CB_RUNNER)
+
+    response_queue = mock_transport._queues[0]
+    if loop_cls is AsyncTestLoop:
+        # the base `schedule_task` is a no-op, so finishing is not a failure
+        assert response_queue.empty()
+        loop.on_schedule_task_done.assert_not_called()
+        mock_logger.error.assert_not_called()
+    else:
+        # the failure is reported once per uid, not on every iteration
+        uid, (_, status, _, _) = response_queue.get_nowait()
+        assert (uid, status) == ("uuid-123", ls.utils.LitAPIStatus.ERROR)
+        assert response_queue.empty()
+        assert loop.response_queue_ids == {}
+        loop.on_schedule_task_done.assert_called_once()
+        # the cause is logged exactly once, with the original exception attached
+        mock_logger.error.assert_called_once()
+        assert str(mock_logger.error.call_args.kwargs["exc_info"]) == "prefill died"
+
+
 class TestLoop(LitLoop):
     def __call__(
         self,

@@ -72,7 +72,6 @@ class ContinuousBatchingLoop(LitLoop):
         super().__init__()
         self.active_sequences: dict[str, dict] = {}  # uid -> {input, current_length, generated_sequence}
         self.max_sequence_length = max_sequence_length
-        self.response_queue_ids: dict[str, int] = {}  # uid -> response_queue_id
         self.no_pending_requests = no_pending_requests
         self.sleep_delay = sleep_delay
 
