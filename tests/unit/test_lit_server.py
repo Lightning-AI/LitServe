@@ -1168,3 +1168,10 @@ def test_health_check_no_stale_cache(lifespan_mock, simple_litapi):
         server.workers_setup_status = {"worker-0": WorkerSetupStatus.READY}
         response = client.get("/health")
         assert response.status_code == 200, "Should recover when workers become ready again"
+
+
+def test_internal_paths_include_shutdown_path_only_when_enabled(monkeypatch):
+    monkeypatch.setenv("LIT_SHUTDOWN_API_KEY", "secret")
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), enable_shutdown_api=True, shutdown_path="/stop")
+    assert "/stop" in server._internal_paths
+    assert "/shutdown" not in ls.LitServer(ls.test_examples.SimpleLitAPI())._internal_paths

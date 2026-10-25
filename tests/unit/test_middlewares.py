@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
+import multiprocessing as mp
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,7 +22,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp
 
 import litserve as ls
-from litserve.middlewares import RequestCountMiddleware
+from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.utils import wrap_litserve_start
 
 
@@ -80,6 +81,46 @@ def test_middlewares_inputs():
         ls.LitServer(ls.test_examples.SimpleLitAPI(), middlewares=(RequestIdMiddleware, {"length": 5}))
 
 
+@pytest.mark.parametrize(
+    ("max_payload_size", "expected"),
+    [
+        (1000, 1000),
+        (1048576.0, 1048576),
+        ("500KB", 500 * 1024),
+        ("2MB", 2 * 1024**2),
+        ("1GB", 1024**3),
+        ("1.5mb", int(1.5 * 1024**2)),
+        (" 2 MB ", 2 * 1024**2),
+        ("10B", 10),
+    ],
+)
+def test_max_payload_size_parsed_at_init(max_payload_size, expected):
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size=max_payload_size)
+    assert server.max_payload_size == expected
+    assert (MaxSizeMiddleware, {"max_size": expected}) in server.middlewares
+
+
+def test_max_payload_size_none_adds_no_middleware():
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size=None)
+    assert server.max_payload_size is None
+    assert all(middleware is not MaxSizeMiddleware for middleware, _ in server.middlewares)
+
+
+@pytest.mark.parametrize(
+    "max_payload_size", ["abc", "MB", "2XB", "", "-1MB", -1, 0, "0MB", True, [1], float("inf"), float("nan")]
+)
+def test_max_payload_size_invalid(max_payload_size):
+    with pytest.raises(ValueError, match="max_payload_size"):
+        ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size=max_payload_size)
+
+
+def test_max_payload_size_string_enforced_on_requests():
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI(), max_payload_size="1KB")
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        assert client.post("/predict", json={"input": 4.0}).status_code == 200
+        assert client.post("/predict", json={"input": "x" * 2048}).status_code == 413
+
+
 def test_middleware_multiple_initialization():
     api1 = ls.test_examples.SimpleLitAPI(api_path="/api1")
     api2 = ls.test_examples.SimpleLitAPI(api_path="/api2")
@@ -133,3 +174,64 @@ def test_active_requests_reset_after_error():
 
         assert in_flight == [1], "request should be counted while it is in flight"
         assert server.active_requests == 0, "failed request should not stay in the active request count"
+
+
+@pytest.mark.parametrize(
+    ("server_kwargs", "internal_paths"),
+    [
+        ({}, ["/", "/health", "/info"]),
+        ({"healthcheck_path": "/healthz", "info_path": "/details"}, ["/", "/healthz", "/details"]),
+    ],
+)
+def test_internal_paths_not_counted_in_active_requests(server_kwargs, internal_paths):
+    """Internal endpoints, on default or custom paths, should not count as active requests."""
+    in_flight = {}
+
+    class RecordingMiddleware(BaseHTTPMiddleware):
+        """Runs inside RequestCountMiddleware, so it sees the count while the request is in flight."""
+
+        async def dispatch(self, request, call_next):
+            in_flight[request.url.path] = server.active_requests
+            return await call_next(request)
+
+    server = ls.LitServer(
+        ls.test_examples.SimpleLitAPI(), track_requests=True, middlewares=[RecordingMiddleware], **server_kwargs
+    )
+    with wrap_litserve_start(server) as server, TestClient(server.app) as client:
+        for path in internal_paths:
+            client.get(path)  # status is irrelevant here, e.g. health is 503 without ready workers
+        assert client.post("/predict", json={"input": 4.0}).status_code == 200
+
+        assert in_flight == {**dict.fromkeys(internal_paths, 0), "/predict": 1}
+        assert server.active_requests == 0
+
+
+@pytest.mark.asyncio
+async def test_request_count_middleware_excluded_paths():
+    """Default excluded paths are skipped, also when uvicorn prefixes scope["path"] with root_path."""
+    counter = mp.Value("i", 0, lock=True)
+    in_flight = {}
+
+    async def app(scope, receive, send):
+        in_flight[scope["path"]] = counter.value
+
+    middleware = RequestCountMiddleware(app, active_counter=counter)
+
+    async def call(path, root_path="/api"):
+        await middleware({"type": "http", "path": path, "root_path": root_path}, None, None)
+
+    await call("/health", root_path="")
+    await call("/predict", root_path="")
+    await call("/api/health")
+    await call("/api")
+    await call("/api/predict")
+    await call("/apiary/health")
+    assert in_flight == {
+        "/health": 0,
+        "/predict": 1,
+        "/api/health": 0,
+        "/api": 0,
+        "/api/predict": 1,
+        "/apiary/health": 1,
+    }
+    assert counter.value == 0

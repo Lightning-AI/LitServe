@@ -19,6 +19,7 @@ from litserve.utils import (
     dump_exception,
     generate_random_zmq_address,
     is_package_installed,
+    parse_size,
     set_trace_if_debug,
 )
 
@@ -198,3 +199,10 @@ def test_add_ssl_context_from_env_with_one_env_var_missing():
     with mock.patch.dict(os.environ, {"LIGHTNING_CERT_PEM": b64_cert}, clear=True):
         ssl_context = add_ssl_context_from_env({})
         assert ssl_context == {}
+
+
+def test_parse_size():
+    assert parse_size("1.5MB") == 1572864
+    assert parse_size(10**400) == 10**400
+    with pytest.raises(ValueError, match="^size must be a positive number"):
+        parse_size("0.0001KB")

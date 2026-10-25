@@ -60,6 +60,7 @@ from litserve.utils import (
     call_after_stream,
     configure_logging,
     is_package_installed,
+    parse_size,
 )
 
 _MCP_AVAILABLE = is_package_installed("mcp")
@@ -525,10 +526,11 @@ class LitServer:
 
     Content & Middleware:
         max_payload_size:
-            Maximum request size. Defaults to "100MB".
+            Maximum request size. Defaults to None (no limit).
 
-            - String format: "10MB", "1GB"
+            - String format: "500KB", "10MB", "1GB" (binary units, 1KB = 1024 bytes)
             - Integer format: bytes (1048576 for 1MB)
+            - Invalid or non-positive values raise a ValueError
             - Increase for large images/videos
 
         middlewares:
@@ -694,7 +696,7 @@ class LitServer:
         enable_shutdown_api: bool = False,
         model_metadata: Optional[dict] = None,
         spec: Optional[LitSpec] = None,
-        max_payload_size=None,
+        max_payload_size: Optional[Union[int, float, str]] = None,
         track_requests: bool = False,
         callbacks: Optional[Union[list[Callback], Callback]] = None,
         middlewares: Optional[list[Union[Callable, tuple[Callable, dict]]]] = None,
@@ -817,6 +819,7 @@ class LitServer:
         if not self.litapi_connector.any_stream():
             middlewares.append((GZipMiddleware, {"minimum_size": 1000}))
         if max_payload_size is not None:
+            max_payload_size = parse_size(max_payload_size, name="max_payload_size")
             middlewares.append((MaxSizeMiddleware, {"max_size": max_payload_size}))
         self.active_counters: list[mp.Value] = []
         self.middlewares = middlewares
@@ -1000,6 +1003,14 @@ class LitServer:
                 else:
                     yield data
             data_available.clear()
+
+    @property
+    def _internal_paths(self) -> list[str]:
+        """Paths of LitServe's own endpoints (not user inference requests)."""
+        paths = ["/", "/metrics", self.healthcheck_path, self.info_path]
+        if self.enable_shutdown_api:
+            paths.append(self._shutdown_path)
+        return paths
 
     @property
     def active_requests(self):
@@ -1530,7 +1541,9 @@ class LitServer:
             # Add middleware to count active requests
             active_counter = mp.Value("i", 0, lock=True)
             self.active_counters.append(active_counter)
-            app.add_middleware(RequestCountMiddleware, active_counter=active_counter)
+            app.add_middleware(
+                RequestCountMiddleware, active_counter=active_counter, excluded_paths=self._internal_paths
+            )
 
     def _start_server(self, port, num_uvicorn_servers, log_level, sockets, uvicorn_worker_type, **kwargs):
         workers = []
