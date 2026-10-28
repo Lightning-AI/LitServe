@@ -13,6 +13,9 @@ on: # Trigger the workflow on push or pull request, but only for the main branch
 
 # based on https://github.com/pypa/gh-action-pypi-publish
 
+permissions:
+  contents: read
+
 jobs:
   build-package:
     runs-on: ubuntu-latest
@@ -21,11 +24,13 @@ jobs:
       UV_EXCLUDE_NEWER: "2 days"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install uv and setup python
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.12"
-          enable-cache: true
+          enable-cache: false # don't restore a cache other workflows can write into the release build
 
       - name: Build 📦 package
         run: uv build
@@ -41,6 +46,8 @@ jobs:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write # upload assets to the release
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -58,8 +65,9 @@ jobs:
     if: startsWith(github.event.ref, 'refs/tags') || github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    environment: pypi
     permissions:
-      id-token: write
+      id-token: write # PyPI trusted publishing
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

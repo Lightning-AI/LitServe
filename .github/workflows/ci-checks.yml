@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref }}
   cancel-in-progress: ${{ ! (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) }}
 
+permissions:
+  contents: read
+
 jobs:
   #  check-typing:
   #    uses: Lightning-AI/utilities/.github/workflows/check-typing.yml@main
