@@ -10,6 +10,9 @@ updates:
     # Check for updates once a week
     schedule:
       interval: "monthly"
+    # Wait for new releases to age before proposing them
+    cooldown:
+      default-days: 7
     # Labels on pull requests for version updates only
     labels:
       - "dependencies"
@@ -26,6 +29,9 @@ updates:
     # Check for updates once a week
     schedule:
       interval: "weekly"
+    # Wait for new releases to age before proposing them
+    cooldown:
+      default-days: 7
     # Labels on pull requests for version updates only
     labels:
       - "CI / actions"

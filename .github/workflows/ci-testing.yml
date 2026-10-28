@@ -12,6 +12,9 @@ on:
   schedule:
     - cron: "0 0 * * *" # every day at midnight UTC
 
+permissions:
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -37,6 +40,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install uv and setup python
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
