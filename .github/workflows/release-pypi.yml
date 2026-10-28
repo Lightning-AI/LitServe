@@ -55,10 +55,11 @@ jobs:
           path: dist
       - run: ls -lh dist/
       - name: Upload to release
-        uses: AButler/upload-release-assets@34491005a5d7ec239a784e460807ce844fde7962 # v4.0.0
-        with:
-          files: "dist/*"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        # --clobber replaces same-named assets, so re-running a release works
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
 
   publish-pypi:
     needs: build-package
