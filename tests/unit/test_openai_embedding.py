@@ -54,6 +54,24 @@ async def test_openai_embedding_spec_with_single_input(openai_embedding_request_
 
 
 @pytest.mark.asyncio
+async def test_openai_embedding_spec_handles_options_preflight(openai_embedding_request_data):
+    # The OPTIONS handler must be registered under OPTIONS (CORS preflight),
+    # not GET, mirroring the chat spec's options_chat_completions wiring.
+    spec = OpenAIEmbeddingSpec()
+    server = ls.LitServer(TestEmbedAPI(spec=spec))
+
+    with wrap_litserve_start(server) as server:
+        async with (
+            LifespanManager(server.app) as manager,
+            AsyncClient(transport=ASGITransport(app=manager.app), base_url="http://test") as ac,
+        ):
+            resp = await ac.options("/v1/embeddings", timeout=10)
+            assert resp.status_code == 200, "OPTIONS preflight should be handled"
+            resp = await ac.get("/v1/embeddings", timeout=10)
+            assert resp.status_code == 405, "GET has no handler and should be rejected"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("api_path", ["/v1/embeddings", "/v2/embeddings"])
 async def test_openai_embedding_spec_with_custom_api_path(openai_embedding_request_data, api_path):
     server = ls.LitServer(

@@ -146,7 +146,7 @@ class OpenAIEmbeddingSpec(LitSpec):
 
         # register the endpoint
         self.add_endpoint(self.api_path, self.embeddings_endpoint, ["POST"])
-        self.add_endpoint(self.api_path, self.options_embeddings, ["GET"])
+        self.add_endpoint(self.api_path, self.options_embeddings, ["OPTIONS"])
 
         # validate LitAPI methods
         if inspect.isgeneratorfunction(lit_api.predict):
