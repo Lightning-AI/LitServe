@@ -20,6 +20,7 @@ import logging
 import multiprocessing as mp
 import os
 import pickle
+import signal
 import socket
 import sys
 import threading
@@ -1512,6 +1513,19 @@ class LitServer:
 
         shutdown_reason = "normal"
         uvicorn_workers = {}
+
+        def _sigterm_handler(signum, frame):
+            logger.info("SIGTERM received. Initiating graceful shutdown.")
+            self._shutdown_event.set()
+
+        prev_sigterm_handler = None
+        try:
+            if threading.current_thread() is threading.main_thread():
+                prev_sigterm_handler = signal.signal(signal.SIGTERM, _sigterm_handler)
+        except (ValueError, AttributeError):
+            # signal.signal can fail if not in the main thread/interpreter or unsupported on platform
+            prev_sigterm_handler = None
+
         try:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
@@ -1531,6 +1545,9 @@ class LitServer:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
             shutdown_reason = "keyboard_interrupt"
         finally:
+            if prev_sigterm_handler is not None:
+                with contextlib.suppress(ValueError, AttributeError):
+                    signal.signal(signal.SIGTERM, prev_sigterm_handler)
             self._perform_graceful_shutdown(manager, uvicorn_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
