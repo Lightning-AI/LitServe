@@ -1175,3 +1175,45 @@ def test_internal_paths_include_shutdown_path_only_when_enabled(monkeypatch):
     server = ls.LitServer(ls.test_examples.SimpleLitAPI(), enable_shutdown_api=True, shutdown_path="/stop")
     assert "/stop" in server._internal_paths
     assert "/shutdown" not in ls.LitServer(ls.test_examples.SimpleLitAPI())._internal_paths
+
+
+def test_run_registers_and_restores_sigterm_handler(monkeypatch):
+    import signal
+    server = ls.LitServer(ls.test_examples.SimpleLitAPI())
+    server.launch_inference_worker = MagicMock(return_value=[])
+    server.verify_worker_status = MagicMock()
+    server._start_server = MagicMock(return_value={})
+    server._perform_graceful_shutdown = MagicMock()
+    server._start_worker_monitoring = MagicMock()
+    server._transport = MagicMock()
+
+    registered_handler = None
+    original_handler = signal.getsignal(signal.SIGTERM)
+
+    def fake_wait():
+        nonlocal registered_handler
+        registered_handler = signal.getsignal(signal.SIGTERM)
+        assert callable(registered_handler)
+        # Invoke the handler to verify it triggers shutdown_event
+        registered_handler(signal.SIGTERM, None)
+        assert server._shutdown_event.is_set()
+
+    with patch("litserve.server.mp.Manager") as mock_manager:
+        mock_event = MagicMock()
+        is_set_flag = False
+
+        def set_event():
+            nonlocal is_set_flag
+            is_set_flag = True
+
+        mock_event.set = MagicMock(side_effect=set_event)
+        mock_event.is_set = MagicMock(side_effect=lambda: is_set_flag)
+        mock_event.wait = MagicMock(side_effect=fake_wait)
+        mock_mgr_instance = MagicMock()
+        mock_mgr_instance.Event = MagicMock(return_value=mock_event)
+        mock_manager.return_value = mock_mgr_instance
+
+        server.run(generate_client_file=False)
+
+    assert signal.getsignal(signal.SIGTERM) == original_handler
+    server._perform_graceful_shutdown.assert_called_once()
