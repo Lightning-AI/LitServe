@@ -281,7 +281,7 @@ class BaseRequestHandler(ABC):
     async def _prepare_request(self, request, request_type) -> dict:
         """Common request preparation logic."""
         if request_type == Request:
-            content_type = request.headers.get("Content-Type", "")
+            content_type = request.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
             if content_type == "application/x-www-form-urlencoded" or content_type.startswith("multipart/form-data"):
                 return await request.form()
             return await request.json()

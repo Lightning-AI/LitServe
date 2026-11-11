@@ -81,6 +81,37 @@ async def test_request_handler(mock_lit_api):
     assert response_queue_id == 0
 
 
+@pytest.mark.parametrize(
+    "content_type",
+    ["application/json", "application/json; charset=UTF-8", "application/problem+json", ""],
+)
+@pytest.mark.asyncio
+async def test_prepare_json_request(mock_lit_api, content_type):
+    async def receive():
+        return {"type": "http.request", "body": b'{"input": "hello"}', "more_body": False}
+
+    request = Request({"type": "http", "headers": [(b"content-type", content_type.encode())]}, receive)
+    handler = RegularRequestHandler(mock_lit_api, None)
+    assert await handler._prepare_request(request, Request) == {"input": "hello"}
+
+
+@pytest.mark.parametrize("media_type", ["multipart/form-data", "Multipart/Form-Data"])
+@pytest.mark.asyncio
+async def test_prepare_multipart_request_preserves_boundary(mock_lit_api, media_type):
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": b'--AaB03x\r\nContent-Disposition: form-data; name="input"\r\n\r\nhello\r\n--AaB03x--\r\n',
+            "more_body": False,
+        }
+
+    request = Request(
+        {"type": "http", "headers": [(b"content-type", f"{media_type}; boundary=AaB03x".encode())]}, receive
+    )
+    handler = RegularRequestHandler(mock_lit_api, None)
+    assert dict(await handler._prepare_request(request, Request)) == {"input": "hello"}
+
+
 @pytest.mark.asyncio
 @patch("litserve.server.asyncio.Event")
 async def test_request_handler_streaming(mock_event, mock_lit_api):
