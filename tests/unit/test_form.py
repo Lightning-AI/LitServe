@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
 
@@ -85,9 +86,20 @@ class SimpleFormLitAPI(LitAPI):
         return {"output": output}
 
 
-def test_urlencoded_form_data():
-    server = LitServer(SimpleFormLitAPI(), accelerator="cpu", devices=1, workers_per_device=1)
+@pytest.mark.parametrize("fast_queue", [True, False])
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        "application/x-www-form-urlencoded",
+        "application/x-www-form-urlencoded; charset=UTF-8",
+        "Application/X-Www-Form-Urlencoded; charset=UTF-8",
+        "application/x-www-form-urlencoded ; charset=utf-8",
+    ],
+)
+def test_urlencoded_form_data(content_type, fast_queue):
+    server = LitServer(SimpleFormLitAPI(), accelerator="cpu", devices=1, workers_per_device=1, fast_queue=fast_queue)
     with wrap_litserve_start(server) as server, TestClient(server.app) as client:
         file = {"input": "4.0"}
-        response = client.post("/predict", data=file)
+        response = client.post("/predict", data=file, headers={"Content-Type": content_type})
+        assert response.status_code == 200
         assert response.json() == {"output": 16.0}
