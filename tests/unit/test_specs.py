@@ -527,3 +527,24 @@ async def test_openai_spec_with_custom_api_path(api_path, openai_request_data):
 async def test_openai_spec_custom_api_path_warning():
     with pytest.warns(UserWarning, match="Custom API path detected"):
         ls.LitServer(TestAPI(spec=OpenAISpec(), api_path="/v2/chat/completions"))
+
+
+_BASE_REQUEST = {"model": "m", "messages": [{"role": "user", "content": "hi"}]}
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"tools": [{"type": "function", "function": {"name": "f", "parameters": {"type": "object"}}}]},
+        {"tools": [{"type": "function", "function": {"name": "f", "description": "d"}}]},
+        {"tools": [{"type": "function", "function": {"name": "f"}}]},
+        {"tools": [{"type": "function", "function": {"name": "f", "strict": True}}]},
+        {"tool_choice": "required"},
+        {"tool_choice": {"type": "function", "function": {"name": "f"}}},
+    ],
+)
+def test_chat_completion_request_accepts_valid_openai_tool_fields(extra):
+    # Per the OpenAI API only function ``name`` is required; ``tool_choice`` may be
+    # "required" or a named function.
+    request = ChatCompletionRequest(**_BASE_REQUEST, **extra)
+    assert request.messages[0].content == "hi"
