@@ -93,14 +93,25 @@ class AudioContent(BaseModel):
 
 class Function(BaseModel):
     name: str
-    description: str
-    parameters: dict[str, object]
+    description: Optional[str] = None
+    parameters: Optional[dict[str, object]] = None
+    strict: Optional[bool] = None
 
 
 class ToolChoice(str, Enum):
     auto: str = "auto"
     none: str = "none"
     any: str = "any"
+    required: str = "required"
+
+
+class ToolChoiceFunction(BaseModel):
+    name: str
+
+
+class NamedToolChoice(BaseModel):
+    type: Literal["function"]
+    function: ToolChoiceFunction
 
 
 class Tool(BaseModel):
@@ -178,7 +189,7 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = 0.0
     user: Optional[str] = None
     tools: Optional[list[Tool]] = None
-    tool_choice: Optional[ToolChoice] = ToolChoice.auto
+    tool_choice: Optional[Union[ToolChoice, NamedToolChoice]] = ToolChoice.auto
     response_format: Optional[ResponseFormat] = None
     reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
     metadata: Optional[dict[str, str]] = None
