@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import base64
+import contextlib
 import json
 import os
 import subprocess
@@ -88,6 +89,38 @@ def test_e2e_default_api():
     resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test is only for Unix")
+def test_e2e_sigterm_shutdown():
+    process = subprocess.Popen(
+        [sys.executable, "tests/e2e/default_api.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
+    )
+    children = []
+    try:
+        for line in process.stdout:
+            print(line, end="")
+            if "Application startup complete." in line:
+                break
+        resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0})
+        assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
+        children = psutil.Process(process.pid).children(recursive=True)
+
+        process.terminate()
+
+        assert process.wait(timeout=30) == 0, f"Expected exit code 0 after SIGTERM but got {process.returncode}"
+        _, alive = psutil.wait_procs(children, timeout=10)
+        assert not alive, f"Server processes still running after SIGTERM: {alive}"
+    finally:
+        for child in children:
+            with contextlib.suppress(psutil.NoSuchProcess):
+                child.kill()
+        process.kill()
 
 
 @e2e_from_file("tests/e2e/default_spec.py")
