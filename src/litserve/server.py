@@ -46,6 +46,7 @@ from litserve.callbacks.base import Callback, CallbackRunner, EventTypes
 from litserve.connector import _Connector
 from litserve.loggers import Logger, _LoggerConnector
 from litserve.loops import LitLoop, inference_worker
+from litserve.mcp import _is_mcp_installed
 from litserve.middlewares import MaxSizeMiddleware, RequestCountMiddleware
 from litserve.python_client import client_template
 from litserve.specs.base import LitSpec
@@ -59,11 +60,12 @@ from litserve.utils import (
     add_ssl_context_from_env,
     call_after_stream,
     configure_logging,
-    is_package_installed,
     parse_size,
 )
 
-_MCP_AVAILABLE = is_package_installed("mcp")
+# Same check as `litserve.mcp`, which only imports the MCP SDK when it is available. Checking for the `mcp`
+# package here instead started the MCP server without it when `mcp` but not `fastmcp` was installed.
+_MCP_AVAILABLE = _is_mcp_installed
 
 if TYPE_CHECKING:
     from litserve.mcp import ToolEndpointType
