@@ -20,6 +20,7 @@ import logging
 import multiprocessing as mp
 import os
 import pickle
+import signal
 import socket
 import sys
 import threading
@@ -1512,6 +1513,7 @@ class LitServer:
 
         shutdown_reason = "normal"
         uvicorn_workers = {}
+        previous_sigterm_handler = None
         try:
             uvicorn_workers = self._start_server(
                 port, num_api_servers, log_level, sockets, api_server_worker_type, **kwargs
@@ -1525,12 +1527,20 @@ class LitServer:
             if self._monitor_workers:
                 self._start_worker_monitoring(manager, uvicorn_workers)
 
+            if api_server_worker_type == "process" and threading.current_thread() is threading.main_thread():
+                # Handle SIGTERM (docker stop, Kubernetes) like Ctrl+C. Setting _shutdown_event from the handler
+                # would deadlock: it runs on this thread, inside wait() on the same manager connection.
+                # Thread mode is left alone, its shutdown doesn't stop the uvicorn threads yet (#684).
+                previous_sigterm_handler = signal.signal(signal.SIGTERM, signal.default_int_handler)
+
             self._shutdown_event.wait()
 
         except KeyboardInterrupt:
             logger.info("KeyboardInterrupt received. Initiating graceful shutdown.")
             shutdown_reason = "keyboard_interrupt"
         finally:
+            if previous_sigterm_handler is not None:
+                signal.signal(signal.SIGTERM, previous_sigterm_handler)
             self._perform_graceful_shutdown(manager, uvicorn_workers, shutdown_reason)
 
     def _prepare_app_run(self, app: FastAPI):
