@@ -117,12 +117,9 @@ def wrap_litserve_start(server: "LitServer", worker_monitor: bool = False):
     if worker_monitor:
         server._start_worker_monitoring(server.manager, {})
 
-    if is_package_installed("mcp"):
-        from litserve.mcp import _LitMCPServerConnector
+    from litserve.mcp import _is_mcp_installed, _LitMCPServerConnector
 
-        server.mcp_server = _LitMCPServerConnector()
-    else:
-        server.mcp_server = None
+    server.mcp_server = _LitMCPServerConnector() if _is_mcp_installed else None
 
     try:
         yield server

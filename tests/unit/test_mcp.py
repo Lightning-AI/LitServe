@@ -27,6 +27,16 @@ def test_mcp_not_installed(mock_is_package_installed):
         MCP()
 
 
+def test_server_mcp_check_matches_litserve_mcp():
+    # The server used to check for the `mcp` package while `litserve.mcp` only imports the MCP SDK when `fastmcp` is
+    # installed, so with `mcp` but not `fastmcp` installed every server failed to start with
+    # "NameError: name 'MCPServer' is not defined"
+    import litserve.mcp
+    import litserve.server
+
+    assert litserve.server._MCP_AVAILABLE is litserve.mcp._is_mcp_installed
+
+
 def test_python_type_to_json_schema():
     assert _python_type_to_json_schema(inspect.Parameter.empty) == "string"
     assert _python_type_to_json_schema(int) == "integer"
