@@ -17,6 +17,7 @@ import selectors
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import pytest
 from tqdm import tqdm
@@ -103,7 +104,7 @@ def run_script_with_timeout(file, timeout, extra_time, killall):
 def test_readme(tmp_path, killall):
     d = tmp_path / "readme_codes"
     d.mkdir(exist_ok=True)
-    code_blocks = get_code_blocks("README.md")
+    code_blocks = get_code_blocks(Path(__file__).parents[2] / "README.md")
     assert len(code_blocks) > 0, "No code block found in README.md"
 
     for i, code in enumerate(tqdm(code_blocks)):

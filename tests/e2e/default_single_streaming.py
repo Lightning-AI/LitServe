@@ -1,3 +1,5 @@
+import os
+
 from litserve import LitAPI, LitServer
 
 
@@ -20,4 +22,4 @@ class SimpleStreamingAPI(LitAPI):
 if __name__ == "__main__":
     api = SimpleStreamingAPI(stream=True)
     server = LitServer(api)
-    server.run(port=8000)
+    server.run(port=int(os.environ.get("LITSERVE_E2E_PORT", 8000)))

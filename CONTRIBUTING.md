@@ -53,15 +53,15 @@ pre-commit run --all-files       # run manually
 ## Running tests
 
 ```bash
-# full suite, as CI runs it
-pytest --cov=litserve tests/ -v -s --durations=100
+# full suite, in parallel, as CI runs it
+pytest --cov=litserve tests/ -n auto -v --durations=100
 
 # a single file or test
 pytest tests/unit/test_batch.py -v
 pytest tests/unit/test_batch.py::test_max_batch_size -v
 ```
 
-Tests live in `tests/unit/`, `tests/integration/`, and `tests/e2e/`. The matching `unit` / `integration` / `e2e` marker is applied automatically based on that directory (see [tests/conftest.py](tests/conftest.py)), so put a new test in the right folder and you're done — no manual marker needed. To run one tier:
+Tests live in `tests/unit/`, `tests/integration/`, and `tests/e2e/`. The matching `unit` / `integration` / `e2e` marker is applied automatically based on that directory (see [tests/conftest.py](tests/conftest.py)), so put a new test in the right folder and you're done — no manual marker needed. Tests run in parallel, each in its own temporary working directory, so use the `port` fixture rather than a hardcoded port, and build paths to repo files from `__file__`. To run one tier:
 
 ```bash
 pytest -m unit tests/          # fast, no server startup
