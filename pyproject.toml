@@ -62,6 +62,7 @@ dev = [
   "pytest-asyncio>=1.0.0",
   "pytest-cov>=6.2.1",
   "pytest-retry>=1.6.3",
+  "pytest-xdist>=3.6",
   "python-multipart>=0.0.20",
   "requests>=2.32.4",
   "rich",

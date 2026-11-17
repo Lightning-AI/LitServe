@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
 import litserve as ls
 
 
@@ -33,4 +35,4 @@ class AsyncAPI(ls.LitAPI):
 if __name__ == "__main__":
     api = AsyncAPI(enable_async=True, stream=True)
     server = ls.LitServer(api)
-    server.run(port=8000)
+    server.run(port=int(os.environ.get("LITSERVE_E2E_PORT", 8000)))

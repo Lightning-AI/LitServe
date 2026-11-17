@@ -1,3 +1,5 @@
+import os
+
 import litserve as ls
 from litserve import OpenAISpec
 from litserve.test_examples.openai_spec_example import TestAPI
@@ -5,4 +7,4 @@ from litserve.test_examples.openai_spec_example import TestAPI
 if __name__ == "__main__":
     api = TestAPI(spec=OpenAISpec())
     server = ls.LitServer(api)
-    server.run()
+    server.run(port=int(os.environ.get("LITSERVE_E2E_PORT", 8000)))

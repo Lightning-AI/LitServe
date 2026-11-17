@@ -11,13 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import base64
+import inspect
 import json
 import os
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
+from pathlib import Path
 
 import psutil
 import pytest
@@ -26,18 +29,31 @@ from openai import OpenAI
 
 from litserve.utils import is_package_installed
 
+REPO_ROOT = Path(__file__).parents[2]
+
 
 def e2e_from_file(filename):
+    """Run the test against ``filename`` started as a real server in a subprocess.
+
+    Every server gets its own port and working directory, so the tests can run in parallel. The test function may ask
+    for ``port`` and ``tmp_path`` (the server's working directory) like any other fixture.
+
+    """
+
     def decorator(test_fn):
+        test_params = inspect.signature(test_fn).parameters
+
         @wraps(test_fn)
-        def wrapper(*args, **kwargs):
+        def wrapper(*, port, tmp_path, **kwargs):
             process = subprocess.Popen(
-                [sys.executable, filename],
+                [sys.executable, str(REPO_ROOT / filename)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # Merge stdout and stderr
                 stdin=subprocess.DEVNULL,
                 text=True,  # so we get strings instead of bytes
                 bufsize=1,  # line-buffered
+                cwd=tmp_path,
+                env={**os.environ, "LITSERVE_E2E_PORT": str(port)},
             )
 
             try:
@@ -47,52 +63,56 @@ def e2e_from_file(filename):
                     if "Application startup complete." in line:
                         break
 
-                # Give your test function a chance to run
-                test_fn(*args, **kwargs)
-            except Exception:
-                raise
+                kwargs.update({k: v for k, v in {"port": port, "tmp_path": tmp_path}.items() if k in test_params})
+                result = test_fn(**kwargs)
+                if inspect.iscoroutine(result):
+                    asyncio.run(result)
             finally:
                 parent = psutil.Process(process.pid)
                 for child in parent.children(recursive=True):
                     child.kill()
                 process.kill()
 
+        # the wrapper needs these fixtures even when the test itself doesn't ask for them
+        names = dict.fromkeys([*test_params, "port", "tmp_path"])
+        wrapper.__signature__ = inspect.Signature([inspect.Parameter(n, inspect.Parameter.KEYWORD_ONLY) for n in names])
         return wrapper
 
     return decorator
 
 
+def _run_client(tmp_path):
+    return subprocess.run([sys.executable, "client.py"], cwd=tmp_path, capture_output=True, text=True).stdout
+
+
+# these two servers ignore LITSERVE_E2E_PORT: they cover the default port and an explicit `port=` argument
 @e2e_from_file("tests/simple_server.py")
-def test_run():
-    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
-    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+def test_run(tmp_path):
+    assert (tmp_path / "client.py").exists(), f"Expected client file to be created at {tmp_path} after starting server"
+    output = _run_client(tmp_path)
     assert '{"output":16.0}' in output, f"tests/simple_server.py didn't return expected output, got {output}"
-    os.remove("client.py")
 
 
 @e2e_from_file("tests/simple_server_diff_port.py")
-def test_run_with_port():
-    assert os.path.exists("client.py"), f"Expected client file to be created at {os.getcwd()} after starting the server"
-    with open(os.path.join(os.getcwd(), "client.py")) as f:
-        client_code = f.read()
-        assert ":8080" in client_code, "Could not find 8080 in client.py"
-    output = subprocess.run("python client.py", shell=True, capture_output=True, text=True).stdout
+def test_run_with_port(tmp_path):
+    assert (tmp_path / "client.py").exists(), f"Expected client file to be created at {tmp_path} after starting server"
+    assert ":8080" in (tmp_path / "client.py").read_text(), "Could not find 8080 in client.py"
+    output = _run_client(tmp_path)
     assert '{"output":16.0}' in output, (
         f"tests/simple_server_server_diff_port.py didn't return expected output, got {output}"
     )
-    os.remove("client.py")
 
 
 @e2e_from_file("tests/e2e/default_api.py")
-def test_e2e_default_api():
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
+def test_e2e_default_api(port):
+    resp = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
 
 
 @e2e_from_file("tests/e2e/default_spec.py")
-def test_e2e_default_spec(openai_request_data):
-    resp = requests.post("http://127.0.0.1:8000/v1/chat/completions", json=openai_request_data)
+def test_e2e_default_spec(port, openai_request_data):
+    resp = requests.post(f"http://127.0.0.1:{port}/v1/chat/completions", json=openai_request_data)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     output = resp.json()["choices"][0]["message"]["content"]
     expected = "This is a generated output"
@@ -100,15 +120,15 @@ def test_e2e_default_spec(openai_request_data):
 
 
 @e2e_from_file("tests/e2e/default_batching.py")
-def test_e2e_default_batching():
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None)
+def test_e2e_default_batching(port):
+    resp = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0}, headers=None)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
     assert resp.json() == {"output": 16.0}, "tests/simple_server.py didn't return expected output"
 
 
 @e2e_from_file("tests/e2e/default_batched_streaming.py")
-def test_e2e_batched_streaming():
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+def test_e2e_batched_streaming(port):
+    resp = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0}, headers=None, stream=True)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
 
     outputs = []
@@ -121,9 +141,9 @@ def test_e2e_batched_streaming():
 
 
 @e2e_from_file("tests/e2e/default_openaispec.py")
-def test_openai_parity():
+def test_openai_parity(port):
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",  # required, but unused
     )
     response = client.chat.completions.create(
@@ -154,9 +174,9 @@ def test_openai_parity():
 
 
 @e2e_from_file("tests/e2e/default_openaispec.py")
-def test_openai_parity_with_image_input():
+def test_openai_parity_with_image_input(port):
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",  # required, but unused
     )
     messages = [
@@ -197,9 +217,9 @@ def test_openai_parity_with_image_input():
 
 
 @e2e_from_file("tests/e2e/default_openaispec.py")
-def test_openai_parity_with_audio_input(openai_request_data_with_audio_wav):
+def test_openai_parity_with_audio_input(port, openai_request_data_with_audio_wav):
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",  # required, but unused
     )
     messages = openai_request_data_with_audio_wav["messages"]
@@ -225,9 +245,9 @@ def test_openai_parity_with_audio_input(openai_request_data_with_audio_wav):
 
 
 @e2e_from_file("tests/e2e/default_openaispec_tools.py")
-def test_openai_parity_with_tools():
+def test_openai_parity_with_tools(port):
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",  # required, but unused
     )
     tools = [
@@ -283,9 +303,9 @@ def test_openai_parity_with_tools():
 
 
 @e2e_from_file("tests/e2e/default_openai_with_batching.py")
-def test_e2e_openai_with_batching(openai_request_data):
+def test_e2e_openai_with_batching(port, openai_request_data):
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",  # required, but unused
     )
     response = client.chat.completions.create(
@@ -301,8 +321,8 @@ def test_e2e_openai_with_batching(openai_request_data):
 
 
 @e2e_from_file("tests/e2e/default_openaispec_response_format.py")
-def test_openai_parity_with_response_format():
-    client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="lit")
+def test_openai_parity_with_response_format(port):
+    client = OpenAI(base_url=f"http://127.0.0.1:{port}/v1", api_key="lit")
     messages = [
         {
             "role": "system",
@@ -352,8 +372,8 @@ def test_openai_parity_with_response_format():
 
 
 @e2e_from_file("tests/e2e/default_single_streaming.py")
-def test_e2e_single_streaming():
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+def test_e2e_single_streaming(port):
+    resp = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0}, headers=None, stream=True)
     assert resp.status_code == 200, f"Expected response to be 200 but got {resp.status_code}"
 
     outputs = []
@@ -370,9 +390,9 @@ def test_e2e_single_streaming():
 
 
 @e2e_from_file("tests/e2e/default_openai_embedding_spec.py")
-def test_openai_embedding_parity():
+def test_openai_embedding_parity(port):
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",
     )
 
@@ -402,8 +422,8 @@ def test_openai_embedding_parity():
 
 
 @e2e_from_file("tests/e2e/default_async_streaming.py")
-def test_e2e_default_async_streaming():
-    resp = requests.post("http://127.0.0.1:8000/predict", json={"input": 4.0}, headers=None, stream=True)
+def test_e2e_default_async_streaming(port):
+    resp = requests.post(f"http://127.0.0.1:{port}/predict", json={"input": 4.0}, headers=None, stream=True)
     outputs = []
     for line in resp.iter_lines():
         if line:
@@ -413,10 +433,10 @@ def test_e2e_default_async_streaming():
 
 
 @e2e_from_file("tests/e2e/openai_embedding_with_batching.py")
-def test_e2e_openai_embedding_with_batching():
+def test_e2e_openai_embedding_with_batching(port):
     model = "text-embedding-3-large"
     client = OpenAI(
-        base_url="http://127.0.0.1:8000/v1",
+        base_url=f"http://127.0.0.1:{port}/v1",
         api_key="lit",  # required, but unused
     )
     futures = []
@@ -437,13 +457,12 @@ def test_e2e_openai_embedding_with_batching():
 
 @pytest.mark.skipif(not is_package_installed("mcp"), reason="mcp is not installed")
 @e2e_from_file("tests/e2e/default_mcp.py")
-@pytest.mark.asyncio
-async def test_mcp_server():
+async def test_mcp_server(port):
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
     async with (
-        streamablehttp_client("http://localhost:8000/mcp/") as (
+        streamablehttp_client(f"http://localhost:{port}/mcp/") as (
             read_stream,
             write_stream,
             _,

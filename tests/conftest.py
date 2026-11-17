@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import base64
-import random
+import socket
 import time
 from collections.abc import Generator
 
@@ -397,4 +397,18 @@ def mock_manager():
 
 @pytest.fixture
 def port():
-    return random.randint(10000, 65535)
+    """A port that is free right now, so parallel tests don't fight over one."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cwd(tmp_path, monkeypatch):
+    """Run every test in its own directory.
+
+    ``LitServer.run`` writes ``client.py`` and ``litserve dockerize`` writes a ``Dockerfile`` to the working directory;
+    without this they pile up in the repo and get shared between tests.
+
+    """
+    monkeypatch.chdir(tmp_path)

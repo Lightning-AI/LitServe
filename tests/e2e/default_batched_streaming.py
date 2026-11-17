@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
 import numpy as np
 
 import litserve as ls
@@ -35,4 +37,4 @@ class SimpleStreamAPI(ls.LitAPI):
 if __name__ == "__main__":
     api = SimpleStreamAPI(stream=True, max_batch_size=4, batch_timeout=0.2)
     server = ls.LitServer(api, fast_queue=True)
-    server.run(port=8000)
+    server.run(port=int(os.environ.get("LITSERVE_E2E_PORT", 8000)))

@@ -47,6 +47,14 @@ def test_simple(lit_server):
         assert response.json() == {"output": 16.0}
 
 
+def wait_until_healthy(client, path, timeout=30):
+    """Poll the health endpoint instead of sleeping a fixed time: workers start slowly on a busy machine."""
+    deadline = time.monotonic() + timeout
+    while (response := client.get(path)).status_code != 200 and time.monotonic() < deadline:
+        time.sleep(0.2)
+    return response
+
+
 class SlowSetupLitAPI(SimpleLitAPI):
     def setup(self, device):
         self.model = lambda x: x**2
@@ -81,8 +89,7 @@ def test_workers_health(use_zmq):
         assert response.status_code == 503
         assert response.text == "not ready"
 
-        time.sleep(3)
-        response = client.get("/health")
+        response = wait_until_healthy(client, "/health")
         assert response.status_code == 200
         assert response.text == "ok"
 
@@ -109,8 +116,7 @@ def test_workers_health_custom_path(use_zmq):
         assert response.status_code == 503
         assert response.text == "not ready"
 
-        time.sleep(3)
-        response = client.get("/my_server/health")
+        response = wait_until_healthy(client, "/my_server/health")
         assert response.status_code == 200
         assert response.text == "ok"
 
@@ -141,8 +147,7 @@ def test_workers_health_with_custom_health_method(use_zmq):
         assert response.status_code == 503
         assert response.text == "not ready"
 
-        time.sleep(4)
-        response = client.get("/health")
+        response = wait_until_healthy(client, "/health")
         assert response.status_code == 200
         assert response.text == "ok"
 
