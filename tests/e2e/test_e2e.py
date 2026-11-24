@@ -23,6 +23,7 @@ import psutil
 import pytest
 import requests
 from openai import OpenAI
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient, TypeSafeUnprocessableEntityError
 
 from litserve.utils import is_package_installed
 
@@ -453,3 +454,23 @@ async def test_mcp_server():
         await session.initialize()
         result = await session.list_tools()
         assert len(result.tools) == 1, f"Expected 1 tool. Result: {result}"
+
+
+@e2e_from_file("tests/e2e/default_system_one_spec.py")
+def test_e2e_system_one_spec():
+    client = TypeSafeClient(api_key="lit", base_url="http://127.0.0.1:8000", model="lit")
+    questions = {
+        "department": Choice(criteria={"returns": "Exchanges, refunds", "shipping": None, "billing": "Charges"}),
+        "escalate": Noul(instructions="Does this need urgent human attention?"),
+        "frustration": Score(criteria=["Calm", "Frustrated", "Very angry"]),
+    }
+    response = client.system_one(state="I was charged twice for my order.", questions=questions)
+    assert response.model == "lit", f"Expected model to be lit but got {response.model}"
+    assert response.answers["department"].choice == "billing", "Expected the choice with the highest logit"
+    assert 0 <= response.answers["escalate"].noul <= 1, "Expected noul to be a probability"
+    frustration = response.answers["frustration"]
+    assert sum(frustration.probabilities.values()) == pytest.approx(1), "Expected probabilities to sum to 1"
+    assert 0 <= frustration.score <= 2, "Expected score to be between the lowest and highest level"
+
+    with pytest.raises(TypeSafeUnprocessableEntityError):
+        client.system_one(state="text", questions={"frustration": Score(criteria=["only one level"])})
