@@ -26,13 +26,14 @@ from litserve.utils import WorkerSetupStatus
 logger = logging.getLogger(__name__)
 
 
-def get_default_loop(stream: bool, max_batch_size: int, enable_async: bool = False) -> _BaseLoop:
+def get_default_loop(stream: bool, max_batch_size: int, enable_async: bool = False, batched: bool = False) -> _BaseLoop:
     """Get the default loop based on the stream flag, batch size, and async support.
 
     Args:
         stream: Whether streaming is enabled
         max_batch_size: Maximum batch size
         enable_async: Whether async support is enabled (supports both coroutines and async generators)
+        batched: Whether the batched interface is requested even when max_batch_size is 1
 
     Returns:
         The appropriate loop implementation
@@ -41,19 +42,21 @@ def get_default_loop(stream: bool, max_batch_size: int, enable_async: bool = Fal
         ValueError: If async and batching are enabled together (not supported)
 
     """
+    batched = batched or max_batch_size > 1
+
     if enable_async:
-        if max_batch_size > 1:
+        if batched:
             raise ValueError("Async batching is not supported. Please use enable_async=False with batching.")
         if stream:
             return StreamingLoop()  # StreamingLoop now supports async
         return SingleLoop()  # Only SingleLoop supports async currently
 
     if stream:
-        if max_batch_size > 1:
+        if batched:
             return BatchedStreamingLoop()
         return StreamingLoop()
 
-    if max_batch_size > 1:
+    if batched:
         return BatchedLoop()
     return SingleLoop()
 
@@ -93,7 +96,7 @@ def inference_worker(
         logging.info(f"LitServe will use {lit_spec.__class__.__name__} spec")
 
     if loop == "auto":
-        loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async)
+        loop = get_default_loop(stream, lit_api.max_batch_size, lit_api.enable_async, lit_api.batched)
 
     loop._restart_workers = restart_workers
 
