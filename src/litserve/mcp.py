@@ -245,11 +245,23 @@ def _param_name_to_title(param_name: str) -> str:
     return " ".join(word.capitalize() for word in words)
 
 
+def _is_pydantic_model_class(annotation: Any) -> bool:
+    """Safely check if an annotation is a Pydantic BaseModel subclass without crashing on GenericAlias/Union."""
+    try:
+        return isinstance(annotation, type) and issubclass(annotation, BaseModel)
+    except TypeError:
+        return False
+
+
 async def _call_handler(handler, **kwargs):
     sig = inspect.signature(handler)
     bound = sig.bind_partial(
         **{
-            k: (v if not issubclass(p.annotation, BaseModel) else p.annotation(**v))
+            k: (
+                v
+                if (not _is_pydantic_model_class(p.annotation) or isinstance(v, BaseModel))
+                else p.annotation(**v)
+            )
             for k, v in kwargs.items()
             for name, p in sig.parameters.items()
             if k == name
@@ -438,6 +450,31 @@ class _MCPRequestHandler:
         if scope["type"] != "http":
             # We only handle HTTP requests
             return
+
+        expected_key = __import__("os").environ.get("LIT_SERVER_API_KEY")
+        if expected_key:
+            headers = {
+                k.decode("latin-1").lower(): v.decode("latin-1")
+                for k, v in scope.get("headers", [])
+            }
+            provided_key = headers.get("x-api-key", "")
+            if not provided_key or not __import__("secrets").compare_digest(
+                provided_key.encode("utf-8"), expected_key.encode("utf-8")
+            ):
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 401,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": b'{"detail":"Invalid API key for MCP endpoint."}',
+                    }
+                )
+                return
 
         try:
             # Handle the HTTP request through the session manager
