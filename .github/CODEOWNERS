@@ -3,7 +3,7 @@
 
 # These owners will be the default owners for everything in the repo. Unless a later match takes precedence,
 # @global-owner1 and @global-owner2 will be requested for review when someone opens a pull request.
-* @andyland @dmitsf @Abdul-0x4A @tchaton @justusschock @k223kim @KaelanDt @ethanwharris
+* @andyland @dmitsf @Abdul-0x4A @tchaton @justusperillieux @k223kim @KaelanDt @ethanwharris
 
 # CI/CD and configs
 /.github/       @andyland @dmitsf @Abdul-0x4A @tchaton
